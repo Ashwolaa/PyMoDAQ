@@ -24,14 +24,22 @@ config = configmod.Config()
 
 class Scan1DBase(ScannerBase):
     scan_type = 'Scan1D'
-
+    
     params = []
     n_axes = 1
     distribution = DataDistribution['uniform']
 
     def __init__(self, actuators: List = None, **_ignored):
         super().__init__(actuators=actuators)
-
+        
+    def value_changed(self, param):
+        try:
+            self.set_scan()
+            self.settings.sigTreeStateChanged.emit(self.settings,param)
+        except:
+            pass
+        return super().value_changed(param)
+    
     def get_nav_axes(self) -> List[Axis]:
         return [Axis(label=f'{self.actuators[0].title}',
                      units=f'{self.actuators[0].units}',
