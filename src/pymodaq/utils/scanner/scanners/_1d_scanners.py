@@ -70,8 +70,13 @@ class Scan1DLinear(Scan1DBase):
     n_axes = 1
     distribution = DataDistribution['uniform']
 
+<<<<<<< HEAD
     def __init__(self, actuators: List['DAQ_Move'] = None, **_ignored):
         super().__init__(actuators=actuators)
+=======
+    def __init__(self, actuators: List = None, **_ignored):
+        ScannerBase.__init__(self, actuators=actuators)        
+>>>>>>> ecefa594 (connect display and change of settings)
 
     def set_scan(self):
         self.positions = mutils.linspace_step(self.settings['start'], self.settings['stop'],
