@@ -358,6 +358,25 @@ def min_ind(x, axis=None):
     return ind_min, min_val
 
 
+
+def makeSnake(arr,dims,):
+    L_dims = len(dims)
+    [dims[0],np.prod(dims[1:L_dims]),L_dims]
+    arr = np.reshape(arr,[dims[0],np.prod(dims[1:L_dims]),L_dims])
+    for i in range(dims[L_dims-2]):
+        if i%2:
+            arr[i] = np.flipud(arr[i])            
+        arr[i] = makeSnake2D(arr[i],dims[L_dims-1],dims[L_dims])
+            
+                        
+def makeSnake2D(arr,shape,):
+    for i in range(shape[0]//2): 
+        start = (2*i+1)*shape[1] 
+        end = start+shape[1]-1
+        arr[[start,end]] = arr[[end,start]]
+    return arr
+
+
 if __name__ == '__main__':                                          # pragma: no cover
     from pymodaq.utils import daq_utils as utils
     import matplotlib.pyplot as plt
