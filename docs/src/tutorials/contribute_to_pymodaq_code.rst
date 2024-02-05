@@ -188,3 +188,13 @@ If we continue to commit some changes to the branch that we used for our PR (the
 be automatically updated, and the new commits will be considered as part of the PR.
 If we want to pursue the work but not put the following commits in the PR, we can start a new branch from the
 *monkey_branch*.
+
+
+Following the future updates
+------------
+In order to keep track of changes done by other developpers, it can be very useful to pull the local changes made on the different branches. 
+You can either update your remove repository and pull the changes on your local copy. For this, you just have to press the Sync fork button on your project folder on github.
+
+
+
+Fork the upstream repository
