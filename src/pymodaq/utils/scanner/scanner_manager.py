@@ -324,7 +324,7 @@ class ScannerManager(QObject, ParameterManager):
 
     def makeScanner(self,act):
         scanner = scanner2.ScannerContainer(self._scanners_settings_widget,actuator=act)
-        scanner.makeScanner()        
+        scanner.updateScanner()        
         scanner.scanner.settings.sigTreeStateChanged.connect(self._update_steps)      
 >>>>>>> 50c3d657 (new scanner manager)
         self.scanners.append(scanner)
