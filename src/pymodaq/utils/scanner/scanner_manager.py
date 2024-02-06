@@ -142,9 +142,7 @@ class ScannerManager(QObject, ParameterManager):
             pos = np.squeeze(scan.scanner.positions)
             positions.append(pos)        
             indexing.append(np.arange(len(pos))) 
-                        
-        L_steps = len(all_comb)
-            
+                                    
         
     def displayPositions(self,):
         positions = []

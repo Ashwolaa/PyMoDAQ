@@ -108,9 +108,9 @@ class ScannerContainer(QObject, ParameterManager):
         self.displayTable_cb.stateChanged.connect(self.showTable)       
         widget.layout().addWidget(self.displayTable_cb)
          
-        self.scanner_settings_layout.addWidget(widget)                                
 
         self.scanner_settings_layout.addWidget(self.scanner.settings_tree)
+        self.scanner_settings_layout.addWidget(widget)                                
         self.makeDisplayWidget()
         self.scanner_settings_layout.addWidget(self.displayWidget)                         
                         
