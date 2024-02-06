@@ -55,9 +55,12 @@ class ScannerContainer(QObject, ParameterManager):
             parent_widget = QtWidgets.QWidget()
         self.parent_widget = parent_widget
         self.scanner_settings_widget = None
-        self._scanner: ScannerBase = None
         self.actuator = actuator
+        self._scanner: ScannerBase = scanner_factory.get('Scan1D','Linear',actuators=[self.actuator])   
         self.setup_ui()
+        self.scanner.settings.sigTreeStateChanged.connect(self.updateDisplayWidget)
+
+
         
     def setup_ui(self):
         self.scanner_settings_widget = QtWidgets.QWidget()
@@ -82,7 +85,7 @@ class ScannerContainer(QObject, ParameterManager):
         
         self.scanType = QtWidgets.QComboBox()
         self.scanType.addItems(scanner_factory.scan_sub_types(scanner_factory.scan_types()[0]))
-        self.scanType.currentIndexChanged.connect(self.makeScanner)                        
+        self.scanType.currentIndexChanged.connect(self.updateScanner)                        
         widget.layout().addWidget(self.scanType)        
         self.randomizeScan = QtWidgets.QCheckBox('Randomize')
         widget.layout().addWidget(self.randomizeScan)        
@@ -106,6 +109,10 @@ class ScannerContainer(QObject, ParameterManager):
         widget.layout().addWidget(self.displayTable_cb)
          
         self.scanner_settings_layout.addWidget(widget)                                
+
+        self.scanner_settings_layout.addWidget(self.scanner.settings_tree)
+        self.makeDisplayWidget()
+        self.scanner_settings_layout.addWidget(self.displayWidget)                         
                         
         # self.makeScanner()
         
@@ -122,9 +129,9 @@ class ScannerContainer(QObject, ParameterManager):
             self.displayViewer.parent.hide()             
                 
     def makeViewer(self,):
-        positions = np.squeeze(self.scanner.positions)
-        displayViewer = viewer.Viewer1DBasic(QtWidgets.QWidget())                
-        displayViewer.show_data([positions])
+        self.displayViewer_widget = QtWidgets.QWidget()
+        displayViewer = viewer.Viewer1DBasic(self.displayViewer_widget)                
+        displayViewer.show_data([self.positions])
         displayViewer.update_labels(labels=[self.actuator.title])
         displayViewer.set_axis_label(axis_settings=dict(orientation='bottom', label='Steps', units=''))
         displayViewer.set_axis_label(axis_settings=dict(orientation='left', label='Positions', units=''))   
@@ -155,48 +162,55 @@ class ScannerContainer(QObject, ParameterManager):
         displayTable.setVisible(self.displayTable_cb.isChecked()) 
         return displayTable
     
-    def makeDisplayWidget(self,):    
-        if self.scanner_settings_layout.count() == 5:
-            child = self.scanner_settings_layout.takeAt(self.scanner_settings_layout.count()-1)
-            child.widget().deleteLater()                
+    def updateTable(self,):
+        self.displayTable.setRowCount(self.steps)
+        for ind,pos in enumerate(self.positions):
+                step_item = QtWidgets.QTableWidgetItem(str(ind))
+                step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
+                pos_item = QtWidgets.QTableWidgetItem(str(pos))
+                pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
+                self.displayTable.setItem(ind,0,step_item)
+                self.displayTable.setItem(ind,1,pos_item)  
+        self.displayTable.resizeColumnsToContents()          
+
+    def updateViewer(self,):
+        self.displayViewer.show_data([self.positions])
+
+
+
+    def makeDisplayWidget(self,):      
         self.displayWidget = QtWidgets.QWidget()
-        self.displayLayout = QtWidgets.QHBoxLayout()                
-        self.displayViewer = self.makeViewer()        
-        self.displayLayout.addWidget(self.displayViewer.parent)       
-        self.displayTable = self.makeTable()           
-        self.displayLayout.addWidget(self.displayTable)
+        self.displayLayout = QtWidgets.QHBoxLayout()  
         self.displayWidget.setLayout(self.displayLayout)   
-        self.displayWidget.show()
-        self.scanner_settings_layout.addWidget(self.displayWidget)                         
+        self.displayViewer = self.makeViewer()        
+        self.displayTable = self.makeTable()
+        self.displayLayout.addWidget(self.displayViewer_widget)       
+        self.displayLayout.addWidget(self.displayTable)
                 
 
     def updateDisplayWidget(self,):
-        positions = np.squeeze(self.scanner.positions)        
-        self.displayTable.setRowCount(len(positions))        
-        for ind,pos in enumerate(positions):
-            step_item = QtWidgets.QTableWidgetItem(str(ind))
-            step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
-            pos_item = QtWidgets.QTableWidgetItem(str(pos))
-            pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
-            self.displayTable.setItem(ind,0,step_item)
-            self.displayTable.setItem(ind,1,pos_item)  
-        self.displayTable.resizeColumnsToContents()                
-        self.displayViewer.show_data([positions])
-            
+        self.updateTable()
+        self.updateViewer()
+
+    @property
+    def positions(self,):
+        return np.squeeze(self.scanner.positions)
+    
+    @property
+    def steps(self,):
+        return len(self.positions)
     
     @property
     def scanner(self) -> ScannerBase:        
         return self._scanner
                 
-    def makeScanner(self,):
-        while self.scanner_settings_layout.count() != 3:
-            child = self.scanner_settings_layout.takeAt(self.scanner_settings_layout.count()-1)
+    def updateScanner(self,):
+        ind = self.scanner_settings_layout.indexOf(self.scanner.settings_tree)
+        if ind:
+            child = self.scanner_settings_layout.takeAt(ind)
             child.widget().deleteLater()
-    
-        self._scanner: ScannerBase = scanner_factory.get('Scan1D',self.scanType.currentText(),actuators=[self.actuator])   
-        self.scanner_settings_layout.addWidget(self.scanner.settings_tree)
+        self._scanner: ScannerBase = scanner_factory.get('Scan1D',self.scanType.currentText(),actuators=[self.actuator])  
         self.scanner.settings.sigTreeStateChanged.connect(self.updateDisplayWidget)
-        self.makeDisplayWidget()
-        self.scanner_settings_layout.addWidget(self.displayWidget)                         
-        QtWidgets.QApplication.processEvents()
-        
+        self.updateDisplayWidget()
+        self.scanner_settings_layout.insertWidget(ind,self.scanner.settings_tree)
+        QtWidgets.QApplication.processEvents()        
