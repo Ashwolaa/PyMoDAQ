@@ -6,7 +6,7 @@ import numpy as np
 
 from qtpy import QtWidgets, QtCore, QtGui
 from qtpy.QtCore import QObject, Signal, Slot
-
+from pymodaq.utils.managers.action_manager import ActionManager
 from pymodaq.utils.logger import set_logger, get_module_name
 from pymodaq.utils.config import Config
 from pymodaq.utils.scanner.scan_factory import ScannerFactory, ScannerBase
@@ -27,7 +27,7 @@ logger = set_logger(get_module_name(__file__))
 config = Config()
 scanner_factory = ScannerFactory()
 
-class ScannerContainer(QObject, ParameterManager):                    
+class ScannerContainer(QObject, ParameterManager,ActionManager):                    
     """Main Object to define a PyMoDAQ scan and create a UI to set it
 
     Parameters
@@ -50,7 +50,9 @@ class ScannerContainer(QObject, ParameterManager):
     def __init__(self, parent_widget: QtWidgets.QWidget = None, actuator= None, scanner_type: str = None
                  ):    
         QObject.__init__(self)
-        ParameterManager.__init__(self)        
+        ParameterManager.__init__(self)    
+        ActionManager.__init__(self,toolbar=QtWidgets.QToolBar())       
+        self.setup_actions()
         if parent_widget is None:
             parent_widget = QtWidgets.QWidget()
         self.parent_widget = parent_widget
@@ -58,6 +60,7 @@ class ScannerContainer(QObject, ParameterManager):
         self.actuator = actuator
         self._scanner: ScannerBase = scanner_factory.get('Scan1D','Linear',actuators=[self.actuator])   
         self.setup_ui()
+
         self.scanner.settings.sigTreeStateChanged.connect(self.updateDisplayWidget)
 
 
@@ -89,41 +92,43 @@ class ScannerContainer(QObject, ParameterManager):
         widget.layout().addWidget(self.scanType)        
         self.randomizeScan = QtWidgets.QCheckBox('Randomize')
         widget.layout().addWidget(self.randomizeScan)        
+        widget.layout().addWidget(self.toolbar)        
 
         self.scanner_settings_layout.addWidget(widget)                        
 
 
-        widget = QtWidgets.QWidget()
-        widget.setLayout(QtWidgets.QHBoxLayout())            
+        # widget = QtWidgets.QWidget()
+        # widget.setLayout(QtWidgets.QHBoxLayout())            
 
-        label = QtWidgets.QLabel()
-        label.setText('Display')
-        widget.layout().addWidget(label)
+        # label = QtWidgets.QLabel()
+        # label.setText('Display')
+        # widget.layout().addWidget(label)
                    
-        self.displayViewer_cb = QtWidgets.QCheckBox('show graph')        
-        self.displayViewer_cb.stateChanged.connect(self.showViewer)
-        widget.layout().addWidget(self.displayViewer_cb)
+        # self.displayViewer_cb = QtWidgets.QCheckBox('show graph')        
+        # self.displayViewer_cb.stateChanged.connect(self.showViewer)
+        # widget.layout().addWidget(self.displayViewer_cb)
 
-        self.displayTable_cb = QtWidgets.QCheckBox('show table')        
-        self.displayTable_cb.stateChanged.connect(self.showTable)       
-        widget.layout().addWidget(self.displayTable_cb)
+        # self.displayTable_cb = QtWidgets.QCheckBox('show table')        
+        # self.displayTable_cb.stateChanged.connect(self.showTable)       
+        # widget.layout().addWidget(self.displayTable_cb)
          
 
         self.scanner_settings_layout.addWidget(self.scanner.settings_tree)
-        self.scanner_settings_layout.addWidget(widget)                                
+        # self.scanner_settings_layout.addWidget(self.toolbar)                                
+        # self.scanner_settings_layout.addWidget(widget)    
         self.makeDisplayWidget()
         self.scanner_settings_layout.addWidget(self.displayWidget)                         
                         
         # self.makeScanner()
         
     def showTable(self,):
-        if self.displayTable_cb.isChecked():
+        if self.is_action_checked('show_table'):        
             self.displayTable.show()
         else:
             self.displayTable.hide()
         
     def showViewer(self,):      
-        if self.displayViewer_cb.isChecked():
+        if self.is_action_checked('show_positions'):
             self.displayViewer.parent.show()
         else:
             self.displayViewer.parent.hide()             
@@ -135,7 +140,7 @@ class ScannerContainer(QObject, ParameterManager):
         displayViewer.update_labels(labels=[self.actuator.title])
         displayViewer.set_axis_label(axis_settings=dict(orientation='bottom', label='Steps', units=''))
         displayViewer.set_axis_label(axis_settings=dict(orientation='left', label='Positions', units=''))   
-        displayViewer.parent.setVisible(self.displayViewer_cb.isChecked()) 
+        displayViewer.parent.setVisible(self.is_action_checked('show_positions')) 
             
         return displayViewer
     
@@ -159,7 +164,7 @@ class ScannerContainer(QObject, ParameterManager):
         displayTable.resizeColumnsToContents()        
         displayTable.setMaximumWidth(displayTable.horizontalHeader().length() + 
                          displayTable.verticalHeader().width())   
-        displayTable.setVisible(self.displayTable_cb.isChecked()) 
+        displayTable.setVisible(self.is_action_checked('show_table')) 
         return displayTable
     
     def updateTable(self,):
@@ -175,6 +180,12 @@ class ScannerContainer(QObject, ParameterManager):
 
     def updateViewer(self,):
         self.displayViewer.show_data([self.positions])
+
+    def setup_actions(self):
+        self.add_action('show_positions', 'Show positions', '2d', 'Display positions on a graphic', checkable=True)
+        self.connect_action('show_positions', self.showViewer)
+        self.add_action('show_table', 'Table of positions', 'Calculator', 'Display positions in a table', checkable=True)
+        self.connect_action('show_table', self.showTable)
 
 
 
