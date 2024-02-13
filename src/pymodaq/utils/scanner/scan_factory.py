@@ -40,7 +40,7 @@ class ScanParameterManager(ParameterManager):
         self.settings_tree.header().setVisible(True)
         self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
         self.settings_tree.header().setMinimumSectionSize(150)
-        self.settings_tree.setMinimumHeight(150)
+        self.settings_tree.setMinimumHeight(100)
 
 
 class ScannerBase(ScanParameterManager, metaclass=ABCMeta):
