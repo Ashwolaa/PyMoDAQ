@@ -44,6 +44,7 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
     """
     scanner_updated_signal = Signal()
     settings_name = 'scanner'
+    limTableSize = 500 #Threshold for displaying in table
     params = [
     ]
 
@@ -94,28 +95,9 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         widget.layout().addWidget(self.randomizeScan)        
         widget.layout().addWidget(self.toolbar)        
 
-        self.scanner_settings_layout.addWidget(widget)                        
-
-
-        # widget = QtWidgets.QWidget()
-        # widget.setLayout(QtWidgets.QHBoxLayout())            
-
-        # label = QtWidgets.QLabel()
-        # label.setText('Display')
-        # widget.layout().addWidget(label)
-                   
-        # self.displayViewer_cb = QtWidgets.QCheckBox('show graph')        
-        # self.displayViewer_cb.stateChanged.connect(self.showViewer)
-        # widget.layout().addWidget(self.displayViewer_cb)
-
-        # self.displayTable_cb = QtWidgets.QCheckBox('show table')        
-        # self.displayTable_cb.stateChanged.connect(self.showTable)       
-        # widget.layout().addWidget(self.displayTable_cb)
-         
-
+        self.scanner_settings_layout.addWidget(widget)                                 
         self.scanner_settings_layout.addWidget(self.scanner.settings_tree)
-        # self.scanner_settings_layout.addWidget(self.toolbar)                                
-        # self.scanner_settings_layout.addWidget(widget)    
+                          
         self.makeDisplayWidget()
         self.scanner_settings_layout.addWidget(self.displayWidget)                         
                         
@@ -140,8 +122,7 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         displayViewer.update_labels(labels=[self.actuator.title])
         displayViewer.set_axis_label(axis_settings=dict(orientation='bottom', label='Steps', units=''))
         displayViewer.set_axis_label(axis_settings=dict(orientation='left', label='Positions', units=''))   
-        displayViewer.parent.setVisible(self.is_action_checked('show_positions')) 
-            
+        displayViewer.parent.setVisible(self.is_action_checked('show_positions'))             
         return displayViewer
     
     
@@ -168,8 +149,12 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         return displayTable
     
     def updateTable(self,):
-        self.displayTable.setRowCount(self.steps)
-        for ind,pos in enumerate(self.positions):
+        if self.n_steps>self.limTableSize:            
+            self.displayTable.setRowCount(self.limTableSize)
+        else:
+            self.displayTable.setRowCount(self.n_steps)
+
+        for ind,pos in enumerate(self.positions[:self.limTableSize]):
                 step_item = QtWidgets.QTableWidgetItem(str(ind))
                 step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
                 pos_item = QtWidgets.QTableWidgetItem(str(pos))
@@ -208,8 +193,8 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         return np.squeeze(self.scanner.positions)
     
     @property
-    def steps(self,):
-        return len(self.positions)
+    def n_steps(self,):
+        return self.scanner.n_steps
     
     @property
     def scanner(self) -> ScannerBase:        
