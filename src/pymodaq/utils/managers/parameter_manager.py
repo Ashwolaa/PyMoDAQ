@@ -27,7 +27,7 @@ class ParameterTreeWidget(ActionManager):
         self.widget.listAllItems = self.tree.listAllItems  # for back-compatibility
 
         self.tree.setMinimumWidth(150)
-        self.tree.setMinimumHeight(300)
+        # self.tree.setMinimumHeight(300)
         
         # Making the buttons
         self.setup_actions(action_list) 
