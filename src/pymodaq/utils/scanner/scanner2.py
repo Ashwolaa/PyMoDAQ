@@ -27,7 +27,7 @@ logger = set_logger(get_module_name(__file__))
 config = Config()
 scanner_factory = ScannerFactory()
 
-class ScannerContainer(QObject, ParameterManager,ActionManager):                    
+class ScannerSelector(QObject, ParameterManager,ActionManager):                    
     """Main Object to define a PyMoDAQ scan and create a UI to set it
 
     Parameters
@@ -74,7 +74,7 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         self.parent_widget.layout().addWidget(self.scanner_settings_widget)            
         
         label = QtWidgets.QLabel()
-        label.setText(self.actuator.title)
+        label.setText(f'{self.actuator.title}')
         label.setStyleSheet("font-weight: bold")
         label.setAlignment(QtCore.Qt.AlignCenter)
         self.scanner_settings_layout.addWidget(label)
@@ -91,13 +91,13 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         self.scanType.addItems(scanner_factory.scan_sub_types(scanner_factory.scan_types()[0]))
         self.scanType.currentIndexChanged.connect(self.updateScanner)                        
         widget.layout().addWidget(self.scanType)        
-        self.randomizeScan = QtWidgets.QCheckBox('Randomize')
-        widget.layout().addWidget(self.randomizeScan)        
+  
         widget.layout().addWidget(self.toolbar)        
 
-        self.scanner_settings_layout.addWidget(widget)                                 
+        self.scanner_settings_layout.addWidget(widget)                        
+
         self.scanner_settings_layout.addWidget(self.scanner.settings_tree)
-                          
+
         self.makeDisplayWidget()
         self.scanner_settings_layout.addWidget(self.displayWidget)                         
                         
@@ -171,7 +171,8 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
         self.connect_action('show_positions', self.showViewer)
         self.add_action('show_table', 'Table of positions', 'Calculator', 'Display positions in a table', checkable=True)
         self.connect_action('show_table', self.showTable)
-
+        self.add_action('randomize_positions','Randomize', checkable=True)
+        self.add_action('backandforth','Back and forth', checkable=True)
 
 
     def makeDisplayWidget(self,):      
@@ -190,7 +191,7 @@ class ScannerContainer(QObject, ParameterManager,ActionManager):
 
     @property
     def positions(self,):
-        return np.squeeze(self.scanner.positions)
+        return np.squeeze(self.scanner.positions)    
     
     @property
     def n_steps(self,):
