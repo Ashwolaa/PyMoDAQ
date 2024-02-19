@@ -19,6 +19,8 @@ from pymodaq.utils.scanner.utils import ScanInfo
 from pymodaq.utils.plotting.scan_selector import Selector
 from pymodaq.utils.data import DataToExport, DataActuator
 from itertools import permutations,product
+from pymodaq.utils.data import Axis, DataDistribution
+
 import numpy as np
 if TYPE_CHECKING:
     from pymodaq.control_modules.daq_move import DAQ_Move
@@ -76,12 +78,12 @@ class ScannerManager(QObject, ParameterManager):
         self._scanners = SignalList()
         self._scanners.resized.connect(self._update_steps)
 
-        self.setup_ui()
         self._actuators = SignalList()
 
         self.actuators = actuators
-        
-        self.settings.child('show_positions').sigActivated.connect(self.displayPositions)
+        self.setup_ui()
+
+        self.settings.child('show_positions').sigActivated.connect(self.updateTable)
 
 
         # for actuator in actuators:
@@ -97,6 +99,7 @@ class ScannerManager(QObject, ParameterManager):
         self.parent_widget.layout().addWidget(self._scanners_settings_widget)
         self.settings_tree.setMinimumHeight(110)
         self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.makeTable()
 
     def updateParamTree(self,):
         lim = []
@@ -119,63 +122,54 @@ class ScannerManager(QObject, ParameterManager):
             self.displayPositions()           
 
     def get_indexing(self,shuffler=None):
-        indexing = []
-        for scan in self._scanners:
-            indexing.append(np.arange(scan.steps))             
-            indexing_array = np.array(list(product(*indexing)))      
-        # if shuffler is not None:
-        #     makeSnake(indexing_array,L_index)              
+        indexing = [np.arange(scan.n_steps) for scan in self._scanners]
+        indexing_array = np.array(list(product(*indexing)))                      
         return indexing_array
     def get_positions(self,shuffler=None):
-        positions = []
-        for scan in self._scanners:
-            pos = np.squeeze(scan.scanner.positions)
-            positions.append(pos)        
+        positions = [scan.positions for scan in self._scanners]
         positions_array = np.array(list(product(*positions)))      
-
-        return positions_array
-    
-    def displayPositions(self,):
-        positions_array = self.get_positions()
-        L_steps = len(positions_array)
-        # all_indexing = np.array(list(itertools.product(*indexing)))  
-        # makeSnake(all_indexing,L_index)                                
-        # all_indexing = np.reshape(all_indexing,[L_index[0],L_index[1]*L_index[2],3])
-        # for i,index in enumerate(all_indexing):
-        #     if i%2:
-        #         all_indexing[i] = np.flipud(all_indexing[i])            
-        #     all_indexing[i] = makeSnake2D(self,all_indexing[i],L_index[1],L_index[2])        
-        # # [0,1;0,2;0,3;1,1;1,2;1,3;2,1;2,2;2,3] ==) [0,1;0,2;0,3;1,3;1,2;1,1;2,1;2,2;2,3]
-
+        return positions_array    
+    # def displayPositions(self,):
+    #     # positions_array = self.get_positions()
+    #     # L_steps = len(positions_array)
+    #     # all_indexing = np.array(list(itertools.product(*indexing)))  
+    #     # makeSnake(all_indexing,L_index)                                
+    #     # all_indexing = np.reshape(all_indexing,[L_index[0],L_index[1]*L_index[2],3])
+    #     # for i,index in enumerate(all_indexing):
+    #     #     if i%2:
+    #     #         all_indexing[i] = np.flipud(all_indexing[i])            
+    #     #     all_indexing[i] = makeSnake2D(self,all_indexing[i],L_index[1],L_index[2])        
+    #     # # [0,1;0,2;0,3;1,1;1,2;1,3;2,1;2,2;2,3] ==) [0,1;0,2;0,3;1,3;1,2;1,1;2,1;2,2;2,3]
+    #     self.updateTable()
                         
-        L_scanner = len(self._scanners)
+    def makeTable(self,):        
+        self.displayTable = QtWidgets.QTableWidget()       
+        self.displayTable.verticalHeader().hide()                   
+        self.displayTable.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        self.displayTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.displayTable.resizeColumnsToContents()
 
-        # all_indexing[len(indexing[1]):]
-        # print(all_comb)
+    def updateTable(self,):
+        positions_array = self.get_positions()
+        L_steps = len(positions_array)  
+        L_scanner = len(self.scanners)        
         if L_steps<1e3:                
-            self.displayTable = QtWidgets.QTableWidget()
-            self.displayTable.setColumnCount(1+L_scanner)
+            self.displayTable.setColumnCount(1+L_scanner)   
             self.displayTable.setRowCount(len(positions_array))                
             self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act.title}' for act in self.actuators])
-            self.displayTable.verticalHeader().hide()
             for ind,positions in enumerate(positions_array):
                 step_item = QtWidgets.QTableWidgetItem(str(ind))
                 step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
-                self.displayTable.setItem(ind,0,step_item)            
+                self.displayTable.setItem(ind,0,step_item)           
                 for ind_pos,pos in enumerate(positions):
                     pos_item = QtWidgets.QTableWidgetItem(str(pos))
                     pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
-                    self.displayTable.setItem(ind,ind_pos+1,pos_item)           
-                
-            self.displayTable.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-            self.displayTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            self.displayTable.resizeColumnsToContents()
-            # self.displayTable.setMaximumWidth(self.displayTable.horizontalHeader().length() + 
-            #                  self.displayTable.verticalHeader().width())           
+                    self.displayTable.setItem(ind,ind_pos+1,pos_item)                 
             self.displayTable.show()
         else:
             print('Table is too big, for table display:')
             print(positions_array)
+
     def updateOrdering(self,):                
         if self.settings.child('scan_parameters','ordering').value():
             l1 = self.settings.child('scan_parameters','ordering').value()
@@ -244,11 +238,12 @@ class ScannerManager(QObject, ParameterManager):
                         axes_indexes=self._scanner.axes_indexes, axes_unique=self._scanner.axes_unique,
                         selected_actuators=[act.title for act in self.actuators])
 
-    def get_nav_axes(self):
-        return self._scanner.get_nav_axes()
+    def get_nav_axes(self) -> List[Axis]:
+        return [scan.get_nav_axes()[0] for scan in self.scanners]     
+
 
     def get_scan_shape(self):
-        return self._scanner.get_scan_shape()
+        return tuple([len(scan.axes_unique) for scan in self.scanners])
 
     def get_indexes_from_scan_index(self, scan_index: int) -> Tuple[int]:
         """To be reimplemented. Calculations of indexes within the scan"""
@@ -259,10 +254,7 @@ class ScannerManager(QObject, ParameterManager):
 
     @property
     def steps(self):
-        steps = []
-        for scan in self.scanners:
-            steps.append(scan.steps)
-        return steps
+        return [scan.n_steps for scan in self.scanners]     
 
     @property
     def tot_steps(self):
@@ -289,17 +281,7 @@ class ScannerManager(QObject, ParameterManager):
     
     @property
     def axes_unique(self):
-        axes_unique = []
-        for scanner in self._scanners:
-            axes_unique.append(scanner.axes_unique)
-        return axes_unique    
-
-    @property
-    def axes_unique(self):
-        axes_unique = []
-        for scanner in self._scanners:
-            axes_unique.append(scanner.axes_unique)
-        return axes_unique
+        return [scan.axes_unique for scan in self.scanners]     
 
     @property
     def distribution(self):

@@ -173,6 +173,9 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.connect_action('show_table', self.showTable)
         self.add_action('randomize_positions','Randomize', checkable=True)
         self.add_action('backandforth','Back and forth', checkable=True)
+        self.connect_action('backandforth', self.updateDisplayWidget)
+        self.connect_action('randomize_positions', self.updateDisplayWidget)
+
 
 
     def makeDisplayWidget(self,):      
@@ -191,7 +194,22 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
 
     @property
     def positions(self,):
-        return np.squeeze(self.scanner.positions)    
+        # import copy
+        # positions = copy.deepcopy(np.squeeze(self.scanner.positions))    
+        positions = np.squeeze(self.scanner.positions)    
+
+        if self.is_action_checked('randomize_positions'):    
+            rng = np.random.default_rng()
+            numbers = rng.choice(len(positions), size=len(positions), replace=False)
+            positions = positions[numbers]
+            # np.random.shuffle(positions)
+        if self.is_action_checked('backandforth'):        
+            positions = np.concatenate([positions[0::2],np.flip(positions[1::2])])
+        return positions
+    
+    @property    
+    def axes_unique(self,):
+        return self.scanner.axes_unique    
     
     @property
     def n_steps(self,):
