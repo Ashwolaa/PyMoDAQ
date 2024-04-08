@@ -152,7 +152,6 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
             self.displayTable.setRowCount(self.limTableSize)
         else:
             self.displayTable.setRowCount(self.n_steps)
-
         for ind,pos in enumerate(self.positions[:self.limTableSize]):
                 step_item = QtWidgets.QTableWidgetItem(str(ind))
                 step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)

@@ -7,6 +7,7 @@ Created the 05/12/2022
 from typing import List, Tuple, Any, TYPE_CHECKING
 import re
 import numpy as np
+from pymodaq.utils import gui_utils as gutils
 from pymodaq.utils.data import Axis, DataDistribution
 from pymodaq.utils.logger import set_logger, get_module_name
 from pymodaq.utils import math_utils as mutils
@@ -94,7 +95,7 @@ class Scan1DLinear(Scan1DBase):
             self.settings.child('stop').setValue(coordinates[1, 0])
 
 
-@ScannerFactory.register()
+# @ScannerFactory.register()
 class Scan1DRandom(Scan1DLinear):
     """ Defines a  random linear scan by first initializing a linear one between start and stop values with
     steps of length defined in the step setting, then shuffling the values."""
@@ -127,7 +128,7 @@ class Scan1DSparse(Scan1DBase):
 
     scan_subtype = 'Sparse'
     params = [
-        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text', 'value': '0:0.1:1', }
+        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text_pb', 'value': '0:0.1:1', }
         ]
     n_axes = 1
     distribution = DataDistribution['uniform']  # because in 1D it doesn't matter is spread or
@@ -136,6 +137,9 @@ class Scan1DSparse(Scan1DBase):
     def __init__(self, actuators: List['DAQ_Move'] = None, **_ignored):
         super().__init__(actuators=actuators)
         self.settings.child('parsed_string').setOpts(tip=self.__doc__)
+        # self.menu = QtWidgets.QMenu()
+        # self.menu.addAction('Load as txt', self.load_txt)
+        # self.menu.addAction('Save as txt', self.save_txt)        
 
     def set_scan(self):
         try:
@@ -170,6 +174,23 @@ class Scan1DSparse(Scan1DBase):
         if len(self.actuators) == 1:
             self.settings.child('parsed_string').setOpts(title=f'{self.actuators[0].title} Parsed string:')
 
+
+    # def load_txt(self):
+    #     fname = gutils.select_file(start_path=None, save=False, ext='*')
+    #     if fname is not None and fname != '':
+    #         data = np.loadtxt(fname)
+    #         if len(data.shape) == 1:
+    #             data = data.reshape((data.size, 1))
+    #         self.set_data_all(data)
+
+    # def save_txt(self):
+    #     fname = gutils.select_file(start_path=None, save=True, ext='dat')
+    #     if fname is not None and fname != '':
+    #         np.savetxt(fname, self.get_data_all(), delimiter='\t')
+
+    # def contextMenuEvent(self, event):
+    #     if self.menu is not None:
+    #         self.menu.exec(event.globalPos())            
 try:
     import adaptive
 

@@ -55,7 +55,9 @@ class ScannerManager(QObject, ParameterManager):
         {'title': 'Scan parameters:', 'name': 'scan_parameters', 'type': 'group',
          'children':[
             {'title': 'Scan dimension:', 'name': 'scan_dim', 'type': 'str',
-         'readonly':True,},             
+         'readonly':True,},       
+            {'title': 'Scan creation:', 'name': 'scan_type', 'type': 'list',
+         'limits': ['sequential','global'],'tip':'Sequential: Actuator''s position are set up one at a time;\n Global: Actuator''s positions are set up all at a time'},               
             {'title': 'Ordering:', 'name': 'ordering', 'type': 'list',
          'limits': [],},
             {'title': 'Shuffling:', 'name': 'shuffling', 'type': 'list',
@@ -65,6 +67,7 @@ class ScannerManager(QObject, ParameterManager):
         {'title': 'Show positions', 'name': 'show_positions', 'type': 'action'},
         
     ]
+    limTableSize = 500 #Threshold for displaying in table
 
     def __init__(self, parent_widget: QtWidgets.QWidget = None, scanner_items=OrderedDict([]),
                  actuators: List[DAQ_Move] = [], ordering: Tuple = ()):
@@ -79,7 +82,7 @@ class ScannerManager(QObject, ParameterManager):
         self._scanners.resized.connect(self._update_steps)
 
         self._actuators = SignalList()
-
+        self._actuators.resized.connect(self._update_steps)
         self.actuators = actuators
         self.setup_ui()
 
@@ -106,7 +109,8 @@ class ScannerManager(QObject, ParameterManager):
         for perm in list(permutations(range(0,len(self.actuators)))): 
             lim.append(list(self.actuators[ind].title for ind in perm))     
         self.settings.child('scan_parameters','ordering').setLimits(lim)        
-        self.settings.child('scan_parameters','scan_dim').setValue(f'{len(self.scanners)}D')        
+        self.settings.child('scan_parameters','scan_dim').setValue(f'{len(self.scanners)}D')   
+
 
     def makeSnake2D(self,arr,L1,L2):
         for i in range(L1//2): 
@@ -151,24 +155,24 @@ class ScannerManager(QObject, ParameterManager):
 
     def updateTable(self,):
         positions_array = self.get_positions()
-        L_steps = len(positions_array)  
-        L_scanner = len(self.scanners)        
-        if L_steps<1e3:                
-            self.displayTable.setColumnCount(1+L_scanner)   
-            self.displayTable.setRowCount(len(positions_array))                
-            self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act.title}' for act in self.actuators])
-            for ind,positions in enumerate(positions_array):
-                step_item = QtWidgets.QTableWidgetItem(str(ind))
-                step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
-                self.displayTable.setItem(ind,0,step_item)           
-                for ind_pos,pos in enumerate(positions):
-                    pos_item = QtWidgets.QTableWidgetItem(str(pos))
-                    pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
-                    self.displayTable.setItem(ind,ind_pos+1,pos_item)                 
-            self.displayTable.show()
+        L_steps = len(positions_array)
+        if L_steps>self.limTableSize:       
+            self.displayTable.setRowCount(L_steps)                
         else:
-            print('Table is too big, for table display:')
-            print(positions_array)
+            self.displayTable.setRowCount(self.limTableSize)                
+        self.displayTable.setColumnCount(1+len(self.scanners))   
+        self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act.title}' for act in self.actuators])
+        for ind,positions in enumerate(positions_array[:self.limTableSize]):
+            step_item = QtWidgets.QTableWidgetItem(str(ind))
+            step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.displayTable.setItem(ind,0,step_item)           
+            for ind_pos,pos in enumerate(positions):
+                pos_item = QtWidgets.QTableWidgetItem(str(pos))
+                pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
+                self.displayTable.setItem(ind,ind_pos+1,pos_item)                 
+        self.displayTable.show()
+        self.displayTable.resizeColumnsToContents()               
+
 
     def updateOrdering(self,):                
         if self.settings.child('scan_parameters','ordering').value():
@@ -198,7 +202,6 @@ class ScannerManager(QObject, ParameterManager):
                 child = self._scanners_settings_widget.layout().takeAt(ind)
                 child.widget().deleteLater()
                 QtWidgets.QApplication.processEvents()
-
                 
     @property
     def scanner(self,index):
@@ -231,6 +234,7 @@ class ScannerManager(QObject, ParameterManager):
                 self.actuators.remove(act)
                 self.removeScanner(act)          
         self.updateParamTree()
+
 
     def get_scan_info(self) -> ScanInfo:
         """Get a summary of the configured scan as a ScanInfo object"""
