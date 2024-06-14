@@ -172,8 +172,8 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.connect_action('show_table', self.showTable)
         self.add_action('randomize_positions','Randomize', checkable=True)
         self.add_action('backandforth','Back and forth', checkable=True)
-        self.connect_action('backandforth', self.updateDisplayWidget)
-        self.connect_action('randomize_positions', self.updateDisplayWidget)
+        self.connect_action('backandforth', self.scanner_updated_signal.emit)
+        self.connect_action('randomize_positions', self.scanner_updated_signal.emit)
 
 
 
@@ -185,7 +185,7 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.displayTable = self.makeTable()
         self.displayLayout.addWidget(self.displayViewer_widget)       
         self.displayLayout.addWidget(self.displayTable)
-                
+        self.scanner_updated_signal.connect(self.updateDisplayWidget)
 
     def updateDisplayWidget(self,):
         self.updateTable()
@@ -196,7 +196,6 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         # import copy
         # positions = copy.deepcopy(np.squeeze(self.scanner.positions))    
         positions = np.squeeze(self.scanner.positions)    
-
         if self.is_action_checked('randomize_positions'):    
             rng = np.random.default_rng()
             numbers = rng.choice(len(positions), size=len(positions), replace=False)
@@ -224,7 +223,7 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
             child = self.scanner_settings_layout.takeAt(ind)
             child.widget().deleteLater()
         self._scanner: ScannerBase = scanner_factory.get('Scan1D',self.scanType.currentText(),actuators=[self.actuator])  
-        self.scanner.settings.sigTreeStateChanged.connect(self.updateDisplayWidget)
-        self.updateDisplayWidget()
+        self.scanner.settings.sigTreeStateChanged.connect(self.scanner_updated_signal.emit)
         self.scanner_settings_layout.insertWidget(ind,self.scanner.settings_tree)
+        self.scanner_updated_signal.emit()
         QtWidgets.QApplication.processEvents()        
