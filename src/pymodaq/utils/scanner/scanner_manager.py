@@ -7,6 +7,8 @@ from qtpy import QtWidgets, QtCore
 from qtpy.QtCore import QObject, Signal, Slot
 
 from pymodaq.utils.QObjects.list import SignalList
+from pymodaq.utils.QObjects.dict import SignalDict,SignalOrderedDict
+
 from pymodaq.utils.logger import set_logger, get_module_name
 from pymodaq.utils.config import Config
 from pymodaq.utils.array_manipulation import makeSnake
@@ -73,26 +75,51 @@ class ScannerManager(QObject, ParameterManager):
                  actuators: List[DAQ_Move] = [], ordering: Tuple = ()):
         QObject.__init__(self)
         ParameterManager.__init__(self)
+
         if parent_widget is None:
             parent_widget = QtWidgets.QWidget()
         self.parent_widget = parent_widget
-        self._scanners_settings_widget = None
-          
-        self._scanners = SignalList()
-        self._scanners.resized.connect(self._update_steps)
 
-        self._actuators = SignalList()
-        self._actuators.resized.connect(self._update_steps)
-        self.actuators = actuators
+        # self._scanners_settings_widget = None      
+
+
+        # self._actuators = SignalDict()
+        # self._actuators.resized.connect(self._update_steps)
+        # self._scanners = SignalOrderedDict()
+        # self._scanners.resized.connect(self._update_steps)
+
+        # for act in actuators:
+
+
+        self._actuators = SignalOrderedDict()
+        self._actuators.resized.connect(self.updateGUI)
+
+        self.ordering = None
         self.setup_ui()
+        self.actuators = actuators
 
-        self.settings.child('show_positions').sigActivated.connect(self.updateTable)
+        self.settings.child('show_positions').sigActivated.connect(self.showTable)
 
+    def updateGUI(self,):
+        self.scanner_updated_signal.emit()
+        return 0
 
-        # for actuator in actuators:
-        # self.settings.child('n_steps').setValue(self._scanner.evaluate_steps())
+    def makeScanner(self,act):
+        scanner = scanner2.ScannerSelector(self._scanners_settings_widget,actuator=act)
+        scanner.updateScanner()                
+        scanner.scanner_updated_signal.connect(self.updateGUI)    
+        return scanner
 
-    def setup_ui(self):
+    def removeScanner(self,act):
+        scan = self.actuators.pop(act)          
+        ind = self._scanners_settings_widget.layout().indexOf(scan.scanner_settings_widget)
+        child = self._scanners_settings_widget.layout().takeAt(ind)
+        child.widget().deleteLater()
+        del(child)
+        QtWidgets.QApplication.processEvents()
+                
+
+    def setup_ui(self):        
         self.parent_widget.setLayout(QtWidgets.QVBoxLayout())
         self.parent_widget.layout().setContentsMargins(0, 0, 0, 0)
         self.parent_widget.layout().addWidget(self.settings_tree)
@@ -104,12 +131,18 @@ class ScannerManager(QObject, ParameterManager):
         self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.makeTable()
 
+        self.scanner_updated_signal.connect(self.updateTable)
+        self.scanner_updated_signal.connect(self._update_steps)
+
+
+
     def updateParamTree(self,):
+        titles = [actuator.title for actuator in self.actuators]
         lim = []
-        for perm in list(permutations(range(0,len(self.actuators)))): 
-            lim.append(list(self.actuators[ind].title for ind in perm))     
+        for perm in list(permutations(range(0,len(titles)))): 
+            lim.append(list(titles[ind] for ind in perm))    
         self.settings.child('scan_parameters','ordering').setLimits(lim)        
-        self.settings.child('scan_parameters','scan_dim').setValue(f'{len(self.scanners)}D')   
+        self.settings.child('scan_parameters','scan_dim').setValue(f'{len(titles)}D')   
 
 
     def makeSnake2D(self,arr,L1,L2):
@@ -122,17 +155,19 @@ class ScannerManager(QObject, ParameterManager):
     def value_changed(self, param: Parameter):        
         if param.name() == 'ordering':
             self.updateOrdering()
+            self.scanner_updated_signal.emit()
         elif param.name() == 'show_positions':
             self.displayPositions()           
 
-    def get_indexing(self,shuffler=None):
-        indexing = [np.arange(scan.n_steps) for scan in self._scanners]
+    def get_indexing(self,shuffler=None):        
+        indexing = [np.arange(self.scanners[act].n_steps) for act in self.ordering]
         indexing_array = np.array(list(product(*indexing)))                      
         return indexing_array
     def get_positions(self,shuffler=None):
-        positions = [scan.positions for scan in self._scanners]
+        positions = [self.scanners[act].positions for act in self.ordering]
         positions_array = np.array(list(product(*positions)))      
         return positions_array    
+    
     # def displayPositions(self,):
     #     # positions_array = self.get_positions()
     #     # L_steps = len(positions_array)
@@ -157,11 +192,11 @@ class ScannerManager(QObject, ParameterManager):
         positions_array = self.get_positions()
         L_steps = len(positions_array)
         if L_steps>self.limTableSize:       
-            self.displayTable.setRowCount(L_steps)                
-        else:
             self.displayTable.setRowCount(self.limTableSize)                
+        else:
+            self.displayTable.setRowCount(L_steps)                
         self.displayTable.setColumnCount(1+len(self.scanners))   
-        self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act.title}' for act in self.actuators])
+        self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act}' for act in self.ordering])
         for ind,positions in enumerate(positions_array[:self.limTableSize]):
             step_item = QtWidgets.QTableWidgetItem(str(ind))
             step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -169,71 +204,57 @@ class ScannerManager(QObject, ParameterManager):
             for ind_pos,pos in enumerate(positions):
                 pos_item = QtWidgets.QTableWidgetItem(str(pos))
                 pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
-                self.displayTable.setItem(ind,ind_pos+1,pos_item)                 
+                self.displayTable.setItem(ind,ind_pos+1,pos_item)   
+
+    def showTable(self,):
         self.displayTable.show()
         self.displayTable.resizeColumnsToContents()               
 
-
-    def updateOrdering(self,):                
-        if self.settings.child('scan_parameters','ordering').value():
-            l1 = self.settings.child('scan_parameters','ordering').value()
-            l2 = [act.title for act in self.actuators]
-            child = []            
-            ordering = np.array([l2.index(item) for item in l1])              
-            if ordering is not np.arange(len(self.actuators)):
-                for ind in range(len(ordering)):
-                    child.append(self._scanners_settings_widget.layout().takeAt(0))            
-                for ind in range(len(ordering)):
-                    self._scanners_settings_widget.layout().addWidget(child[ordering[ind]].widget())              
-                self.actuators = [self.actuators[order] for order in ordering]
-                self.scanners = SignalList([self.scanners[order] for order in ordering])
-
-    def makeScanner(self,act):
-        scanner = scanner2.ScannerSelector(self._scanners_settings_widget,actuator=act)
-        scanner.updateScanner()                
-        scanner.scanner.settings.sigTreeStateChanged.connect(self._update_steps)    
-        self.scanners.append(scanner)
-
-    def removeScanner(self,act):
-        for scan in self.scanners:
-            if act == scan.actuator:
-                self.scanners.remove(scan)
-                ind = self._scanners_settings_widget.layout().indexOf(scan.scanner_settings_widget)
-                child = self._scanners_settings_widget.layout().takeAt(ind)
-                child.widget().deleteLater()
-                QtWidgets.QApplication.processEvents()
-                
+    def updateOrdering(self,):      
+        l1 = self.settings.child('scan_parameters','ordering').value()            
+        if l1 and l1 != self.ordering:            
+            child = dict()            
+            for act in self.ordering:
+                child[act] = self._scanners_settings_widget.layout().takeAt(0)
+            for act in l1:                    
+                    self._scanners_settings_widget.layout().addWidget(child[act].widget()) 
+            self.ordering = l1
+        self.scanner_updated_signal.emit()
     @property
-    def scanner(self,index):
-        return self._scanners[index].scanner
+    def scanner(self,act):
+        return self.actuators[act].scanner
 
     @property
-    def scanners(self):
-        """list of str: Returns as a list the selected scanners that will make the actual scan"""
-        return self._scanners
-    
-    @scanners.setter
-    def scanners(self, scan_list):
-        """list of str: Returns as a list the selected scanners that will make the actual scan"""
-        self._scanners=scan_list
-        self._scanners.resized.connect(self._update_steps)
+    def scanners(self,):
+        """dict of scans: Returns as a dict the selected scanners that will make the actual scan"""
+        scanners = {key.title: scans for key,scans in self.actuators.items()}
+        return scanners
+        
+    # @scanners.setter
+    # def scanners(self, scan_list):
+    #     """list of str: Returns as a list the selected scanners that will make the actual scan"""
+    #     self._scanners=scan_list
+    #     self._scanners.resized.connect(self._update_steps)
 
     @property
-    def actuators(self):
-        """list of str: Returns as a list the name of the selected actuators to describe the actual scan"""
+    def actuators(self,):
+        """dict of actuators: Returns as a dict the name of the selected actuators to describe the actual scan"""
         return self._actuators
 
     @actuators.setter
     def actuators(self, act_list):
+        self._actuators.resized.disconnect(self.updateGUI)
+        for act in self.actuators.copy(): #Loop through copy to avoid RuntimeError: OrderedDict mutated during iteration
+            if act not in act_list:
+                self.removeScanner(act)  
         for act in act_list:
             if act not in self.actuators:
-                self.actuators.append(act)
-                self.makeScanner(act)  
-        for act in self.actuators:
-            if act not in act_list:
-                self.actuators.remove(act)
-                self.removeScanner(act)          
+                self.actuators[act] = self.makeScanner(act)     
+        self.ordering = [act.title for act in self.actuators]
+        self._actuators.resized.connect(self.updateGUI)
+
         self.updateParamTree()
+        # self.updateGUI()
 
 
     def get_scan_info(self) -> ScanInfo:
@@ -243,11 +264,11 @@ class ScannerManager(QObject, ParameterManager):
                         selected_actuators=[act.title for act in self.actuators])
 
     def get_nav_axes(self) -> List[Axis]:
-        return [scan.get_nav_axes()[0] for scan in self.scanners]     
+        return [scan.get_nav_axes()[0] for scan in self.scanners.values()]     
 
 
     def get_scan_shape(self):
-        return tuple([len(scan.axes_unique) for scan in self.scanners])
+        return tuple([len(scan.axes_unique) for scan in self.scanners.values()])
 
     def get_indexes_from_scan_index(self, scan_index: int) -> Tuple[int]:
         """To be reimplemented. Calculations of indexes within the scan"""
@@ -258,7 +279,7 @@ class ScannerManager(QObject, ParameterManager):
 
     @property
     def steps(self):
-        return [scan.n_steps for scan in self.scanners]     
+        return [scan.n_steps for scan in self.scanners.values()]     
 
     @property
     def tot_steps(self):
@@ -363,7 +384,7 @@ def main():
     settings.child('set_scan').sigActivated.connect(scanner_manager.set_scan)
     
 
-    scanner_manager.scanner_updated_signal.connect(print_info)
+    # scanner_manager.scanner_updated_signal.connect(print_info)
     widget_main.show()
     sys.exit(app.exec_())
 
