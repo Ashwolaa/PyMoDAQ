@@ -31,6 +31,7 @@
     <file>Icon_Library/autoscale.png</file>
     <file>Icon_Library/b_icon.png</file>
     <file>Icon_Library/back.png</file>
+    <file>Icon_Library/back-and-forth.png</file>
     <file>Icon_Library/bg_icon.png</file>
     <file>Icon_Library/Browse_Dir_Path.png</file>
     <file>Icon_Library/Calculator.png</file>
@@ -191,6 +192,7 @@
     <file>Icon_Library/SelectPolygon.png</file>
     <file>Icon_Library/sequence.png</file>
     <file>Icon_Library/sequence2.png</file>
+    <file>Icon_Library/shuffle.png</file>
     <file>Icon_Library/Snap&amp;Save.png</file>
     <file>Icon_Library/snap.png</file>
     <file>Icon_Library/Snapshot.png</file>
