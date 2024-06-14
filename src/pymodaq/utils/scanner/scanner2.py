@@ -91,7 +91,8 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.scanType.addItems(scanner_factory.scan_sub_types(scanner_factory.scan_types()[0]))
         self.scanType.currentIndexChanged.connect(self.updateScanner)                        
         widget.layout().addWidget(self.scanType)        
-  
+        verticalSpacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding,) 
+        widget.layout().addItem(verticalSpacer)
         widget.layout().addWidget(self.toolbar)        
 
         self.scanner_settings_layout.addWidget(widget)                                 
@@ -165,17 +166,18 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.displayViewer.show_data([self.positions])
 
     def setup_actions(self):
+
+        self.add_action('randomize_positions','Randomize', 'shuffle', 'Randomize given positions', checkable=True,)
+        self.add_action('backandforth','Back and forth', 'back-and-forth', 'Force scan to start and finish near first positions', checkable=True)
+        self.connect_action('backandforth', self.scanner_updated_signal.emit)
+        self.connect_action('randomize_positions', self.scanner_updated_signal.emit)
+        # spacer = QtWidgets.QWidget()
+        # spacer.setSizePolicy( QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        # self.add_widget('spacer',spacer)
         self.add_action('show_positions', 'Show positions', '2d', 'Display positions on a graphic', checkable=True)
         self.connect_action('show_positions', self.showViewer)
         self.add_action('show_table', 'Table of positions', 'Calculator', 'Display positions in a table', checkable=True)
         self.connect_action('show_table', self.showTable)
-        self.add_action('randomize_positions','Randomize', checkable=True)
-        self.add_action('backandforth','Back and forth', checkable=True)
-        self.connect_action('backandforth', self.scanner_updated_signal.emit)
-        self.connect_action('randomize_positions', self.scanner_updated_signal.emit)
-
-
-
     def makeDisplayWidget(self,):      
         self.displayWidget = QtWidgets.QWidget()
         self.displayLayout = QtWidgets.QHBoxLayout()  
