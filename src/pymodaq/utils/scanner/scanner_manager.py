@@ -245,6 +245,7 @@ class ScannerManager(QObject, ParameterManager):
         return self._scanners[index].scanner
 
     @property
+<<<<<<< HEAD
     def scanners(self):
         """list of str: Returns as a list the selected scanners that will make the actual scan"""
         return self._scanners
@@ -255,6 +256,13 @@ class ScannerManager(QObject, ParameterManager):
         self._scanners=scan_list
         self._scanners.resized.connect(self._update_steps)
 
+=======
+    def scanners(self,):
+        """dict of scans: Returns as a dict the selected scanners that will make the actual scan"""
+        scanners = {key.title: scans for key,scans in self.actuators.items()}
+        return scanners
+        
+>>>>>>> 94081bae (update pgn library and organize display)
     @property
     def actuators(self,):
         """dict of actuators: Returns as a dict the name of the selected actuators to describe the actual scan"""
@@ -262,6 +270,17 @@ class ScannerManager(QObject, ParameterManager):
 
     @actuators.setter
     def actuators(self, act_list):
+<<<<<<< HEAD
+=======
+        """Definition of actuators, a dictionnary is made with actuators as keys and scanner object as values
+        Args:
+            act_list (list(DAQ_Move)): _description_
+        """
+        self._actuators.resized.disconnect(self.updateGUI)
+        for act in self.actuators.copy(): #Loop through copy to avoid RuntimeError: OrderedDict mutated during iteration
+            if act not in act_list:
+                self.removeScanner(act)  
+>>>>>>> 94081bae (update pgn library and organize display)
         for act in act_list:
             if act not in self.actuators:
                 self.actuators.append(act)
