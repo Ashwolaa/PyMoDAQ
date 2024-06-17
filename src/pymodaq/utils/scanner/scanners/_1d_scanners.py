@@ -34,14 +34,6 @@ class Scan1DBase(ScannerBase):
     def __init__(self, actuators: List = None, **_ignored):
         super().__init__(actuators=actuators)
         
-    def value_changed(self, param):
-        try:
-            self.set_scan()
-            self.settings.sigTreeStateChanged.emit(self.settings,param)
-        except:
-            pass
-        return super().value_changed(param)
-    
         
     def value_changed(self, param):
         try:
