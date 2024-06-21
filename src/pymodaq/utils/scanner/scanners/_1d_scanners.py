@@ -130,7 +130,7 @@ class Scan1DSparse(Scan1DBase):
 
     scan_subtype = 'Sparse'
     params = [
-        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text_pb', 'value': '0:0.1:1', }
+        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text', 'value': '0:0.1:1', }
         ]
     n_axes = 1
     distribution = DataDistribution['uniform']  # because in 1D it doesn't matter is spread or
@@ -144,19 +144,25 @@ class Scan1DSparse(Scan1DBase):
         # self.menu.addAction('Save as txt', self.save_txt)        
 
     def set_scan(self):
+        series = np.asarray([])
         try:
-            range_strings = re.findall("[^,\s]+", self.settings['parsed_string'])
-            series = np.asarray([])
-            for range_string in range_strings:
-                number_strings = re.findall("[^:]+", range_string)  # Extract the numbers by splitting on :.
-                this_range = np.asarray([])
-                if len(number_strings) == 3:  # 3 Numbers specify a range
-                    start, step, stop = [float(number) for number in number_strings]
-                    this_range = mutils.linspace_step(start, stop, step)
-                elif len(number_strings) == 1:  # 1 number just specifies a single number
-                    this_range = np.asarray([float(number_strings[0])])
-                series = np.concatenate((series, this_range))
-
+            _strings = re.findall("[^;\s]+", self.settings['parsed_string'])
+            for _string in _strings:
+                try:
+                    this_range = eval(_string)
+                    this_range = this_range.flatten()
+                    series = np.concatenate((series, this_range))
+                except:
+                    range_strings = re.findall("[^,]+", _string)
+                    for range_string in range_strings:
+                        number_strings = re.findall("[^:]+", range_string)  # Extract the numbers by splitting on :.
+                        this_range = np.asarray([])
+                        if len(number_strings) == 3:  # 3 Numbers specify a range
+                            start, step, stop = [float(number) for number in number_strings]
+                            this_range = mutils.linspace_step(start, stop, step)
+                        elif len(number_strings) == 1:  # 1 number just specifies a single number
+                            this_range = np.asarray([float(number_strings[0])])
+                        series = np.concatenate((series, this_range))
             self.positions = np.atleast_1d(np.squeeze(series))
             self.get_info_from_positions(self.positions)
         except Exception as e:
