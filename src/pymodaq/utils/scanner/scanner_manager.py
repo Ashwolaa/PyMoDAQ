@@ -52,6 +52,7 @@ class ScannerManager(QObject, ParameterManager):
     
     
     scanner_updated_signal = Signal()
+    ordering_signal = Signal()
     settings_name = 'scanner'
     params = [
         {'title': 'Scan parameters:', 'name': 'scan_parameters', 'type': 'group',
@@ -88,36 +89,44 @@ class ScannerManager(QObject, ParameterManager):
         # self._actuators.resized.connect(self._update_steps)
         # self._scanners = SignalOrderedDict()
         # self._scanners.resized.connect(self._update_steps)
-
         # for act in actuators:
-
-
         self._actuators = SignalOrderedDict()
         self._actuators.resized.connect(self.updateGUI)
-
         self.ordering = None
         self.setup_ui()
+        self.connectSignals()
         self.actuators = actuators
 
-        self.settings.child('show_positions').sigActivated.connect(self.showTable)
 
     def updateGUI(self,):
         self.scanner_updated_signal.emit()
         return 0                
 
-    def setup_ui(self):        
-        self.parent_widget.setLayout(QtWidgets.QVBoxLayout())
-        self.parent_widget.layout().setContentsMargins(0, 0, 0, 0)
-        self.parent_widget.layout().addWidget(self.settings_tree)
-        self._scanners_settings_widget = QtWidgets.QWidget()
-        self._scanners_settings_widget.setLayout(QtWidgets.QHBoxLayout())
-        self._scanners_settings_widget.layout().setContentsMargins(0, 0, 0, 0)
-        self.parent_widget.layout().addWidget(self._scanners_settings_widget)
-        self.settings_tree.setMinimumHeight(110)
-        self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        self.makeTable()
+    def connectSignals(self,):
         self.scanner_updated_signal.connect(self.updateTable)
         self.scanner_updated_signal.connect(self._update_steps)
+        self.settings.child('show_positions').sigActivated.connect(self.showTable)
+
+
+    def setup_ui(self): 
+        # Intialize UI       
+        
+        # Going vertical layout
+        self.parent_widget.setLayout(QtWidgets.QVBoxLayout())
+        self.parent_widget.layout().setContentsMargins(0, 0, 0, 0)
+        # Adding parameter tree + resizing
+        self.parent_widget.layout().addWidget(self.settings_tree)
+        self.settings_tree.setMinimumHeight(110)
+        self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        # Container widget for scanners
+        self._scanners_settings_widget = QtWidgets.QWidget()
+        # Going horizontal layout
+        self._scanners_settings_widget.setLayout(QtWidgets.QHBoxLayout())
+        self._scanners_settings_widget.layout().setContentsMargins(0, 0, 0, 0)
+        # Adding widget to main layout
+        self.parent_widget.layout().addWidget(self._scanners_settings_widget)
+        # Making table to display positions
+        self.makeTable()
 
 
 
@@ -216,6 +225,7 @@ class ScannerManager(QObject, ParameterManager):
 
     def updateOrdering(self,):      
         l1 = self.settings.child('scan_parameters','ordering').value()            
+        self.ordering_signal.emit(l1)
         if l1 and l1 != self.ordering:            
             child = dict()            
             for act in self.ordering:

@@ -196,7 +196,7 @@ class SequentialScanner(QObject,ActionManager,):
     def positions(self,):
         # import copy
         # positions = copy.deepcopy(np.squeeze(self.scanner.positions))    
-        positions = np.squeeze(self.scanner.positions)    
+        positions = np.squeeze(self.scanner.positions,axis=1)    
         if self.is_action_checked('randomize_positions'):    
             rng = np.random.default_rng()
             numbers = rng.choice(len(positions), size=len(positions), replace=False)
@@ -204,6 +204,7 @@ class SequentialScanner(QObject,ActionManager,):
             # np.random.shuffle(positions)
         if self.is_action_checked('backandforth'):        
             positions = np.concatenate([positions[0::2],np.flip(positions[1::2])])
+        positions = np.round(positions,8)
         return positions
     
     @property    

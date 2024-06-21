@@ -117,15 +117,20 @@ class Scan1DRandom(Scan1DLinear):
         
 @ScannerFactory.register()
 class Scan1DSparse(Scan1DBase):
-    """ Syntax goes as start:step:stop or with single entry
+    """ Syntax goes either as:
+    - start:step:stop
+    - single entry
+    - np command
 
-    * 0:0.2:1 will give [0 0.2 0.4 0.6 0.8 1]
-    * 0 will give [0]
+    * 0:0.2:1 ==> [0 0.2 0.4 0.6 0.8 1]
+    * 0 ==> [0]
+    * np.arange(5) ==> [0 1 2 3 4]
+    Multiple entries are separated with semicolon or blank space (new line, space, tab):
 
-    Separate entries with comma or new line:
+    * 0:0.2:1;5 will give [0 0.2 0.4 0.6 0.8 1 5]
+    * 0:0.2:1;5:1:7 will give [0 0.2 0.4 0.6 0.8 1 5 6 7]    
+    * np.arange(5);10:1:14 will give [0 1 2 3 4 10 11 12 13 14]    
 
-    * 0:0.2:1,5 will give [0 0.2 0.4 0.6 0.8 1 5]
-    * 0:0.2:1,5:1:7 will give [0 0.2 0.4 0.6 0.8 1 5 6 7]
     """
 
     scan_subtype = 'Sparse'
