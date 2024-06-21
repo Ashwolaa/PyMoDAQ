@@ -27,7 +27,7 @@ logger = set_logger(get_module_name(__file__))
 config = Config()
 scanner_factory = ScannerFactory()
 
-class SequentialScanner(QObject, ParameterManager,ActionManager):                    
+class SequentialScanner(QObject,ActionManager,):                    
     """Main Object to define a PyMoDAQ scan and create a UI to set it
 
     Parameters
@@ -50,8 +50,8 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
 
     def __init__(self, parent_widget: QtWidgets.QWidget = None, actuator= None, scanner_type: str = None
                  ):    
+        # distribution = DataDistribution['uniform']  # because in 1D it doesn't matter is spread or
         QObject.__init__(self)
-        ParameterManager.__init__(self,action_list=())    
         ActionManager.__init__(self,toolbar=QtWidgets.QToolBar())       
         self.setup_actions()
         if parent_widget is None:
@@ -64,7 +64,6 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
 
         self.scanner.settings.sigTreeStateChanged.connect(self.updateDisplayWidget)
 
-
         
     def setup_ui(self):
         self.scanner_settings_widget = QtWidgets.QWidget()
@@ -72,7 +71,7 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
         self.scanner_settings_widget.setLayout(self.scanner_settings_layout)
         self.scanner_settings_layout.setContentsMargins(0, 0, 0, 0)
         self.parent_widget.layout().addWidget(self.scanner_settings_widget)            
-        
+
         label = QtWidgets.QLabel()
         label.setText(f'{self.actuator.title}')
         label.setStyleSheet("font-weight: bold")
@@ -125,8 +124,7 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
         displayViewer.set_axis_label(axis_settings=dict(orientation='left', label='Positions', units=''))   
         displayViewer.parent.setVisible(self.is_action_checked('show_positions'))             
         return displayViewer
-    
-    
+        
     def makeTable(self,):        
         positions = np.squeeze(self.scanner.positions)
         displayTable = QtWidgets.QTableWidget()
@@ -134,6 +132,8 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
         displayTable.setRowCount(len(positions))        
         displayTable.setHorizontalHeaderLabels(['Steps','Positions'])
         displayTable.verticalHeader().hide()
+        displayTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        displayTable.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         for ind,pos in enumerate(positions):
             step_item = QtWidgets.QTableWidgetItem(str(ind))
             step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -141,11 +141,8 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
             pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
             displayTable.setItem(ind,0,step_item)
             displayTable.setItem(ind,1,pos_item)                       
-        displayTable.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        displayTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        displayTable.resizeColumnsToContents()        
         displayTable.setMaximumWidth(displayTable.horizontalHeader().length() + 
-                         displayTable.verticalHeader().width())   
+                         displayTable.verticalHeader().width())                               
         displayTable.setVisible(self.is_action_checked('show_table')) 
         return displayTable
     
@@ -188,10 +185,12 @@ class SequentialScanner(QObject, ParameterManager,ActionManager):
         self.displayLayout.addWidget(self.displayViewer_widget)       
         self.displayLayout.addWidget(self.displayTable)
         self.scanner_updated_signal.connect(self.updateDisplayWidget)
+        self.scanner_updated_signal.emit()
 
     def updateDisplayWidget(self,):
-        self.updateTable()
-        self.updateViewer()
+        if self.positions is not None:
+            self.updateTable()
+            self.updateViewer()
 
     @property
     def positions(self,):
