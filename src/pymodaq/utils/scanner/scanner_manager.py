@@ -7,7 +7,6 @@ from qtpy import QtWidgets, QtCore
 from qtpy.QtCore import QObject, Signal, Slot
 
 from pymodaq.utils.QObjects.list import SignalList
-from pymodaq.utils.QObjects.list import SignalList
 from pymodaq.utils.QObjects.dict import SignalDict,SignalOrderedDict
 
 from pymodaq.utils.logger import set_logger, get_module_name
@@ -116,7 +115,6 @@ class ScannerManager(QObject, ParameterManager):
         self.parent_widget.layout().addWidget(self._scanners_settings_widget)
         self.settings_tree.setMinimumHeight(110)
         self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-<<<<<<< HEAD
         self.makeTable()
         self.scanner_updated_signal.connect(self.updateTable)
         self.scanner_updated_signal.connect(self._update_steps)
@@ -198,11 +196,11 @@ class ScannerManager(QObject, ParameterManager):
         positions_array = self.get_positions()
         L_steps = len(positions_array)
         if L_steps>self.limTableSize:       
-            self.displayTable.setRowCount(L_steps)                
-        else:
             self.displayTable.setRowCount(self.limTableSize)                
+        else:
+            self.displayTable.setRowCount(L_steps)                
         self.displayTable.setColumnCount(1+len(self.scanners))   
-        self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act.title}' for act in self.actuators])
+        self.displayTable.setHorizontalHeaderLabels(['Steps']+[f'{act}' for act in self.ordering])
         for ind,positions in enumerate(positions_array[:self.limTableSize]):
             step_item = QtWidgets.QTableWidgetItem(str(ind))
             step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -210,7 +208,9 @@ class ScannerManager(QObject, ParameterManager):
             for ind_pos,pos in enumerate(positions):
                 pos_item = QtWidgets.QTableWidgetItem(str(pos))
                 pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
-                self.displayTable.setItem(ind,ind_pos+1,pos_item)                 
+                self.displayTable.setItem(ind,ind_pos+1,pos_item)   
+
+    def showTable(self,):
         self.displayTable.show()
         self.displayTable.resizeColumnsToContents()               
 
@@ -226,28 +226,15 @@ class ScannerManager(QObject, ParameterManager):
         self.scanner_updated_signal.emit()
 
     @property
-    def scanner(self,index):
-        return self._scanners[index].scanner
+    def scanner(self,act):
+        return self.actuators[act].scanner
 
     @property
-<<<<<<< HEAD
-    def scanners(self):
-        """list of str: Returns as a list the selected scanners that will make the actual scan"""
-        return self._scanners
-    
-    @scanners.setter
-    def scanners(self, scan_list):
-        """list of str: Returns as a list the selected scanners that will make the actual scan"""
-        self._scanners=scan_list
-        self._scanners.resized.connect(self._update_steps)
-
-=======
     def scanners(self,):
         """dict of scans: Returns as a dict the selected scanners that will make the actual scan"""
         scanners = {key.title: scans for key,scans in self.actuators.items()}
         return scanners
         
->>>>>>> 94081bae (update pgn library and organize display)
     @property
     def actuators(self,):
         """dict of actuators: Returns as a dict the name of the selected actuators to describe the actual scan"""
@@ -255,8 +242,6 @@ class ScannerManager(QObject, ParameterManager):
 
     @actuators.setter
     def actuators(self, act_list):
-<<<<<<< HEAD
-=======
         """Definition of actuators, a dictionnary is made with actuators as keys and scanner object as values
         Args:
             act_list (list(DAQ_Move)): _description_
@@ -265,16 +250,14 @@ class ScannerManager(QObject, ParameterManager):
         for act in self.actuators.copy(): #Loop through copy to avoid RuntimeError: OrderedDict mutated during iteration
             if act not in act_list:
                 self.removeScanner(act)  
->>>>>>> 94081bae (update pgn library and organize display)
         for act in act_list:
             if act not in self.actuators:
-                self.actuators.append(act)
-                self.makeScanner(act)  
-        for act in self.actuators:
-            if act not in act_list:
-                self.actuators.remove(act)
-                self.removeScanner(act)          
+                self.actuators[act] = self.makeScanner(act)     
+        self.ordering = [act.title for act in self.actuators]
+        self._actuators.resized.connect(self.updateGUI)
+
         self.updateParamTree()
+        # self.updateGUI()
 
 
     def get_scan_info(self) -> ScanInfo:
@@ -283,24 +266,23 @@ class ScannerManager(QObject, ParameterManager):
                         axes_indexes=self._scanner.axes_indexes, axes_unique=self._scanner.axes_unique,
                         selected_actuators=[act.title for act in self.actuators])
 
-<<<<<<< HEAD
     def get_nav_axes(self) -> List[Axis]:
         return [scan.get_nav_axes()[0] for scan in self.scanners.values()]     
 
 
     def get_scan_shape(self):
-        return tuple([len(scan.axes_unique) for scan in self.scanners])
+        return tuple([len(scan.axes_unique) for scan in self.scanners.values()])
 
     def get_indexes_from_scan_index(self, scan_index: int) -> Tuple[int]:
         """To be reimplemented. Calculations of indexes within the scan"""
         return self._scanner.get_indexes_from_scan_index(scan_index)
 
     def _update_steps(self):
-        self.settings.child('scan_parameters','n_steps').setValue(self.n_steps)                     
+        self.settings.child('scan_parameters','n_steps').setValue(self.tot_steps)                     
 
     @property
     def steps(self):
-        return [scan.n_steps for scan in self.scanners]     
+        return [scan.n_steps for scan in self.scanners.values()]     
 
     @property
     def tot_steps(self):
@@ -312,13 +294,8 @@ class ScannerManager(QObject, ParameterManager):
 
     @property
     def positions(self):
-        return self._scanner.positions
-    
-    @property
-    def positions(self,scan='all'):        
-        self._scanners.index(scan)
-        return self._scanner.positions    
-
+        return self.get_positions()
+      
     def positions_at(self, index: int) -> DataToExport:
         """ Extract the actuators positions at a given index in the scan as a DataToExport of DataActuators"""
         dte = DataToExport('scanner')
@@ -329,20 +306,10 @@ class ScannerManager(QObject, ParameterManager):
     @property
     def axes_indexes(self):
         return self._scanner.axes_indexes
-
+    
     @property
     def axes_unique(self):
-        axes_unique = []
-        for scanner in self._scanners:
-            axes_unique.append(scanner.axes_unique)
-        return axes_unique    
-
-    @property
-    def axes_unique(self):
-        axes_unique = []
-        for scanner in self._scanners:
-            axes_unique.append(scanner.axes_unique)
-        return axes_unique
+        return [scan.axes_unique for scan in self.scanners]     
 
     @property
     def distribution(self):

@@ -26,6 +26,7 @@ config = configmod.Config()
 class Scan1DBase(ScannerBase):
     scan_type = 'Scan1D'
     
+    
     params = []
     n_axes = 1
     distribution = DataDistribution['uniform']
