@@ -109,7 +109,7 @@ class ParameterEx(ParameterManager):
                     ' pymodaq.utils.scanner module'},
             {'title': 'Table view', 'name': 'tabular_table_multitypes', 'type': 'table_view',
              'delegate': [table.BooleanDelegate,table.SpinBoxDelegate,table.SpinBoxDelegate], 'menu': True,
-             'value': table.TableModel([[True, 0.2, 0.3]], ['value1', 'value2', 'value3']),
+             'value': table.TableModel([[True, 0.2, 0.3]], ['Bool', 'Spinbox1', 'Spinbox2']),
              'tip': 'Possibility to alternate between different delegate'},                       
         ]},  # The advantage of the Table model lies in its modularity for concrete examples see the
         # TableModelTabular and the TableModelSequential custom models in the pymodaq.utils.scanner module
