@@ -96,14 +96,14 @@ class TestTableView:
             import pymodaq_gui.utils.widgets.table as table
 
             params = {'title': 'Table view', 'name': 'tabular_table_multitypes', 'type': 'table_view',
-             'delegate': [table.BooleanDelegate,table.SpinBoxDelegate,table.SpinBoxDelegate], 'menu': True,
-             'value': table.TableModel([[True, 0.2, 0.3]], ['value1', 'value2', 'value3']),
-             'tip': 'Possibility to alternate between different delegate'}
+             'delegate': [None,table.BooleanDelegate,None,table.SpinBoxDelegate,], 'menu': True,
+             'value': table.TableModel([[True, False,0.15,0.10]], ['Bool_Standard', 'Bool_Delegate', 'Spinbox_standard', 'Spinbox_delegate']),
+             'tip': 'Possibility to alternate between different delegate'}  
             tree = init_ParameterTree
             settings = Parameter.create(**params)
             tree.setParameters(settings, showTop=False)
-            assert settings.value().get_data_all() == [[True, 0.2, 0.3]]                    
+            assert settings.value().get_data_all() == [[True, False,0.15,0.10]]                 
             # Keeping selection order + erase non existing items
-            settings.setValue(table.TableModel([[True, 0.2, 0.3],[False, 1.5, 2.6]], ['value1', 'value2', 'value3']))
-            assert settings.value().get_data_all() == [[True, 0.2, 0.3],[False, 1.5, 2.6]]
+            settings.setValue(table.TableModel([[False, True,0.25,0.20],[True, False,0.42,0.40]], ['Bool_Standard', 'Bool_Delegate', 'Spinbox_standard', 'Spinbox_delegate']))
+            assert settings.value().get_data_all() == [[False, True,0.25,0.20],[True, False,0.42,0.40]]
             
