@@ -123,13 +123,16 @@ class TableViewParameterItem(WidgetParameterItem):
         ParameterItem.optsChanged(self, param, opts)
 
         if 'delegate' in opts:
-            if hasattr(opts['delegate'],"__len__"): #Testing if an array or a single input is given
-                for col,delegate in enumerate(opts['delegate']): #If array, associate each column with its associated type
-                    styledItemDelegate = QtWidgets.QStyledItemDelegate()
-                    styledItemDelegate.setItemEditorFactory(delegate())
-                    self.widget.setItemDelegateForColumn(col,QtWidgets.QStyledItemDelegate().setItemEditorFactory(delegate()))
-            else:
-                styledItemDelegate = QtWidgets.QStyledItemDelegate() #If single input, associate all columns to the given type
+            if hasattr(opts['delegate'],"__len__"):              #Testing if an array or a single input is given                
+                delegates = []
+                for col,delegate in enumerate(opts['delegate']): #If array, associate each column with its associated type                    
+                    delegates.append(QtWidgets.QStyledItemDelegate(self.widget))
+                    if delegate is not None:
+                        delegates[col].setItemEditorFactory(delegate())
+                    self.widget.setItemDelegateForColumn(col,delegates[col])
+
+            else:                                                #If single input, associate all columns to the given type
+                styledItemDelegate = QtWidgets.QStyledItemDelegate(self.widget) 
                 styledItemDelegate.setItemEditorFactory(opts['delegate']())
                 self.widget.setItemDelegate(styledItemDelegate)   
 
