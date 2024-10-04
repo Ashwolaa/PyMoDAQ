@@ -96,7 +96,7 @@ class TestTableView:
             import pymodaq_gui.utils.widgets.table as table
 
             params = {'title': 'Table view', 'name': 'tabular_table_multitypes', 'type': 'table_view',
-             'delegate': [None,table.BooleanDelegate,None,table.SpinBoxDelegate,], 'menu': True,
+             'delegate': [None,table.BooleanDelegate(),None,table.SpinBoxDelegate(),], 'menu': True,
              'value': table.TableModel([[True, False,0.15,0.10]], ['Bool_Standard', 'Bool_Delegate', 'Spinbox_standard', 'Spinbox_delegate']),
              'tip': 'Possibility to alternate between different delegate'}  
             tree = init_ParameterTree

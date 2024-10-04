@@ -128,12 +128,12 @@ class TableViewParameterItem(WidgetParameterItem):
                 for col,delegate in enumerate(opts['delegate']): #If array, associate each column with its associated type                    
                     delegates.append(QtWidgets.QStyledItemDelegate(self.widget))
                     if delegate is not None:
-                        delegates[col].setItemEditorFactory(delegate())
+                        delegates[col].setItemEditorFactory(delegate)
                     self.widget.setItemDelegateForColumn(col,delegates[col])
 
             else:                                                #If single input, associate all columns to the given type
                 styledItemDelegate = QtWidgets.QStyledItemDelegate(self.widget) 
-                styledItemDelegate.setItemEditorFactory(opts['delegate']())
+                styledItemDelegate.setItemEditorFactory(opts['delegate'])
                 self.widget.setItemDelegate(styledItemDelegate)   
 
         if 'menu' in opts:
