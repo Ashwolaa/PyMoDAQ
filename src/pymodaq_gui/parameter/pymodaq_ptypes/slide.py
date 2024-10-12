@@ -134,8 +134,8 @@ class SliderParameterItem(WidgetParameterItem):
         #Additional changes according to user syntax
         if 'subtype' not in opts:
             opts['subtype'] = 'linear'
-
-        if opts['bounds'] is None:
+            
+        if 'bounds' not in opts:
             defs['bounds'] = [0., float(self.param.value() or 1)]  # max value set to default value when no max given or 1 if no default
             if 'limits' not in opts:
                 if 'min' in opts:
