@@ -27,7 +27,7 @@ logger = set_logger(get_module_name(__file__))
 config = Config()
 scanner_factory = ScannerFactory()
 
-class ScannerSelector(QObject, ParameterManager,ActionManager):                    
+class SequentialScanner(QObject,ActionManager,):                    
     """Main Object to define a PyMoDAQ scan and create a UI to set it
 
     Parameters
@@ -50,8 +50,8 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
 
     def __init__(self, parent_widget: QtWidgets.QWidget = None, actuator= None, scanner_type: str = None
                  ):    
+        # distribution = DataDistribution['uniform']  # because in 1D it doesn't matter is spread or
         QObject.__init__(self)
-        ParameterManager.__init__(self)    
         ActionManager.__init__(self,toolbar=QtWidgets.QToolBar())       
         self.setup_actions()
         if parent_widget is None:
@@ -64,7 +64,6 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
 
         self.scanner.settings.sigTreeStateChanged.connect(self.updateDisplayWidget)
 
-
         
     def setup_ui(self):
         self.scanner_settings_widget = QtWidgets.QWidget()
@@ -72,7 +71,7 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.scanner_settings_widget.setLayout(self.scanner_settings_layout)
         self.scanner_settings_layout.setContentsMargins(0, 0, 0, 0)
         self.parent_widget.layout().addWidget(self.scanner_settings_widget)            
-        
+
         label = QtWidgets.QLabel()
         label.setText(f'{self.actuator.title}')
         label.setStyleSheet("font-weight: bold")
@@ -89,9 +88,11 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         
         self.scanType = QtWidgets.QComboBox()
         self.scanType.addItems(scanner_factory.scan_sub_types(scanner_factory.scan_types()[0]))
+        
         self.scanType.currentIndexChanged.connect(self.updateScanner)                        
         widget.layout().addWidget(self.scanType)        
-  
+        verticalSpacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding,) 
+        widget.layout().addItem(verticalSpacer)
         widget.layout().addWidget(self.toolbar)        
 
         self.scanner_settings_layout.addWidget(widget)                                 
@@ -123,8 +124,7 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         displayViewer.set_axis_label(axis_settings=dict(orientation='left', label='Positions', units=''))   
         displayViewer.parent.setVisible(self.is_action_checked('show_positions'))             
         return displayViewer
-    
-    
+        
     def makeTable(self,):        
         positions = np.squeeze(self.scanner.positions)
         displayTable = QtWidgets.QTableWidget()
@@ -132,6 +132,8 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         displayTable.setRowCount(len(positions))        
         displayTable.setHorizontalHeaderLabels(['Steps','Positions'])
         displayTable.verticalHeader().hide()
+        displayTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        displayTable.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         for ind,pos in enumerate(positions):
             step_item = QtWidgets.QTableWidgetItem(str(ind))
             step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -139,11 +141,8 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
             pos_item.setFlags(pos_item.flags() & ~QtCore.Qt.ItemIsEditable)            
             displayTable.setItem(ind,0,step_item)
             displayTable.setItem(ind,1,pos_item)                       
-        displayTable.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        displayTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        displayTable.resizeColumnsToContents()        
         displayTable.setMaximumWidth(displayTable.horizontalHeader().length() + 
-                         displayTable.verticalHeader().width())   
+                         displayTable.verticalHeader().width())                               
         displayTable.setVisible(self.is_action_checked('show_table')) 
         return displayTable
     
@@ -152,7 +151,6 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
             self.displayTable.setRowCount(self.limTableSize)
         else:
             self.displayTable.setRowCount(self.n_steps)
-
         for ind,pos in enumerate(self.positions[:self.limTableSize]):
                 step_item = QtWidgets.QTableWidgetItem(str(ind))
                 step_item.setFlags(step_item.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -166,17 +164,18 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.displayViewer.show_data([self.positions])
 
     def setup_actions(self):
+
+        self.add_action('randomize_positions','Randomize', 'shuffle', 'Randomize given positions', checkable=True,)
+        self.add_action('backandforth','Back and forth', 'back-and-forth', 'Scan will start and finish near its first positions', checkable=True)
+        self.connect_action('backandforth', self.scanner_updated_signal.emit)
+        self.connect_action('randomize_positions', self.scanner_updated_signal.emit)
+        # spacer = QtWidgets.QWidget()
+        # spacer.setSizePolicy( QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        # self.add_widget('spacer',spacer)
         self.add_action('show_positions', 'Show positions', '2d', 'Display positions on a graphic', checkable=True)
         self.connect_action('show_positions', self.showViewer)
         self.add_action('show_table', 'Table of positions', 'Calculator', 'Display positions in a table', checkable=True)
         self.connect_action('show_table', self.showTable)
-        self.add_action('randomize_positions','Randomize', checkable=True)
-        self.add_action('backandforth','Back and forth', checkable=True)
-        self.connect_action('backandforth', self.scanner_updated_signal.emit)
-        self.connect_action('randomize_positions', self.scanner_updated_signal.emit)
-
-
-
     def makeDisplayWidget(self,):      
         self.displayWidget = QtWidgets.QWidget()
         self.displayLayout = QtWidgets.QHBoxLayout()  
@@ -186,16 +185,18 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
         self.displayLayout.addWidget(self.displayViewer_widget)       
         self.displayLayout.addWidget(self.displayTable)
         self.scanner_updated_signal.connect(self.updateDisplayWidget)
+        self.scanner_updated_signal.emit()
 
     def updateDisplayWidget(self,):
-        self.updateTable()
-        self.updateViewer()
+        if self.positions is not None:
+            self.updateTable()
+            self.updateViewer()
 
     @property
     def positions(self,):
         # import copy
         # positions = copy.deepcopy(np.squeeze(self.scanner.positions))    
-        positions = np.squeeze(self.scanner.positions)    
+        positions = np.squeeze(self.scanner.positions,axis=1)    
         if self.is_action_checked('randomize_positions'):    
             rng = np.random.default_rng()
             numbers = rng.choice(len(positions), size=len(positions), replace=False)
@@ -203,6 +204,7 @@ class ScannerSelector(QObject, ParameterManager,ActionManager):
             # np.random.shuffle(positions)
         if self.is_action_checked('backandforth'):        
             positions = np.concatenate([positions[0::2],np.flip(positions[1::2])])
+        positions = np.round(positions,8)
         return positions
     
     @property    

@@ -26,12 +26,14 @@ config = configmod.Config()
 class Scan1DBase(ScannerBase):
     scan_type = 'Scan1D'
     
+    
     params = []
     n_axes = 1
     distribution = DataDistribution['uniform']
 
     def __init__(self, actuators: List = None, **_ignored):
         super().__init__(actuators=actuators)
+        
         
     def value_changed(self, param):
         try:
@@ -120,20 +122,25 @@ class Scan1DRandom(Scan1DLinear):
         
 @ScannerFactory.register()
 class Scan1DSparse(Scan1DBase):
-    """ Syntax goes as start:step:stop or with single entry
+    """ Syntax goes either as:
+    - start:step:stop
+    - single entry
+    - np command
 
-    * 0:0.2:1 will give [0 0.2 0.4 0.6 0.8 1]
-    * 0 will give [0]
+    * 0:0.2:1 ==> [0 0.2 0.4 0.6 0.8 1]
+    * 0 ==> [0]
+    * np.arange(5) ==> [0 1 2 3 4]
+    Multiple entries are separated with semicolon or blank space (new line, space, tab):
 
-    Separate entries with comma or new line:
+    * 0:0.2:1;5 will give [0 0.2 0.4 0.6 0.8 1 5]
+    * 0:0.2:1;5:1:7 will give [0 0.2 0.4 0.6 0.8 1 5 6 7]    
+    * np.arange(5);10:1:14 will give [0 1 2 3 4 10 11 12 13 14]    
 
-    * 0:0.2:1,5 will give [0 0.2 0.4 0.6 0.8 1 5]
-    * 0:0.2:1,5:1:7 will give [0 0.2 0.4 0.6 0.8 1 5 6 7]
     """
 
     scan_subtype = 'Sparse'
     params = [
-        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text_pb', 'value': '0:0.1:1', }
+        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text', 'value': '0:0.1:1', }
         ]
     n_axes = 1
     distribution = DataDistribution['uniform']  # because in 1D it doesn't matter is spread or
@@ -147,19 +154,25 @@ class Scan1DSparse(Scan1DBase):
         # self.menu.addAction('Save as txt', self.save_txt)        
 
     def set_scan(self):
+        series = np.asarray([])
         try:
-            range_strings = re.findall("[^,\s]+", self.settings['parsed_string'])
-            series = np.asarray([])
-            for range_string in range_strings:
-                number_strings = re.findall("[^:]+", range_string)  # Extract the numbers by splitting on :.
-                this_range = np.asarray([])
-                if len(number_strings) == 3:  # 3 Numbers specify a range
-                    start, step, stop = [float(number) for number in number_strings]
-                    this_range = mutils.linspace_step(start, stop, step)
-                elif len(number_strings) == 1:  # 1 number just specifies a single number
-                    this_range = np.asarray([float(number_strings[0])])
-                series = np.concatenate((series, this_range))
-
+            _strings = re.findall("[^;\s]+", self.settings['parsed_string'])
+            for _string in _strings:
+                try:
+                    this_range = eval(_string)
+                    this_range = this_range.flatten()
+                    series = np.concatenate((series, this_range))
+                except:
+                    range_strings = re.findall("[^,]+", _string)
+                    for range_string in range_strings:
+                        number_strings = re.findall("[^:]+", range_string)  # Extract the numbers by splitting on :.
+                        this_range = np.asarray([])
+                        if len(number_strings) == 3:  # 3 Numbers specify a range
+                            start, step, stop = [float(number) for number in number_strings]
+                            this_range = mutils.linspace_step(start, stop, step)
+                        elif len(number_strings) == 1:  # 1 number just specifies a single number
+                            this_range = np.asarray([float(number_strings[0])])
+                        series = np.concatenate((series, this_range))
             self.positions = np.atleast_1d(np.squeeze(series))
             self.get_info_from_positions(self.positions)
         except Exception as e:
