@@ -1,29 +1,29 @@
 from __future__ import annotations
-from typing import Tuple, List, TYPE_CHECKING
+
 from collections import OrderedDict
-
-
-from qtpy import QtWidgets, QtCore
-from qtpy.QtCore import QObject, Signal, Slot
-
-from pymodaq.utils.QObjects.list import SignalList
-from pymodaq.utils.QObjects.dict import SignalDict,SignalOrderedDict
-
-from pymodaq.utils.logger import set_logger, get_module_name
-from pymodaq.utils.config import Config
-from pymodaq.utils.array_manipulation import makeSnake
-from pymodaq.utils.scanner import scanner_selector,sequential_scanner
-from pymodaq.utils.scanner.scan_factory import ScannerFactory, ScannerBase
-from pymodaq.utils.managers.parameter_manager import ParameterManager, Parameter
-import pymodaq.utils.daq_utils as utils
-import pymodaq.utils.parameter.utils as putils
-from pymodaq.utils.scanner.utils import ScanInfo
-from pymodaq.utils.plotting.scan_selector import Selector
-from pymodaq.utils.data import DataToExport, DataActuator
-from itertools import permutations,product
-from pymodaq.utils.data import Axis, DataDistribution
+from itertools import permutations, product
+from typing import TYPE_CHECKING, List, Tuple
 
 import numpy as np
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import QObject, Signal, Slot
+
+import pymodaq.utils.daq_utils as utils
+import pymodaq.utils.parameter.utils as putils
+from pymodaq.utils.array_manipulation import makeSnake
+from pymodaq.utils.config import Config
+from pymodaq.utils.data import (Axis, DataActuator, DataDistribution,
+                                DataToExport)
+from pymodaq.utils.logger import get_module_name, set_logger
+from pymodaq.utils.managers.parameter_manager import (Parameter,
+                                                      ParameterManager)
+from pymodaq.utils.plotting.scan_selector import Selector
+from pymodaq.utils.QObjects.dict import SignalDict, SignalOrderedDict
+from pymodaq.utils.QObjects.list import SignalList
+from pymodaq.utils.scanner import scanner_selector, sequential_scanner
+from pymodaq.utils.scanner.scan_factory import ScannerBase, ScannerFactory
+from pymodaq.utils.scanner.utils import ScanInfo
+
 if TYPE_CHECKING:
     from pymodaq.control_modules.daq_move import DAQ_Move
 
@@ -52,7 +52,7 @@ class ScannerManager(QObject, ParameterManager):
     
     
     scanner_updated_signal = Signal()
-    ordering_signal = Signal()
+    ordering_signal = Signal(list)
     settings_name = 'scanner'
     params = [
         {'title': 'Scan parameters:', 'name': 'scan_parameters', 'type': 'group',
@@ -225,8 +225,9 @@ class ScannerManager(QObject, ParameterManager):
 
     def updateOrdering(self,):      
         l1 = self.settings.child('scan_parameters','ordering').value()            
-        self.ordering_signal.emit(l1)
+        
         if l1 and l1 != self.ordering:            
+            self.ordering_signal.emit(l1)            
             child = dict()            
             for act in self.ordering:
                 child[act] = self._scanners_settings_widget.layout().takeAt(0)
@@ -256,7 +257,10 @@ class ScannerManager(QObject, ParameterManager):
         Args:
             act_list (list(DAQ_Move)): _description_
         """
-        self._actuators.resized.disconnect(self.updateGUI)
+        try:
+            self._actuators.resized.disconnect(self.updateGUI)
+        except:
+            pass
         for act in self.actuators.copy(): #Loop through copy to avoid RuntimeError: OrderedDict mutated during iteration
             if act not in act_list:
                 self.removeScanner(act)  
@@ -404,6 +408,7 @@ def main():
 
 if __name__ == '__main__':
     import sys
+
     from qtpy import QtWidgets
     main()
 

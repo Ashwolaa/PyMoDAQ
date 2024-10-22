@@ -4,17 +4,19 @@ Created the 05/12/2022
 
 @author: Sebastien Weber
 """
-from typing import List, Tuple, Any, TYPE_CHECKING
 import re
+from typing import TYPE_CHECKING, Any, List, Tuple
+
 import numpy as np
-from pymodaq.utils import gui_utils as gutils
-from pymodaq.utils.data import Axis, DataDistribution
-from pymodaq.utils.logger import set_logger, get_module_name
-from pymodaq.utils import math_utils as mutils
+
 from pymodaq.utils import config as configmod
+from pymodaq.utils import gui_utils as gutils
+from pymodaq.utils import math_utils as mutils
+from pymodaq.utils.data import Axis, DataDistribution
+from pymodaq.utils.logger import get_module_name, set_logger
 from pymodaq.utils.plotting.scan_selector import Selector
 
-from ..scan_factory import ScannerFactory, ScannerBase, ScanParameterManager
+from ..scan_factory import ScannerBase, ScannerFactory, ScanParameterManager
 
 if TYPE_CHECKING:
     from pymodaq.control_modules.daq_move import DAQ_Move
@@ -25,7 +27,6 @@ config = configmod.Config()
 
 class Scan1DBase(ScannerBase):
     scan_type = 'Scan1D'
-    
     
     params = []
     n_axes = 1
@@ -72,13 +73,8 @@ class Scan1DLinear(Scan1DBase):
     n_axes = 1
     distribution = DataDistribution['uniform']
 
-<<<<<<< HEAD
-    def __init__(self, actuators: List['DAQ_Move'] = None, **_ignored):
-        super().__init__(actuators=actuators)
-=======
     def __init__(self, actuators: List = None, **_ignored):
-        ScannerBase.__init__(self, actuators=actuators)        
->>>>>>> ecefa594 (connect display and change of settings)
+        super().__init__(actuators=actuators)        
 
     def set_scan(self):
         self.positions = mutils.linspace_step(self.settings['start'], self.settings['stop'],
