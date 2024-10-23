@@ -32,7 +32,7 @@ class Scan1DBase(ScannerBase):
     n_axes = 1
     distribution = DataDistribution['uniform']
 
-    def __init__(self, actuators: List = None, **_ignored):
+    def __init__(self, actuators: List['DAQ_Move'] = None, **_ignored):
         super().__init__(actuators=actuators)
         
         

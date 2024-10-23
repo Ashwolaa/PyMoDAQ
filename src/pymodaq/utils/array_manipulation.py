@@ -361,14 +361,48 @@ def min_ind(x, axis=None):
 
 def makeSnake(arr,dims,):
     L_dims = len(dims)
-    [dims[0],np.prod(dims[1:L_dims]),L_dims]
+    S = arr.shape
     arr = np.reshape(arr,[dims[0],np.prod(dims[1:L_dims]),L_dims])
-    for i in range(dims[L_dims-2]):
+
+
+    for i in range(dims[0]):
+        arr_sel = arr[i]
+        if L_dims>2:
+            for j in np.flip(np.arange(L_dims))[:-1]:
+                # if j%2:
+                    # arr_sel[:,j] = np.flip(arr_sel[:,j])
+                flip_count = int(np.prod(dims[j:]))
+                arr_sel[:,j] = flipArray(arr_sel[:,j],flip_count)
         if i%2:
-            arr[i] = np.flipud(arr[i])            
-        arr[i] = makeSnake2D(arr[i],dims[L_dims-1],dims[L_dims])
+            arr_sel=np.flipud(arr_sel)
+                # arr_sel = arr[i][:,-1-j]
+                # if j%2:
+                    # arr_sel=np.flipud(arr_sel)
+                # arr[i][:,-1-j] = flipArray(arr[i][:,-1-j],int(np.prod(dims[-1:-1-j])))
+        # else:
             
-                        
+            # arr_sel[:,-1-i] = flipArray(arr_sel[:,-1-i],dims[-1-i],doFlip=i%2)
+        # if i%2:
+        # arr_sel = np.flipud(arr_sel)            
+        # arr[i] = makeSnake2D(arr[i],(dims[L_dims-1],dims[L_dims]))
+        # arr[i] = makeSnake2D(arr[i],(dims[L_dims-1],dims[L_dims]))
+        # if L_dims>2:
+        # arr_sel[:,-1] = flipArray(arr_sel[:,-1],dims[-1])
+            # arr[i] = makeSnake2D(arr[i],(dims[L_dims-2],dims[L_dims-1]))
+        arr[i] = arr_sel
+    arr = np.reshape(arr,S)    
+    return arr
+
+def flipArray(arr,dim):    
+    N_slices = int(arr.size/dim)
+    for i in range(N_slices):
+        start = (2*i+1)*dim
+        end = start+dim
+        sel = slice(start,end)
+        arr[sel] = np.flip(arr[sel])        
+    return arr
+    # arr[i][:,-1]
+
 def makeSnake2D(arr,shape,):
     for i in range(shape[0]//2): 
         start = (2*i+1)*shape[1] 
@@ -378,8 +412,9 @@ def makeSnake2D(arr,shape,):
 
 
 if __name__ == '__main__':                                          # pragma: no cover
-    from pymodaq.utils import daq_utils as utils
     import matplotlib.pyplot as plt
+
+    from pymodaq.utils import daq_utils as utils
 
     x = random_step(00, 100, 5)
     y = random_step(00, 100, 5)

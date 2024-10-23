@@ -164,6 +164,8 @@ class ScannerManager(QObject, ParameterManager):
                 pass
             elif 'scan_type' == 'sequential':     
                 pass
+        elif param.name() == 'shuffling':
+            self.updateTable()
 
     def makeSnake2D(self,arr,L1,L2):
         for i in range(L1//2): 
@@ -174,11 +176,21 @@ class ScannerManager(QObject, ParameterManager):
 
     def get_indexing(self,shuffler=None):        
         indexing = [np.arange(self.scanners[act].n_steps) for act in self.ordering]
-        indexing_array = np.array(list(product(*indexing)))                      
+        indexing_array = np.array(list(product(*indexing))) 
+        if shuffler =='Snake':
+            indexing_array = makeSnake(indexing_array,indexing_array)
         return indexing_array
     def get_positions(self,shuffler=None):
         positions = [self.scanners[act].positions for act in self.ordering]
-        positions_array = np.array(list(product(*positions)))      
+        positions_array = np.array(list(product(*positions)))    
+        if positions_array.size>0:
+            shuffler = self.settings.child('scan_parameters','shuffling').value()   
+            if shuffler == 'Snake':
+                dims = [len(pos) for pos in positions]
+                positions_array = makeSnake(positions_array,dims)
+            # indexing_array = self.get_indexing(shuffler)
+            # positions_array = positions_array[indexing_array]
+        #  makeSnake()
         return positions_array    
     
     # def displayPositions(self,):

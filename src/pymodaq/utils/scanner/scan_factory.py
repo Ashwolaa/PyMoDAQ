@@ -7,20 +7,20 @@ Created the 05/12/2022
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Callable, Union, List, Tuple, TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Callable, List, Tuple, Union
 
 import numpy as np
 from qtpy import QtWidgets
 
-from pymodaq.utils.managers.parameter_manager import ParameterManager, Parameter
-from pymodaq.utils.parameter.utils import get_param_path, iter_children_params
-from pymodaq.utils.factory import ObjectFactory
-from pymodaq.utils.logger import set_logger, get_module_name
-from pymodaq.utils.data import Axis, DataDistribution
-from pymodaq.utils.abstract import abstract_attribute
-from pymodaq.utils import math_utils as mutils
 from pymodaq.utils import config as configmod
+from pymodaq.utils import math_utils as mutils
+from pymodaq.utils.abstract import abstract_attribute
+from pymodaq.utils.data import Axis, DataDistribution
+from pymodaq.utils.factory import ObjectFactory
+from pymodaq.utils.logger import get_module_name, set_logger
+from pymodaq.utils.managers.parameter_manager import (Parameter,
+                                                      ParameterManager)
+from pymodaq.utils.parameter.utils import get_param_path, iter_children_params
 from pymodaq.utils.scanner.scan_config import ScanConfig
 
 if TYPE_CHECKING:
