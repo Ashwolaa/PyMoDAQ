@@ -954,6 +954,14 @@ class DashBoard(CustomApp):
         self.settings_menu.setEnabled(True)
         self.preset_menu.setEnabled(status)
 
+    def make_loading_menu(self, menu:QMenu, files_folder:Path, manager_enum):
+        menu.clear()
+        for file in files_folder.iterdir():
+            if file.suffix == ".xml":
+                menu.addAction(self.get_action(
+                        self.get_action_from_file(file, manager_enum)
+                    )
+                )
     def start_plugin_manager(self):
         self.win_plug_manager = QtWidgets.QMainWindow()
         self.win_plug_manager.setWindowTitle("PyMoDAQ Plugin Manager")
