@@ -20,6 +20,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QDialogButtonBox,
     QMessageBox,
+    QMenu,
 )
 from time import perf_counter
 import numpy as np
@@ -79,12 +80,25 @@ roi_path = config_mod_pymodaq.get_set_roi_path()
 remote_path = config_mod_pymodaq.get_set_remote_path()
 
 
-class ManagerEnums(BaseEnum):
-    preset = 0
-    remote = 1
-    overshoot = 2
-    roi = 3
+# class ManagerEnums(BaseEnum):
+#     preset = 0
+#     remote = 1
+#     overshoot = 2
+#     roi = 3
 
+class ManagerEnums(BaseEnum):
+    preset = (0, config_mod_pymodaq.get_set_preset_path)
+    remote = (1, config_mod_pymodaq.get_set_remote_path)
+    overshoot = (2, config_mod_pymodaq.get_set_overshoot_path)
+    roi = (3, config_mod_pymodaq.get_set_roi_path)
+
+    def __init__(self, id, path_func):
+        self.id = id
+        self.path_func = path_func
+
+    def get_path(self):
+        path:Path = self.path_func()
+        return path
 
 class PymodaqUpdateTableWidget(QTableWidget):
     """
@@ -765,13 +779,8 @@ class DashBoard(CustomApp):
         self.connect_action("log_window", self.logger_dock.setVisible)
         self.connect_action("new_preset", self.create_preset)
         self.connect_action("modify_preset", self.modify_preset)
+        self.create_loading_menu_slot(ManagerEnums.preset)                        
 
-        for ind_file, file in enumerate(self.preset_path.iterdir()):
-            if file.suffix == ".xml":
-                self.connect_action(
-                    self.get_action_from_file(file, ManagerEnums.preset),
-                    self.create_menu_slot(self.preset_path.joinpath(file)),
-                )
         self.connect_action(
             "load_preset",
             lambda: self.set_preset_mode(
@@ -783,44 +792,15 @@ class DashBoard(CustomApp):
         self.connect_action("new_overshoot", self.create_overshoot)
         self.connect_action("modify_overshoot", self.modify_overshoot)
         self.connect_action("activate_overshoot", self.activate_overshoot)
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_overshoot_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                self.connect_action(
-                    self.get_action_from_file(file, ManagerEnums.overshoot),
-                    self.create_menu_slot_over(
-                        config_mod_pymodaq.get_set_overshoot_path().joinpath(file)
-                    ),
-                )
+        self.create_loading_menu_slot(ManagerEnums.overshoot)
 
         self.connect_action("save_roi", self.create_roi_file)
         self.connect_action("modify_roi", self.modify_roi)
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_roi_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                self.connect_action(
-                    self.get_action_from_file(file, ManagerEnums.roi),
-                    self.create_menu_slot_roi(
-                        config_mod_pymodaq.get_set_roi_path().joinpath(file)
-                    ),
-                )
+        self.create_loading_menu_slot(ManagerEnums.roi)
 
         self.connect_action("new_remote", self.create_remote)
         self.connect_action("modify_remote", self.modify_remote)
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_remote_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                self.connect_action(
-                    self.get_action_from_file(file, ManagerEnums.remote),
-                    self.create_menu_slot_remote(
-                        config_mod_pymodaq.get_set_remote_path().joinpath(file)
-                    ),
-                )
+        self.create_loading_menu_slot(ManagerEnums.remote)
 
         self.connect_action("do_scan", lambda: self.load_scan_module())
         self.connect_action("do_log", lambda: self.load_log_module())
@@ -839,7 +819,8 @@ class DashBoard(CustomApp):
         """
         Create the menubar object looking like :
         """
-        menubar.clear()
+        if menubar is not None:
+            menubar.clear()
 
         # %% create Settings menu
         self.file_menu = menubar.addMenu("File")
@@ -864,14 +845,7 @@ class DashBoard(CustomApp):
         self.preset_menu.addAction(self.get_action("modify_preset"))
         self.preset_menu.addSeparator()
         self.load_preset_menu = self.preset_menu.addMenu("Load presets")
-
-        for ind_file, file in enumerate(self.preset_path.iterdir()):
-            if file.suffix == ".xml":
-                self.load_preset_menu.addAction(
-                    self.get_action(
-                        self.get_action_from_file(file, ManagerEnums.preset)
-                    )
-                )
+        self.make_loading_menu(self.load_preset_menu, ManagerEnums.preset)
 
         self.overshoot_menu = menubar.addMenu("Overshoot Modes")
         self.overshoot_menu.addAction(self.get_action("new_overshoot"))
@@ -879,46 +853,21 @@ class DashBoard(CustomApp):
         self.overshoot_menu.addAction(self.get_action("activate_overshoot"))
         self.overshoot_menu.addSeparator()
         load_overshoot_menu = self.overshoot_menu.addMenu("Load Overshoots")
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_overshoot_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                load_overshoot_menu.addAction(
-                    self.get_action(
-                        self.get_action_from_file(file, ManagerEnums.overshoot)
-                    )
-                )
+        self.make_loading_menu(load_overshoot_menu, ManagerEnums.overshoot)
 
         self.roi_menu = menubar.addMenu("ROI Modes")
         self.roi_menu.addAction(self.get_action("save_roi"))
         self.roi_menu.addAction(self.get_action("modify_roi"))
         self.roi_menu.addSeparator()
         load_roi_menu = self.roi_menu.addMenu("Load roi configs")
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_roi_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                load_roi_menu.addAction(
-                    self.get_action(self.get_action_from_file(file, ManagerEnums.roi))
-                )
+        self.make_loading_menu(load_roi_menu, ManagerEnums.roi)
 
         self.remote_menu = menubar.addMenu("Remote/Shortcuts Control")
         self.remote_menu.addAction("New remote config.", self.create_remote)
         self.remote_menu.addAction("Modify remote config.", self.modify_remote)
         self.remote_menu.addSeparator()
         load_remote_menu = self.remote_menu.addMenu("Load remote config.")
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_remote_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                load_remote_menu.addAction(
-                    self.get_action(
-                        self.get_action_from_file(file, ManagerEnums.remote)
-                    )
-                )
+        self.make_loading_menu(load_remote_menu, ManagerEnums.remote)
 
         # extensions menu
         self.extensions_menu = menubar.addMenu("Extensions")
@@ -954,14 +903,25 @@ class DashBoard(CustomApp):
         self.settings_menu.setEnabled(True)
         self.preset_menu.setEnabled(status)
 
-    def make_loading_menu(self, menu:QMenu, files_folder:Path, manager_enum):
-        menu.clear()
-        for file in files_folder.iterdir():
+    def create_loading_menu_slot(self, manager_enum: ManagerEnums):
+        config_folder:Path = manager_enum.get_path()
+        for file in config_folder.iterdir():
+            if file.suffix == ".xml":
+                self.connect_action(
+                    self.get_action_from_file(file, manager_enum),
+                    self.create_menu_slot(config_folder.joinpath(file), manager_enum),
+                )
+
+    def make_loading_menu(self, menu:QMenu, manager_enum:ManagerEnums, refresh=True):
+        if refresh:
+            menu.clear()
+        for file in manager_enum.get_path().iterdir():
             if file.suffix == ".xml":
                 menu.addAction(self.get_action(
                         self.get_action_from_file(file, manager_enum)
                     )
                 )
+
     def start_plugin_manager(self):
         self.win_plug_manager = QtWidgets.QMainWindow()
         self.win_plug_manager.setWindowTitle("PyMoDAQ Plugin Manager")
@@ -972,80 +932,65 @@ class DashBoard(CustomApp):
         self.plugin_manager.restart_signal.connect(self.restart_fun)
         self.win_plug_manager.show()
 
-    def create_menu_slot(self, filename):
-        return lambda: self.set_preset_mode(filename)
+    def create_menu_slot(self, filename:str, manager_enum:ManagerEnums):
+        if manager_enum == ManagerEnums.preset:
+            func = self.set_preset_mode
+        elif manager_enum == ManagerEnums.roi:
+            func = self.set_roi_configuration
+        elif manager_enum == ManagerEnums.overshoot:
+            func = self.set_overshoot_configuration
+        elif manager_enum == ManagerEnums.remote:
+            func = self.set_remote_configuration
+        return lambda: func(filename)
+
+    # def create_menu_slot_preset(self, filename):
+    #     return lambda: self.set_preset_mode(filename)
 
     def create_menu_slot_ext(self, ext):
         return lambda: self.load_extensions_module(ext)
 
-    def create_menu_slot_roi(self, filename):
-        return lambda: self.set_roi_configuration(filename)
+    # def create_menu_slot_roi(self, filename):
+    #     return lambda: self.set_roi_configuration(filename)
 
-    def create_menu_slot_over(self, filename):
-        return lambda: self.set_overshoot_configuration(filename)
+    # def create_menu_slot_over(self, filename):
+    #     return lambda: self.set_overshoot_configuration(filename)
 
-    def create_menu_slot_remote(self, filename):
-        return lambda: self.set_remote_configuration(filename)
+    # def create_menu_slot_remote(self, filename):
+    #     return lambda: self.set_remote_configuration(filename)
+
+    def set_config_file(self, manager_enum:ManagerEnums):
+        if manager_enum == ManagerEnums.roi:
+            func = self.roi_saver.set_new_roi
+        elif manager_enum == ManagerEnums.overshoot:
+            func = self.overshoot_manager.set_new_overshoot
+        elif manager_enum == ManagerEnums.remote:
+            func = self.remote_manager.set_new_remote
+        try:
+            if self.preset_file is not None:
+                action = self.get_action_from_file(self.preset_file, manager_enum)
+                func(self.preset_file.stem)
+                self.add_action(
+                    action,
+                    self.preset_file.stem,
+                    "",
+                )
+                self.setup_menu(self.menubar)
+                self.connect_action(
+                    action,
+                    self.create_menu_slot(manager_enum.get_path().joinpath(self.preset_file.name), manager_enum),
+                )
+
+        except Exception as e:
+            logger.exception(str(e))
 
     def create_roi_file(self):
-        try:
-            if self.preset_file is not None:
-                self.roi_saver.set_new_roi(self.preset_file.stem)
-                self.add_action(
-                    self.get_action_from_file(self.preset_file, ManagerEnums.roi),
-                    self.preset_file.stem,
-                    "",
-                )
-                self.setup_menu(self.menubar)
-                self.connect_action(
-                    self.get_action_from_file(self.preset_file, ManagerEnums.roi),
-                    self.create_menu_slot_roi(
-                        config_mod_pymodaq.get_set_roi_path().joinpath(self.preset_file.name)
-                    ),
-                )
-
-
-        except Exception as e:
-            logger.exception(str(e))
+        self.set_config_file(ManagerEnums.roi)            
 
     def create_remote(self):
-        try:
-            if self.preset_file is not None:
-                self.remote_manager.set_new_remote(self.preset_file.stem)
-                self.add_action(
-                    self.get_action_from_file(self.preset_file, ManagerEnums.remote),
-                    self.preset_file.stem,
-                    "",
-                )
-                self.setup_menu(self.menubar)
-                self.connect_action(
-                    self.get_action_from_file(self.preset_file, ManagerEnums.remote),
-                    self.create_menu_slot_remote(
-                        config_mod_pymodaq.get_set_remote_path().joinpath(self.preset_file.name)
-                    ),
-                )
-
-        except Exception as e:
-            logger.exception(str(e))
+        self.set_config_file(ManagerEnums.remote)
 
     def create_overshoot(self):
-        try:
-            if self.preset_file is not None:
-                self.overshoot_manager.set_new_overshoot(self.preset_file.stem)
-                self.add_action(
-                    self.get_action_from_file(self.preset_file, ManagerEnums.overshoot),
-                    self.preset_file.stem,
-                    "",
-                )
-                self.setup_menu(self.menubar)
-                self.connect_action(
-                    self.get_action_from_file(self.preset_file, ManagerEnums.overshoot),
-                    self.create_menu_slot_over(
-                        config_mod_pymodaq.get_set_overshoot_path().joinpath(self.preset_file.name)
-                    ),
-                )
-        except Exception as e:
-            logger.exception(str(e))
+        self.set_config_file(ManagerEnums.overshoot)
 
     def create_preset(self):
         try:
@@ -1060,7 +1005,21 @@ class DashBoard(CustomApp):
     @staticmethod
     def get_action_from_file(file: Path, manager: ManagerEnums):
         return f"{file.stem}_{manager.name}"
+    
+    def modify_config(self):
+        try:
+            path = select_file(
+                start_path=config_mod_pymodaq.get_set_remote_path(),
+                save=False,
+                ext="xml",
+            )
+            if path != "":
+                self.remote_manager.set_file_remote(path)
 
+            else:  # cancel
+                pass
+        except Exception as e:
+            logger.exception(str(e))
     def modify_remote(self):
         try:
             path = select_file(
