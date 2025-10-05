@@ -1057,7 +1057,7 @@ class DashBoard(CustomApp):
     def create_roi_file(self):
         try:
             if self.preset_file is not None:
-                self.roi_saver.set_new_roi(self.preset_file.stem)
+                self.roi_saver.set_new_config(self.preset_file.stem)
                 self.add_action(
                     self.get_action_from_file(self.preset_file, ManagerEnums.roi),
                     self.preset_file.stem,
@@ -1151,7 +1151,8 @@ class DashBoard(CustomApp):
                 ext="xml",
             )
             if path != "":
-                self.overshoot_manager.set_file_overshoot(path)
+                # self.overshoot_manager.set_file_overshoot(path)
+                self.overshoot_manager.set_config_from_file(path)
 
             else:  # cancel
                 pass
@@ -1164,7 +1165,7 @@ class DashBoard(CustomApp):
                 start_path=config_mod_pymodaq.get_set_roi_path(), save=False, ext="xml"
             )
             if path != "":
-                self.roi_saver.set_file_roi(path)
+                self.roi_saver.set_config_from_file(path)
 
             else:  # cancel
                 pass
@@ -1175,7 +1176,7 @@ class DashBoard(CustomApp):
         try:
             path = select_file(start_path=self.preset_path, save=False, ext="xml")
             if path != "":
-                modified = self.preset_manager.set_file_preset(path)
+                modified = self.preset_manager.set_config_from_file(path)
 
                 if modified:
                     self.remove_preset_related_files(path.name)
@@ -1563,7 +1564,7 @@ class DashBoard(CustomApp):
 
         if filename.suffix == ".xml":
             self.preset_file = filename
-            self.preset_manager.set_file_preset(filename, show=False)
+            self.preset_manager.set_config_from_file(filename, show=False)
             move_docks = []
             det_docks_settings = []
             det_docks_viewer = []
@@ -1574,13 +1575,10 @@ class DashBoard(CustomApp):
             plugins = []
             plugins += [
                 {"type": "move", "value": child}
-                for child in self.preset_manager.preset_params.child("Moves").children()
+                for child in self.preset_manager.settings.child("Moves").children()
             ]
             plugins += [
-                {"type": "det", "value": child}
-                for child in self.preset_manager.preset_params.child(
-                    "Detectors"
-                ).children()
+                {"type": "det", "value": child} for child in self.preset_manager.settings.child("Detectors").children()
             ]
             for plug in plugins:
                 if plug["type"] == "det":
@@ -1757,7 +1755,7 @@ class DashBoard(CustomApp):
                     "ROI configuration ({}) has been loaded".format(file),
                     log_type="log",
                 )
-                self.roi_saver.set_file_roi(filename, show=False)
+                self.roi_saver.set_config_from_file(filename, show=False)
 
         except Exception as e:
             logger.exception(str(e))

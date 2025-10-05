@@ -13,6 +13,7 @@ from pymodaq_gui.parameter import ioxml
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.parameter import ParameterTree, Parameter
 from pymodaq_gui.parameter.pymodaq_ptypes import registerParameterType, GroupParameter
+from pymodaq_gui.managers.parameter_manager import ParameterManager
 
 logger = set_logger(get_module_name(__file__))
 remote_path = get_set_remote_path()
@@ -254,52 +255,82 @@ class JoystickButtonsSelection(QtWidgets.QDialog):
         buttonBox.rejected.connect(self.reject)
 
 
-class RemoteManager(QObject):
+class RemoteSettings(QObject, ParameterManager):
+    params = [{'title': 'Activate all', 'name': 'activate_all', 'type': 'action'},
+                {'title': 'Deactivate all', 'name': 'deactivate_all', 'type': 'action'},
+                {'title:': 'Actions', 'name': 'action_group', 'type': 'group'}]    
+    remote_changed = Signal(dict)
+
+    def __init__(self, parent: QObject | None = ...) -> None:
+        super().__init__(parent)
+
+        self.remote_actions = dict(shortcuts=dict([]), joysticks=dict([]))
+        self.settings.child(("activate_all")).sigActivated.connect(lambda: self.activate_all(True))
+        self.settings.child(("deactivate_all")).sigActivated.connect(lambda: self.activate_all(False))
+
+    def parameter_tree_changed(self, param, changes):
+        """
+        Check for changes in the given (parameter,change,information) tuple list.
+        In case of value changed, update the DAQscan_settings tree consequently.
+
+        =============== ============================================ ==============================
+        **Parameters**    **Type**                                     **Description**
+        *param*           instance of pyqtgraph parameter              the parameter to be checked
+        *changes*         (parameter,change,information) tuple list    the current changes state
+        =============== ============================================ ==============================
+        """
+        for param, change, data in changes:
+            path = self.settings.childPath(param)
+            if change == "childAdded":
+                pass
+
+            elif change == "value":
+                if "shortcut" in param.name():
+                    self.remote_actions["shortcuts"][param.name()]["activated"] = data
+                    self.remote_changed.emit(
+                        dict(
+                            action_type="shortcut",
+                            action_name=param.name(),
+                            action_dict=self.remote_actions["shortcuts"][param.name()],
+                        )
+                    )
+                elif "joy" in param.name():
+                    self.remote_actions["joysticks"][param.name()]["activated"] = data
+                    self.remote_changed.emit(
+                        dict(
+                            action_type="joystick",
+                            action_name=param.name(),
+                            action_dict=self.remote_actions["joysticks"][param.name()],
+                        )
+                    )
+
+    def activate_all(self, activate=True):
+        for child in self.remote_settings.child(("action_group")).children():
+            child.setValue(activate)                    
+
+class RemoteManager(QObject, ConfigManager):
     remote_changed = Signal(dict)
 
     def __init__(self, actuators=[], detectors=[], msgbox=False):
         super().__init__()
         self.actuators = actuators
         self.detectors = detectors
-        if msgbox:
-            msgBox = QMessageBox()
-            msgBox.setText("Preset Manager?")
-            msgBox.setInformativeText("What do you want to do?")
-            cancel_button = msgBox.addButton(QMessageBox.StandardButton.Cancel)
-            new_button = msgBox.addButton(
-                "New", QMessageBox.ButtonRole.ActionRole
-            )
-            modify_button = msgBox.addButton(
-                "Modify", QMessageBox.ButtonRole.AcceptRole
-            )
-            msgBox.setDefaultButton(QMessageBox.StandardButton.Cancel)
-            ret = msgBox.exec()
 
-            if msgBox.clickedButton() == new_button:
-                self.set_new_remote()
+        self.remote_settings = RemoteSettings()
+        # params = [{'title': 'Activate all', 'name': 'activate_all', 'type': 'action'},
+        #           {'title': 'Deactivate all', 'name': 'deactivate_all', 'type': 'action'},
+        #           {'title:': 'Actions', 'name': 'action_group', 'type': 'group'}]
+        # self.remote_settings = Parameter.create(title='Remote Settings', name='remote', type='group',
+        #                                         children=params)
+        # self.remote_settings.sigTreeStateChanged.connect(self.remote_settings_changed)
+        # self.remote_settings_tree = ParameterTree()
+        # self.remote_settings_tree.setParameters(self.remote_settings, showTop=False)
+        # self.remote_settings.child(('activate_all')).sigActivated.connect(lambda: self.activate_all(True))
+        # self.remote_settings.child(('deactivate_all')).sigActivated.connect(lambda: self.activate_all(False))
 
-            elif msgBox.clickedButton() == modify_button:
-                path = select_file(start_path=remote_path, save=False, ext='xml')
-                if path != '':
-                    self.set_file_remote(str(path))
-            else:  # cancel
-                pass
-        params = [{'title': 'Activate all', 'name': 'activate_all', 'type': 'action'},
-                  {'title': 'Deactivate all', 'name': 'deactivate_all', 'type': 'action'},
-                  {'title:': 'Actions', 'name': 'action_group', 'type': 'group'}]
-
-        self.remote_actions = dict(shortcuts=dict([]), joysticks=dict([]))
-        self.remote_settings = Parameter.create(title='Remote Settings', name='remote', type='group',
-                                                children=params)
-        self.remote_settings.sigTreeStateChanged.connect(self.remote_settings_changed)
-        self.remote_settings_tree = ParameterTree()
-        self.remote_settings_tree.setParameters(self.remote_settings, showTop=False)
-        self.remote_settings.child(('activate_all')).sigActivated.connect(lambda: self.activate_all(True))
-        self.remote_settings.child(('deactivate_all')).sigActivated.connect(lambda: self.activate_all(False))
-
-    def activate_all(self, activate=True):
-        for child in self.remote_settings.child(('action_group')).children():
-            child.setValue(activate)
+    # def activate_all(self, activate=True):
+    #     for child in self.remote_settings.child(('action_group')).children():
+    #         child.setValue(activate)
 
     def set_remote_configuration(self):
         # remove existing shorcuts
@@ -309,12 +340,12 @@ class RemoteManager(QObject):
         while len(self.remote_actions['joysticks']):
             self.remote_actions['joysticks'].pop(list(self.remote_actions['joysticks'].keys())[0])
         all_actions = []
-        for child in self.remote_params.child('act_actions').children():
+        for child in self.settings.child("act_actions").children():
             module_name = child.opts['title'].split('Actuator ')[1]
             module_type = 'act'
             for action in child.child(('actions')).children():
                 all_actions.append((module_name, action, module_type))
-        for child in self.remote_params.child('det_actions').children():
+        for child in self.settings.child("det_actions").children():
             module_name = child.opts['title'].split('Detector ')[1]
             module_type = 'det'
             for action in child.child(('actions')).children():
@@ -348,23 +379,6 @@ class RemoteManager(QObject):
 
         self.activate_all()
 
-    def set_new_remote(self, file=None):
-        if file is None:
-            file = 'remote_default'
-        param = [
-            {'title': 'Filename:', 'name': 'filename', 'type': 'str', 'value': file},
-        ]
-        params_action = [{'title': 'Actuator Actions:', 'name': 'act_actions', 'type': 'groupmodules',
-                          'addList': self.actuators, 'modtype': 'Actuator'},
-                         {'title': 'Detector Actions:', 'name': 'det_actions', 'type': 'groupmodules',
-                          'addList': self.detectors, 'modtype': 'Detector'}
-                         ]  # PresetScalableGroupMove(name="Moves")]
-        self.remote_params = Parameter.create(title='Preset', name='Preset', type='group',
-                                              children=param + params_action)
-        self.remote_params.sigTreeStateChanged.connect(self.parameter_tree_changed)
-        logger.info('Creating a new remote file')
-        self.show_remote()
-
     def parameter_tree_changed(self, param, changes):
         """
             Check for changes in the given (parameter,change,information) tuple list.
@@ -377,7 +391,7 @@ class RemoteManager(QObject):
             =============== ============================================ ==============================
         """
         for param, change, data in changes:
-            path = self.remote_params.childPath(param)
+            path = self.settings.childPath(param)
             if change == 'childAdded':
                 pass
 
@@ -419,7 +433,7 @@ class RemoteManager(QObject):
 
     def remote_settings_changed(self, param, changes):
         for param, change, data in changes:
-            path = self.remote_params.childPath(param)
+            path = self.settings.childPath(param)
             if change == 'childAdded':
                 pass
 
@@ -435,43 +449,43 @@ class RemoteManager(QObject):
                                                   action_name=param.name(),
                                                   action_dict=self.remote_actions['joysticks'][param.name()]))
 
-    def set_file_remote(self, filename, show=True):
-        """
+    # def set_file_remote(self, filename, show=True):
+    #     """
 
-        """
-        children = ioxml.XML_file_to_parameter(filename)
-        self.remote_params = Parameter.create(title='Shortcuts:', name='shortcuts', type='group', children=children)
-        if show:
-            self.show_remote()
+    #     """
+    #     children = ioxml.XML_file_to_parameter(filename)
+    #     self.remote_params = Parameter.create(title='Shortcuts:', name='shortcuts', type='group', children=children)
+    #     if show:
+    #         self.show_remote()
 
-    def show_remote(self):
-        """
+    # def show_remote(self):
+    #     """
 
-        """
-        dialog = QDialog()
-        vlayout = QtWidgets.QVBoxLayout()
-        tree = ParameterTree()
-        # tree.setMinimumWidth(400)
-        tree.setMinimumHeight(500)
-        tree.setParameters(self.remote_params, showTop=False)
+    #     """
+    #     dialog = QDialog()
+    #     vlayout = QtWidgets.QVBoxLayout()
+    #     tree = ParameterTree()
+    #     # tree.setMinimumWidth(400)
+    #     tree.setMinimumHeight(500)
+    #     tree.setParameters(self.remote_params, showTop=False)
 
-        vlayout.addWidget(tree)
-        dialog.setLayout(vlayout)
-        buttonBox = QDialogButtonBox(parent=dialog)
+    #     vlayout.addWidget(tree)
+    #     dialog.setLayout(vlayout)
+    #     buttonBox = QDialogButtonBox(parent=dialog)
 
-        buttonBox.addButton("Save", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
-        buttonBox.rejected.connect(dialog.reject)
+    #     buttonBox.addButton("Save", QDialogButtonBox.ButtonRole.AcceptRole)
+    #     buttonBox.accepted.connect(dialog.accept)
+    #     buttonBox.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+    #     buttonBox.rejected.connect(dialog.reject)
 
-        vlayout.addWidget(buttonBox)
-        dialog.setWindowTitle('Fill in information about the actions and their shortcuts')
-        res = dialog.exec()
+    #     vlayout.addWidget(buttonBox)
+    #     dialog.setWindowTitle('Fill in information about the actions and their shortcuts')
+    #     res = dialog.exec()
 
-        if res == QDialog.DialogCode.Accepted:
-            # save preset parameters in a xml file
-            ioxml.parameter_to_xml_file(
-                self.remote_params, os.path.join(remote_path, self.remote_params.child('filename').value()))
+    #     if res == QDialog.DialogCode.Accepted:
+    #         # save preset parameters in a xml file
+    #         ioxml.parameter_to_xml_file(
+    #             self.remote_params, os.path.join(remote_path, self.remote_params.child('filename').value()))
 
 
 if __name__ == '__main__':
