@@ -476,7 +476,7 @@ class DashBoard(CustomApp):
         )
         win.setCentralWidget(area)
         win.setWindowTitle("Logger")
-        self.log_module = extmod.DAQ_Logger(dockarea=area, dashboard=self)
+        self.log_module = extmod.DAQ_Logger(dockarea=area, dashboard=self, action_list=("search",))
         self.extensions["DAQ_Logger"] = self.log_module
         self.log_module.status_signal.connect(self.add_status)
         win.show()

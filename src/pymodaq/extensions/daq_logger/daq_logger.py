@@ -61,7 +61,7 @@ class DAQ_Logger(CustomExt):
         {'title': 'Log Type:', 'name': 'log_type', 'type': 'str', 'value': '', 'readonly': True},
     ]
 
-    def __init__(self, dockarea: DockArea = None, dashboard: 'DashBoard' = None):
+    def __init__(self, dockarea: DockArea = None, dashboard: 'DashBoard' = None, **kwargs):
         """
 
         Parameters
@@ -72,7 +72,7 @@ class DAQ_Logger(CustomExt):
             instance of the pymodaq dashboard
         """
 
-        super().__init__(dockarea, dashboard)
+        super().__init__(dockarea, dashboard, **kwargs)
 
         self.wait_time = 1000
         self.logger: Union[H5Logger, DataBaseLogger] = None
