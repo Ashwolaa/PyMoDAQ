@@ -235,6 +235,7 @@ class ScanSelector(ParameterManager, QObject):
 
     """
     scan_select_signal = Signal(SelectorWrapper)
+    settings_name = "selector_settings"
 
     params = [
         {'title': 'Scan options', 'name': 'scan_options', 'type': 'group', 'children': [
@@ -249,7 +250,7 @@ class ScanSelector(ParameterManager, QObject):
 
     def __init__(self, viewer_items: List[SelectorItem] = None, positions: List = None):
         QObject.__init__(self)
-        ParameterManager.__init__(self, 'selector_settings')
+        ParameterManager.__init__(self, action_list=('search',))
 
         self.table_model: TableModel = None
         self.table_view: TableViewCustom = None

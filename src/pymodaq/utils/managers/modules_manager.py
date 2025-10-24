@@ -79,7 +79,7 @@ class ModulesManager(QObject, ParameterManager):
                  **kwargs):
 
         QObject.__init__(self)
-        ParameterManager.__init__(self)
+        ParameterManager.__init__(self, action_list=("search",))
         if detectors is None:
             detectors = []
         if actuators is None:

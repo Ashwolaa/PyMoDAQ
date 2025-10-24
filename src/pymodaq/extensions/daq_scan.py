@@ -125,7 +125,7 @@ class DAQScan(QObject, ParameterManager):
         
         logger.info('Initializing DAQScan')
         QObject.__init__(self)
-        ParameterManager.__init__(self)
+        ParameterManager.__init__(self, action_list=('search',))
 
         self.title = __class__.__name__
 

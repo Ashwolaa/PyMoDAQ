@@ -46,7 +46,7 @@ class ScanParameterManager(ParameterManager):
     settings_name = 'scanner_settings'
 
     def __init__(self):
-        super().__init__()
+        super().__init__(action_list=('search',))
         self.settings_tree.header().setVisible(True)
         self.settings_tree.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
         self.settings_tree.header().setMinimumSectionSize(150)

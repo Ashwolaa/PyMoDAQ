@@ -65,7 +65,7 @@ class Scanner(QObject, ParameterManager):
     def __init__(self, parent_widget: QtWidgets.QWidget = None, scanner_items=OrderedDict([]),
                  actuators: List[DAQ_Move] = []):
         QObject.__init__(self)
-        ParameterManager.__init__(self)
+        ParameterManager.__init__(self, action_list=("search", "save", "update"))
         if parent_widget is None:
             parent_widget = QtWidgets.QWidget()
         self.parent_widget = parent_widget

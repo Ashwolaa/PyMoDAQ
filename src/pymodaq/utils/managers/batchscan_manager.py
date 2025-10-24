@@ -37,7 +37,7 @@ class BatchManager(ParameterManager):
               {'title': 'Scans', 'name': 'scans', 'type': 'group', 'children': []}]
 
     def __init__(self, msgbox=False, actuators=[], detectors=[], path=None):
-        super().__init__()
+        super().__init__(action_list=('search',))
 
         self.modules_manager: ModulesManager = ModulesManager(detectors, actuators)
         self.modules_manager.show_only_control_modules(True)
