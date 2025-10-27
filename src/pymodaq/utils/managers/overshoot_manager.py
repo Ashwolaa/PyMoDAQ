@@ -1,11 +1,9 @@
 from qtpy import QtWidgets
-from qtpy.QtWidgets import QMessageBox, QDialogButtonBox, QDialog
 import sys
-import os
 
-from pymodaq_gui.parameter import ioxml, Parameter, ParameterTree
+from pymodaq_gui.parameter import ioxml, Parameter
 from pymodaq_gui.parameter.pymodaq_ptypes import registerParameterType, GroupParameter
-from pymodaq_gui.utils import select_file
+from pymodaq_gui.managers.config_manager import ConfigManager
 
 # check if overshoot_configurations directory exists on the drive
 from pymodaq.utils.config import get_set_overshoot_path
@@ -112,34 +110,17 @@ class PresetScalableGroupDet(GroupParameter):
 registerParameterType('groupdetover', PresetScalableGroupDet, override=True)
 
 
-class OvershootManager:
-    def __init__(self, msgbox=False, det_modules=[], actuators_modules=[]):
+class OvershootManager(ConfigManager):
+    title = "Overshoot"
+    name = "overshoot"
 
+    def __init__(self, msgbox=False, det_modules=[], actuators_modules=[]):
         self.overshoot_params = None
         self.det_modules = det_modules
         self.actuators_modules = actuators_modules
-
-        self._activated = False
-
-        if msgbox:
-            msgBox = QMessageBox()
-            msgBox.setText("Overshoot Manager?")
-            msgBox.setInformativeText("What do you want to do?")
-            cancel_button = msgBox.addButton(QMessageBox.StandardButton.Cancel)
-            new_button = msgBox.addButton("New", QMessageBox.ButtonRole.ActionRole)
-            modify_button = msgBox.addButton("Modify", QMessageBox.ButtonRole.AcceptRole)
-            msgBox.setDefaultButton(QMessageBox.StandardButton.Cancel)
-            ret = msgBox.exec()
-
-            if msgBox.clickedButton() == new_button:
-                self.set_new_overshoot()
-
-            elif msgBox.clickedButton() == modify_button:
-                path = select_file(start_path=overshoot_path, save=False, ext='xml')
-                if path != '':
-                    self.set_file_overshoot(str(path))
-            else:  # cancel
-                pass
+        self._activated = False   
+        #Init comes after as the msgbox is created at the ConfigManager level     
+        super().__init__(config_path=overshoot_path, msgbox=msgbox)
 
     @property
     def activated(self) -> bool:
@@ -149,57 +130,17 @@ class OvershootManager:
     def activated(self, status: bool):
         self._activated = status
 
-    def set_file_overshoot(self, filename, show=True):
-        """
-
-        """
-        children = ioxml.XML_file_to_parameter(filename)
-        self.overshoot_params = Parameter.create(title='Overshoot', name='Overshoot', type='group',
-                                                 children=children)
-        if show:
-            self.show_overshoot()
-
-    def set_new_overshoot(self, file=None):
-        if file is None:
-            file = 'overshoot_default'
-        param = [{'title': 'Filename:', 'name': 'filename', 'type': 'str', 'value': file}]
-        params_det = [{'title': 'Detectors:', 'name': 'Detectors', 'type': 'groupdetover', 'detlist': self.det_modules,
-                       'movelist': self.actuators_modules}]  # [PresetScalableGroupDet(name="Detectors")]
-        self.overshoot_params = Parameter.create(title='Preset', name='Preset', type='group',
-                                                 children=param + params_det)
-
-        self.show_overshoot()
-
-    def show_overshoot(self):
-        """
-
-        """
-        dialog = QDialog()
-        vlayout = QtWidgets.QVBoxLayout()
-        tree = ParameterTree()
-        tree.setMinimumWidth(400)
-        tree.setMinimumHeight(500)
-        tree.setParameters(self.overshoot_params, showTop=False)
-
-        vlayout.addWidget(tree)
-        dialog.setLayout(vlayout)
-        buttonBox = QDialogButtonBox(parent=dialog)
-
-        buttonBox.addButton("Save", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
-        buttonBox.rejected.connect(dialog.reject)
-
-        vlayout.addWidget(buttonBox)
-        dialog.setWindowTitle('Fill in information about this managers')
-        res = dialog.exec()
-
-        if res == QDialog.DialogCode.Accepted:
-            # save managers parameters in a xml file
-            # start = os.path.split(os.path.split(os.path.realpath(__file__))[0])[0]
-            # start = os.path.join("..",'daq_scan')
-            ioxml.parameter_to_xml_file(
-                self.overshoot_params, os.path.join(overshoot_path, self.overshoot_params.child('filename').value()))
+    def make_config(self):
+        params_det = [
+            {
+                "title": "Detectors:",
+                "name": "Detectors",
+                "type": "groupdetover",
+                "detlist": self.det_modules,
+                "movelist": self.actuators_modules,
+            }
+        ]
+        return params_det
 
     def activate_overshoot(self, det_modules, act_modules, status: bool):
         det_titles = [det.title for det in det_modules]
