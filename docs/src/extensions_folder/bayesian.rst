@@ -1,7 +1,17 @@
 .. _bayesian_extension:
 
+
+
 Bayesian Optimisation
 =====================
+
+
+.. figure:: bayesian_data/bayesian_logo.png
+   :alt: logo
+   :width: 60%
+
+   Bayesian Extension logo
+
 
 First of all, this work is heavily supported by the work of Fernando Nogueira through its python package:
 `bayesian-optimization <https://github.com/bayesian-optimization/BayesianOptimization>`__ and the underlying use
@@ -199,6 +209,7 @@ But it could converge before! Therefore you can choose some more intelligent sto
   the *tolerance* settings, the algorithm will stop!
 * The *Best* one. In this mode, the Npoints best fitness value will be used to extract the corresponding coordinates.
   If those coordinates have a relative standard deviation of less than *toleranceù, the alorithm will stop!
+* The *None* one: no stopping unless manually (not the cleverest one I guess...)
 
 Observable and Probed Data
 --------------------------
