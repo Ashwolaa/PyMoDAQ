@@ -10,6 +10,7 @@ from importlib import import_module
 from packaging import version as version_mod
 from typing import Tuple, Union, List, Any, TYPE_CHECKING, Sequence
 import argparse
+import qtawesome as qta
 
 
 from qtpy import QtGui, QtWidgets, QtCore
@@ -248,7 +249,6 @@ class DashBoard(CustomApp):
         self.detector_modules = []
 
         self.compact_actuator_dock: Dock = None
-
         self.setup_ui()
 
         self.mainwindow.setVisible(True)
@@ -726,6 +726,20 @@ class DashBoard(CustomApp):
         self.add_action("check_update", "Check Updates", "", auto_toolbar=False)
         self.toolbar.addSeparator()
         self.add_action("plugin_manager", "Plugin Manager", "")
+        # Add a spacer widget to push subsequent actions to the right
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.add_widget("space", spacer)        
+
+        self.add_action("has_update", "Check Updates", "", auto_toolbar=True)
+
+        # animation = qta.Spin(self.toolbar)
+        animation = qta.Pulse(self.toolbar)
+        # self.get_action("has_update").setIcon(qta.icon("mdi6.update", color="green", animation=animation))
+        self.get_action("has_update").setIcon(qta.icon("ei.refresh", color="green", animation=animation))
+        # animation.start()
+
+        # animation = qta.Spin(self.get_action("has_update"))
 
     def update_preset_action_list(self):
         presets = []
@@ -833,6 +847,7 @@ class DashBoard(CustomApp):
         self.connect_action("about", self.show_about)
         self.connect_action("help", self.show_help)
         self.connect_action("check_update", lambda: self.check_update(True))
+        self.connect_action("has_update", lambda: self.check_update(True))
         self.connect_action("plugin_manager", self.start_plugin_manager)
 
     def setup_menu(self, menubar: QtWidgets.QMenuBar = None):
