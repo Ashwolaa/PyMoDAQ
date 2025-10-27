@@ -9,7 +9,7 @@ from qtpy.QtWidgets import QMessageBox, QDialog, QDialogButtonBox
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils import config as config_mod
 
-from pymodaq_gui.managers.parameter_manager import ParameterManager
+from pymodaq_gui.managers.config_manager import ConfigManager
 from pymodaq_gui.utils import Dock, file_io, DockArea
 from pymodaq_gui.parameter import ioxml
 from pymodaq_gui.messenger import messagebox
@@ -31,13 +31,15 @@ params = [
     ]
 
 
-class BatchManager(ParameterManager):
-    settings_name = 'batch_settings'
-    params = [{'title': 'Filename:', 'name': 'filename', 'type': 'str', 'value': 'batch_default'},
-              {'title': 'Scans', 'name': 'scans', 'type': 'group', 'children': []}]
+class BatchManager(ConfigManager):
+    title = "Batch"
+    name = "batch"
 
     def __init__(self, msgbox=False, actuators=[], detectors=[], path=None):
-        super().__init__()
+        if path is None:
+            path = batch_path
+        else:
+            assert isinstance(path, Path)
 
         self.modules_manager: ModulesManager = ModulesManager(detectors, actuators)
         self.modules_manager.show_only_control_modules(True)
@@ -46,36 +48,34 @@ class BatchManager(ParameterManager):
         self.modules_manager.settings_tree.setMaximumHeight(200)
 
         self._scans = OrderedDict([])
-
         self.scanner = Scanner(actuators=self.modules_manager.actuators_all)
+        self.scanner_widget = self.scanner.parent_widget
+
+        # Init comes after as the msgbox is created at the ConfigManager level
+        super().__init__(config_path=path, msgbox=msgbox)
 
         self.settings_tree.setMinimumWidth(400)
         self.settings_tree.setMaximumWidth(500)
         self.settings_tree.setMinimumHeight(500)
 
-        if path is None:
-            path = batch_path
-        else:
-            assert isinstance(path, Path)
-        self.batch_path = path
+    def make_config(self):
+        return [{'title': 'Scans', 'name': 'scans', 'type': 'group', 'children': []}]
 
-        if msgbox:
-            msgBox = QMessageBox()
-            msgBox.setText("Scan Batch Manager?")
-            msgBox.setInformativeText("What do you want to do?")
-            cancel_button = msgBox.addButton(QMessageBox.StandardButton.Cancel)
-            new_button = msgBox.addButton("New", QMessageBox.ButtonRole.AcceptRole)
-            modify_button = msgBox.addButton('Modify', QMessageBox.ButtonRole.AcceptRole)
-            msgBox.setDefaultButton(QMessageBox.StandardButton.Cancel)
-            ret = msgBox.exec()
+    def validate_config(self):
+        """Validate that actuators and detectors match the dashboard configuration"""
+        children = self.settings.child('scans').children()
+        if children:
+            actuators = children[0].child('modules', 'actuators').value()['all_items']
+            if actuators != self.modules_manager.actuators_name:
+                messagebox(text='The loaded actuators from the batch file do not corresponds to the dashboard actuators')
+                return False
 
-            if msgBox.clickedButton() == new_button:
-                self.set_new_batch()
+            detectors = children[0].child('modules', 'detectors').value()['all_items']
+            if detectors != self.modules_manager.detectors_name:
+                messagebox(text='The loaded detectors from the batch file do not corresponds to the dashboard detectors')
+                return False
 
-            elif msgBox.clickedButton() == modify_button:
-                self.set_file_batch()
-            else:  # cancel
-                pass
+        return True
 
     def get_act_dets(self):
         acts = dict([])
@@ -85,42 +85,30 @@ class BatchManager(ParameterManager):
             dets[name] = self.settings.child('scans', name, 'modules', 'detectors').value()['selected']
         return acts, dets
 
-    def set_file_batch(self, filename=None, show=True):
+    def set_config_from_file(self, file_path: Path, show=True):
         """
-
+        Load an existing batch configuration from an XML file.
         """
-        if filename is None or filename is False:
-            filename = file_io.select_file(start_path=self.batch_path, save=False, ext='xml')
-            if filename == '':
-                return
+        if file_path is None or file_path is False:
+            file_path = file_io.select_file(start_path=self.config_path, save=False, ext='xml')
+            if file_path == '':
+                return False
 
-        status = False
-        settings_tmp = self.create_parameter(filename)
-        children = settings_tmp.child('scans').children()
-
-        #self.settings = self.create_parameter(self.params)
-        actuators = children[0].child('modules', 'actuators').value()['all_items']
-        if actuators != self.modules_manager.actuators_name:
-            messagebox(text='The loaded actuators from the batch file do not corresponds to the dashboard actuators')
-            return
-
-        detectors = children[0].child('modules', 'detectors').value()['all_items']
-        if detectors != self.modules_manager.detectors_name:
-            messagebox(text='The loaded detectors from the batch file do not corresponds to the dashboard detectors')
-            return
-
-        self.settings = settings_tmp
-
-        # for child in children:
-        #     self.add_scan(name=child.name(), title=child.opts['title'])
-        #
-        #     self.settings.child('scans', child.name()).restoreState(child.saveState())
+        # Use parent method to load and validate the settings
+        if not super().set_config_from_file(file_path, show=False):
+            return False
 
         if show:
-            status = self.show_tree()
+            status = self.show_config(widget=self._create_batch_widget())
         else:
             self.settings_tree.setParameters(self.settings, showTop=False)
+            status = True
         return status
+
+    def set_file_batch(self, filename=None, show=True):
+        """Backward compatibility wrapper - DEPRECATED, use set_config_from_file() instead"""
+        logger.warning("set_file_batch() is deprecated, use set_config_from_file() instead")
+        return self.set_config_from_file(filename, show)
 
     def set_scans(self):
         infos = []
@@ -147,51 +135,36 @@ class BatchManager(ParameterManager):
     def get_scan_names(self) -> List[str]:
         return list(self._scans.keys())
 
-    def set_new_batch(self):
-        self.settings = self.create_parameter(self.params)
-        status = self.show_tree()
+    def set_new_config(self, file: str = None, show=True):
+        """Create a new batch configuration"""
+        super().set_new_config(file, show=False)
+        if show:
+            status = self.show_config(widget=self._create_batch_widget())
+        else:
+            status = True
         return status
 
-    def show_tree(self):
+    def set_new_batch(self):
+        """Backward compatibility wrapper - DEPRECATED, use set_new_config() instead"""
+        logger.warning("set_new_batch() is deprecated, use set_new_config() instead")
+        return self.set_new_config()
 
-
-        dialog = QDialog()
-        dialog.setLayout(QtWidgets.QVBoxLayout())
-
-        widget_all_settings = QtWidgets.QWidget()
-
-        dialog.layout().addWidget(widget_all_settings)
-        buttonBox = QDialogButtonBox(parent=dialog)
-        buttonBox.addButton("Save", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
-        buttonBox.rejected.connect(dialog.reject)
-
-        dialog.layout().addWidget(buttonBox)
-        dialog.setWindowTitle('Fill in information about this Scan batch')
-
-        widget_all_settings.setLayout(QtWidgets.QHBoxLayout())
-        widget_all_settings.layout().addWidget(self.settings_tree)
-
-        widget_vertical = QtWidgets.QWidget()
-        widget_vertical.setLayout(QtWidgets.QVBoxLayout())
-        widget_all_settings.layout().addWidget(widget_vertical)
-
-        self.scanner_widget = self.scanner.parent_widget
+    def _create_batch_widget(self):
+        """Create the custom widget for batch configuration with modules manager and scanner"""
+        widget = QtWidgets.QWidget()
+        widget_layout = QtWidgets.QVBoxLayout()
+        widget.setLayout(widget_layout)
         add_scan = QtWidgets.QPushButton('Add Scan')
         add_scan.clicked.connect(self.add_scan)
+        widget_layout.addWidget(self.modules_manager.settings_tree)
+        widget_layout.addWidget(self.scanner_widget)
+        widget_layout.addWidget(add_scan)
+        return widget
 
-        widget_vertical.layout().addWidget(self.modules_manager.settings_tree)
-        widget_vertical.layout().addWidget(self.scanner_widget)
-        widget_vertical.layout().addWidget(add_scan)
-
-        res = dialog.exec()
-
-        if res == QDialog.DialogCode.Accepted:
-            ioxml.parameter_to_xml_file(
-                self.settings, self.batch_path.joinpath(self.settings.child('filename').value()))
-
-        return res == QDialog.DialogCode.Accepted
+    def show_tree(self):
+        """Backward compatibility wrapper - DEPRECATED, use show_config() instead"""
+        logger.warning("show_tree() is deprecated, use show_config() instead")
+        return self.show_config(widget=self._create_batch_widget())
 
     def set_scanner_settings(self, settings_tree: QtWidgets.QWidget):
         while True:
