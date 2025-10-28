@@ -1,5 +1,7 @@
 from qtpy import QtWidgets
+from qtpy.QtCore import Signal
 import sys
+from typing import Optional, List
 
 from pymodaq_gui.parameter import ioxml, Parameter
 from pymodaq_gui.parameter.pymodaq_ptypes import registerParameterType, GroupParameter
@@ -114,12 +116,15 @@ class OvershootManager(ConfigManager):
     title = "Overshoot"
     name = "overshoot"
 
+    # Custom signal for activation toggle
+    overshoot_activated = Signal(bool)
+
     def __init__(self, msgbox=False, det_modules=[], actuators_modules=[]):
         self.overshoot_params = None
         self.det_modules = det_modules
         self.actuators_modules = actuators_modules
-        self._activated = False   
-        #Init comes after as the msgbox is created at the ConfigManager level     
+        self._activated = False
+        #Init comes after as the msgbox is created at the ConfigManager level
         super().__init__(config_path=overshoot_path, msgbox=msgbox)
 
     @property
@@ -174,6 +179,46 @@ class OvershootManager(ConfigManager):
     @staticmethod
     def create_overshoot_fun(move_module, position):
         return lambda: move_module.move_abs(position)
+
+    def create_menu(self, menubar=None, menu_title: Optional[str] = None,
+                    actions: Optional[List[str]] = None):
+        """
+        Create menu with overshoot-specific actions
+
+        Extends the base ConfigManager menu by adding:
+        - Activate/Deactivate Overshoot toggle action
+
+        Args:
+            menubar: Menu bar to add menu to
+            menu_title: Optional custom title
+            actions: List of standard actions to include (default: all except 'edit')
+
+        Returns:
+            QMenu: The created menu
+        """
+        # Default actions for Overshoot: no 'edit' since we load configs to activate them
+        if actions is None:
+            actions = ['new', 'duplicate', 'load', 'delete', 'refresh', 'open_dir']
+
+        # Create base menu from ConfigManager
+        menu = super().create_menu(menubar, menu_title, actions)
+
+        # Add separator before custom actions
+        menu.addSeparator()
+
+        # Add Activate/Deactivate toggle action
+        self._activate_action = menu.addAction("Activate Overshoot")
+        self._activate_action.setCheckable(True)
+        self._activate_action.setChecked(self._activated)
+        self._activate_action.triggered.connect(self._toggle_activation)
+
+        return menu
+
+    def _toggle_activation(self, checked: bool):
+        """Toggle overshoot activation"""
+        self._activated = checked
+        self._activate_action.setText("Deactivate Overshoot" if checked else "Activate Overshoot")
+        self.overshoot_activated.emit(checked)
 
 
 if __name__ == '__main__':

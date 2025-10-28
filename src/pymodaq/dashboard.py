@@ -634,20 +634,6 @@ class DashBoard(CustomApp):
         self.add_action(
             "log_window", "Show/hide log window", "", checkable=True, auto_toolbar=False
         )
-        self.add_action(
-            "new_preset",
-            "New Preset",
-            "",
-            'Create a new experimental setup configuration file: a "preset"',
-            auto_toolbar=False,
-        )
-        self.add_action(
-            "modify_preset",
-            "Modify Preset",
-            "",
-            'Modify an existing experimental setup configuration file: a "preset"',
-            auto_toolbar=False,
-        )
 
         self.add_widget(
             "preset_list",
@@ -658,66 +644,6 @@ class DashBoard(CustomApp):
         )
         self.add_action("load_preset", "LOAD", "Open", tip="Load the selected Preset: ")
         self.update_preset_action_list()
-
-        self.add_action(
-            "new_overshoot",
-            "New Overshoot",
-            "",
-            "Create a new experimental setup overshoot configuration file",
-            auto_toolbar=False,
-        )
-        self.add_action(
-            "modify_overshoot",
-            "Modify Overshoot",
-            "",
-            "Modify an existing experimental setup overshoot configuration file",
-            auto_toolbar=False,
-        )
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_overshoot_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                self.add_action(
-                    self.get_action_from_file(file, ManagerEnums.overshoot),
-                    file.stem,
-                    auto_toolbar=False,
-                )
-
-        self.add_action("save_roi", "Save ROIs as a file", "", auto_toolbar=False)
-        self.add_action("modify_roi", "Modify ROI file", "", auto_toolbar=False)
-
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_roi_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                self.add_action(
-                    self.get_action_from_file(file, ManagerEnums.roi),
-                    file.stem,
-                    "",
-                    auto_toolbar=False,
-                )
-
-        self.add_action("new_remote", "Create New Remote", "", auto_toolbar=False)
-        self.add_action("modify_remote", "Modify Remote file", "", auto_toolbar=False)
-        for ind_file, file in enumerate(
-            config_mod_pymodaq.get_set_remote_path().iterdir()
-        ):
-            if file.suffix == ".xml":
-                self.add_action(
-                    self.get_action_from_file(file, ManagerEnums.remote),
-                    file.stem,
-                    "",
-                    auto_toolbar=False,
-                )
-        self.add_action(
-            "activate_overshoot",
-            "Activate overshoot",
-            "Error",
-            tip="if activated, apply an overshoot if one is configured",
-            checkable=True,
-            enabled=False,
-        )
         self.toolbar.addSeparator()
         self.add_action(
             "do_scan",
@@ -742,22 +668,12 @@ class DashBoard(CustomApp):
         self.add_action("plugin_manager", "Plugin Manager", "")
 
     def update_preset_action_list(self):
+        """Update the preset combobox list with available preset files"""
         presets = []
         self.get_action("preset_list").clear()
         for ind_file, file in enumerate(self.preset_path.iterdir()):
             if file.suffix == ".xml":
-                filestem = file.stem
-                if not self.has_action(
-                    self.get_action_from_file(file, ManagerEnums.preset)
-                ):
-                    self.add_action(
-                        self.get_action_from_file(file, ManagerEnums.preset),
-                        filestem,
-                        "",
-                        f"Load the {filestem}.xml preset",
-                        auto_toolbar=False,
-                    )
-                presets.append(filestem)
+                presets.append(file.stem)
 
         self.get_action("preset_list").addItems(presets)
 
@@ -765,6 +681,33 @@ class DashBoard(CustomApp):
         self.get_action("load_preset").setToolTip(
             f"Load the {preset_name}.xml preset file!"
         )
+
+    def update_preset_action_states(self):
+        """Update preset manager action states based on whether a preset is loaded"""
+        preset_is_loaded = self.preset_file is not None
+
+        # Actions that require a loaded preset
+        self.preset_manager.set_action_enabled('edit', preset_is_loaded)
+        self.preset_manager.set_action_enabled('duplicate', preset_is_loaded)
+
+    def update_manager_action_states(self, manager):
+        """Update manager action states based on whether a config is loaded
+
+        Parameters
+        ----------
+        manager : ConfigManager
+            The manager instance (OvershootManager, ROISaver, or RemoteManager)
+        """
+        # Check if manager has a loaded config
+        config_is_loaded = hasattr(manager, '_current_config_file') and manager._current_config_file is not None
+
+        # Actions that require a loaded config
+        if manager.has_action('edit'):
+            manager.set_action_enabled('edit', config_is_loaded)
+        if manager.has_action('duplicate'):
+            manager.set_action_enabled('duplicate', config_is_loaded)
+        if manager.has_action('delete'):
+            manager.set_action_enabled('delete', config_is_loaded)
 
     def connect_things(self):
         self.status_signal[str].connect(self.add_status)
@@ -777,30 +720,13 @@ class DashBoard(CustomApp):
         self.connect_action("load_layout", self.load_layout_state)
         self.connect_action("save_layout", self.save_layout_state)
         self.connect_action("log_window", self.logger_dock.setVisible)
-        self.connect_action("new_preset", self.create_preset)
-        self.connect_action("modify_preset", self.modify_preset)
-        self.create_loading_menu_slot(ManagerEnums.preset)                        
 
         self.connect_action(
             "load_preset",
-            lambda: self.set_preset_mode(
-                self.preset_path.joinpath(
+            lambda: self.preset_manager.set_config_from_file(self.preset_path.joinpath(
                     f"{self.get_action('preset_list').currentText()}.xml"
-                )
-            ),
+                ), show=False),
         )
-        self.connect_action("new_overshoot", self.create_overshoot)
-        self.connect_action("modify_overshoot", self.modify_overshoot)
-        self.connect_action("activate_overshoot", self.activate_overshoot)
-        self.create_loading_menu_slot(ManagerEnums.overshoot)
-
-        self.connect_action("save_roi", self.create_roi_file)
-        self.connect_action("modify_roi", self.modify_roi)
-        self.create_loading_menu_slot(ManagerEnums.roi)
-
-        self.connect_action("new_remote", self.create_remote)
-        self.connect_action("modify_remote", self.modify_remote)
-        self.create_loading_menu_slot(ManagerEnums.remote)
 
         self.connect_action("do_scan", lambda: self.load_scan_module())
         self.connect_action("do_log", lambda: self.load_log_module())
@@ -840,34 +766,25 @@ class DashBoard(CustomApp):
         docked_menu.addSeparator()
         docked_menu.addAction(self.get_action("log_window"))
 
-        self.preset_menu = menubar.addMenu("Preset Modes")
-        self.preset_menu.addAction(self.get_action("new_preset"))
-        self.preset_menu.addAction(self.get_action("modify_preset"))
-        self.preset_menu.addSeparator()
-        self.load_preset_menu = self.preset_menu.addMenu("Load presets")
-        self.make_loading_menu(self.load_preset_menu, ManagerEnums.preset)
+        # Preset menu is always available (needed to load presets)
+        self.preset_menu = self.preset_manager.create_menu(
+            menubar=menubar,
+            menu_title="Preset Modes"
+        )
+        # Connect preset manager actions to dashboard methods
+        # self.preset_manager.connect_action('new', self.create_preset)
+        # self.preset_manager.connect_action('edit', self.modify_preset)
+        # Connect signals for menu updates
+        self.preset_manager.config_saved.connect(self.on_preset_saved)
+        self.preset_manager.config_loaded.connect(self.on_preset_loaded)
 
-        self.overshoot_menu = menubar.addMenu("Overshoot Modes")
-        self.overshoot_menu.addAction(self.get_action("new_overshoot"))
-        self.overshoot_menu.addAction(self.get_action("modify_overshoot"))
-        self.overshoot_menu.addAction(self.get_action("activate_overshoot"))
-        self.overshoot_menu.addSeparator()
-        load_overshoot_menu = self.overshoot_menu.addMenu("Load Overshoots")
-        self.make_loading_menu(load_overshoot_menu, ManagerEnums.overshoot)
+        # Disable actions that require a loaded preset
+        self.update_preset_action_states()
 
-        self.roi_menu = menubar.addMenu("ROI Modes")
-        self.roi_menu.addAction(self.get_action("save_roi"))
-        self.roi_menu.addAction(self.get_action("modify_roi"))
-        self.roi_menu.addSeparator()
-        load_roi_menu = self.roi_menu.addMenu("Load roi configs")
-        self.make_loading_menu(load_roi_menu, ManagerEnums.roi)
-
-        self.remote_menu = menubar.addMenu("Remote/Shortcuts Control")
-        self.remote_menu.addAction("New remote config.", self.create_remote)
-        self.remote_menu.addAction("Modify remote config.", self.modify_remote)
-        self.remote_menu.addSeparator()
-        load_remote_menu = self.remote_menu.addMenu("Load remote config.")
-        self.make_loading_menu(load_remote_menu, ManagerEnums.remote)
+        # These menus will be created after preset is loaded
+        self.overshoot_menu = None
+        self.roi_menu = None
+        self.remote_menu = None
 
         # extensions menu
         self.extensions_menu = menubar.addMenu("Extensions")
@@ -895,32 +812,74 @@ class DashBoard(CustomApp):
 
         status = self.preset_file is None
 
-        self.overshoot_menu.setEnabled(not status)
-        self.roi_menu.setEnabled(not status)
-        self.remote_menu.setEnabled(not status)
         self.extensions_menu.setEnabled(not status)
         self.file_menu.setEnabled(True)
         self.settings_menu.setEnabled(True)
         self.preset_menu.setEnabled(status)
 
-    def create_loading_menu_slot(self, manager_enum: ManagerEnums):
-        config_folder:Path = manager_enum.get_path()
-        for file in config_folder.iterdir():
-            if file.suffix == ".xml":
-                self.connect_action(
-                    self.get_action_from_file(file, manager_enum),
-                    self.create_menu_slot(config_folder.joinpath(file), manager_enum),
-                )
+    def create_manager_menus(self):
+        """
+        Create menus for overshoot, ROI, and remote managers.
 
-    def make_loading_menu(self, menu:QMenu, manager_enum:ManagerEnums, refresh=True):
-        if refresh:
-            menu.clear()
-        for file in manager_enum.get_path().iterdir():
-            if file.suffix == ".xml":
-                menu.addAction(self.get_action(
-                        self.get_action_from_file(file, manager_enum)
-                    )
-                )
+        Called after preset is loaded and managers are instantiated.
+        This ensures menus only appear when managers are available.
+        """
+        # Remove and cleanup old menus if they exist to prevent signal stacking
+        if self.overshoot_menu is not None:
+            self.menubar.removeAction(self.overshoot_menu.menuAction())
+            self.overshoot_menu.deleteLater()  # Ensure proper Qt cleanup
+            self.overshoot_menu = None
+        if self.roi_menu is not None:
+            self.menubar.removeAction(self.roi_menu.menuAction())
+            self.roi_menu.deleteLater()
+            self.roi_menu = None
+        if self.remote_menu is not None:
+            self.menubar.removeAction(self.remote_menu.menuAction())
+            self.remote_menu.deleteLater()
+            self.remote_menu = None
+
+        # Find position to insert (after preset menu, before extensions)
+        preset_action = self.preset_menu.menuAction()
+        extensions_action = self.extensions_menu.menuAction()
+
+        # Create Overshoot menu using manager
+        if hasattr(self, 'overshoot_manager') and self.overshoot_manager is not None:
+            self.overshoot_menu = self.overshoot_manager.create_menu(
+                menubar=None,  # We'll insert manually
+                menu_title="Overshoot Modes"
+            )
+            self.menubar.insertMenu(extensions_action, self.overshoot_menu)
+            # Connect signals
+            self.overshoot_manager.overshoot_activated.connect(self.activate_overshoot)
+            self.overshoot_manager.config_loaded.connect(self.on_overshoot_loaded)
+            # Disable actions that require a loaded config
+            self.update_manager_action_states(self.overshoot_manager)
+
+        # Create ROI menu using manager
+        if hasattr(self, 'roi_saver') and self.roi_saver is not None:
+            self.roi_menu = self.roi_saver.create_menu(
+                menubar=None,
+                menu_title="ROI Modes",
+                actions=['new', 'edit', 'duplicate', 'load', 'delete', 'open_dir']
+            )
+            self.menubar.insertMenu(extensions_action, self.roi_menu)
+            # Connect signals
+            self.roi_saver.config_loaded.connect(self.on_roi_loaded)
+            # Disable actions that require a loaded config
+            self.update_manager_action_states(self.roi_saver)
+
+        # Create Remote menu using manager
+        if hasattr(self, 'remote_manager') and self.remote_manager is not None:
+            self.remote_menu = self.remote_manager.create_menu(
+                menubar=None,
+                menu_title="Remote/Shortcuts Control"
+            )
+            self.menubar.insertMenu(extensions_action, self.remote_menu)
+            # Connect signals (these are connected to the NEW manager each time preset loads)
+            self.remote_manager.config_loaded.connect(self.on_remote_loaded)
+            self.remote_manager.remote_changed.connect(self.activate_remote)
+            # Disable actions that require a loaded config
+            self.update_manager_action_states(self.remote_manager)
 
     def start_plugin_manager(self):
         self.win_plug_manager = QtWidgets.QMainWindow()
@@ -932,65 +891,8 @@ class DashBoard(CustomApp):
         self.plugin_manager.restart_signal.connect(self.restart_fun)
         self.win_plug_manager.show()
 
-    def create_menu_slot(self, filename:str, manager_enum:ManagerEnums):
-        if manager_enum == ManagerEnums.preset:
-            func = self.set_preset_mode
-        elif manager_enum == ManagerEnums.roi:
-            func = self.set_roi_configuration
-        elif manager_enum == ManagerEnums.overshoot:
-            func = self.set_overshoot_configuration
-        elif manager_enum == ManagerEnums.remote:
-            func = self.set_remote_configuration
-        return lambda: func(filename)
-
-    # def create_menu_slot_preset(self, filename):
-    #     return lambda: self.set_preset_mode(filename)
-
     def create_menu_slot_ext(self, ext):
         return lambda: self.load_extensions_module(ext)
-
-    # def create_menu_slot_roi(self, filename):
-    #     return lambda: self.set_roi_configuration(filename)
-
-    # def create_menu_slot_over(self, filename):
-    #     return lambda: self.set_overshoot_configuration(filename)
-
-    # def create_menu_slot_remote(self, filename):
-    #     return lambda: self.set_remote_configuration(filename)
-
-    def set_config_file(self, manager_enum:ManagerEnums):
-        if manager_enum == ManagerEnums.roi:
-            func = self.roi_saver.set_new_roi
-        elif manager_enum == ManagerEnums.overshoot:
-            func = self.overshoot_manager.set_new_overshoot
-        elif manager_enum == ManagerEnums.remote:
-            func = self.remote_manager.set_new_remote
-        try:
-            if self.preset_file is not None:
-                action = self.get_action_from_file(self.preset_file, manager_enum)
-                func(self.preset_file.stem)
-                self.add_action(
-                    action,
-                    self.preset_file.stem,
-                    "",
-                )
-                self.setup_menu(self.menubar)
-                self.connect_action(
-                    action,
-                    self.create_menu_slot(manager_enum.get_path().joinpath(self.preset_file.name), manager_enum),
-                )
-
-        except Exception as e:
-            logger.exception(str(e))
-
-    def create_roi_file(self):
-        self.set_config_file(ManagerEnums.roi)            
-
-    def create_remote(self):
-        self.set_config_file(ManagerEnums.remote)
-
-    def create_overshoot(self):
-        self.set_config_file(ManagerEnums.overshoot)
 
     def create_preset(self):
         try:
@@ -1005,63 +907,6 @@ class DashBoard(CustomApp):
     @staticmethod
     def get_action_from_file(file: Path, manager: ManagerEnums):
         return f"{file.stem}_{manager.name}"
-    
-    def modify_config(self):
-        try:
-            path = select_file(
-                start_path=config_mod_pymodaq.get_set_remote_path(),
-                save=False,
-                ext="xml",
-            )
-            if path != "":
-                self.remote_manager.set_file_remote(path)
-
-            else:  # cancel
-                pass
-        except Exception as e:
-            logger.exception(str(e))
-    def modify_remote(self):
-        try:
-            path = select_file(
-                start_path=config_mod_pymodaq.get_set_remote_path(),
-                save=False,
-                ext="xml",
-            )
-            if path != "":
-                self.remote_manager.set_file_remote(path)
-
-            else:  # cancel
-                pass
-        except Exception as e:
-            logger.exception(str(e))
-
-    def modify_overshoot(self):
-        try:
-            path = select_file(
-                start_path=config_mod_pymodaq.get_set_overshoot_path(),
-                save=False,
-                ext="xml",
-            )
-            if path != "":
-                self.overshoot_manager.set_file_overshoot(path)
-
-            else:  # cancel
-                pass
-        except Exception as e:
-            logger.exception(str(e))
-
-    def modify_roi(self):
-        try:
-            path = select_file(
-                start_path=config_mod_pymodaq.get_set_roi_path(), save=False, ext="xml"
-            )
-            if path != "":
-                self.roi_saver.set_file_roi(path)
-
-            else:  # cancel
-                pass
-        except Exception as e:
-            logger.exception(str(e))
 
     def modify_preset(self):
         try:
@@ -1085,6 +930,21 @@ class DashBoard(CustomApp):
 
             else:  # cancel
                 pass
+        except Exception as e:
+            logger.exception(str(e))
+
+    def on_preset_saved(self, file_path: Path):
+        """Called when a preset is saved via the PresetManager"""
+        try:
+            self.update_preset_action_list()
+            self.new_preset_created.emit()
+        except Exception as e:
+            logger.exception(str(e))
+
+    def on_preset_loaded(self, file_path: Path):
+        """Called when a preset is loaded via the PresetManager's load submenu"""
+        try:
+            self.set_preset_mode(file_path)
         except Exception as e:
             logger.exception(str(e))
 
@@ -1455,7 +1315,7 @@ class DashBoard(CustomApp):
 
         if filename.suffix == ".xml":
             self.preset_file = filename
-            self.preset_manager.set_file_preset(filename, show=False)
+            # self.preset_manager.set_config_from_file(filename, show=False)
             move_docks = []
             det_docks_settings = []
             det_docks_viewer = []
@@ -1466,11 +1326,11 @@ class DashBoard(CustomApp):
             plugins = []
             plugins += [
                 {"type": "move", "value": child}
-                for child in self.preset_manager.preset_params.child("Moves").children()
+                for child in self.preset_manager.settings.child("Moves").children()
             ]
             plugins += [
                 {"type": "det", "value": child}
-                for child in self.preset_manager.preset_params.child(
+                for child in self.preset_manager.settings.child(
                     "Detectors"
                 ).children()
             ]
@@ -1638,34 +1498,38 @@ class DashBoard(CustomApp):
                 break
         return is_init
 
-    def set_roi_configuration(self, filename):
-        if not isinstance(filename, Path):
-            filename = Path(filename)
-        try:
-            if filename.suffix == ".xml":
-                file = filename.stem
-                self.settings.child("loaded_files", "roi_file").setValue(file)
-                self.update_status(
-                    "ROI configuration ({}) has been loaded".format(file),
-                    log_type="log",
-                )
-                self.roi_saver.set_file_roi(filename, show=False)
+    def on_roi_loaded(self, filename: Path):
+        """Called when ROI config is loaded (via signal from ROISaver)
 
+        The config is already loaded by the manager, this just updates dashboard UI
+        """
+        try:
+            file = filename.stem
+            self.settings.child("loaded_files", "roi_file").setValue(file)
+            self.update_status(
+                f"ROI configuration ({file}) has been loaded",
+                log_type="log",
+            )
+            # Update action states now that a config is loaded
+            self.update_manager_action_states(self.roi_saver)
         except Exception as e:
             logger.exception(str(e))
 
-    def set_remote_configuration(self, filename):
-        if not isinstance(filename, Path):
-            filename = Path(filename)
-        ext = filename.suffix
-        if ext == ".xml":
+    def on_remote_loaded(self, filename: Path):
+        """Called when Remote config is loaded (via signal from RemoteManager)
+
+        The config is already loaded by the manager, this just updates dashboard UI
+        """
+        try:
             self.remote_file = filename
-            self.remote_manager.remote_changed.connect(self.activate_remote)
-            self.remote_manager.set_file_remote(filename, show=False)
-            self.settings.child("loaded_files", "remote_file").setValue(filename)
+            self.settings.child("loaded_files", "remote_file").setValue(filename.stem)
             self.remote_manager.set_remote_configuration()
             self.remote_dock.addWidget(self.remote_manager.remote_settings_tree)
             self.remote_dock.setVisible(True)
+            # Update action states now that a config is loaded
+            self.update_manager_action_states(self.remote_manager)
+        except Exception as e:
+            logger.exception(str(e))
 
     def activate_remote(self, remote_action, activate_all=False):
         """
@@ -1831,23 +1695,24 @@ class DashBoard(CustomApp):
         else:
             return lambda: getattr(module, action["action"])()
 
-    def set_overshoot_configuration(self, filename):
+    def on_overshoot_loaded(self, filename: Path):
+        """Called when Overshoot config is loaded (via signal from OvershootManager)
+
+        The config is already loaded by the manager, this just updates dashboard UI
+        """
         try:
-            if not isinstance(filename, Path):
-                filename = Path(filename)
-
-            if filename.suffix == ".xml":
-                file = filename.stem
-                self.settings.child("loaded_files", "overshoot_file").setValue(file)
-                self.update_status(
-                    "Overshoot configuration ({}) has been loaded".format(file),
-                    log_type="log",
-                )
-                self.overshoot_manager.set_file_overshoot(filename, show=False)
-                self.set_action_enabled("activate_overshoot", True)
-                self.set_action_checked("activate_overshoot", False)
-                self.get_action("activate_overshoot").trigger()
-
+            file = filename.stem
+            self.settings.child("loaded_files", "overshoot_file").setValue(file)
+            self.update_status(
+                f"Overshoot configuration ({file}) has been loaded",
+                log_type="log",
+            )
+            # Update action states now that a config is loaded
+            self.update_manager_action_states(self.overshoot_manager)
+            # Trigger overshoot activation (via the manager's toggle action)
+            if hasattr(self.overshoot_manager, '_activate_action'):
+                self.overshoot_manager._activate_action.setChecked(False)
+                self.overshoot_manager._activate_action.trigger()
         except Exception as e:
             logger.exception(str(e))
 
@@ -1949,31 +1814,34 @@ class DashBoard(CustomApp):
                 self.update_module_manager()
 
                 #####################################################
+                # Create managers
                 self.overshoot_manager = OvershootManager(
                     det_modules=[det.title for det in detector_modules],
                     actuators_modules=[move.title for move in actuators_modules],
                 )
-                # load overshoot if present
-                file = filename.name
-                path = overshoot_path.joinpath(file)
-                if path.is_file():
-                    self.set_overshoot_configuration(path)
-
                 self.remote_manager = RemoteManager(
                     actuators=[move.title for move in actuators_modules],
                     detectors=[det.title for det in detector_modules],
                 )
-                # load remote file if present
+                self.roi_saver = ROISaver(det_modules=detector_modules)
+
+                # Create manager menus and connect signals BEFORE loading configs
+                # so that signals are properly connected
+                self.create_manager_menus()
+
+                # Now load configs if present (signals will handle dashboard integration)
                 file = filename.name
+                path = overshoot_path.joinpath(file)
+                if path.is_file():
+                    self.overshoot_manager.set_config_from_file(path, show=False)
+
                 path = remote_path.joinpath(file)
                 if path.is_file():
-                    self.set_remote_configuration(path)
+                    self.remote_manager.set_config_from_file(path, show=False)
 
-                self.roi_saver = ROISaver(det_modules=detector_modules)
-                # load roi saver if present
                 path = roi_path.joinpath(file)
                 if path.is_file():
-                    self.set_roi_configuration(path)
+                    self.roi_saver.set_config_from_file(path, show=False)
 
                 # connecting to logger
                 for mov in actuators_modules:
@@ -1988,9 +1856,14 @@ class DashBoard(CustomApp):
                 if self.pid_window is not None:
                     self.pid_window.show()
 
-                self.load_preset_menu.setEnabled(False)
+                # Disable preset loading UI (preset is now loaded)
                 self.set_action_enabled("load_preset", False)
                 self.set_action_enabled("preset_list", False)
+
+                # Enable preset manager actions that require a loaded preset
+                self.update_preset_action_states()
+
+                # Enable manager menus
                 self.overshoot_menu.setEnabled(True)
                 self.roi_menu.setEnabled(True)
                 self.remote_menu.setEnabled(True)

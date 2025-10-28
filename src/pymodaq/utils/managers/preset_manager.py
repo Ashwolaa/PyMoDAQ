@@ -58,7 +58,7 @@ class PresetManager(ConfigManager):
 
         return self.extra_params + params_move + params_det
 
-    def set_new_config(self, file: str = None):
+    def set_new_config(self, file: str = None, show: bool = True):
         super().set_new_config(file, show=False)
         try:
             for option in self.param_options:
@@ -111,5 +111,4 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     # prog = PresetManager(True)
     prog = PresetManager(True)
-
     sys.exit(app.exec_())
