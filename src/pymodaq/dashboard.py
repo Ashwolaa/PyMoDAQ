@@ -80,26 +80,6 @@ roi_path = config_mod_pymodaq.get_set_roi_path()
 remote_path = config_mod_pymodaq.get_set_remote_path()
 
 
-# class ManagerEnums(BaseEnum):
-#     preset = 0
-#     remote = 1
-#     overshoot = 2
-#     roi = 3
-
-class ManagerEnums(BaseEnum):
-    preset = (0, config_mod_pymodaq.get_set_preset_path)
-    remote = (1, config_mod_pymodaq.get_set_remote_path)
-    overshoot = (2, config_mod_pymodaq.get_set_overshoot_path)
-    roi = (3, config_mod_pymodaq.get_set_roi_path)
-
-    def __init__(self, id, path_func):
-        self.id = id
-        self.path_func = path_func
-
-    def get_path(self):
-        path:Path = self.path_func()
-        return path
-
 class PymodaqUpdateTableWidget(QTableWidget):
     """
     A class to represent PyMoDAQ and its subpackages'
@@ -766,14 +746,10 @@ class DashBoard(CustomApp):
         docked_menu.addSeparator()
         docked_menu.addAction(self.get_action("log_window"))
 
-        # Preset menu is always available (needed to load presets)
         self.preset_menu = self.preset_manager.create_menu(
             menubar=menubar,
             menu_title="Preset Modes"
         )
-        # Connect preset manager actions to dashboard methods
-        # self.preset_manager.connect_action('new', self.create_preset)
-        # self.preset_manager.connect_action('edit', self.modify_preset)
         # Connect signals for menu updates
         self.preset_manager.config_saved.connect(self.on_preset_saved)
         self.preset_manager.config_loaded.connect(self.on_preset_loaded)
@@ -893,45 +869,6 @@ class DashBoard(CustomApp):
 
     def create_menu_slot_ext(self, ext):
         return lambda: self.load_extensions_module(ext)
-
-    def create_preset(self):
-        try:
-            status = self.preset_manager.set_new_preset()
-            if status:
-                self.update_preset_action_list()
-                self.setup_menu(self.menubar)
-                self.new_preset_created.emit()
-        except Exception as e:
-            logger.exception(str(e))
-
-    @staticmethod
-    def get_action_from_file(file: Path, manager: ManagerEnums):
-        return f"{file.stem}_{manager.name}"
-
-    def modify_preset(self):
-        try:
-            path = select_file(start_path=self.preset_path, save=False, ext="xml")
-            if path != "":
-                modified = self.preset_manager.set_file_preset(path)
-
-                if modified:
-                    self.remove_preset_related_files(path.name)
-                    if self.detector_modules:
-                        mssg = QMessageBox()
-                        mssg.setText(
-                            "You have to restart the application to take the modifications"
-                            " into account!\n\n"
-                            "The related files: ROI, Layout, Overshoot and Remote will be"
-                            " deleted if existing!\n\n"
-                            "Quitting the application..."
-                        )
-                        mssg.exec()
-                        self.restart_fun()
-
-            else:  # cancel
-                pass
-        except Exception as e:
-            logger.exception(str(e))
 
     def on_preset_saved(self, file_path: Path):
         """Called when a preset is saved via the PresetManager"""
@@ -1063,6 +1000,29 @@ class DashBoard(CustomApp):
             path = layout_path.joinpath(self.preset_file.stem + ".dock")
             self.save_layout_state(path)
 
+    def _apply_plugin_settings(self, module, plug_settings, plug_type_name):
+        """Apply plugin settings with error handling
+
+        Parameters
+        ----------
+        module : DAQ_Move or DAQ_Viewer
+            The module to apply settings to
+        plug_settings : Parameter
+            The settings parameter to apply
+        plug_type_name : str
+            The plugin type name for error messages
+        """
+        if plug_settings is not None:
+            try:
+                putils.set_param_from_param(module.settings, plug_settings)
+            except KeyError as e:
+                mssg = (
+                    f"Could not set this setting: {str(e)}\n"
+                    f"The Preset is no more compatible with the plugin {plug_type_name}"
+                )
+                logger.warning(mssg)
+                self.splash_sc.showMessage(mssg)
+
     def add_move(
             self,
             plug_name: str = None,
@@ -1121,16 +1081,7 @@ class DashBoard(CustomApp):
         QtWidgets.QApplication.processEvents()
         mov_mod_tmp.manage_ui_actions("quit", "setEnabled", False)
 
-        if plug_settings is not None:
-            try:
-                putils.set_param_from_param(mov_mod_tmp.settings, plug_settings)
-            except KeyError as e:
-                mssg = (
-                    f"Could not set this setting: {str(e)}\n"
-                    f"The Preset is no more compatible with the plugin {plug_type}"
-                )
-                logger.warning(mssg)
-                self.splash_sc.showMessage(mssg)
+        self._apply_plugin_settings(mov_mod_tmp, plug_settings, plug_type)
         QtWidgets.QApplication.processEvents()
 
         mov_mod_tmp.bounds_signal[bool].connect(self.do_stuff_from_out_bounds)
@@ -1138,6 +1089,64 @@ class DashBoard(CustomApp):
 
         actuators_modules.append(mov_mod_tmp)
         return mov_mod_tmp
+
+    def _add_module_from_extension(
+        self,
+        module_type: str,
+        name: str,
+        instrument_name: str,
+        instrument_controller: Any,
+        **kwargs
+    ) -> Union[DAQ_Move, DAQ_Viewer]:
+        """Generic method to add a module (actuator or detector) from an extension
+
+        Parameters
+        ----------
+        module_type : str
+            Either 'move' or 'det' to specify the type of module
+        name : str
+            The name to print on the UI title
+        instrument_name : str
+            The name of the instrument class
+        instrument_controller : object
+            Whatever object is used to communicate between the instrument module and the extension
+        kwargs : dict
+            Additional arguments to pass to add_move or add_det
+
+        Returns
+        -------
+        Union[DAQ_Move, DAQ_Viewer]
+            The created module
+        """
+        if module_type == 'move':
+            module = self.add_move(
+                name, None, instrument_name, [], [], [],
+                ui_identifier=kwargs.get('ui_identifier'),
+                **kwargs
+            )
+            modules_list = self.actuators_modules
+        elif module_type == 'det':
+            module = self.add_det(
+                name, None, [], [], [],
+                plug_type=kwargs.get('daq_type'),
+                plug_subtype=instrument_name
+            )
+            modules_list = self.detector_modules
+        else:
+            raise ValueError(f"module_type must be 'move' or 'det', got '{module_type}'")
+
+        module.controller = instrument_controller
+        module.master = False
+        module.init_hardware_ui()
+        QtWidgets.QApplication.processEvents()
+        self.poll_init(module)
+        QtWidgets.QApplication.processEvents()
+
+        # Update modules list and module manager
+        modules_list.append(module)
+        self.update_module_manager()
+
+        return module
 
     def add_move_from_extension(
         self, name: str, instrument_name: str, instrument_controller: Any,
@@ -1164,19 +1173,10 @@ class DashBoard(CustomApp):
             One of the possible registered UI
         kwargs: named arguments to be passed to add_move
         """
-        actuator = self.add_move(name, None, instrument_name, [], [], [],
-                                 ui_identifier=ui_identifier,
-                                 **kwargs)
-        actuator.controller = instrument_controller
-        actuator.master = False
-        actuator.init_hardware_ui()
-        QtWidgets.QApplication.processEvents()
-        self.poll_init(actuator)
-        QtWidgets.QApplication.processEvents()
-
-        # Update actuators modules and module manager
-        self.actuators_modules.append(actuator)
-        self.update_module_manager()
+        return self._add_module_from_extension(
+            'move', name, instrument_name, instrument_controller,
+            ui_identifier=ui_identifier, **kwargs
+        )
 
     def add_det(
         self,
@@ -1214,16 +1214,7 @@ class DashBoard(CustomApp):
         QtWidgets.QApplication.processEvents()
         det_mod_tmp.manage_ui_actions("quit", "setEnabled", False)
 
-        if plug_settings is not None:
-            try:
-                putils.set_param_from_param(det_mod_tmp.settings, plug_settings)
-            except KeyError as e:
-                mssg = (
-                    f"Could not set this setting: {str(e)}\n"
-                    f"The Preset is no more compatible with the plugin {plug_subtype}"
-                )
-                logger.warning(mssg)
-                self.splash_sc.showMessage(mssg)
+        self._apply_plugin_settings(det_mod_tmp, plug_settings, plug_subtype)
 
         detector_modules.append(det_mod_tmp)
         return det_mod_tmp
@@ -1269,19 +1260,10 @@ class DashBoard(CustomApp):
             whatever object is used to communicate between the instrument module and the extension
             which created it
         """
-        detector = self.add_det(
-            name, None, [], [], [], plug_type=daq_type, plug_subtype=instrument_name
+        return self._add_module_from_extension(
+            'det', name, instrument_name, instrument_controller,
+            daq_type=daq_type
         )
-        detector.controller = instrument_controller
-        detector.master = False
-        detector.init_hardware_ui()
-        QtWidgets.QApplication.processEvents()
-        self.poll_init(detector)
-        QtWidgets.QApplication.processEvents()
-
-        # Update actuators modules and module manager
-        self.detector_modules.append(detector)
-        self.update_module_manager()
 
     def update_module_manager(self):
         if self.modules_manager is None:
