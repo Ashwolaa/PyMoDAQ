@@ -11,12 +11,12 @@ PyMoDAQ Utils
    :target: https://pypi.org/project/pymodaq_utils/
    :alt: Latest Version
 
-.. image:: https://readthedocs.org/projects/pymodaq/badge/?version=latest
-   :target: https://pymodaq.readthedocs.io/en/stable/?badge=latest
+.. image:: https://readthedocs.org/projects/pymodaq/badge/?version=5.1.x
+   :target: https://pymodaq.readthedocs.io/en/stable/?badge=5.1.x
    :alt: Documentation Status
 
-.. image:: https://codecov.io/gh/PyMoDAQ/pymodaq_utils/branch/0.0.x_dev/graph/badge.svg?token=IyhqsXIhjt 
- :target: https://codecov.io/gh/PyMoDAQ/pymodaq_utils
+.. image:: https://codecov.io/gh/PyMoDAQ/PyMoDAQ/branch/5.1.x/graph/badge.svg?token=IQNJRCQDM2 
+ :target: https://codecov.io/gh/PyMoDAQ/PyMoDAQ
 
 +-------------+-------------+---------------+
 |             | Linux       | Windows       |
