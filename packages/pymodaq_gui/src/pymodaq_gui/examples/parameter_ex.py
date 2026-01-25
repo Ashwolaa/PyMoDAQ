@@ -3,7 +3,7 @@ S Weber  2020
 Examples of custome parameter types derived from pyqtgraph
 """
 import sys
-from qtpy import QtWidgets, QtCore
+from qtpy import QtCore
 from collections import OrderedDict
 
 import pymodaq_gui.utils.widgets.table as table
