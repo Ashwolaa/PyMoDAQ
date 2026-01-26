@@ -35,8 +35,9 @@ from pymodaq_gui.parameter import utils as putils
 from pymodaq_gui.qt_utils import mkQApp
 
 from pymodaq.utils.h5modules import module_saving
-from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES, get_actuator_plugin
+from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES, get_actuator_plugin, get_actuator_module, update_plugin_config
 from pymodaq.control_modules.utils import ParameterControlModule
+from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator
 
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusMove, ControlToHardwareMove,
                                                      UiToMainMove,
@@ -102,6 +103,44 @@ class DAQ_Move(ParameterControlModule):
     listener_class = MoveActorListener
     ui: Optional[DAQ_Move_UI_Base]
 
+    @property
+    def _plugin_settings_name(self) -> str:
+        """Return the name of the plugin settings parameter group."""
+        return 'move_settings'
+
+    @property
+    def _saver_class(self):
+        """Return the saver class to use for this control module."""
+        return module_saving.ActuatorTimeSaver
+
+    @property
+    def _close_command(self) -> str:
+        """Return the close command enum value."""
+        return ControlToHardwareMove.CLOSE
+
+    def _create_hardware_instance(self):
+        """Factory method - create hardware instance."""
+        return DAQ_Move_Hardware(
+            self._actuator, self._current_value, self._title
+        )
+
+    def _emit_init_command(self):
+        """Emit initialization command to hardware."""
+        self.command_hardware.emit(
+            ThreadCommand(
+                ControlToHardwareMove.INI_STAGE,
+                attribute=[
+                    self.settings.child("move_settings").saveState(),
+                    self.controller,
+                ],
+            )
+        )
+
+    def _set_ui_init_state(self, status: bool):
+        """Set UI initialization state."""
+        if self.ui is not None:
+            self.ui.actuator_init = status
+
     def __init__(
         self, parent=None, title="DAQ Move", ui_identifier: Optional[str] = None, **kwargs
     ) -> None:
@@ -121,6 +160,7 @@ class DAQ_Move(ParameterControlModule):
 
         super().__init__(action_list=("save", "update"), **kwargs)
 
+        self._actuator: SelectedActuator = SelectedActuator()
         if not (
             ui_identifier is not None and ui_identifier in ActuatorUIFactory.keys()
         ):
@@ -142,8 +182,8 @@ class DAQ_Move(ParameterControlModule):
 
         self.splash_sc = get_splash_sc()
         self._title = title
-        if len(ACTUATOR_NAMES) > 0:  # will be 0 if no valid plugins are installed
-            self.actuator = kwargs.get("actuator", ACTUATOR_NAMES[0])
+
+
 
         self._module_and_data_saver: module_saving.ActuatorTimeSaver = None
         for hidden_param in ('custom_name',
@@ -155,6 +195,7 @@ class DAQ_Move(ParameterControlModule):
             self.settings.child('saver_settings', hidden_param).setOpts(visible=False)
 
         self._move_done_bool = True
+        self.actuator = self._actuator
 
         self._current_value = DataActuator(title, units=self.units)
         self._target_value = DataActuator(title, units=self.units)
@@ -162,6 +203,8 @@ class DAQ_Move(ParameterControlModule):
 
         self._refresh_timer = QTimer(self)
         self._refresh_timer.timeout.connect(self.get_actuator_value)
+
+
 
     def process_ui_cmds(self, cmd: utils.ThreadCommand):
         """Process commands sent by actions done in the ui
@@ -208,7 +251,8 @@ class DAQ_Move(ParameterControlModule):
             self.move_rel(data_act)
             self.ui.config = self.config
         elif cmd.command == UiToMainMove.ACTUATOR_CHANGED:
-            self.actuator = cmd.attribute
+            if isinstance(cmd.attribute, SelectedActuator):
+                self.actuator_changed_from_ui(cmd.attribute)
         elif cmd.command == UiToMainMove.REL_VALUE:
             self._relative_value = cmd.attribute
 
@@ -396,55 +440,6 @@ class DAQ_Move(ParameterControlModule):
     def move_rel_m(self):
         self.move_rel(-self._relative_value)
 
-    def quit_fun(self):
-        """Programmatic quitting of the current instance of DAQ_Move
-
-        Des-init the actuator then close the UI parent widget
-        """
-        # insert anything that needs to be closed before leaving
-
-        if self._initialized_state:
-            self.init_hardware(False)
-        self.quit_signal.emit()
-        if self.ui is not None:
-            self.ui.close()
-        # self.parent.close()
-
-    def init_hardware(self, do_init=True):
-        """Init or desinit the selected instrument plugin class"""
-        if not do_init:
-            try:
-                self.command_hardware.emit(ThreadCommand(ControlToHardwareMove.CLOSE))
-                if self.ui is not None:
-                    self.ui.actuator_init = False
-            except Exception as e:
-                self.logger.exception(str(e))
-        else:
-            try:
-                hardware = DAQ_Move_Hardware(
-                    self._actuator_type, self._current_value, self._title
-                )
-                self._hardware_thread = QThread()
-                hardware.moveToThread(self._hardware_thread)
-
-                self.command_hardware[ThreadCommand].connect(hardware.queue_command)
-                hardware.status_sig[ThreadCommand].connect(self.thread_status)
-                self._update_settings_signal[edict].connect(hardware.update_settings)
-
-                self._hardware_thread.hardware = hardware
-                self._hardware_thread.start()
-                self.command_hardware.emit(
-                    ThreadCommand(
-                        ControlToHardwareMove.INI_STAGE,
-                        attribute=[
-                            self.settings.child("move_settings").saveState(),
-                            self.controller,
-                        ],
-                    )
-                )
-            except Exception as e:
-                self.logger.exception(str(e))
-
     @property
     def initialized_state(self):
         """bool: status of the actuator's initialization (init or not)"""
@@ -457,30 +452,14 @@ class DAQ_Move(ParameterControlModule):
 
     def value_changed(self, param: Parameter):
         """Apply changes of value in the settings"""
-        super().value_changed(param=param)
-        path = self.settings.childPath(param)
+        result = super().value_changed(param=param)
+        if result is None:
+            return  # Already handled by base class
 
         if param.name() == "refresh_timeout":
             self._refresh_timer.setInterval(param.value())
 
-        elif param.name() == 'continuous_saving_opt':
-            self.settings.child('saver_settings').setOpts(visible=param.value())
-
-        elif param.name() in putils.iter_children(self.settings.child('saver_settings'), []):
-            if param.name() == 'do_save':
-                self.setup_continuous_saving(param.value())
-            self.h5saver.settings.child(*path[1:]).setValue(param.value())
-
         self._update_settings(param=param)
-
-    def setup_continuous_saving(self, init: bool = True):
-        """Configure the objects dealing with the continuous saving mode"""
-        if init:
-            self.module_and_data_saver = module_saving.ActuatorTimeSaver(self)
-            self.module_and_data_saver.h5saver = self.h5saver
-            self.h5saver.settings.child('do_save').sigValueChanged.connect(self._init_continuous_save)
-        else:
-            self.h5saver.close_file()
 
     def _init_continuous_save(self):
         """ Initialize the continuous saving H5Saver object
@@ -495,23 +474,6 @@ class DAQ_Move(ParameterControlModule):
             self.h5saver.init_file(update_h5=True)
         else:
             self.settings.child('saver_settings', 'N_saved').hide()
-
-    def param_deleted(self, param):
-        """Apply deletion of settings"""
-        if param.name() not in putils.iter_children(
-            self.settings.child("main_settings"), []
-        ):
-            self._update_settings_signal.emit(
-                edict(path=["move_settings"], param=param, change="parent")
-            )
-
-    def child_added(self, param, data):
-        """Apply addition of settings"""
-        path = self.settings.childPath(param)
-        if "main_settings" not in path:
-            self._update_settings_signal.emit(
-                edict(path=path, param=data[0].saveState(), change="childAdded")
-            )
 
     def raise_timeout(self):
         """Update status with "Timeout occurred" statement and change the timeout flag."""
@@ -704,6 +666,12 @@ class DAQ_Move(ParameterControlModule):
         else:
             self._refresh_timer.stop()
 
+    def actuator_changed_from_ui(self, actuator: SelectedActuator):
+        self._actuator = actuator
+        self.settings.child('main_settings').setValue(actuator.module_name)
+        self.plugin_config = update_plugin_config(self.actuator)
+        self.update_settings()
+
     @property
     def actuator(self):
         """str: the selected actuator's type
@@ -712,13 +680,12 @@ class DAQ_Move(ParameterControlModule):
         -------
 
         """
-        return self._actuator_type
+        return self._actuator
 
     @actuator.setter
-    def actuator(self, act_type):
-        if act_type in ACTUATOR_NAMES:
-            self._actuator_type = act_type
-            self.update_plugin_config()
+    def actuator(self, act_type: SelectedActuator):
+        if isinstance(act_type, SelectedActuator):
+            self.plugin_config = update_plugin_config(self.actuator)
             if self.ui is not None:
                 self.ui.actuator = act_type
             self.update_settings()
@@ -726,19 +693,14 @@ class DAQ_Move(ParameterControlModule):
             raise ActuatorError(
                 f"{act_type} is an invalid actuator, should be within {ACTUATOR_NAMES}"
             )
+        
 
     @property
     def actuators(self) -> List[str]:
         """Get the list of possible actuators"""
         return ACTUATOR_NAMES
 
-    def update_plugin_config(self):
-        parent_module = utils.find_dict_in_list_from_key_val(
-            ACTUATOR_TYPES, "name", self.actuator
-        )
-        mod = import_module(parent_module["module"].__package__.split(".")[0])
-        if hasattr(mod, "config"):
-            self.plugin_config = mod.config
+
 
     @property
     def units(self):
@@ -815,12 +777,12 @@ class DAQ_Move(ParameterControlModule):
             return str(Q_(1, unit).to_base_units().units)
 
     def update_settings(self):
-        self.settings.child("main_settings", "move_type").setValue(self._actuator_type)
+        self.settings.child("main_settings", "move_type").setValue(self._actuator)
         self.settings.child("main_settings", "module_name").setValue(self._title)
         try:
             for child in self.settings.child("move_settings").children():
                 child.remove()            
-            _class, move_params = get_actuator_plugin(self._actuator_type)
+            _class, move_params = get_actuator_plugin(self._actuator.module_name)
             self.settings.child("move_settings").addChildren(move_params.children())
             self.ui.set_settings(self.settings) # Apply settings on UI
         except Exception as e:
@@ -868,7 +830,7 @@ class DAQ_Move_Hardware(QObject):
     **Attributes**      **Type**
     *status_sig*        instance of Signal
     *hardware*          ???
-    *actuator_type*        string
+    *actuator*        SelectedActuator
     *current_position*  float
     *target_value*   float
     *hardware_adress*   string
@@ -879,12 +841,12 @@ class DAQ_Move_Hardware(QObject):
 
     status_sig = Signal(ThreadCommand)
 
-    def __init__(self, actuator_type, position: DataActuator, title="actuator"):
+    def __init__(self, actuator, position: DataActuator, title="actuator"):
         super().__init__()
         self.logger = set_logger(f"{logger.name}.{title}.actuator")
         self._title = title
         self.hardware: Optional[DAQ_Move_base] = None
-        self.actuator_type = actuator_type
+        self.actuator = actuator
         self.hardware_adress = None
         self.axis_address = None
         self.motion_stoped = False
@@ -938,13 +900,7 @@ class DAQ_Move_Hardware(QObject):
 
         status = edict(initialized=False, info="")
         try:
-            parent_module = utils.find_dict_in_list_from_key_val(
-                ACTUATOR_TYPES, "name", self.actuator_type
-            )
-            class_ = getattr(
-                getattr(parent_module["module"], "daq_move_" + self.actuator_type),
-                "DAQ_Move_" + self.actuator_type,
-            )
+            class_, params = get_actuator_plugin(self.actuator.module_name)  # to make sure the plugin is valid
             self.hardware = class_(self, params_state)
             assert self.hardware is not None
             try:

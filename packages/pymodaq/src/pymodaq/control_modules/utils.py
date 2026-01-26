@@ -4,6 +4,7 @@ Created the 03/10/2022
 
 @author: Sebastien Weber
 """
+from abc import abstractmethod
 from random import randint
 from typing import Optional, Type, Union
 from easydict import EasyDict as edict
@@ -17,6 +18,7 @@ from pymodaq_utils.enums import StrEnum
 
 from pymodaq_gui.parameter import Parameter, ioxml
 from pymodaq_gui.parameter.utils import ParameterWithPath
+from pymodaq_gui.parameter import utils as putils
 from pymodaq_gui.parameter.ioxml import VALID_FOR_CONFIGURATION
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.h5modules.saving import H5Saver
@@ -423,6 +425,79 @@ class ParameterControlModule(ParameterManager, ControlModule):
         ParameterManager.__init__(self, action_list=action_list)
         ControlModule.__init__(self)
 
+    @property
+    @abstractmethod
+    def _plugin_settings_name(self) -> str:
+        """Return the name of the plugin settings parameter group.
+
+        Returns
+        -------
+        str
+            'move_settings' for DAQ_Move or 'detector_settings' for DAQ_Viewer
+        """
+
+    @property
+    @abstractmethod
+    def _saver_class(self) -> Type:
+        """Return the saver class to use for this control module.
+
+        Returns
+        -------
+        Type
+            ActuatorTimeSaver for DAQ_Move or DetectorSaver for DAQ_Viewer
+        """
+
+    def quit_fun(self):
+        """Programmatic quitting of the control module.
+
+        De-initializes the hardware if initialized, emits quit_signal,
+        calls _cleanup_resources() for subclass-specific cleanup,
+        and closes the UI if present.
+        """
+        if self._initialized_state:
+            self.init_hardware(False)
+        self.quit_signal.emit()
+        self._cleanup_resources()
+        if self.ui is not None:
+            try:
+                self.ui.close()
+            except Exception as e:
+                logger.exception(str(e))
+
+    def _cleanup_resources(self):
+        """Override in subclasses for specific cleanup.
+
+        Called during quit_fun() before closing the UI.
+        """
+        pass
+
+    def child_added(self, param, data):
+        """Apply addition of settings to the hardware.
+
+        Parameters
+        ----------
+        param: Parameter
+            The parent parameter where the child was added
+        data: tuple
+            Tuple containing the added child parameter
+        """
+        path = self.settings.childPath(param)
+        if path is not None and 'main_settings' not in path:
+            self._update_settings_signal.emit(
+                edict(path=path, param=data[0].saveState(), change='childAdded'))
+
+    def param_deleted(self, param):
+        """Apply deletion of settings to the hardware.
+
+        Parameters
+        ----------
+        param: Parameter
+            The parameter that was deleted
+        """
+        if param.name() not in putils.iter_children(self.settings.child('main_settings'), []):
+            self._update_settings_signal.emit(
+                edict(path=[self._plugin_settings_name], param=param, change='parent'))
+
     def apply_controller_parameters(self, controller_param: Parameter):
         """Apply controller parameters (Master/Slave, ID, eventually axes) to the ControlModule instance
 
@@ -450,6 +525,11 @@ class ParameterControlModule(ParameterManager, ControlModule):
         ----------
         param: Parameter
             a given parameter whose value has been changed by user
+
+        Returns
+        -------
+        Optional[Parameter]
+            None if the parameter was handled, otherwise the parameter for subclass handling
         """
         if param.name() == 'plugin_config':
             self.show_config(self.plugin_config)
@@ -476,9 +556,134 @@ class ParameterControlModule(ParameterManager, ControlModule):
             except AttributeError:
                 pass
 
+        elif param.name() == 'continuous_saving_opt':
+            self.settings.child('saver_settings').setOpts(visible=param.value())
+            return None  # Handled
+
+        elif param.name() in putils.iter_children(self.settings.child('saver_settings'), []):
+            path = self.settings.childPath(param)
+            if param.name() == 'do_save':
+                self.setup_continuous_saving(param.value())
+            self._get_h5saver_for_saving().settings.child(*path[1:]).setValue(param.value())
+            return None  # Handled
+
         else:
             # not handled
             return param
+
+    def _get_h5saver_for_saving(self) -> H5Saver:
+        """Return the H5Saver instance to use for continuous saving.
+
+        Override in subclasses if a different h5saver is used.
+
+        Returns
+        -------
+        H5Saver
+            The H5Saver instance for continuous saving
+        """
+        return self.h5saver
+
+    def setup_continuous_saving(self, init: bool = True):
+        """Configure the objects dealing with the continuous saving mode.
+
+        Parameters
+        ----------
+        init: bool
+            If True, initialize continuous saving. If False, close the file.
+        """
+        if init:
+            self._setup_continuous_saving_init()
+        else:
+            self._get_h5saver_for_saving().close_file()
+
+    def _setup_continuous_saving_init(self):
+        """Initialize continuous saving - called by setup_continuous_saving.
+
+        Override in subclasses for custom initialization.
+        """
+        self.module_and_data_saver = self._saver_class(self)
+        h5saver = self._get_h5saver_for_saving()
+        self.module_and_data_saver.h5saver = h5saver
+        h5saver.settings.child('do_save').sigValueChanged.connect(self._init_continuous_save)
+
+    @abstractmethod
+    def _init_continuous_save(self):
+        """Initialize continuous save - module-specific implementation.
+
+        Called when do_save setting changes.
+        """
+
+    def init_hardware(self, do_init=True):
+        """Template method for hardware initialization.
+
+        Parameters
+        ----------
+        do_init: bool
+            If True, initialize the hardware. If False, deinitialize.
+        """
+        if not do_init:
+            self._deinit_hardware()
+        else:
+            self._do_init_hardware()
+
+    def _deinit_hardware(self):
+        """Common de-initialization."""
+        try:
+            self.command_hardware.emit(ThreadCommand(self._close_command))
+            if self.ui is not None:
+                self._set_ui_init_state(False)
+        except Exception as e:
+            logger.exception(str(e))
+
+    def _do_init_hardware(self):
+        """Common initialization - connects signals, starts thread."""
+        try:
+            hardware = self._create_hardware_instance()
+            self._hardware_thread = QThread()
+            if self._run_hardware_in_thread:
+                hardware.moveToThread(self._hardware_thread)
+
+            self._connect_hardware_signals(hardware)
+
+            self._hardware_thread.hardware = hardware
+            if self._run_hardware_in_thread:
+                self._hardware_thread.start()
+            self._emit_init_command()
+            self._post_init_hardware()
+        except Exception as e:
+            logger.exception(str(e))
+
+    def _connect_hardware_signals(self, hardware):
+        """Connect common signals - extend in subclasses for additional signals."""
+        self.command_hardware[ThreadCommand].connect(hardware.queue_command)
+        hardware.status_sig[ThreadCommand].connect(self.thread_status)
+        self._update_settings_signal[edict].connect(hardware.update_settings)
+
+    def _post_init_hardware(self):
+        """Hook for post-initialization actions - override in subclasses."""
+        pass
+
+    @property
+    @abstractmethod
+    def _close_command(self) -> str:
+        """Return the close command enum value."""
+
+    @property
+    def _run_hardware_in_thread(self) -> bool:
+        """Whether to run hardware in separate thread (default True)."""
+        return True
+
+    @abstractmethod
+    def _create_hardware_instance(self):
+        """Factory method - create hardware instance."""
+
+    @abstractmethod
+    def _emit_init_command(self):
+        """Emit initialization command to hardware."""
+
+    @abstractmethod
+    def _set_ui_init_state(self, status: bool):
+        """Set UI initialization state."""
 
     def _update_settings(self, param: Parameter):
         # I do not understand what it does

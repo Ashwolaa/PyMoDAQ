@@ -149,7 +149,10 @@ class ControlModuleUI(CustomApp):
     def _set_init_state(self, status: bool):
         self._ini_state = status        
         self.enable_actions(status, all_except=('init', 'selector', 'show_settings', 'show_graphs'))
-        self.set_action_enabled('selector', not status)
+        try:
+            self.set_action_enabled('selector', not status)
+        except Exception:
+            pass
         self.update_init_icon(status, 'init')
 
     def enable_actions(self, status=True, all_except=()):

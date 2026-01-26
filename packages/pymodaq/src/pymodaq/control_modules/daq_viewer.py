@@ -42,7 +42,7 @@ from pymodaq_gui.utils import Dock
 
 from pymodaq.utils.gui_utils import get_splash_sc
 from pymodaq.control_modules.daq_viewer_ui.ui_base import DAQ_Viewer_UI
-from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum,get_detector_plugin, get_detector_module)
+from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum,get_detector_plugin, get_detector_module, update_plugin_config)
 from pymodaq.control_modules.utils import ControllerStatus
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusViewer, ControlToHardwareViewer,
                                                      UiToMainViewer)
@@ -105,6 +105,55 @@ class DAQ_Viewer(ParameterControlModule):
 
     listener_class = ViewerActorListener
     ui: Optional[DAQ_Viewer_UI]
+
+    @property
+    def _plugin_settings_name(self) -> str:
+        """Return the name of the plugin settings parameter group."""
+        return 'detector_settings'
+
+    @property
+    def _saver_class(self):
+        """Return the saver class to use for this control module."""
+        return module_saving.DetectorSaver
+
+    @property
+    def _close_command(self) -> str:
+        """Return the close command enum value."""
+        return ControlToHardwareViewer.CLOSE
+
+    @property
+    def _run_hardware_in_thread(self) -> bool:
+        """Whether to run hardware in separate thread - configurable for DAQ_Viewer."""
+        return self.config('viewer', 'viewer_in_thread')
+
+    def _create_hardware_instance(self):
+        """Factory method - create hardware instance."""
+        return DAQ_Detector(self._title, self.settings, self.detector)
+
+    def _connect_hardware_signals(self, hardware):
+        """Connect signals - extends base class with data signals."""
+        super()._connect_hardware_signals(hardware)
+        hardware.data_detector_sig[DataToExport].connect(self.show_data)
+        hardware.data_detector_temp_sig[DataToExport].connect(self.show_temp_data)
+
+    def _emit_init_command(self):
+        """Emit initialization command to hardware."""
+        self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.INI_DETECTOR,
+                                                 attribute=[
+                                                     self.settings.child('detector_settings').saveState(),
+                                                     self.controller]))
+
+    def _set_ui_init_state(self, status: bool):
+        """Set UI initialization state."""
+        QtWidgets.QApplication.processEvents()
+        if self.ui is not None:
+            self.ui.detector_init = status
+
+    def _post_init_hardware(self):
+        """Enable viewer docks after hardware init."""
+        if self.ui is not None:
+            for dock in self.ui.viewer_docks:
+                dock.setEnabled(True)
 
     def __init__(
         self,
@@ -182,20 +231,17 @@ class DAQ_Viewer(ParameterControlModule):
         self.detector = self._detector
 
         self.grab_done_signal.connect(self._save_export_data)
-        self.update_plugin_config()
+        self.plugin_config = update_plugin_config(self.detector)
 
 
     def __repr__(self):
         return f'{self.__class__.__name__}: {self.title} {self.detector}'
 
-    def setup_continuous_saving(self, init: bool = True):
-        """Configure the objects dealing with the continuous saving mode"""
-        if init:
-            self.module_and_data_saver = module_saving.DetectorSaver(self)
-            self._h5saver_continuous = H5Saver(save_type='detector')
-            self._h5saver_continuous.settings.child('do_save').sigValueChanged.connect(self._init_continuous_save)
-        else:
-            self._h5saver_continuous.close_file()
+    def _setup_continuous_saving_init(self):
+        """Initialize continuous saving - DAQ_Viewer creates a separate h5saver."""
+        self.module_and_data_saver = self._saver_class(self)
+        self._h5saver_continuous = H5Saver(save_type='detector')
+        self._h5saver_continuous.settings.child('do_save').sigValueChanged.connect(self._init_continuous_save)
 
 
     def process_ui_cmds(self, cmd: utils.ThreadCommand):
@@ -283,7 +329,7 @@ class DAQ_Viewer(ParameterControlModule):
     def detector_changed_from_ui(self, detector: SelectedDetector):
         self._detector = detector
         self.settings.child('main_settings', 'DAQ_type').setValue(detector.daq_type.name)
-        self.update_plugin_config()
+        self.plugin_config = update_plugin_config(self.detector)
         self._set_setting_tree()
 
     @property
@@ -294,7 +340,7 @@ class DAQ_Viewer(ParameterControlModule):
     @detector.setter
     def detector(self, det: SelectedDetector):
         self._detector = det
-        self.update_plugin_config()
+        self.plugin_config = update_plugin_config(self.detector)
         if self.ui is not None:
             self.ui.detector = det
         self._set_setting_tree()
@@ -308,11 +354,11 @@ class DAQ_Viewer(ParameterControlModule):
         if ngrab >= 1:
             self.settings.child('main_settings', 'Naverage').setValue(ngrab)
 
-    def update_plugin_config(self):
-        parent_module = get_detector_module(self.detector)
-        mod = import_module(parent_module.__package__.split('.')[0])
-        if hasattr(mod, 'config'):
-            self.plugin_config = mod.config
+    # def update_plugin_config(self):
+    #     parent_module = get_detector_module(self.detector)
+    #     mod = import_module(parent_module.__package__.split('.')[0])
+    #     if hasattr(mod, 'config'):
+    #         self.plugin_config = mod.config
 
     @property
     def grab_state(self):
@@ -358,77 +404,16 @@ class DAQ_Viewer(ParameterControlModule):
 
         self._viewers = viewers
 
-    def quit_fun(self):
-        """ Quit the application, closing the hardware and other modules """
-
-        # insert anything that needs to be closed before leaving
-
-        if self._initialized_state:  # means  initialized
-            self.init_hardware(False)
-        self.quit_signal.emit()
-
+    def _cleanup_resources(self):
+        """Clean up DAQ_Viewer-specific resources (LCD panel)."""
         if self._lcd is not None:
             try:
                 self._lcd.parent.close()
             except Exception as e:
                 self.logger.exception(str(e))
 
-        try:
-            if self.ui is not None:
-                self.ui.close()
-
-        except Exception as e:
-            self.logger.exception(str(e))
-
     #  #####################################
     #  Methods for running the acquisition
-
-    def init_hardware(self, do_init=True):
-        """ Init the selected detector
-
-        Parameters
-        ----------
-        do_init: bool
-            If True, create a DAQ_Detector instance and move it into a separated thread, connected its signals/slots
-            to the DAQ_Viewer object (self)
-            If False, force the instrument to close and kill the Thread (still not done properly in some cases)
-        """
-        if not do_init:
-            try:
-                self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.CLOSE))
-                QtWidgets.QApplication.processEvents()
-                if self.ui is not None:
-                    self.ui.detector_init = False
-
-            except Exception as e:
-                self.logger.exception(str(e))
-        else:            
-            try:
-
-                hardware = DAQ_Detector(self._title, self.settings, self.detector)
-                self._hardware_thread = QThread()
-                if self.config('viewer', 'viewer_in_thread'):
-                    hardware.moveToThread(self._hardware_thread)
-
-                self.command_hardware[ThreadCommand].connect(hardware.queue_command)
-                hardware.data_detector_sig[DataToExport].connect(self.show_data)
-                hardware.data_detector_temp_sig[DataToExport].connect(self.show_temp_data)
-                hardware.status_sig[ThreadCommand].connect(self.thread_status)
-                self._update_settings_signal[edict].connect(hardware.update_settings)
-
-                self._hardware_thread.hardware = hardware
-                if self.config('viewer', 'viewer_in_thread'):
-                    self._hardware_thread.start()
-                self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.INI_DETECTOR,
-                                                         attribute=[
-                                                             self.settings.child('detector_settings').saveState(),
-                                                             self.controller]))
-                if self.ui is not None:
-                    for dock in self.ui.viewer_docks:
-                        dock.setEnabled(True)
-
-            except Exception as e:
-                self.logger.exception(str(e))
 
     def snap(self, send_to_tcpip=False):
         """ Launch a single grab """
@@ -860,6 +845,13 @@ class DAQ_Viewer(ParameterControlModule):
                 else:
                     self.viewers[ind].show_data(dwa)
 
+    def _get_h5saver_for_saving(self):
+        """Return the H5Saver instance to use for continuous saving.
+
+        DAQ_Viewer uses a separate h5saver for continuous saving.
+        """
+        return self._h5saver_continuous
+
     def value_changed(self, param: Parameter):
         """ParameterManager subclassed method. Process events from value changed by user in the UI Settings
 
@@ -868,7 +860,9 @@ class DAQ_Viewer(ParameterControlModule):
         param: Parameter
             a given parameter whose value has been changed by user
         """
-        super().value_changed(param=param)
+        result = super().value_changed(param=param)
+        if result is None:
+            return  # Already handled by base class
 
         path = self.settings.childPath(param)
         if param.name() == 'DAQ_type':
@@ -887,7 +881,6 @@ class DAQ_Viewer(ParameterControlModule):
                 self.settings.child('main_settings', 'N_live_averaging').setValue(0)
             else:
                 self.settings.child('main_settings', 'N_live_averaging').hide()
-            #self._update_settings_signal.emit(edict(path=path, param=param, change='value'))
 
         elif param.name() in putils.iter_children(self.settings.child('main_settings', 'axes'), []):
             if self.daq_type.name == "DAQ2D":
@@ -903,45 +896,11 @@ class DAQ_Viewer(ParameterControlModule):
                     for viewer in self.viewers:
                         viewer.x_axis, viewer.y_axis = self.get_scaling_options()
 
-        elif param.name() == 'continuous_saving_opt':
-            self.settings.child('saver_settings').setOpts(visible=param.value())
-
-
         elif param.name() == 'wait_time':
             self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.UPDATE_WAIT_TIME,
                                                      [param.value()]))
 
-        elif param.name() in putils.iter_children(self.settings.child('saver_settings'), []):
-            if param.name() == 'do_save':
-                self.setup_continuous_saving(param.value())
-            self._h5saver_continuous.settings.child(*path[1:]).setValue(param.value())
-
         self._update_settings(param=param)
-
-    def child_added(self, param, data):
-        """ Adds a child in the settings attribute
-
-        Parameters
-        ----------
-        param: Parameter
-            the parameter where child will be added
-        data: Parameter
-            the child parameter
-        """
-        if param.name() not in putils.iter_children(self.settings.child('main_settings'), []):
-            self._update_settings_signal.emit(edict(path=putils.get_param_path(param)[1:], param=data[0],
-                                                    change='childAdded'))
-
-    def param_deleted(self, param):
-        """ Remove a child from the settings attribute
-
-        Parameters
-        ----------
-        param: Parameter
-            a given parameter whose value has been changed by user
-        """
-        if param.name() not in putils.iter_children(self.settings.child('main_settings'), []):
-            self._update_settings_signal.emit(edict(path=['detector_settings'], param=param, change='parent'))
 
     def _set_setting_tree(self):
         """Apply the specific settings of the selected detector (plugin)

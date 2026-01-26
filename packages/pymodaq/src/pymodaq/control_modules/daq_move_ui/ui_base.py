@@ -1,4 +1,3 @@
-from qtpy.QtWidgets import QComboBox
 from pint import DimensionalityError
 from qtpy import QtWidgets
 from typing import Union, List
@@ -6,6 +5,8 @@ from typing import Union, List
 from pymodaq_utils.config import Config
 from pymodaq.control_modules.thread_commands import UiToMainMove
 from pymodaq.control_modules.ui_utils import ControlModuleUI
+from pymodaq.control_modules.daq_move_ui.actuator_selector import ActuatorSelector
+from pymodaq.control_modules.daq_types import SelectedActuator
 from pymodaq.utils.data import DataActuator
 from pymodaq_data import Q_
 from pymodaq_data import DataToExport
@@ -61,7 +62,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self._ini_state = False
         self.move_toolbar = self.add_toolbar('move', 'Move')
 
-        self.actuators_combo: QComboBox = None
+        self.selector: ActuatorSelector = None
         self.abs_value_sb: QSpinBoxWithShortcut = None
         self.abs_value_sb_2: QSpinBoxWithShortcut = None
         self.abs_value_sb_bis: QSpinBoxWithShortcut = None
@@ -82,9 +83,15 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.graph_widget: QtWidgets.QWidget = None
         self.viewer: ViewerDispatcher = None
 
-        self.setup_ui()
+        # self.setup_ui()
+        self.setup_docks()
+        self.setup_actions()  # see ActionManager MixIn class
+        self.connect_things()
+        self.enable_actions(False, all_except=('init', 'selector', 'show_settings', 'show_graphs'))
+
 
         self.enable_move_buttons(False)
+        self.settings_tree.setVisible(False)
 
     def show_data(self, data: DataToExport):
         self.viewer.show_data(data)
@@ -111,21 +118,16 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         # self.ini_actuator_pb.setIcon(icon)
 
     @property
-    def actuator(self):
-        return self.actuators_combo.currentText()
+    def actuator(self) -> SelectedActuator:
+        """Get the currently selected actuator."""
+        return self.selector.selected_module
 
     @actuator.setter
-    def actuator(self, act_name: str):
-        self.actuators_combo.setCurrentText(act_name)
-
-    @property
-    def actuators(self):
-        return [self.actuators_combo.itemText(ind) for ind in range(self.actuators_combo.count())]
-
-    @actuators.setter
-    def actuators(self, actuators: List[str]):
-        self.actuators_combo.clear()
-        self.actuators_combo.addItems(actuators)
+    def actuator(self, act: Union[str, SelectedActuator]):
+        """Set the currently selected actuator."""
+        if isinstance(act, str):
+            act = SelectedActuator(module_name=act)
+        self.selector.selected_module = act
 
     @property
     def move_done(self):
@@ -210,7 +212,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.parent.layout().addWidget(self.move_toolbar)
         self.control_widget = QtWidgets.QWidget()
 
-        self.actuators_combo = QComboBox()
+        self.selector = ActuatorSelector()
         self.abs_value_sb = QSpinBoxWithShortcut(step=0.1, dec=True, siPrefix=config('actuator', 'siprefix'))
         self.abs_value_sb.setStyleSheet("background-color : lightgreen; color: black")
 
@@ -288,9 +290,9 @@ class DAQ_Move_UI_Base(ControlModuleUI):
             self.ini_actuator_pb.click()
 
     def send_init(self, checked):
-        self.actuators_combo.setEnabled(not checked)
+        self.selector.add_widget.setEnabled(not checked)
         self.command_sig.emit(ThreadCommand(UiToMainMove.INIT, [self.ini_actuator_pb.isChecked(),
-                                                                self.actuators_combo.currentText()]))
+                                                                self.selector.selected_module]))
 
     def emit_move_abs(self, spinbox):
         spinbox.editingFinished.emit()
@@ -306,7 +308,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
     def setup_actions_in_toolbar(self, toolbar: QtWidgets.QToolBar):
         self.setup_title_widget(self.title, toolbar=toolbar)
 
-        self.add_widget('selector', self.actuators_combo, toolbar=toolbar)
+        self.add_widget('selector', self.selector.add_widget, toolbar=toolbar)
         self.setup_init_action('init', 'Ini. Actuator', toolbar=toolbar)
         self.setup_settings_action(toolbar=toolbar)
         toolbar.addSeparator()
@@ -391,8 +393,8 @@ class DAQ_Move_UI_Base(ControlModuleUI):
 
         self.ini_actuator_pb.clicked.connect(self.send_init)
 
-        self.actuators_combo.currentTextChanged.connect(
-            lambda act: self.command_sig.emit(ThreadCommand(UiToMainMove.ACTUATOR_CHANGED, act)))
+        self.selector.module_changed.connect(
+            lambda sel_act: self.command_sig.emit(ThreadCommand(UiToMainMove.ACTUATOR_CHANGED, sel_act)))
         if 'refresh_value' in self.actions_names:
             self.connect_action('refresh_value',
                                 lambda do_refresh: self.command_sig.emit(ThreadCommand(UiToMainMove.LOOP_GET_VALUE,

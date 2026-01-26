@@ -1,3 +1,6 @@
+from typing import Union
+from importlib import import_module
+
 from pymodaq_gui.parameter import Parameter
 
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
@@ -5,6 +8,8 @@ from pymodaq_utils.enums import BaseEnum
 
 from pymodaq_utils.utils import find_dict_in_list_from_key_val, find_dicts_in_list_from_key_val
 from pymodaq.utils.exceptions import DetectorError, ActuatorError
+from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector
+from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator
 
 from pymodaq import CONTROL_MODULES
 
@@ -59,6 +64,15 @@ class DAQTypesEnum(BaseEnum):
     def get_dim(self):
         return self.value.split('Viewer')[1].split('D')[0]
 
+def update_plugin_config(selected_module: Union[SelectedActuator,SelectedDetector]):
+    if type(selected_module) is SelectedDetector:
+        parent_module = get_detector_module(selected_module)
+    elif type(selected_module) is SelectedActuator:
+        parent_module = get_actuator_module(selected_module)
+    else:
+        raise ValueError("selected_module must be of type SelectedActuator or SelectedDetector")        
+    mod = import_module(parent_module.__package__.split('.')[0])    
+    return mod.config if hasattr(mod, 'config') else {}
 
 def get_module(module_dict, name):
     return find_dict_in_list_from_key_val(module_dict, 'name', name)['module']
@@ -66,8 +80,8 @@ def get_module(module_dict, name):
 def get_detector_module(detector):
     return get_module(DET_TYPES[detector.daq_type.name], detector.module_name)
 
-def get_actuator_module(act_name):
-    return get_module(ACTUATOR_TYPES, act_name)
+def get_actuator_module(actuator):
+    return get_module(ACTUATOR_TYPES, actuator.module_name)
 
 def get_plugin(module_dict, name, prefix, class_prefix, params_name):
     """

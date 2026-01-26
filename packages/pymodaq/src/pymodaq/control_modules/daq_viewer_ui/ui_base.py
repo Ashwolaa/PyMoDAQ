@@ -20,7 +20,6 @@ from pymodaq_gui.utils.widgets import QLED
 from pymodaq_gui.utils import DockArea
 from pymodaq_utils.config import Config as ConfigUtils
 from pymodaq_utils.enums import StrEnum
-from pymodaq.control_modules.instruments import DET_TYPES
 from pymodaq_gui.plotting.data_viewers.viewer import ViewerFactory, ViewerDispatcher
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
 from pymodaq_gui.utils.styling import create_icon
@@ -33,13 +32,20 @@ viewer_factory = ViewerFactory()
 config = Config()
 config_utils = ConfigUtils()
 
-options = {
-    'DAQ0D': [name for name in [plugin['name'] for plugin in DET_TYPES['DAQ0D']]],
-    'DAQ1D': [name for name in [plugin['name'] for plugin in DET_TYPES['DAQ1D']]],
-    'DAQ2D': [name for name in [plugin['name'] for plugin in DET_TYPES['DAQ2D']]],
-    'DAQND': [name for name in [plugin['name'] for plugin in DET_TYPES['DAQND']]],
-}
-add_menu_entries = add_category_layers(options)
+
+def get_detector_menu_entries():
+    """Build detector menu entries lazily to avoid import-time errors"""
+    try:
+        from pymodaq.control_modules.instruments import DET_TYPES
+        options = {
+            'DAQ0D': [plugin['name'] for plugin in DET_TYPES['DAQ0D']],
+            'DAQ1D': [plugin['name'] for plugin in DET_TYPES['DAQ1D']],
+            'DAQ2D': [plugin['name'] for plugin in DET_TYPES['DAQ2D']],
+            'DAQND': [plugin['name'] for plugin in DET_TYPES['DAQND']],
+        }
+        return add_category_layers(options)
+    except Exception:
+        return {'DAQ0D': {'Mock': ['Mock']}}
 
 
 class ActionIconNames(StrEnum):
@@ -92,7 +98,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self._ini_state = False
         self._data_ready = False
 
-        self.selector = ViewerSelector(add_menu_entries=add_menu_entries)
+        self.selector = ViewerSelector(add_menu_entries=get_detector_menu_entries())
         self.statusbar: QtWidgets.QStatusBar = None
         self.grab_done_led: QLED = None
 
