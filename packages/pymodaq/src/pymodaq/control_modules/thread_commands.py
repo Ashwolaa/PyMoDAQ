@@ -1,6 +1,18 @@
 from pymodaq_utils.enums import StrEnum
 
 
+class UiToMainCommon(StrEnum):
+    """Common commands shared between UIs.
+
+    These commands are valid for both DAQ_Move_UI and DAQ_Viewer_UI.
+    """
+    INIT = 'init'
+    QUIT = 'quit'
+    SHOW_LOG = 'show_log'
+    SHOW_CONFIG = 'show_config'
+    STOP = 'stop'
+
+
 class ThreadStatus(StrEnum):
     """ Allowed Generic commands sent from a plugin using the method: emit_status
 
