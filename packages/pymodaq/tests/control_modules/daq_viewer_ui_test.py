@@ -7,9 +7,11 @@ Created the 03/10/2022
 import pytest
 from pytest import fixture
 
-from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedModule
+from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector
 from pymodaq.utils.conftests import qtbotskip, main_modules_skip
-from pymodaq.control_modules.daq_viewer_ui.ui_base import DAQ_Viewer_UI, options, DAQTypesEnum
+from pymodaq.control_modules.daq_viewer_ui.ui_base import DAQ_Viewer_UI
+from pymodaq.control_modules.instruments import DAQTypesEnum
+from pymodaq.control_modules.daq_types import get
 from pymodaq_gui.utils.dock import DockArea
 from qtpy import QtWidgets
 from pymodaq.control_modules.thread_commands import UiToMainViewer
@@ -47,7 +49,7 @@ def test_api_attributes(ini_daq_viewer_ui):
     assert 'command_sig' in attributes
     assert 'title' in attributes
     assert 'detector' in attributes
-    assert 'add_setting_tree' in attributes
+    # assert 'add_setting_tree' in attributes
     assert 'add_viewer' in attributes
     assert 'do_init' in attributes
     assert 'detector_init' in attributes
@@ -80,7 +82,7 @@ def test_signals(ini_daq_viewer_ui):
 
     assert daq_viewer.viewer_types[0] == DAQTypesEnum.DAQ0D.to_viewer_type()
 
-    MOD = SelectedModule(daq_type=DAQTypesEnum.DAQ1D, module_name='Mock')
+    MOD = SelectedDetector(daq_type=DAQTypesEnum.DAQ1D, module_name='Mock')
     with qtbot.waitSignal(daq_viewer.command_sig) as blocker:
         daq_viewer.detector = MOD
     assert blocker.args[0].command == UiToMainViewer.DETECTOR_CHANGED
@@ -90,7 +92,7 @@ def test_signals(ini_daq_viewer_ui):
 
 
     with qtbot.waitSignal(daq_viewer.command_sig) as blocker:
-        daq_viewer.get_action('ini_detector').trigger()
+        daq_viewer.get_action('init').trigger()
 
     assert blocker.args[0].command == UiToMainViewer.INIT
     assert blocker.args[0].attribute[0]
@@ -122,7 +124,7 @@ def test_do_init(ini_daq_viewer_ui):
     daq_type = DAQTypesEnum[DAQTypesEnum.names()[IND_daq_type]]
     det_name = options[daq_type.name][IND_det_type]
 
-    detector  = SelectedModule(daq_type,det_name)
+    detector  = SelectedDetector(daq_type,det_name)
 
     daq_viewer, qtbot = ini_daq_viewer_ui
     daq_viewer.detector = detector

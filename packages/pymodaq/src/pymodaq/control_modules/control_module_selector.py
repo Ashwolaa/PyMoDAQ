@@ -2,8 +2,6 @@ from qtpy import QtWidgets, QtCore
 
 from pymodaq_gui.utils.menu_builder import build_nested_menu
 
-from pymodaq.control_modules.instruments import DET_TYPES
-
 REMOTE_ITEMS  = {'LECODirector', 'TCPServer'}
 MOCK_ITEMS = {}
 
@@ -101,6 +99,7 @@ def add_category_layers(dimension_dict, remote_items=None, mock_items=None):
 if __name__ == '__main__':
     import sys
     from pymodaq_gui.qt_utils import mkQApp
+    from pymodaq.control_modules.instruments import DET_TYPES
 
     app = mkQApp('Selector')
 

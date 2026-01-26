@@ -6,7 +6,7 @@ from qtpy import QtWidgets, QtCore
 import pytest
 from pytest import fixture, approx
 import qt_themes
-from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedModule
+from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector
 from pymodaq_gui.utils.dock import DockArea
 
 from pymodaq.control_modules import daq_viewer as daqvm
@@ -73,7 +73,7 @@ class TestWithoutUI:
     def test_detector_changed(self, ini_daq_viewer_without_ui, det):
         prog, qtbot = ini_daq_viewer_without_ui
         daq_type = 'DAQ0D'
-        prog.detector = SelectedModule(DAQTypesEnum[daq_type], det)
+        prog.detector = SelectedDetector(DAQTypesEnum[daq_type], det)
         _class, det_params = get_detector_plugin(prog.detector.daq_type.name, prog.detector.module_name)
         assert putils.iter_children(prog.settings.child('detector_settings'), []) == \
             putils.iter_children(det_params, [])
@@ -85,7 +85,7 @@ class TestWithUI:
     def test_daq_type_changed(self, ini_daq_viewer_ui, daq_type):
         prog, qtbot, dockarea = ini_daq_viewer_ui
         with qtbot.waitSignal(prog.ui.command_sig) as blocker:
-            prog.detector = SelectedModule(DAQTypesEnum[daq_type], 'Mock')
+            prog.detector = SelectedDetector(DAQTypesEnum[daq_type], 'Mock')
         assert len(prog.viewers) == 1
         assert prog.viewers[0].viewer_type == f'Data{daq_type[3:]}'
 
