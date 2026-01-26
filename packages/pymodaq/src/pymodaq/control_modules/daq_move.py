@@ -15,8 +15,7 @@ import sys
 from typing import List, Union, Optional, Dict, TypeVar, TYPE_CHECKING
 import numpy as np
 
-from qtpy.QtCore import QObject, Signal, QThread, Slot, Qt, QTimer
-from qtpy import QtWidgets
+from qtpy.QtCore import QObject, Signal, QThread, Slot, QTimer
 
 from easydict import EasyDict as edict
 
@@ -31,23 +30,22 @@ from pymodaq.utils.data import DataToExport, DataActuator
 from pymodaq_data.h5modules.backends import Node
 
 from pymodaq_gui.h5modules.saving import H5Saver
-from pymodaq_gui.parameter import ioxml, Parameter
+from pymodaq_gui.parameter import Parameter
 from pymodaq_gui.parameter import utils as putils
 from pymodaq_gui.qt_utils import mkQApp
 
 from pymodaq.utils.h5modules import module_saving
-from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES
+from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES, get_actuator_plugin
 from pymodaq.control_modules.utils import ParameterControlModule
 
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusMove, ControlToHardwareMove,
                                                      UiToMainMove,
                                                      )
 from pymodaq.control_modules.move_utility_classes import (ThreadCommand, MoveCommand, DAQ_Move_base, DataActuatorType,
-                                                           check_units, DataUnitError)
-
+                                                           check_units)
 
 from pymodaq.control_modules.move_utility_classes import params as daq_move_params
-from pymodaq.utils.leco.pymodaq_listener import (MoveActorListener, LECOMoveCommands, LECOCommands,)
+from pymodaq.utils.leco.pymodaq_listener import (MoveActorListener, LECOMoveCommands)
 from pymodaq.control_modules.utils import ControllerStatus
 from pymodaq import Q_, Unit
 
@@ -140,7 +138,6 @@ class DAQ_Move(ParameterControlModule):
 
         if self.ui is not None:
             self.ui.actuators = ACTUATOR_NAMES
-            self.ui.set_settings_tree(self.settings_tree)
             self.ui.command_sig.connect(self.process_ui_cmds)
 
         self.splash_sc = get_splash_sc()
@@ -822,21 +819,10 @@ class DAQ_Move(ParameterControlModule):
         self.settings.child("main_settings", "module_name").setValue(self._title)
         try:
             for child in self.settings.child("move_settings").children():
-                child.remove()
-            parent_module = utils.find_dict_in_list_from_key_val(
-                ACTUATOR_TYPES, "name", self._actuator_type
-            )
-            class_ = getattr(
-                getattr(parent_module["module"], "daq_move_" + self._actuator_type),
-                "DAQ_Move_" + self._actuator_type,
-            )
-            params = getattr(class_, "params")
-            move_params = Parameter.create(
-                name="move_settings", type="group", children=params
-            )
-
+                child.remove()            
+            _class, move_params = get_actuator_plugin(self._actuator_type)
             self.settings.child("move_settings").addChildren(move_params.children())
-
+            self.ui.set_settings(self.settings) # Apply settings on UI
         except Exception as e:
             self.logger.exception(str(e))
 

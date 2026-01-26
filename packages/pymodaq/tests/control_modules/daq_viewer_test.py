@@ -12,7 +12,7 @@ from pymodaq_gui.utils.dock import DockArea
 from pymodaq.control_modules import daq_viewer as daqvm
 from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq.control_modules.utils import ControlModule
-from pymodaq.control_modules.instruments import DET_TYPES, get_viewer_plugins, DAQTypesEnum
+from pymodaq.control_modules.instruments import DET_TYPES, get_detector_plugin, DAQTypesEnum
 from pymodaq.utils.conftests import qtbotskip, main_modules_skip
 from pymodaq.utils.config import Config
 from pymodaq_utils.config import Config as ConfigUtils
@@ -74,7 +74,7 @@ class TestWithoutUI:
         prog, qtbot = ini_daq_viewer_without_ui
         daq_type = 'DAQ0D'
         prog.detector = SelectedModule(DAQTypesEnum[daq_type], det)
-        det_params, _class = get_viewer_plugins(prog.detector.daq_type.name, prog.detector.module_name)
+        _class, det_params = get_detector_plugin(prog.detector.daq_type.name, prog.detector.module_name)
         assert putils.iter_children(prog.settings.child('detector_settings'), []) == \
             putils.iter_children(det_params, [])
 

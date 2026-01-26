@@ -1,11 +1,7 @@
-from abc import abstractmethod
-
 from qtpy.QtWidgets import QComboBox
 from pint import DimensionalityError
 from qtpy import QtWidgets
 from typing import Union, List
-
-import qt_themes
 
 from pymodaq_utils.config import Config
 from pymodaq.control_modules.thread_commands import UiToMainMove
@@ -15,11 +11,9 @@ from pymodaq_data import Q_
 from pymodaq_data import DataToExport
 from pymodaq_gui.plotting.data_viewers import ViewerDispatcher
 from pymodaq_gui.utils import DockArea, QSpinBoxWithShortcut, PushButtonIcon, QLED, QSpinBox_ro
-from pymodaq_gui.parameter import ParameterTree
 from pymodaq_gui.utils.widgets import LabelWithFont
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.config import Config as ControlModulesConfig
-from pymodaq_gui.utils.styling import create_icon
 
 config_utils = Config()
 config = ControlModulesConfig()
@@ -88,9 +82,6 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.graph_widget: QtWidgets.QWidget = None
         self.viewer: ViewerDispatcher = None
 
-        self._tree: ParameterTree = None
-
-
         self.setup_ui()
 
         self.enable_move_buttons(False)
@@ -111,19 +102,13 @@ class DAQ_Move_UI_Base(ControlModuleUI):
 
     @actuator_init.setter
     def actuator_init(self, status):
-        self._ini_state = status
-        self.ini_state_led.set_as(status)
-        self.enable_move_buttons(status)
+        self._set_init_state(status)
 
-        if status:
-            icon = create_icon('cable',
-                               icon_color=qt_themes.get_theme().green,)
-        else:
-            icon = create_icon('cable',
-                               icon_color=qt_themes.get_theme().red,)
-        if self.has_action('ini_actuator'):
-            self.get_action('ini_actuator').set_icon(icon)
-        self.ini_actuator_pb.setIcon(icon)
+        # self._ini_state = status
+        # self.ini_state_led.set_as(status)
+        self.enable_move_buttons(status)
+        icon = self.update_init_icon(status, 'init')
+        # self.ini_actuator_pb.setIcon(icon)
 
     @property
     def actuator(self):
@@ -250,8 +235,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.move_rel_minus_pb = PushButtonIcon('step_into', 'Set Rel. (-)', icon_color=self.get_theme().blue)
         self.stop_pb = PushButtonIcon('stop_circle', 'Stop', icon_color=self.get_theme().red)
         self.get_value_pb = PushButtonIcon('looks_one', 'Update Value', icon_color=self.get_theme().cyan)
-        self.statusbar = QtWidgets.QStatusBar()
-        self.statusbar.setMaximumHeight(30)
+        self.setup_statusbar()
 
         self.graph_widget = QtWidgets.QWidget()
         self.graph_widget.setLayout(QtWidgets.QHBoxLayout())
@@ -290,7 +274,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.parent.close()
         self.graph_widget.close()
         self.control_widget.close()
-        self._tree.close()
+        self.settings_tree.close()
 
     def do_init(self, do_init=True):
         """Programmatically press the Init button
@@ -319,21 +303,12 @@ class DAQ_Move_UI_Base(ControlModuleUI):
             DataActuator(data=self.rel_value_sb.value() * (1 if sign == '+' else -1),
                          units=self._unit)))
 
-    def set_settings_tree(self, tree):
-        self._tree = tree
-
-
     def setup_actions_in_toolbar(self, toolbar: QtWidgets.QToolBar):
-        self.add_widget('name', LabelWithFont(f'{self.title}', font_name="Tahoma",
-                                              font_size=14, isbold=True, isitalic=True),
-                        toolbar=toolbar)
+        self.setup_title_widget(self.title, toolbar=toolbar)
 
-        self.add_widget('actuators_combo', self.actuators_combo, toolbar=toolbar)
-        self.add_action('ini_actuator', 'Ini. Actuator', 'cable', toolbar=toolbar,
-                        tip='Connect to selected actuator', icon_color=qt_themes.get_theme().red,
-                        icon_checked_color=qt_themes.get_theme().green)
-        self.add_action('show_settings', 'Show Settings', 'settings', "Show Settings", checkable=True,
-                        toolbar=toolbar)
+        self.add_widget('selector', self.actuators_combo, toolbar=toolbar)
+        self.setup_init_action('init', 'Ini. Actuator', toolbar=toolbar)
+        self.setup_settings_action(toolbar=toolbar)
         toolbar.addSeparator()
         self.add_widget('current', self.current_value_sb, toolbar=toolbar)
         self.add_widget('move_done', self.move_done_led, toolbar=toolbar)
@@ -346,10 +321,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.add_action('show_controls', 'Show Controls',
                         'discover_tune', "Show more controls", checkable=True,
                         toolbar=toolbar)
-        self.add_action('show_graph', 'Show Graph', 'bid_landscape', 'Show/Hide the Graph Widget',
-                        checkable=True, icon_checked='bid_landscape_disabled',
-                        icon_color=self.get_theme().green, icon_checked_color=self.get_theme().red,
-                        toolbar=toolbar)
+        self.setup_show_graph_action(toolbar=toolbar)
         self.add_action('refresh_value', 'Refresh', 'repeat',
                         "Refresh Value Continuously", checkable=True,
                         toolbar=toolbar, icon_checked='repeat_on',
@@ -388,7 +360,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         if 'show_controls' in self.actions_names:
             self.connect_action('show_controls', self.show_controls)
         if 'show_settings' in self.actions_names:
-            self.connect_action('show_settings', self.show_tree)
+            self.connect_action('show_settings', self.show_settings)
         if 'show_graph' in self.actions_names:
             self.connect_action('show_graph', self.show_graph)
         if 'move_abs' in self.actions_names:
@@ -399,8 +371,8 @@ class DAQ_Move_UI_Base(ControlModuleUI):
             self.connect_action('stop', lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.STOP, )))
         if 'show_config' in self.actions_names:
             self.connect_action('show_config', lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.SHOW_CONFIG, )))
-        if 'ini_actuator' in self.actions_names:
-            self.connect_action('ini_actuator', self.ini_actuator_pb.click)
+        if 'init' in self.actions_names:
+            self.connect_action('init', self.ini_actuator_pb.click)
 
         self.move_abs_pb.clicked.connect(lambda: self.emit_move_abs(self.abs_value_sb_bis))
         self.abs_value_sb.shortcut["Ctrl+E"].activated.connect(lambda: self.emit_move_abs(self.abs_value_sb))
@@ -426,14 +398,8 @@ class DAQ_Move_UI_Base(ControlModuleUI):
                                 lambda do_refresh: self.command_sig.emit(ThreadCommand(UiToMainMove.LOOP_GET_VALUE,
                                                                                    do_refresh)))
 
-    def show_tree(self, show: bool = True):
-        self._tree.setVisible(show)
-        self._tree.closeEvent = lambda event: self.set_action_checked('show_settings', False)
-
     def show_controls(self, show: bool = True):
-        self.control_widget.setVisible(show)
-        self.control_widget.closeEvent = lambda event: self.set_action_checked('show_controls', False)
+        self.show_widget_with_close_handling(self.control_widget, show, 'show_controls')
 
     def show_graph(self, show: bool = True):
-        self.graph_widget.setVisible(show)
-        self.graph_widget.closeEvent = lambda event: self.set_action_checked('show_graph', False)
+        self.show_widget_with_close_handling(self.graph_widget, show, 'show_graph')

@@ -5,7 +5,7 @@ from pymodaq.control_modules.instruments import DAQTypesEnum
 from ..control_module_selector import ModuleSelector
 
 @dataclass
-class SelectedModule:
+class SelectedDetector:
     daq_type: DAQTypesEnum = field(default_factory=lambda: DAQTypesEnum.DAQ0D)
     module_name: str = 'Mock'
 
@@ -19,19 +19,19 @@ class SelectedModule:
 
 class ViewerSelector(ModuleSelector):
 
-    module_changed = QtCore.Signal(SelectedModule)
+    module_changed = QtCore.Signal(SelectedDetector)
 
     def __init__(self, *args, **kwargs):
-        super().__init__(str(SelectedModule()), *args, **kwargs)
+        super().__init__(str(SelectedDetector()), *args, **kwargs)
 
-        self._selected_module: SelectedModule = SelectedModule()
+        self._selected_module: SelectedDetector = SelectedDetector()
 
     @property
     def selected_module(self):
         return self._selected_module
 
     @selected_module.setter
-    def selected_module(self, value: SelectedModule):
+    def selected_module(self, value: SelectedDetector):
         self._selected_module = value
         self.add_widget.setText(str(value))
         self.module_changed.emit(value)
@@ -45,5 +45,5 @@ class ViewerSelector(ModuleSelector):
         # Call the parameter's addNew method with the selected type
         self.add_widget.setText('/'.join((path_tuple[0], path_tuple[-1])))
         self.add_widget.adjustSize()
-        self.selected_module = SelectedModule(DAQTypesEnum[path_tuple[0]], path_tuple[-1], )
+        self.selected_module = SelectedDetector(DAQTypesEnum[path_tuple[0]], path_tuple[-1], )
         self.module_changed.emit(self.selected_module)

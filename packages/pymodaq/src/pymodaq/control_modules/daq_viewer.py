@@ -16,10 +16,9 @@ import time
 from easydict import EasyDict as edict
 import numpy as np
 from qtpy import QtWidgets
-from qtpy.QtCore import Qt, QObject, Slot, QThread, Signal
+from qtpy.QtCore import QObject, Slot, QThread, Signal
 
 from pymodaq_data.data import DataToExport, Axis, DataDistribution
-from pymodaq.utils.data import DataFromPlugins
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq.control_modules.utils import ParameterControlModule
@@ -28,7 +27,6 @@ from pymodaq_gui.utils.file_io import select_file
 from pymodaq_gui.utils.widgets.lcd import LCD
 
 from pymodaq_utils.config import Config, get_set_local_dir
-from pymodaq_gui.h5modules.browsing import browse_data
 from pymodaq_gui.h5modules.saving import H5Saver
 from pymodaq.utils.h5modules import module_saving
 from pymodaq_data.h5modules.backends import Node
@@ -39,24 +37,22 @@ from pymodaq_gui.parameter import utils as putils
 from pymodaq.control_modules.viewer_utility_classes import params as daq_viewer_params
 from pymodaq_utils import utils
 from pymodaq_utils.warnings import deprecation_msg
-from pymodaq_gui.utils import DockArea, Dock
+from pymodaq_gui.utils import Dock
 
 
 from pymodaq.utils.gui_utils import get_splash_sc
 from pymodaq.control_modules.daq_viewer_ui.ui_base import DAQ_Viewer_UI
-from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum,
-                                           DetectorError, get_viewer_plugins)
+from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum,get_detector_plugin, get_detector_module)
 from pymodaq.control_modules.utils import ControllerStatus
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusViewer, ControlToHardwareViewer,
                                                      UiToMainViewer)
 from pymodaq_gui.plotting.data_viewers.viewer import ViewerBase
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
-from pymodaq_utils.enums import enum_checker
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base
 
 from pymodaq.utils.leco.pymodaq_listener import ViewerActorListener, LECOClientCommands, LECOViewerCommands
 from pymodaq.utils.config import Config as ControlModulesConfig
-from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedModule
+from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector
 
 logger = set_logger(get_module_name(__file__))
 config_utils = Config()
@@ -123,7 +119,7 @@ class DAQ_Viewer(ParameterControlModule):
 
         super().__init__(**kwargs)
 
-        self._detector = SelectedModule(daq_type=DAQTypesEnum[daq_type])
+        self._detector = SelectedDetector(daq_type=DAQTypesEnum[daq_type])
 
         self._viewer_types: List[ViewersEnum] = []
         self._viewers: List[ViewerBase] = []
@@ -139,7 +135,6 @@ class DAQ_Viewer(ParameterControlModule):
 
         if self.ui is not None:
             QtWidgets.QApplication.processEvents()
-            self.ui.add_setting_tree(self.settings_tree)
             self.ui.command_sig.connect(self.process_ui_cmds)
             self.viewers = self.ui.viewers
             self._viewer_types = self.ui.viewer_types
@@ -189,11 +184,6 @@ class DAQ_Viewer(ParameterControlModule):
         self.grab_done_signal.connect(self._save_export_data)
         self.update_plugin_config()
 
-    def get_detector_module(self, detector: SelectedModule):
-        detector_module = find_dict_in_list_from_key_val(
-            DET_TYPES[detector.daq_type.name],
-            'name', detector.module_name)['module']
-        return detector_module
 
     def __repr__(self):
         return f'{self.__class__.__name__}: {self.title} {self.detector}'
@@ -236,7 +226,7 @@ class DAQ_Viewer(ParameterControlModule):
         elif cmd.command == UiToMainViewer.SAVE_CURRENT:
             self.save_current()
         elif cmd.command == UiToMainViewer.DETECTOR_CHANGED:
-            if isinstance(cmd.attribute, SelectedModule):
+            if isinstance(cmd.attribute, SelectedDetector):
                 self.detector_changed_from_ui(cmd.attribute)
         elif cmd.command == UiToMainViewer.TAKE_BKG:
             self.take_bkg()
@@ -290,19 +280,19 @@ class DAQ_Viewer(ParameterControlModule):
         """List of available DAQ_TYPES as keys of the DAQTypesEnum"""
         return DAQTypesEnum.names()
 
-    def detector_changed_from_ui(self, detector: SelectedModule):
+    def detector_changed_from_ui(self, detector: SelectedDetector):
         self._detector = detector
         self.settings.child('main_settings', 'DAQ_type').setValue(detector.daq_type.name)
         self.update_plugin_config()
         self._set_setting_tree()
 
     @property
-    def detector(self) -> SelectedModule:
+    def detector(self) -> SelectedDetector:
         """Get/Set the currently selected detector among available detectors"""
         return self._detector
 
     @detector.setter
-    def detector(self, det: SelectedModule):
+    def detector(self, det: SelectedDetector):
         self._detector = det
         self.update_plugin_config()
         if self.ui is not None:
@@ -319,7 +309,7 @@ class DAQ_Viewer(ParameterControlModule):
             self.settings.child('main_settings', 'Naverage').setValue(ngrab)
 
     def update_plugin_config(self):
-        parent_module = self.get_detector_module(self.detector)
+        parent_module = get_detector_module(self.detector)
         mod = import_module(parent_module.__package__.split('.')[0])
         if hasattr(mod, 'config'):
             self.plugin_config = mod.config
@@ -960,7 +950,7 @@ class DAQ_Viewer(ParameterControlModule):
 
         See Also
         --------
-        pymodaq.control_modules.utils:get_viewer_plugins
+        pymodaq.control_modules.utils:get_detector_plugin
         """
 
         try:
@@ -968,10 +958,11 @@ class DAQ_Viewer(ParameterControlModule):
                 for child in self.settings.child('detector_settings').children():
                     child.remove()
 
-            det_params, _class = get_viewer_plugins(self.detector.daq_type.name,
+            _class, det_params = get_detector_plugin(self.detector.daq_type.name,
                                                     self.detector.module_name)
             self.settings.child('detector_settings').addChildren(det_params.children())
             self.settings.child('main_settings', 'module_name').setValue(self._title)
+            self.ui.set_settings(self.settings)
         except Exception as e:
             self.logger.exception(str(e))
 
@@ -1120,7 +1111,7 @@ class DAQ_Detector(QObject):
     data_detector_sig = Signal(DataToExport)
     data_detector_temp_sig = Signal(DataToExport)
 
-    def __init__(self, title, settings_parameter, detector: SelectedModule):
+    def __init__(self, title, settings_parameter, detector: SelectedDetector):
         super().__init__()
         self.waiting_for_data = False
         self.controller = None
@@ -1241,7 +1232,7 @@ class DAQ_Detector(QObject):
         try:
             # status="Not initialized"
             status = edict(initialized=False, info="", x_axis=None, y_axis=None)
-            det_params, class_ = get_viewer_plugins(self.daq_type.name, self.detector_name)
+            class_, det_params = get_detector_plugin(self.daq_type.name, self.detector_name)
             self.detector: DAQ_Viewer_base = class_(self, params_state)
 
             try:

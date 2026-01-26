@@ -60,12 +60,77 @@ class DAQTypesEnum(BaseEnum):
         return self.value.split('Viewer')[1].split('D')[0]
 
 
-def get_viewer_plugins(daq_type, det_name):
-    parent_module = find_dict_in_list_from_key_val(DET_TYPES[daq_type], 'name', det_name)
+def get_module(module_dict, name):
+    return find_dict_in_list_from_key_val(module_dict, 'name', name)['module']
+
+def get_detector_module(detector):
+    return get_module(DET_TYPES[detector.daq_type.name], detector.module_name)
+
+def get_actuator_module(act_name):
+    return get_module(ACTUATOR_TYPES, act_name)
+
+def get_plugin(module_dict, name, prefix, class_prefix, params_name):
+    """
+    Get the plugin class and its parameters from its name
+    Parameters
+    ----------
+    module_dict : list of dict
+        List of available plugins
+    name : str
+        Name of the plugin to get
+    prefix : str
+        Prefix used for the module import
+    class_prefix : str
+        Prefix used for the class name
+    params_name : str
+        Name of the parameters group
+    Returns
+    -------
+    obj : class
+        The plugin class
+    params : Parameter
+        The parameters of the plugin
+    """    
+    parent_module = get_module(module_dict, name)
+    class_name = f"{class_prefix}{name}" 
+    obj = getattr(getattr(parent_module, prefix + name), class_name)
+    params = getattr(obj, 'params')
+    params = Parameter.create(name=params_name, type='group', children=params)
+    return obj, params
+
+def get_detector_plugin(daq_type, det_name):
+    """
+    Get the detector plugin class and its parameters from its name
+    Parameters
+    ----------
+    daq_type : str
+        Type of the DAQ (e.g. 'DAQ0D', 'DAQ1D', etc.)
+    det_name : str
+        Name of the detector plugin
+    Returns
+    -------
+    obj : class
+        The viewer plugin class
+    params : Parameter
+        The parameters of the viewer plugin        
+    """
     match_name = daq_type.lower()
     match_name = f'{match_name[0:3]}_{match_name[3:].upper()}viewer_'
-    obj = getattr(getattr(parent_module['module'], match_name + det_name),
-                  f'{match_name[0:7].upper()}{match_name[7:]}{det_name}')
-    params = getattr(obj, 'params')
-    det_params = Parameter.create(name='Det Settings', type='group', children=params)
-    return det_params, obj
+    class_prefix = f"{match_name[0:7].upper()}{match_name[7:]}"
+    return get_plugin(DET_TYPES[daq_type], det_name, match_name, class_prefix, 'Det Settings')
+
+def get_actuator_plugin(act_name):
+    """
+    Get the actuator plugin class and its parameters from its name
+    Parameters
+    ----------
+    act_name : str
+        Name of the actuator plugin
+    Returns
+    -------
+    obj : class
+        The viewer plugin class
+    params : Parameter
+        The parameters of the viewer plugin        
+    """    
+    return get_plugin(ACTUATOR_TYPES, act_name, "daq_move_", "DAQ_Move_", "move_settings")

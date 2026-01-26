@@ -22,7 +22,7 @@ from qtpy.QtWidgets import (
 )
 import numpy as np
 
-from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedModule
+from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector
 from pymodaq.utils.gui_utils.loader_utils import create_daq_scan
 
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -1165,7 +1165,7 @@ class DashBoard(CustomApp):
         )
         toolbar_dock.addWidget(det_mod_tmp.ui.toolbar)
         QtWidgets.QApplication.processEvents()
-        det_mod_tmp.detector = SelectedModule(plug_type, plug_subtype)
+        det_mod_tmp.detector = SelectedDetector(plug_type, plug_subtype)
         QtWidgets.QApplication.processEvents()
 
         if plug_settings is not None:
