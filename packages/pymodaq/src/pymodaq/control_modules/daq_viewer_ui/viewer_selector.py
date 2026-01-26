@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from qtpy import QtCore
-from pymodaq.control_modules.instruments import DAQTypesEnum
+from pymodaq.control_modules.daq_types import DAQTypesEnum
 from ..control_module_selector import ModuleSelector
 
 @dataclass
