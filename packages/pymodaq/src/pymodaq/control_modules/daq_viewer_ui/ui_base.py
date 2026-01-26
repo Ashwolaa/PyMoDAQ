@@ -98,7 +98,8 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self._detector_widget = None
         self._settings_widget = None
 
-        self.selector = ViewerSelector(add_menu_entries=add_menu_entries)
+        self.selector = ViewerSelector(add_menu_entries=add_menu_entries)        
+        self.statusbar: QtWidgets.QStatusBar = None
 
         self.setup_docks()
 
@@ -129,8 +130,10 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         widget.layout().setContentsMargins(2, 2, 2, 2)
         self._settings_widget = QWidget()
         self._settings_widget.setLayout(QtWidgets.QVBoxLayout())
-
         widget.layout().addWidget(self.dockarea)
+
+        self.statusbar = QtWidgets.QStatusBar()
+        self.statusbar.setMaximumHeight(30)
 
     def add_setting_tree(self, tree):
         self._settings_widget.layout().addWidget(tree)
@@ -161,6 +164,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.add_action('background_subtract', 'Subtract Background', 'texture_minus', checkable=True,
                         tip='If checked, apply background substraction',
                         icon_checked_color=self.get_theme().green)
+        self.add_widget('status', self.statusbar)
 
     def connect_things(self):
         self.connect_action('show_settings', self._show_settings)
