@@ -29,7 +29,7 @@ from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
 from pymodaq.utils.config import Config as ControlModulesConfig
 
 from pymodaq.control_modules.thread_commands import ThreadStatus
-
+from pymodaq.control_modules.ui_utils import ControlModuleUI
 
 class ControleModuleType(StrEnum):
     DAQ_MOVE = 'DAQ_Move'
@@ -282,7 +282,7 @@ class ControlModule(QObject):
     _update_settings_signal = Signal(edict)
     status_sig = Signal(str)
     custom_sig = Signal(ThreadCommand)
-    ui = None
+    ui:ControlModuleUI = None
 
     def __init__(self):
         super().__init__()
@@ -295,7 +295,7 @@ class ControlModule(QObject):
         self._initialized_state = False
         self._send_to_tcpip = False
         self._tcpclient_thread = None
-        self._hardware_thread = None
+        self._hardware_thread = None        
 
         self.plugin_config: Optional[Config] = None
 
@@ -993,113 +993,201 @@ class ParameterControlModule(ParameterManager, ControlModule):
                 ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE
             )            
 
-    def thread_status(self, status: ThreadCommand, control_module_type='detector'):
-        """Get back info (using the ThreadCommand object) from the hardware
-
-        And re-emit this ThreadCommand using the custom_sig signal if it should be used in a higher level module
-
+    def _handle_status_update(self, status: ThreadCommand):
+        """Handle status update commands (legacy and current).
 
         Parameters
         ----------
-        status: ThreadCommand
-            The info returned from the hardware, the command (str) can be either:
-                * Update_Status: display messages and log info (deprecated)
-                * update_status: display info on the UI status bar
-                * close: close the current thread and delete corresponding attribute on cascade.
-                * update_settings: Update the "detector setting" node in the settings tree.
-                * update_main_settings: update the "main setting" node in the settings tree
-                * raise_timeout:
-                * show_splash: Display the splash screen with attribute as message
-                * close_splash
-                * show_config: display the plugin configuration
+        status : ThreadCommand
+            Status command with update message
         """
-
         if status.command == "Update_Status":
-            # legacy
+            # Legacy format
             if len(status.attribute) > 1:
                 self.update_status(status.attribute[0], log=status.attribute[1])
             else:
                 self.update_status(status.attribute[0])
-
-        elif status.command == ThreadStatus.UPDATE_STATUS:
+        else:  # ThreadStatus.UPDATE_STATUS
             self.update_status(status.attribute)
 
-        elif status.command == ThreadStatus.CLOSE:
-            try:
-                self.update_status(status.attribute[0])
-                self._hardware_thread.quit()
-                terminated = self._hardware_thread.wait(5000)
-                if not terminated:
-                    self._hardware_thread.terminate()
-                    self._hardware_thread.wait()
-                    self.update_status('thread is locked?!', 'log')
-            except Exception as e:
-                logger.exception(f'Wrong call to the "close" command: \n{str(e)}')
+    def _handle_close(self, status: ThreadCommand):
+        """Handle hardware thread closure.
 
-            self._initialized_state = False
-            self.init_signal.emit(self._initialized_state)
+        Parameters
+        ----------
+        status : ThreadCommand
+            Close command with status message
+        """
+        try:
+            self.update_status(status.attribute[0])
+            self._hardware_thread.quit()
+            terminated = self._hardware_thread.wait(5000)
+            if not terminated:
+                self._hardware_thread.terminate()
+                self._hardware_thread.wait()
+                self.update_status('thread is locked?!', 'log')
+        except Exception as e:
+            logger.exception(f'Wrong call to the "close" command: \n{str(e)}')
 
-        elif status.command == ThreadStatus.UPDATE_MAIN_SETTINGS:
-            # this is a way for the plugins to update main settings of the ui (solely values, limits and options)
-            try:
-                if status.attribute[2] == 'value':
-                    self.settings.child('main_settings', *status.attribute[0]).setValue(status.attribute[1])
-                elif status.attribute[2] == 'limits':
-                    self.settings.child('main_settings', *status.attribute[0]).setLimits(status.attribute[1])
-                elif status.attribute[2] == 'options':
-                    self.settings.child('main_settings', *status.attribute[0]).setOpts(**status.attribute[1])
-            except Exception as e:
-                logger.exception(f'Wrong call to the "update_main_settings" command: \n{str(e)}')
+        self._initialized_state = False
+        self.init_signal.emit(self._initialized_state)
 
-        elif status.command == ThreadStatus.UPDATE_SETTINGS:
-            # using this the settings shown in the UI for the plugin reflects the real plugin settings
-            try:
-                self.settings.sigTreeStateChanged.disconnect(
-                    self.parameter_tree_changed)  # any changes on the detcetor settings will update accordingly the gui
-            except Exception as e:
-                logger.exception(str(e))
-            try:
-                if status.attribute[2] == 'value':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setValue(status.attribute[1])
-                elif status.attribute[2] == 'limits':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setLimits(status.attribute[1])
+    def _handle_update_main_settings(self, status: ThreadCommand):
+        """Handle main settings updates from hardware.
 
-                elif status.attribute[2] == 'options':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setOpts(**status.attribute[1])
-                elif status.attribute[2] == 'childAdded':
-                    child = Parameter.create(name='tmp')
-                    child.restoreState(status.attribute[1][0])
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).addChild(status.attribute[1][0])
+        Allows plugins to update main settings UI (values, limits, options).
 
-            except Exception as e:
-                logger.exception(f'Wrong call to the "update_settings" command: \n{str(e)}')
+        Parameters
+        ----------
+        status : ThreadCommand
+            Command with [path, value, update_type] attributes
+        """
+        try:
+            path, value, update_type = status.attribute[0], status.attribute[1], status.attribute[2]
+            param = self.settings.child('main_settings', *path)
+
+            if update_type == 'value':
+                param.setValue(value)
+            elif update_type == 'limits':
+                param.setLimits(value)
+            elif update_type == 'options':
+                param.setOpts(**value)
+        except Exception as e:
+            logger.exception(f'Wrong call to the "update_main_settings" command: \n{str(e)}')
+
+    def _handle_update_settings(self, status: ThreadCommand, control_module_type: str):
+        """Handle plugin settings updates from hardware.
+
+        Temporarily disconnects parameter tree signals to avoid feedback loops.
+
+        Parameters
+        ----------
+        status : ThreadCommand
+            Command with [path, value, update_type] attributes
+        control_module_type : str
+            'detector' or 'move' - determines settings path
+        """
+        # Disconnect to avoid feedback loop
+        try:
+            self.settings.sigTreeStateChanged.disconnect(self.parameter_tree_changed)
+        except Exception as e:
+            logger.exception(str(e))
+
+        try:
+            path, value, update_type = status.attribute[0], status.attribute[1], status.attribute[2]
+            param = self.settings.child(f'{control_module_type}_settings', *path)
+
+            if update_type == 'value':
+                param.setValue(value)
+            elif update_type == 'limits':
+                param.setLimits(value)
+            elif update_type == 'options':
+                param.setOpts(**value)
+            elif update_type == 'childAdded':
+                child = Parameter.create(name='tmp')
+                child.restoreState(value[0])
+                param.addChild(value[0])
+        except Exception as e:
+            logger.exception(f'Wrong call to the "update_settings" command: \n{str(e)}')
+        finally:
+            # Reconnect signal
             self.settings.sigTreeStateChanged.connect(self.parameter_tree_changed)
 
-        elif status.command == ThreadStatus.UPDATE_UI:
-            try:
-                if self.ui is not None:
-                    if hasattr(self.ui, status.attribute):
-                        getattr(self.ui, status.attribute)(*status.args,
-                                                           **status.kwargs)
-            except Exception as e:
-                logger.info(f'Wrong call to the "update_ui" command: \n{str(e)}')
+    def _handle_update_ui(self, status: ThreadCommand):
+        """Handle UI method calls from hardware.
 
-        elif status.command == ThreadStatus.RAISE_TIMEOUT:
-            self.raise_timeout()
+        Dynamically calls UI methods with provided arguments.
 
-        elif status.command == ThreadStatus.SHOW_SPLASH:
+        Parameters
+        ----------
+        status : ThreadCommand
+            Command with method name in attribute, args and kwargs
+        """
+        try:
+            if self.ui is not None and hasattr(self.ui, status.attribute):
+                getattr(self.ui, status.attribute)(*status.args, **status.kwargs)
+        except Exception as e:
+            logger.info(f'Wrong call to the "update_ui" command: \n{str(e)}')
+
+    def _handle_splash(self, status: ThreadCommand, show: bool):
+        """Handle splash screen visibility.
+
+        Parameters
+        ----------
+        status : ThreadCommand
+            Command with optional message for splash screen
+        show : bool
+            True to show splash, False to close it
+        """
+        if show:
             self.settings_tree.setEnabled(False)
             self.splash_sc.show()
             self.splash_sc.raise_()
             self.splash_sc.showMessage(status.attribute, color=Qt.white)
-
-        elif status.command == ThreadStatus.CLOSE_SPLASH:
+        else:
             self.splash_sc.close()
             self.settings_tree.setEnabled(True)
 
-        self.custom_sig.emit(status)  # to be used if needed in custom application connected to this module            
+    def thread_status(self, status: ThreadCommand, control_module_type='detector'):
+        """Process status updates from hardware thread.
 
+        Dispatches status commands to appropriate handlers and re-emits
+        via custom_sig for higher-level modules to use.
+
+        Supported commands:
+            * UPDATE_STATUS: Display status message
+            * CLOSE: Close hardware thread
+            * UPDATE_MAIN_SETTINGS: Update main settings from hardware
+            * UPDATE_SETTINGS: Update plugin settings from hardware
+            * UPDATE_UI: Call UI methods dynamically
+            * RAISE_TIMEOUT: Handle timeout events
+            * SHOW_SPLASH/CLOSE_SPLASH: Control splash screen
+            * Update_Status: (deprecated) Legacy status update
+
+        Parameters
+        ----------
+        status : ThreadCommand
+            The status command from hardware
+        control_module_type : str, optional
+            'detector' or 'move' - used for settings path resolution
+        """
+        cmd = status.command
+
+        if cmd == "Update_Status" or cmd == ThreadStatus.UPDATE_STATUS:
+            self._handle_status_update(status)
+
+        elif cmd == ThreadStatus.CLOSE:
+            self._handle_close(status)
+
+        elif cmd == ThreadStatus.UPDATE_MAIN_SETTINGS:
+            self._handle_update_main_settings(status)
+
+        elif cmd == ThreadStatus.UPDATE_SETTINGS:
+            self._handle_update_settings(status, control_module_type)
+
+        elif cmd == ThreadStatus.UPDATE_UI:
+            self._handle_update_ui(status)
+
+        elif cmd == ThreadStatus.RAISE_TIMEOUT:
+            self.raise_timeout()
+
+        elif cmd == ThreadStatus.SHOW_SPLASH:
+            self._handle_splash(status, show=True)
+
+        elif cmd == ThreadStatus.CLOSE_SPLASH:
+            self._handle_splash(status, show=False)
+
+        # Always emit for custom handling in higher-level modules
+        self.custom_sig.emit(status)            
+
+    def raise_timeout(self):
+        """Update status with "Timeout occurred" statement and change the timeout flag."""
+        self.update_status("Timeout occurred", log_type="log")
+        self._post_timeout_handling()
+
+    def _post_timeout_handling(self):
+        """Hook for module-specific timeout handling.
+
+        Override in subclasses to implement custom behavior after a timeout occurs.
+        """
+        pass

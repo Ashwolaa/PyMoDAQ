@@ -467,9 +467,7 @@ class DAQ_Move(ParameterControlModule):
         else:
             self.settings.child('saver_settings', 'N_saved').hide()
 
-    def raise_timeout(self):
-        """Update status with "Timeout occurred" statement and change the timeout flag."""
-        self.update_status("Timeout occurred")
+    def _post_timeout_handling(self):
         self.wait_position_flag = False
 
     @Slot(ThreadCommand)

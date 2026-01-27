@@ -487,10 +487,8 @@ class DAQ_Viewer(ParameterControlModule):
         self._grabing = False
 
     @Slot()
-    def _raise_timeout(self):
-        """  Print the "timeout occurred" error message in the status bar via the update_status method.
-        """
-        self.update_status("Timeout occurred", log_type="log")
+    def _post_timeout_handling(self):
+        pass
 
     def save_current(self):
         """Save current data into a h5file"""
