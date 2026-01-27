@@ -40,9 +40,6 @@ class ControlModuleUI(CustomApp):
     """
     command_sig = QtCore.Signal(ThreadCommand)
 
-    # Common icon name for initialization action
-    INIT_ICON = 'cable'
-
     def __init__(self, parent):
         super().__init__(parent)
         self.config = config
@@ -244,7 +241,6 @@ class ControlModuleUI(CustomApp):
                                icon_color=self.get_theme().green,
                                icon_checked_color=self.get_theme().red,
                                toolbar=toolbar)
-
 
 def register_uis(parent_module_name: str = 'pymodaq.control_modules.daq_move_ui'):
     uis = []

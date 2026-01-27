@@ -342,11 +342,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
     def connect_things(self):
         super().connect_things()
         if self.has_action('show_controls'):            
-            self.connect_action('show_controls', self.show_controls)
-        # if self.has_action('show_settings'):            
-        #     self.connect_action('show_settings', self.show_settings)
-        # if self.has_action('init'):
-        #     self.connect_action('init', self.ini_actuator_pb.click)            
+            self.connect_action('show_controls', self.show_controls)        
         if self.has_action('show_graph'):            
             self.connect_action('show_graph', self.show_graph)
         if self.has_action('move_abs'):
