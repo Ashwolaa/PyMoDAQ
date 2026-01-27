@@ -1075,51 +1075,52 @@ class DAQ_Detector(HardwareWorker):
     def _handle_specific_command(self, command: ThreadCommand):
         """Handle detector-specific commands.
 
+        Supported commands:
+            * GRAB: Start continuous data acquisition
+            * SINGLE: Perform a single snapshot
+            * STOP_GRAB: Stop the current acquisition
+            * UPDATE_SCANNER: Update scanner settings (deprecated)
+            * UPDATE_WAIT_TIME: Update wait time between acquisitions
+            * custom: Any command supported by the hardware plugin
+
         Parameters
         ----------
         command: ThreadCommand
             The specific command to pass to the detector hardware
-            * grab
-            * single
-            * stop_grab
-            * stop_all
-            * update_scanner
-            * move_at_navigator
-            * update_wait_time
-            * get_axis
-            * any string that the hardware is able to understand            
         """
-        if command.command == ControlToHardwareViewer.GRAB:
+        cmd = command.command
+
+        if cmd == ControlToHardwareViewer.GRAB:
             self.single_grab = False
             self.grab_state = True
             self.grab_data(**command.attribute)
 
-        elif command.command == ControlToHardwareViewer.SINGLE:
+        elif cmd == ControlToHardwareViewer.SINGLE:
             self.single_grab = True
             self.grab_state = True
             self.single(**command.attribute)
 
-        elif command.command == ControlToHardwareViewer.STOP_GRAB:
+        elif cmd == ControlToHardwareViewer.STOP_GRAB:
             self.grab_state = False
-            self.detector.stop()
+            self.hardware.stop()
             QtWidgets.QApplication.processEvents()
             self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
 
-        elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
-            self.detector.update_scanner(command.attribute[0])
+        elif cmd == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
+            self.hardware.update_scanner(command.attribute[0])
 
-        elif command.command == ControlToHardwareViewer.UPDATE_WAIT_TIME:
+        elif cmd == ControlToHardwareViewer.UPDATE_WAIT_TIME:
             self.wait_time = command.attribute[0]
 
-        else:  # custom commands for particular plugins
-            if hasattr(self.detector, command.command):
-                cmd = getattr(self.detector, command.command)
+        else:  # Custom commands for particular plugins
+            if hasattr(self.hardware, cmd):
+                method = getattr(self.hardware, cmd)
                 if isinstance(command.attribute, list):
-                    cmd(*command.attribute)
+                    method(*command.attribute)
                 elif isinstance(command.attribute, dict):
-                    cmd(**command.attribute)
+                    method(**command.attribute)
                 else:
-                    cmd(command.attribute)
+                    method(command.attribute)
 
     def _initialize_hardware(self, params_state=None, controller=None):
         """ Initialize an instrument plugin class and tries to apply preset settings
@@ -1144,11 +1145,11 @@ class DAQ_Detector(HardwareWorker):
             self.hardware = self.detector  # Set hardware alias for base class
 
             try:
-                self.detector.dte_signal.connect(self.data_ready)
-                self.detector.dte_signal_temp.connect(self.emit_temp_data)
-                infos = self.detector.ini_detector(controller)
-                status.controller = self.detector.controller
-                self.controller = self.detector.controller  # Update base class controller
+                self.hardware.dte_signal.connect(self.data_ready)
+                self.hardware.dte_signal_temp.connect(self.emit_temp_data)
+                infos = self.hardware.ini_detector(controller)
+                status.controller = self.hardware.controller
+                self.controller = self.hardware.controller  # Update base class controller
 
             except Exception as e:
                 logger.exception("Hardware couldn't be initialized", exc_info=e)
@@ -1244,7 +1245,7 @@ class DAQ_Detector(HardwareWorker):
             # for live mode:two possibilities: either snap one data and regrab softwarewise
             # (while True) or if self.detector.live_mode_available is True all data is continuously
             # emitted from the plugin
-            if self.detector.live_mode_available:
+            if self.hardware.live_mode_available:
                 kwargs['wait_time'] = self.wait_time
             else:
                 kwargs['wait_time'] = 0
@@ -1253,7 +1254,7 @@ class DAQ_Detector(HardwareWorker):
                 try:
                     if not self.waiting_for_data:
                         self.waiting_for_data = True
-                        self.detector.grab_data(Naverage, live=live, **kwargs)
+                        self.hardware.grab_data(Naverage, live=live, **kwargs)
                     QtWidgets.QApplication.processEvents()
                     if self.single_grab:
                         if self.hardware_averaging:
@@ -1266,7 +1267,7 @@ class DAQ_Detector(HardwareWorker):
                         # after acquisition
                     if not self.grab_state:
                         break   # if not in grab mode  breaks the while loop
-                    if self.detector.live_mode_available and (not self.hardware_averaging and
+                    if self.hardware.live_mode_available and (not self.hardware_averaging and
                                                               self.average_done):
                         break  # if live can be done in the plugin breaks the while loop except
                         # if average is asked but not done hardware wise

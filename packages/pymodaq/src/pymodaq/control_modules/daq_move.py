@@ -864,7 +864,7 @@ class DAQ_Move_Hardware(HardwareWorker):
         status = edict(initialized=False, info="")
         try:
             class_, params = self._get_plugin_class_and_params(self.actuator)
-            self.hardware = class_(self, params_state)
+            self.hardware:DAQ_Move_base = class_(self, params_state)
             assert self.hardware is not None
 
             try:
@@ -969,45 +969,50 @@ class DAQ_Move_Hardware(HardwareWorker):
     def _handle_specific_command(self, command: ThreadCommand):
         """Handle actuator-specific commands.
 
+        Supported commands:
+            * MOVE_ABS: Move to absolute position
+            * MOVE_REL: Move relative to current position
+            * MOVE_HOME: Move to home position
+            * GET_ACTUATOR_VALUE: Get current actuator value
+            * STOP_MOTION: Stop any ongoing motion
+            * RESET_STOP_MOTION: Reset the motion stopped flag
+            * custom: Any command supported by the hardware plugin
+
         Parameters
         ----------
         command : ThreadCommand
             The specific command to pass to the actuator hardware
-            * **move_abs** command, call the move_abs method with position from command attribute
-            * **move_rel** command, call the move_rel method with the relative position from the command attribute.
-            * **move_home** command, call the move_home method
-            * **get_actuator_value** command, get the current position from the check_position method
-            * **stop_motion** command, stop any motion via the stop_Motion method
-            * **reset_stop_motion** command, set the motion_stopped attribute to false            
         """
-        if command.command == ControlToHardwareMove.MOVE_ABS:
+        cmd = command.command
+
+        if cmd == ControlToHardwareMove.MOVE_ABS:
             self.move_abs(*command.attribute)
 
-        elif command.command == ControlToHardwareMove.MOVE_REL:
+        elif cmd == ControlToHardwareMove.MOVE_REL:
             self.move_rel(*command.attribute)
 
-        elif command.command == ControlToHardwareMove.MOVE_HOME:
+        elif cmd == ControlToHardwareMove.MOVE_HOME:
             self.move_home()
 
-        elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
+        elif cmd == ControlToHardwareMove.GET_ACTUATOR_VALUE:
             pos = self.get_actuator_value()
             self.status_sig.emit(
                 ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
             )
 
-        elif command.command == ControlToHardwareMove.STOP_MOTION:
+        elif cmd == ControlToHardwareMove.STOP_MOTION:
             self.stop_motion()
 
-        elif command.command == ControlToHardwareMove.RESET_STOP_MOTION:
+        elif cmd == ControlToHardwareMove.RESET_STOP_MOTION:
             self.motion_stoped = False
 
-        else:  # custom commands for particular plugins (see spectrometer module 'get_spectro_wl' for instance)
-            if hasattr(self.hardware, command.command):
-                cmd = getattr(self.hardware, command.command)
+        else:  # Custom commands for particular plugins
+            if hasattr(self.hardware, cmd):
+                method = getattr(self.hardware, cmd)
                 if isinstance(command.attribute, list):
-                    cmd(*command.attribute)
+                    method(*command.attribute)
                 elif isinstance(command.attribute, dict):
-                    cmd(**command.attribute)
+                    method(**command.attribute)
 
     def stop_motion(self):
         """
