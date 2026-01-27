@@ -974,7 +974,7 @@ class ParameterControlModule(ParameterManager, ControlModule):
             self.settings.child("main_settings", "module_name").setValue(self._title)
 
             if self.ui is not None:
-                self.ui.set_settings(self.settings)
+                self.ui.settings = self.settings
         except Exception as e:
             self.logger.exception(str(e))
 
