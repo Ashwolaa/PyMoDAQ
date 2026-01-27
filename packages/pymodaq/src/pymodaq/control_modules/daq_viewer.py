@@ -238,6 +238,7 @@ class DAQ_Viewer(ParameterControlModule):
         self.detector = self._detector
 
         self.grab_done_signal.connect(self._save_export_data)
+        self.grab_done_signal.connect(self._update_grab_done_led)
 
 
     def __repr__(self):
@@ -441,6 +442,7 @@ class DAQ_Viewer(ParameterControlModule):
 
         if self.ui is not None:
             self.ui.data_ready = False
+            self.ui.grab_done = False  # Reset the LED when starting a new grab
 
         self._start_grab_time = time.perf_counter()
         if snap_state:
@@ -639,6 +641,17 @@ class DAQ_Viewer(ParameterControlModule):
 
         h5saver.close_file()
         self.data_saved.emit()
+
+    @Slot(DataToExport)
+    def _update_grab_done_led(self, data: DataToExport):
+        """Update the grab done LED in the UI.
+
+        Parameters
+        ----------
+        data: DataToExport
+        """
+        if self.ui is not None:
+            self.ui.grab_done = True
 
     @Slot(DataToExport)
     def _save_export_data(self, data: DataToExport):
