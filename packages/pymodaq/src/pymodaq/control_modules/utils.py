@@ -564,12 +564,7 @@ class ParameterControlModule(ParameterManager, ControlModule):
             Parameter object containing the controller parameters
         """
         try:
-            if self.module_type == ControleModuleType.DAQ_VIEWER:
-                controller_settings = self.settings.child('detector_settings', 'controller')
-            elif self.module_type == ControleModuleType.DAQ_MOVE:
-                controller_settings = self.settings.child('move_settings', 'controller')
-            else:
-                raise TypeError('Unknown ControlModuleType')
+            controller_settings = self.settings.child(self._plugin_settings_name, 'controller')                
             controller_settings.restoreState(controller_param.saveState())
 
         except Exception as e:
@@ -662,6 +657,17 @@ class ParameterControlModule(ParameterManager, ControlModule):
         h5saver = self._get_h5saver_for_saving()
         self.module_and_data_saver.h5saver = h5saver
         h5saver.settings.child('do_save').sigValueChanged.connect(self._init_continuous_save)
+
+    def _hide_saver_params(self):
+        """Hide common saver parameters that are not relevant for continuous saving.
+
+        This method hides parameters that are typically managed automatically
+        or through other mechanisms in continuous saving mode.
+        """
+        for hidden_param in ('custom_name', 'current_scan_name',
+                            'current_scan_path', 'current_h5_file',
+                            'new_file', 'base_name'):
+            self.settings.child('saver_settings', hidden_param).setOpts(visible=False)
 
     @abstractmethod
     def _init_continuous_save(self):
@@ -821,45 +827,78 @@ class ParameterControlModule(ParameterManager, ControlModule):
             except TypeError:
                 pass  # already disconnected
 
-    @Slot(ThreadCommand)
-    def process_tcpip_cmds(self, status: ThreadCommand) -> Optional[ThreadCommand]:
+    def _handle_connection_status(self, status: ThreadCommand) -> bool:
+        """Handle common connection status changes.
+
+        Parameters
+        ----------
+        status : ThreadCommand
+            The status command to handle
+
+        Returns
+        -------
+        bool
+            True if the command was handled, False otherwise
+        """
         if status.command == 'connected':
             self.settings.child('main_settings', 'tcpip', 'tcp_connected').setValue(True)
+            return True
 
         elif status.command == 'disconnected':
             self.settings.child('main_settings', 'tcpip', 'tcp_connected').setValue(False)
+            return True
 
         elif status.command == LECOClientCommands.LECO_CONNECTED:
             self.settings.child('main_settings', 'leco', 'leco_connected').setValue(True)
+            return True
 
         elif status.command == LECOClientCommands.LECO_DISCONNECTED:
             self.settings.child('main_settings', 'leco', 'leco_connected').setValue(False)
+            return True
 
         elif status.command == 'Update_Status':
             self.thread_status(status)
+            return True
 
-        elif status.command == 'set_info':
+        return False
+
+    @Slot(ThreadCommand)
+    def process_tcpip_cmds(self, status: ThreadCommand) -> Optional[ThreadCommand]:
+        """Process TCP/IP and LECO commands.
+
+        First tries to handle common connection status changes, then
+        processes module-specific commands.
+
+        Parameters
+        ----------
+        status : ThreadCommand
+            The command to process
+
+        Returns
+        -------
+        Optional[ThreadCommand]
+            None if handled, otherwise the status for subclass handling
+        """
+        # Handle common connection status
+        if self._handle_connection_status(status):
+            return None
+        common_param = self._plugin_settings_name
+        if status.command == 'set_info':
             """ The Director sent a parameter to be updated"""
             path_in_settings = status.attribute.path
-            if 'move' in self.__class__.__name__.lower():
-                common_param = 'move_settings'
-            else:
-                common_param = 'detector_settings'
-            if common_param in path_in_settings:
+
+            if self._plugin_settings_name in path_in_settings:
                 param = self.settings.child(*path_in_settings)
             elif 'settings_client' in path_in_settings:
-                param = self.settings.child(common_param, *path_in_settings[1:])
+                param = self.settings.child(self._plugin_settings_name, *path_in_settings[1:])
             else:
-                param = self.settings.child(common_param, *path_in_settings)
+                param = self.settings.child(self._plugin_settings_name, *path_in_settings)
 
             param.setValue(status.attribute.parameter.value())
 
         elif status.command == LECOCommands.GET_SETTINGS:
             """ The Director requested the content of the actuator settings"""
-            if 'move' in self.__class__.__name__.lower():
-                common_param = 'move_settings'
-            else:
-                common_param = 'detector_settings'
+
             self._command_tcpip.emit(
                 ThreadCommand(LECOCommands.SET_DIRECTOR_SETTINGS,
                               ioxml.parameter_to_xml_string(
