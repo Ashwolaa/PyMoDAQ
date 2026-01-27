@@ -66,7 +66,6 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.abs_value_sb: QSpinBoxWithShortcut = None
         self.abs_value_sb_2: QSpinBoxWithShortcut = None
         self.abs_value_sb_bis: QSpinBoxWithShortcut = None
-        self.ini_actuator_pb: PushButtonIcon = None
         self.move_done_led: QLED = None
         self.current_value_sb: QSpinBox_ro = None
         self.find_home_pb: PushButtonIcon = None
@@ -110,7 +109,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
     def actuator_init(self, status):
         self._set_init_state(status)
         self.enable_move_buttons(status)
-        icon = self.update_init_icon(status, 'init')
+        self.update_init_icon(status, 'init')
 
     @property
     def actuator(self) -> SelectedActuator:
@@ -215,8 +214,6 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.abs_value_sb_2.setStyleSheet("background-color : lightcoral; color: black")
 
         self.abs_value_sb_bis = QSpinBoxWithShortcut(step=0.1, dec=True, siPrefix=config('actuator', 'siprefix'))
-        self.ini_actuator_pb = PushButtonIcon('cable', 'Initialization', checkable=True,
-                                              tip='Start This actuator initialization')
         self.move_done_led = QLED(readonly=True)
         self.current_value_sb = QSpinBox_ro(font_size=20, min_height=27,
                                             siPrefix=config('actuator', 'siprefix'),
@@ -272,20 +269,10 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.control_widget.close()
         self.settings_tree.close()
 
-    def do_init(self, do_init=True):
-        """Programmatically press the Init button
-        API entry
-        Parameters
-        ----------
-        do_init: bool
-            will fire the Init button depending on the argument value and the button check state
-        """
-        if do_init is not self.ini_actuator_pb.isChecked():
-            self.ini_actuator_pb.click()
 
     def send_init(self, checked):
         self.selector.add_widget.setEnabled(not checked)
-        self.command_sig.emit(ThreadCommand(UiToMainMove.INIT, [self.ini_actuator_pb.isChecked(),
+        self.command_sig.emit(ThreadCommand(UiToMainMove.INIT, [checked,
                                                                 self.selector.selected_module]))
 
     def emit_move_abs(self, spinbox):
@@ -386,8 +373,6 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.find_home_pb.clicked.connect(lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.FIND_HOME, )))
         self.stop_pb.clicked.connect(lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.STOP, )))
         self.get_value_pb.clicked.connect(lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.GET_VALUE, )))
-
-        self.ini_actuator_pb.clicked.connect(self.send_init)
 
         self.selector.module_changed.connect(
             lambda sel_act: self.command_sig.emit(ThreadCommand(UiToMainMove.ACTUATOR_CHANGED, sel_act)))

@@ -229,7 +229,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
             self.get_action('grab').trigger()
 
     def send_init(self, checked: bool):
-        self._enable_detchoices(not checked)
+        self.selector.add_widget.setEnabled(not checked)
         if not checked and self.is_action_checked('background_subtract'):
             self.get_action('background_subtract').trigger()
         QtWidgets.QApplication.processEvents()

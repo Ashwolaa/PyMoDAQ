@@ -164,19 +164,6 @@ class ControlModuleUI(CustomApp):
         """Should be implemented to send to the main app the fact that someone (un)checked init."""
         raise NotImplementedError
 
-    def set_settings(self, settings):
-        """Set the settings Parameter to display in the UI
-
-        This allows the main control module to share its settings with the UI.
-        The UI's tree will display the given Parameter directly.
-
-        Parameters
-        ----------
-        settings: Parameter
-            The Parameter object to display
-        """
-        self.settings = settings
-
     def show_settings(self, show: bool = True):
         """Show or hide the settings widget
 

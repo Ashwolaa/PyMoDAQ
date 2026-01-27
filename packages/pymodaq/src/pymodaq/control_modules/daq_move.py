@@ -529,19 +529,15 @@ class DAQ_Move(ParameterControlModule):
                 self.append_data()
 
             self.current_value_signal.emit(self._current_value)
-            if (
-                    self.settings["main_settings", "tcpip", "tcp_connected"]
-                and self._send_to_tcpip
-            ):
-                self._command_tcpip.emit(ThreadCommand("position_is", data_act))
-            if (
-                self.settings["main_settings", "leco", "leco_connected"]
-                and self._send_to_tcpip
-            ):
-                self._command_tcpip.emit(
-                    ThreadCommand(LECOMoveCommands.POSITION, data_act)
-                )
-
+            if self._send_to_tcpip:
+                if self.settings.child("main_settings", "tcpip", "tcp_connected").value():
+                    self._command_tcpip.emit(
+                        ThreadCommand("position_is", data_act)
+                        )
+                if self.settings.child("main_settings", "leco", "leco_connected").value():
+                    self._command_tcpip.emit(
+                        ThreadCommand(LECOMoveCommands.POSITION, data_act)
+                    )
         elif status.command == ThreadStatusMove.MOVE_DONE:
             data_act = self._check_data_type(status.attribute)
             if self.ui is not None:
@@ -550,19 +546,15 @@ class DAQ_Move(ParameterControlModule):
             self._current_value = data_act
             self._move_done_bool = True
             self.move_done_signal.emit(data_act)
-            if (
-                self.settings.child("main_settings", "tcpip", "tcp_connected").value()
-                and self._send_to_tcpip
-            ):
-                self._command_tcpip.emit(ThreadCommand("move_done", data_act))
-            if (
-                self.settings.child("main_settings", "leco", "leco_connected").value()
-                and self._send_to_tcpip
-            ):
-                self._command_tcpip.emit(
-                    ThreadCommand(LECOMoveCommands.MOVE_DONE, data_act)
-                )
-
+            if self._send_to_tcpip:
+                if self.settings.child("main_settings", "tcpip", "tcp_connected").value():
+                    self._command_tcpip.emit(
+                        ThreadCommand("move_done", data_act)
+                        )
+                if self.settings.child("main_settings", "leco", "leco_connected").value():
+                    self._command_tcpip.emit(
+                        ThreadCommand(LECOMoveCommands.MOVE_DONE, data_act)
+                    )
         elif status.command == ThreadStatusMove.OUT_OF_BOUNDS:
             logger.warning(f"The Actuator {self.title} has reached its defined bounds")
             self.bounds_signal.emit(True)
