@@ -2,8 +2,24 @@ from dataclasses import dataclass, field
 
 from qtpy import QtCore
 from pymodaq.control_modules.daq_types import DAQTypesEnum
-from ..control_module_selector import ModuleSelector
+from ..control_module_selector import ModuleSelector, add_category_layers
 
+
+
+def get_detector_menu_entries():
+    """Build detector menu entries lazily to avoid import-time errors"""
+    try:
+        from pymodaq.control_modules.instruments import DET_TYPES
+        options = {
+            'DAQ0D': [plugin['name'] for plugin in DET_TYPES['DAQ0D']],
+            'DAQ1D': [plugin['name'] for plugin in DET_TYPES['DAQ1D']],
+            'DAQ2D': [plugin['name'] for plugin in DET_TYPES['DAQ2D']],
+            'DAQND': [plugin['name'] for plugin in DET_TYPES['DAQND']],
+        }
+        return add_category_layers(options)
+    except Exception:
+        return {'DAQ0D': {'Mock': ['Mock']}}
+    
 @dataclass
 class SelectedDetector:
     daq_type: DAQTypesEnum = field(default_factory=lambda: DAQTypesEnum.DAQ0D)

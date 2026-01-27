@@ -25,27 +25,12 @@ from pymodaq_gui.plotting.data_viewers import ViewersEnum
 from pymodaq_gui.utils.styling import create_icon
 from pymodaq.utils.config import Config
 from pymodaq.control_modules.thread_commands import UiToMainViewer
-from pymodaq.control_modules.control_module_selector import add_category_layers
-from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector, ViewerSelector
+from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector, ViewerSelector, get_detector_menu_entries
 
 viewer_factory = ViewerFactory()
 config = Config()
 config_utils = ConfigUtils()
 
-
-def get_detector_menu_entries():
-    """Build detector menu entries lazily to avoid import-time errors"""
-    try:
-        from pymodaq.control_modules.instruments import DET_TYPES
-        options = {
-            'DAQ0D': [plugin['name'] for plugin in DET_TYPES['DAQ0D']],
-            'DAQ1D': [plugin['name'] for plugin in DET_TYPES['DAQ1D']],
-            'DAQ2D': [plugin['name'] for plugin in DET_TYPES['DAQ2D']],
-            'DAQND': [plugin['name'] for plugin in DET_TYPES['DAQND']],
-        }
-        return add_category_layers(options)
-    except Exception:
-        return {'DAQ0D': {'Mock': ['Mock']}}
 
 
 class ActionIconNames(StrEnum):
@@ -176,7 +161,6 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.command_sig.emit(ThreadCommand(UiToMainViewer.VIEWERS_CHANGED,
                                             attribute=dict(viewer_types=self.viewer_types,
                                                            viewers=self.viewers)))
-
     @property
     def grab_done(self):
         """bool: the status of the grab_done LED."""
@@ -218,16 +202,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         if not self.config('viewer', 'allow_settings_edition'):
             self.settings_tree.setEnabled(not self.is_action_checked('grab'))
 
-    def do_init(self, do_init=True):
-        """Programmatically press the Init button
-        API entry
-        Parameters
-        ----------
-        do_init: bool
-            will fire the Init button depending on the argument value and the button check state
-        """
-        if do_init is not self.is_action_checked('init'):
-            self.get_action('init').trigger()
+    ################ Trigger actions ################            
 
     def do_grab(self, do_grab=True):
         """Programmatically press the Grab button
