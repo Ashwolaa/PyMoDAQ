@@ -935,8 +935,7 @@ class DAQ_Viewer(ParameterControlModule):
 
         if status.command == ThreadStatusViewer.INI_DETECTOR:
             self.update_status("detector initialized: " + str(status.attribute['initialized']))
-            if self.ui is not None:
-                self.ui.detector_init = status.attribute['initialized']
+            self._set_ui_init_state(status.attribute['initialized'])
             if status.attribute['initialized']:
                 self.controller = status.attribute['controller']
                 self._initialized_state = True

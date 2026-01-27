@@ -512,8 +512,7 @@ class DAQ_Move(ParameterControlModule):
             )
             if status.attribute["initialized"]:
                 self.controller = status.attribute["controller"]
-                if self.ui is not None:
-                    self.ui.actuator_init = True
+                self._set_ui_init_state(True)
                 self._initialized_state = True
             else:
                 self._initialized_state = False
