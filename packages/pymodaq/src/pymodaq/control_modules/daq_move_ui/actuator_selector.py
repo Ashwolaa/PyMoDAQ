@@ -4,7 +4,7 @@ from pymodaq.control_modules.daq_types import SelectedActuator
 from pymodaq.control_modules.control_module_selector import ModuleSelector, categorize_items
 
 
-def get_actuator_names():
+def get_actuator_menu_entries():
     """Lazy import of ACTUATOR_NAMES to avoid import-time errors"""
     try:
         from pymodaq.control_modules.instruments import ACTUATOR_NAMES
@@ -23,7 +23,7 @@ class ActuatorSelector(ModuleSelector):
     module_changed = Signal(SelectedActuator)
 
     def __init__(self, add_menu_entries: dict = None):
-        actuator_names = get_actuator_names()
+        actuator_names = get_actuator_menu_entries()
         if add_menu_entries is None:
             add_menu_entries = categorize_items(actuator_names) if actuator_names else {'Plugin': ['Mock']}
 
