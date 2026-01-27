@@ -21,7 +21,7 @@ from qtpy.QtCore import QObject, Slot, QThread, Signal
 from pymodaq_data.data import DataToExport, Axis, DataDistribution
 
 from pymodaq_utils.logger import set_logger, get_module_name
-from pymodaq.control_modules.utils import ParameterControlModule
+from pymodaq.control_modules.utils import ParameterControlModule, HardwareWorker
 
 from pymodaq_gui.utils.file_io import select_file
 from pymodaq_gui.utils.widgets.lcd import LCD
@@ -214,13 +214,7 @@ class DAQ_Viewer(ParameterControlModule):
 
         self.settings.child('main_settings', 'DAQ_type').setValue(self._detector.module_name)
         self.settings.child('main_settings', 'detector_type').setValue(self._detector.daq_type)
-        for hidden_param in ('custom_name',
-                            'current_scan_name',
-                            'current_scan_path',
-                            'current_h5_file',
-                            'new_file',
-                            'base_name'):
-            self.settings.child('saver_settings', hidden_param).setOpts(visible=False)
+        self._hide_saver_params()
 
         self._grabing: bool = False
         self._do_bkg: bool = False
@@ -998,44 +992,33 @@ class DAQ_Viewer(ParameterControlModule):
             self.snapshot('', send_to_tcpip=True)
         elif status.command == LECOViewerCommands.GRAB:
             self.grab(send_to_tcpip=True)
-        elif status.command ==LECOViewerCommands.SNAP:
-            self.snap( send_to_tcpip=True)
-
+        elif status.command == LECOViewerCommands.SNAP:
+            self.snap(send_to_tcpip=True)
         elif status.command == LECOViewerCommands.STOP:
             self.stop()
 
-        elif status.command == LECOClientCommands.LECO_CONNECTED:
-            self.settings.child('main_settings', 'leco', 'leco_connected').setValue(True)
-
-        elif status.command == LECOClientCommands.LECO_DISCONNECTED:
-            self.settings.child('main_settings', 'leco', 'leco_connected').setValue(False)
 
 
-
-class DAQ_Detector(QObject):
+class DAQ_Detector(HardwareWorker):
     """ Worker class to control the instrument plugin
 
     Attributes
     ----------
-    detector: real instance of the instrument plugin class
+    detector: real instance of the instrument plugin class (same as hardware in parent)
     controller: DAQ_Viewer_base
         wrapper object used to control a given instrument in the instrument plugin
     controller_adress: int
         unique integer used to identify a controller shared among multiple instrument plugins
 
     """
-    status_sig = Signal(ThreadCommand)
     data_detector_sig = Signal(DataToExport)
     data_detector_temp_sig = Signal(DataToExport)
 
     def __init__(self, title, settings_parameter, detector: SelectedDetector):
-        super().__init__()
+        super().__init__(title=title)
         self.waiting_for_data = False
-        self.controller = None
-        self.logger = set_logger(f'{logger.name}.{title}.detector')
-        self._title = title
         self._selected_detector = detector
-        self.detector: DAQ_Viewer_base = None
+        self.detector: DAQ_Viewer_base = None  # alias for self.hardware for backward compatibility
         self.controller_adress: int = None
         self.grab_state = False
         self.single_grab = False
@@ -1048,6 +1031,25 @@ class DAQ_Detector(QObject):
         self.wait_time = settings_parameter['main_settings', 'wait_time']
 
     @property
+    def _worker_type(self) -> str:
+        """Return 'detector' for logging."""
+        return 'detector'
+
+    @property
+    def _init_command_name(self) -> str:
+        """Return the initialization command name."""
+        return ControlToHardwareViewer.INI_DETECTOR
+
+    @property
+    def _close_command_name(self) -> str:
+        """Return the close command name."""
+        return ControlToHardwareViewer.CLOSE
+
+    def _get_plugin_class_and_params(self, component):
+        """Get the detector plugin class and parameters."""
+        return get_detector_plugin(component)
+
+    @property
     def detector_name(self) -> str:
         """Get the detector module name."""
         return self._selected_detector.module_name
@@ -1057,42 +1059,13 @@ class DAQ_Detector(QObject):
         """Get the DAQ type."""
         return self._selected_detector.daq_type
 
-    @property
-    def title(self):
-        return self._title
-
-    def update_settings(self, settings_parameter_dict):
-        """ Apply a Parameter serialized as a dict to the instrument plugin class or to self
-
-        Parameters
-        ----------
-        settings_parameter_dict: dict
-            dictionary serializing a Parameter object
-
-        Examples
-        --------
-        If the parameter is of the form ('detector_settings', 'xxx') then the parameter is sent to the instrument
-        plugin class.
-        """
-
-        path = settings_parameter_dict['path']
-        param = settings_parameter_dict['param']
-        if path[0] == 'main_settings':
-            if hasattr(self, path[-1]):
-                setattr(self, path[-1], param.value())
-
-        elif path[0] == 'detector_settings':
-            self.detector.update_settings(settings_parameter_dict)
-
-    def queue_command(self, command: ThreadCommand):
-        """Transfer command from the main module to the hardware module
+    def _handle_specific_command(self, command: ThreadCommand):
+        """Handle detector-specific commands.
 
         Parameters
         ----------
         command: ThreadCommand
-            The specific (or generic) command (str) to pass to the hardware,  either:
-            * ini_detector
-            * close
+            The specific command to pass to the detector hardware
             * grab
             * single
             * stop_grab
@@ -1101,17 +1074,9 @@ class DAQ_Detector(QObject):
             * move_at_navigator
             * update_wait_time
             * get_axis
-            * any string that the hardware is able to understand
+            * any string that the hardware is able to understand            
         """
-        if command.command == ControlToHardwareViewer.INI_DETECTOR:
-            status = self.ini_detector(*command.attribute)
-            self.status_sig.emit(ThreadCommand(ThreadStatusViewer.INI_DETECTOR, status))
-
-        elif command.command == ControlToHardwareViewer.CLOSE:
-            status = self.close()
-            self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status, 'log']))
-
-        elif command.command == ControlToHardwareViewer.GRAB:
+        if command.command == ControlToHardwareViewer.GRAB:
             self.single_grab = False
             self.grab_state = True
             self.grab_data(**command.attribute)
@@ -1126,7 +1091,6 @@ class DAQ_Detector(QObject):
             self.detector.stop()
             QtWidgets.QApplication.processEvents()
             self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
-
 
         elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
             self.detector.update_scanner(command.attribute[0])
@@ -1144,7 +1108,7 @@ class DAQ_Detector(QObject):
                 else:
                     cmd(command.attribute)
 
-    def ini_detector(self, params_state=None, controller=None):
+    def _initialize_hardware(self, params_state=None, controller=None):
         """ Initialize an instrument plugin class and tries to apply preset settings
 
         When the instrument is initialized from the Dashboard using a Preset, tries to apply the preset
@@ -1154,18 +1118,24 @@ class DAQ_Detector(QObject):
         ----------
         params_state: dict
         controller: wrapper
+
+        Returns
+        -------
+        edict
+            Status with 'initialized', 'info', 'controller' keys
         """
         try:
-            # status="Not initialized"
             status = edict(initialized=False, info="", x_axis=None, y_axis=None)
-            class_, det_params = get_detector_plugin(self._selected_detector)
+            class_, det_params = self._get_plugin_class_and_params(self._selected_detector)
             self.detector: DAQ_Viewer_base = class_(self, params_state)
+            self.hardware = self.detector  # Set hardware alias for base class
 
             try:
                 self.detector.dte_signal.connect(self.data_ready)
                 self.detector.dte_signal_temp.connect(self.emit_temp_data)
                 infos = self.detector.ini_detector(controller)
                 status.controller = self.detector.controller
+                self.controller = self.detector.controller  # Update base class controller
 
             except Exception as e:
                 logger.exception("Hardware couldn't be initialized", exc_info=e)
@@ -1293,14 +1263,6 @@ class DAQ_Detector(QObject):
 
         except Exception as e:
             self.logger.exception(str(e))
-
-    def close(self):
-        """ Call the close method of the instrument plugin class
-        """
-        if self.detector is not None and self.detector.controller is not None:
-            status = self.detector.close()
-            return status
-
 
 def prepare_docks(area, title):
     """ Static method to init docks to be used within a DAQ_Viewer

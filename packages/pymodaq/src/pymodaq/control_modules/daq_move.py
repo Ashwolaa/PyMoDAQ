@@ -36,7 +36,7 @@ from pymodaq_gui.qt_utils import mkQApp
 
 from pymodaq.utils.h5modules import module_saving
 from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES, get_actuator_plugin
-from pymodaq.control_modules.utils import ParameterControlModule
+from pymodaq.control_modules.utils import ParameterControlModule, HardwareWorker
 from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator
 
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusMove, ControlToHardwareMove,
@@ -199,13 +199,7 @@ class DAQ_Move(ParameterControlModule):
 
 
         self._module_and_data_saver: module_saving.ActuatorTimeSaver = None
-        for hidden_param in ('custom_name',
-                            'current_scan_name',
-                            'current_scan_path',
-                            'current_h5_file',
-                            'new_file',
-                            'base_name'):
-            self.settings.child('saver_settings', hidden_param).setOpts(visible=False)
+        self._hide_saver_params()
 
         self._move_done_bool = True
         self.actuator = self._actuator
@@ -794,46 +788,49 @@ class DAQ_Move(ParameterControlModule):
             self.stop_motion()
 
 
-class DAQ_Move_Hardware(QObject):
-    """
-    ================== ========================
-    **Attributes**      **Type**
-    *status_sig*        instance of Signal
-    *hardware*          ???
-    *actuator*        SelectedActuator
-    *current_position*  float
-    *target_value*   float
-    *hardware_adress*   string
-    *axis_address*      string
-    *motion_stoped*     boolean
-    ================== ========================
-    """
+class DAQ_Move_Hardware(HardwareWorker):
+    """Hardware worker class for actuator control.
 
-    status_sig = Signal(ThreadCommand)
+    Attributes
+    ----------
+    hardware : DAQ_Move_base
+        The actuator plugin instance
+    actuator : SelectedActuator
+        The selected actuator configuration
+    hardware_adress : str
+        Hardware address identifier
+    axis_address : str
+        Axis address identifier
+    motion_stoped : bool
+        Flag indicating if motion was stopped
+    """
 
     def __init__(self, actuator, position: DataActuator, title="actuator"):
-        super().__init__()
-        self.logger = set_logger(f"{logger.name}.{title}.actuator")
-        self._title = title
-        self.hardware: Optional[DAQ_Move_base] = None
+        super().__init__(title=title)
         self.actuator = actuator
         self.hardware_adress = None
         self.axis_address = None
         self.motion_stoped = False
 
     @property
-    def title(self):
-        return self._title
+    def _worker_type(self) -> str:
+        """Return 'actuator' for logging."""
+        return 'actuator'
 
-    def close(self):
-        """
-        Uninitialize the stage closing the hardware.
+    @property
+    def _init_command_name(self) -> str:
+        """Return the initialization command name."""
+        return ControlToHardwareMove.INI_STAGE
 
-        """
-        if self.hardware is not None and self.hardware.controller is not None:
-            self.hardware.close()
+    @property
+    def _close_command_name(self) -> str:
+        """Return the close command name."""
+        return ControlToHardwareMove.CLOSE
 
-        return "Stage uninitialized"
+    def _get_plugin_class_and_params(self, component):
+        """Get the actuator plugin class and parameters."""
+        return get_actuator_plugin(component)
+
 
     def get_actuator_value(self):
         """Get the current position checking the hardware value."""
@@ -849,34 +846,29 @@ class DAQ_Move_Hardware(QObject):
         pos = self.hardware.get_actuator_value()
         return pos
 
-    def ini_stage(self, params_state=None, controller: Optional[HardwareController] = None) -> edict:
+    def _initialize_hardware(self, params_state=None, controller: Optional[HardwareController] = None) -> edict:
+        """Initialize an actuator plugin and connect signals.
+
+        Parameters
+        ----------
+        params_state : dict
+            Saved parameter state to restore
+        controller : object, optional
+            Shared controller instance
+
+        Returns
+        -------
+        edict
+            Status dictionary with 'initialized', 'info', 'controller' keys
         """
-        Init a stage updating the hardware and sending an hardware move_done signal.
-
-        =============== =================================== ==========================================================================================================================
-        **Parameters**   **Type**                             **Description**
-
-         *params_state*  ordered dictionary list             The parameter state of the hardware class composed by a list representing the tree to keep a temporary save of the tree
-
-         *controller*    one or many instance of DAQ_Move     The controller id of the hardware
-
-         *stage*         instance of DAQ_Move                 Defining axes and motors
-        =============== =================================== ==========================================================================================================================
-
-        See Also
-        --------
-        DAQ_utils.ThreadCommand, DAQ_Move
-        """
-
         status = edict(initialized=False, info="")
         try:
-            class_, params = get_actuator_plugin(self.actuator)  # to make sure the plugin is valid
+            class_, params = self._get_plugin_class_and_params(self.actuator)
             self.hardware = class_(self, params_state)
             assert self.hardware is not None
+
             try:
-                infos = self.hardware.ini_stage(
-                    controller
-                )  # return edict(info="", controller=, stage=)
+                infos = self.hardware.ini_stage(controller)
             except Exception as e:
                 logger.exception("Hardware couldn't be initialized", exc_info=e)
                 infos = str(e), False
@@ -891,8 +883,11 @@ class DAQ_Move_Hardware(QObject):
             else:
                 status.info = infos[0]
                 status.initialized = infos[1]
+
             status.controller = self.hardware.controller
+            self.controller = self.hardware.controller  # Update base class controller
             self.hardware.move_done_signal.connect(self.move_done)
+
             if status.initialized:
                 self.status_sig.emit(
                     ThreadCommand(
@@ -971,75 +966,48 @@ class DAQ_Move_Hardware(QObject):
             ThreadCommand(command=ThreadStatusMove.MOVE_DONE, attribute=pos)
         )
 
-    @Slot(ThreadCommand)
-    def queue_command(self, command: ThreadCommand):
-        """Interpret command send by DAQ_Move class
-                * **ini_stage** command, init a stage from command attribute.
-                * **close** command, unitinalise the stage closing hardware and emitting the corresponding status signal
-                * **move_abs** command, call the move_Abs method with position from command attribute
-                * **move_rel** command, call the move_Rel method with the relative position from the command attribute.
-                * **move_home** command, call the move_home method
-                * **get_actuator_value** command, get the current position from the check_position method
-                * **Stop_motion** command, stop any motion via the stop_Motion method
-                * **reset_stop_motion** command, set the motion_stopped attribute to false
+    def _handle_specific_command(self, command: ThreadCommand):
+        """Handle actuator-specific commands.
 
         Parameters
         ----------
-        command: ThreadCommand
-            Possible commands are:
-            * **ini_stage** command, init a stage from command attribute.
-            * **close** command, unitinalise the stage closing hardware and emitting the corresponding status signal
+        command : ThreadCommand
+            The specific command to pass to the actuator hardware
             * **move_abs** command, call the move_abs method with position from command attribute
             * **move_rel** command, call the move_rel method with the relative position from the command attribute.
             * **move_home** command, call the move_home method
             * **get_actuator_value** command, get the current position from the check_position method
             * **stop_motion** command, stop any motion via the stop_Motion method
-            * **reset_stop_motion** command, set the motion_stopped attribute to false
+            * **reset_stop_motion** command, set the motion_stopped attribute to false            
         """
-        try:
-            logger.debug(f"Threadcommand {command.command} sent to {self.title}")
-            if command.command == ControlToHardwareMove.INI_STAGE:
-                status: edict = self.ini_stage(*command.attribute)
-                self.status_sig.emit(
-                    ThreadCommand(command=ThreadStatusMove.INI_STAGE, attribute=status)
-                )
+        if command.command == ControlToHardwareMove.MOVE_ABS:
+            self.move_abs(*command.attribute)
 
-            elif command.command == ControlToHardwareMove.CLOSE:
-                status = self.close()
-                self.status_sig.emit(
-                    ThreadCommand(command=ThreadStatus.CLOSE, attribute=[status])
-                )
+        elif command.command == ControlToHardwareMove.MOVE_REL:
+            self.move_rel(*command.attribute)
 
-            elif command.command == ControlToHardwareMove.MOVE_ABS:
-                self.move_abs(*command.attribute)
+        elif command.command == ControlToHardwareMove.MOVE_HOME:
+            self.move_home()
 
-            elif command.command == ControlToHardwareMove.MOVE_REL:
-                self.move_rel(*command.attribute)
+        elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
+            pos = self.get_actuator_value()
+            self.status_sig.emit(
+                ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
+            )
 
-            elif command.command == ControlToHardwareMove.MOVE_HOME:
-                self.move_home()
+        elif command.command == ControlToHardwareMove.STOP_MOTION:
+            self.stop_motion()
 
-            elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
-                pos = self.get_actuator_value()
-                self.status_sig.emit(
-                    ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
-                )
+        elif command.command == ControlToHardwareMove.RESET_STOP_MOTION:
+            self.motion_stoped = False
 
-            elif command.command == ControlToHardwareMove.STOP_MOTION:
-                self.stop_motion()
-
-            elif command.command == ControlToHardwareMove.RESET_STOP_MOTION:
-                self.motion_stoped = False
-
-            else:  # custom commands for particular plugins (see spectrometer module 'get_spectro_wl' for instance)
-                if hasattr(self.hardware, command.command):
-                    cmd = getattr(self.hardware, command.command)
-                    if isinstance(command.attribute, list):
-                        cmd(*command.attribute)
-                    elif isinstance(command.attribute, dict):
-                        cmd(**command.attribute)
-        except Exception as e:
-            self.logger.exception(str(e))
+        else:  # custom commands for particular plugins (see spectrometer module 'get_spectro_wl' for instance)
+            if hasattr(self.hardware, command.command):
+                cmd = getattr(self.hardware, command.command)
+                if isinstance(command.attribute, list):
+                    cmd(*command.attribute)
+                elif isinstance(command.attribute, dict):
+                    cmd(**command.attribute)
 
     def stop_motion(self):
         """
@@ -1058,31 +1026,6 @@ class DAQ_Move_Hardware(QObject):
             self.hardware.stop_motion()
         self.hardware.poll_timer.stop()
 
-    @Slot(edict)
-    def update_settings(self, settings_parameter_dict):
-        """
-        Update settings of hardware with dictionary parameters in case of "Move_Settings" path, else update attribute with dictionnary parameters.
-
-        =========================  =========== ======================================================
-        **Parameters**              **Type**    **Description**
-
-        *settings_parameter_dict*  dictionary  Dictionary containing the path and linked parameter
-        =========================  =========== ======================================================
-
-        See Also
-        --------
-        update_settings
-        """
-        # settings_parameter_dict = edict(path=path,param=param)
-        path = settings_parameter_dict["path"]
-        param = settings_parameter_dict["param"]
-        if path[0] == "main_settings":
-            if hasattr(self, path[-1]):
-                setattr(self, path[-1], param.value())
-
-        elif path[0] == "move_settings":
-            if self.hardware is not None:
-                self.hardware.update_settings(settings_parameter_dict)
 
 
 def main(init_qt=True):
