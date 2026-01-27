@@ -104,6 +104,163 @@ config = ControlModulesConfig()
 logger = set_logger(get_module_name(__file__))
 
 
+class HardwareWorker(QObject):
+    """Abstract base class for hardware worker threads.
+
+    Common base for DAQ_Detector and DAQ_Move_Hardware classes that run in separate threads
+    and communicate with hardware plugins.
+
+    Attributes
+    ----------
+    status_sig : Signal[ThreadCommand]
+        Signal to send status updates back to the main control module
+    hardware : object
+        The actual hardware plugin instance (DAQ_Viewer_base or DAQ_Move_base)
+    controller : object
+        The hardware controller instance, shared between modules if needed
+    """
+    status_sig = Signal(ThreadCommand)
+
+    def __init__(self, title: str = "hardware"):
+        """Initialize the hardware worker.
+
+        Parameters
+        ----------
+        title : str
+            Name identifier for logging purposes
+        """
+        super().__init__()
+        self._title = title
+        self.logger = set_logger(f"{logger.name}.{title}.{self._worker_type}")
+        self.hardware = None
+        self.controller = None
+
+    @property
+    def title(self) -> str:
+        """Get the title/name of this worker."""
+        return self._title
+
+    @property
+    @abstractmethod
+    def _worker_type(self) -> str:
+        """Return the worker type name for logging ('actuator' or 'detector')."""
+
+    @property
+    @abstractmethod
+    def _init_command_name(self) -> str:
+        """Return the initialization ThreadCommand name (e.g., 'INI_STAGE' or 'INI_DETECTOR')."""
+
+    @property
+    @abstractmethod
+    def _close_command_name(self) -> str:
+        """Return the close ThreadCommand name."""
+
+    @abstractmethod
+    def _get_plugin_class_and_params(self, component):
+        """Get the plugin class and parameters for the given component.
+
+        Parameters
+        ----------
+        component : SelectedActuator or SelectedDetector
+            The component to get plugin info for
+
+        Returns
+        -------
+        tuple
+            (plugin_class, plugin_params)
+        """
+
+    @abstractmethod
+    def _initialize_hardware(self, params_state, controller) -> edict:
+        """Module-specific hardware initialization.
+
+        Parameters
+        ----------
+        params_state : dict
+            Saved parameter state to restore
+        controller : object
+            Shared controller instance or None
+
+        Returns
+        -------
+        edict
+            Status dictionary with 'initialized', 'info', 'controller' keys
+        """
+
+    def close(self) -> str:
+        """Close and uninitialize the hardware.
+
+        Returns
+        -------
+        str
+            Status message about uninitialization
+        """
+        if self.hardware is not None and self.hardware.controller is not None:
+            self.hardware.close()
+        return f"{self._worker_type.capitalize()} uninitialized"
+
+    def update_settings(self, settings_parameter_dict: dict):
+        """Apply parameter changes to the hardware plugin or to self.
+
+        Parameters
+        ----------
+        settings_parameter_dict : dict
+            Dictionary with 'path' and 'param' keys
+        """
+        path = settings_parameter_dict['path']
+        param = settings_parameter_dict['param']
+
+        if path[0] == 'main_settings':
+            if hasattr(self, path[-1]):
+                setattr(self, path[-1], param.value())
+        else:
+            # Pass to hardware plugin (move_settings or detector_settings)
+            if self.hardware is not None:
+                self.hardware.update_settings(settings_parameter_dict)
+
+    @Slot(ThreadCommand)
+    def queue_command(self, command: ThreadCommand):
+        """Dispatch commands from the main control module.
+
+        This method handles common commands and delegates module-specific
+        commands to subclass implementations.
+
+        Parameters
+        ----------
+        command : ThreadCommand
+            The command to execute
+        """
+        try:
+            self.logger.debug(f"Threadcommand {command.command} sent to {self.title}")
+
+            if command.command == self._init_command_name:
+                status = self._initialize_hardware(*command.attribute)
+                self.status_sig.emit(
+                    ThreadCommand(command=self._init_command_name, attribute=status))
+
+            elif command.command == self._close_command_name:
+                status = self.close()
+                self.status_sig.emit(
+                    ThreadCommand(command=ThreadStatus.CLOSE, attribute=[status]))
+
+            else:
+                # Delegate to module-specific implementation
+                self._handle_specific_command(command)
+
+        except Exception as e:
+            self.logger.exception(str(e))
+
+    @abstractmethod
+    def _handle_specific_command(self, command: ThreadCommand):
+        """Handle module-specific commands not covered by the base class.
+
+        Parameters
+        ----------
+        command : ThreadCommand
+            The command to handle
+        """
+
+
 class ControlModule(QObject):
     """Abstract Base class common to both DAQ_Move and DAQ_Viewer control modules
 
