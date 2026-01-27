@@ -9,6 +9,7 @@ import qt_themes
 from pymodaq.control_modules import daq_move as daqmv
 from pymodaq.control_modules.daq_move import DAQ_Move
 from pymodaq.control_modules.utils import ControlModule
+from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator, get_actuator_names
 
 from pymodaq_utils.config import Config
 
@@ -62,7 +63,7 @@ class TestMethods:
 class TestDAQMove:
     def test_data_emit(self, ini_daq_move_ui):
         daq_move, qtbot, widget = ini_daq_move_ui
-        daq_move.actuator = 'Mock'
+        daq_move.actuator = SelectedActuator('Mock')
 
         with qtbot.waitSignal(daq_move.init_signal, timeout=10000) as blocker:
             daq_move.init_hardware_ui(True)
@@ -88,5 +89,5 @@ class TestDAQMove:
 
     def test_axis_management(self, ini_daq_move_ui):
         daq_move, qtbot, widget = ini_daq_move_ui
-        daq_move.actuator = 'Mock'
+        daq_move.actuator = SelectedActuator('Mock')
         pass
