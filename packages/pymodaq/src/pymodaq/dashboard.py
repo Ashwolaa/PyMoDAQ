@@ -23,6 +23,7 @@ from qtpy.QtWidgets import (
 import numpy as np
 
 from pymodaq.control_modules.daq_viewer_ui.viewer_selector import SelectedDetector
+from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator
 from pymodaq.utils.gui_utils.loader_utils import create_daq_scan
 
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -1077,7 +1078,7 @@ class DashBoard(CustomApp):
         actuator_widgets.append(QtWidgets.QWidget())
         mov_mod_tmp = DAQ_Move(actuator_widgets[-1], plug_name, ui_identifier=ui_identifier)
 
-        mov_mod_tmp.actuator = plug_type
+        mov_mod_tmp.actuator = SelectedActuator(plug_type)
         QtWidgets.QApplication.processEvents()
 
         if plug_settings is not None:
