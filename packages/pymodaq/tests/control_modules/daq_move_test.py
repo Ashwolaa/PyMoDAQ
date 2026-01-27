@@ -9,7 +9,7 @@ import qt_themes
 from pymodaq.control_modules import daq_move as daqmv
 from pymodaq.control_modules.daq_move import DAQ_Move
 from pymodaq.control_modules.utils import ControlModule
-from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator, get_actuator_menu_entries
+from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator
 
 from pymodaq_utils.config import Config
 

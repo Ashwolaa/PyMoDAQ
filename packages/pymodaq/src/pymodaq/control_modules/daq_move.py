@@ -185,7 +185,7 @@ class DAQ_Move(ParameterControlModule):
 
         self.parent = parent
         if parent is not None:
-            self.ui = DAQ_Move_UI(parent, title)
+            self.ui = DAQ_Move_UI(parent, title, self.settings_tree)
         else:
             self.ui = None
 

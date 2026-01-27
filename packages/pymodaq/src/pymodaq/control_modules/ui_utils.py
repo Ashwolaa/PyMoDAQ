@@ -8,7 +8,7 @@ import qt_themes
 from pymodaq_gui.utils import CustomApp
 from pymodaq_gui.utils.widgets import LabelWithFont
 from pymodaq_gui.utils.styling import create_icon
-
+from pymodaq_gui.parameter import ParameterTree
 from pymodaq_utils.enums import StrEnum
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_utils.config import Config as ConfigUtils
@@ -40,10 +40,14 @@ class ControlModuleUI(CustomApp):
     """
     command_sig = QtCore.Signal(ThreadCommand)
 
-    def __init__(self, parent):
+    def __init__(self, parent, settings_tree:ParameterTree = None):
         super().__init__(parent)
         self.config = config
         self._ini_state = False
+        if settings_tree is not None:
+            self.module_settings_tree = settings_tree
+        else:
+            self.module_settings_tree = ParameterTree()
 
     def display_status(self, txt, wait_time=config_utils('general', 'message_status_persistence')):
         if self.statusbar is not None:
@@ -170,7 +174,7 @@ class ControlModuleUI(CustomApp):
             Whether to show or hide the settings widget
         """
         self.show_widget_with_close_handling(
-            self.settings_tree, show, 'show_settings')
+            self.module_settings_tree, show, 'show_settings')
 
     def setup_init_action(self, action_name: str = 'init', label: str = 'Initialize',
                           toolbar: QtWidgets.QToolBar = None):

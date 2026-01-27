@@ -191,7 +191,7 @@ class DAQ_Viewer(ParameterControlModule):
 
         self.parent = parent
         if parent is not None:
-            self.ui = DAQ_Viewer_UI(parent, title)
+            self.ui = DAQ_Viewer_UI(parent, title, self.settings_tree)
         else:
             self.ui = None
 
@@ -850,8 +850,8 @@ class DAQ_Viewer(ParameterControlModule):
         result = super().value_changed(param=param)
         if result is None:
             return  # Already handled by base class
-
         path = self.settings.childPath(param)
+        # Only process parameters not handled by parent
         if param.name() == 'DAQ_type':
             self.settings.child('saver_settings', 'do_save').setValue(False)
             self.settings.child('main_settings', 'axes').show(param.value() == 'DAQ2D')
@@ -885,8 +885,9 @@ class DAQ_Viewer(ParameterControlModule):
 
         elif param.name() == 'wait_time':
             self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.UPDATE_WAIT_TIME,
-                                                     [param.value()]))
+                                                        [param.value()]))
 
+        # Call _update_settings for parameters not handled by parent
         self._update_settings(param=param)
 
     def _process_overshoot(self, dte: DataToExport):

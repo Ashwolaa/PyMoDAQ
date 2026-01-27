@@ -71,9 +71,8 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
 
     command_sig = Signal(ThreadCommand)
 
-    def __init__(self, parent: QtWidgets.QWidget, title="DAQ_Viewer", **kwargs):
-        ControlModuleUI.__init__(self, parent)
-
+    def __init__(self, parent: QtWidgets.QWidget, title="DAQ_Viewer", settings_tree=None, **kwargs):
+        super().__init__(parent, settings_tree)
         self.dockarea = DockArea()
 
         ViewerDispatcher.__init__(self, self.dockarea, title=title)
@@ -303,8 +302,6 @@ def main(init_qt=True):
 
     # prog.detectors = detectors
     prog.command_sig.connect(print_command_sig)
-
-    prog.set_settings(param)
 
     #prog.update_viewers([prog.selector.selected_module.daq_type.to_viewer_type()])
 

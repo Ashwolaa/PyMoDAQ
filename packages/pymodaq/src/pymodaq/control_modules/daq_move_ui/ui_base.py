@@ -55,8 +55,8 @@ class DAQ_Move_UI_Base(ControlModuleUI):
 
     is_compact = False
 
-    def __init__(self, parent: Union[DockArea, QtWidgets.QWidget], title="DAQ_Move"):
-        super().__init__(parent)
+    def __init__(self, parent: Union[DockArea, QtWidgets.QWidget], title="DAQ_Move", settings_tree=None):
+        super().__init__(parent, settings_tree)
         self.title = title
         self._unit = ''
         self._ini_state = False

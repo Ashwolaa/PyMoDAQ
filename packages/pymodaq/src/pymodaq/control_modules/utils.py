@@ -973,8 +973,6 @@ class ParameterControlModule(ParameterManager, ControlModule):
             # Update module name in main_settings
             self.settings.child("main_settings", "module_name").setValue(self._title)
 
-            if self.ui is not None:
-                self.ui.settings = self.settings
         except Exception as e:
             self.logger.exception(str(e))
 

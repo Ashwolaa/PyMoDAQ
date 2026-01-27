@@ -15,9 +15,9 @@ from pymodaq.control_modules.daq_move_ui.factory import ActuatorUIFactory
 @ActuatorUIFactory.register('Simple')
 class DAQ_Move_UI_Simple(DAQ_Move_UI_Base):
     is_compact = True
-    def __init__(self, parent, title="DAQ_Move"):
+    def __init__(self, parent, title, settings_tree):
 
-        super().__init__(parent, title)
+        super().__init__(parent, title, settings_tree)
 
     def setup_docks(self):
         super().setup_docks()
