@@ -885,16 +885,7 @@ class ParameterControlModule(ParameterManager, ControlModule):
         common_param = self._plugin_settings_name
         if status.command == 'set_info':
             """ The Director sent a parameter to be updated"""
-            path_in_settings = status.attribute.path
-
-            if self._plugin_settings_name in path_in_settings:
-                param = self.settings.child(*path_in_settings)
-            elif 'settings_client' in path_in_settings:
-                param = self.settings.child(self._plugin_settings_name, *path_in_settings[1:])
-            else:
-                param = self.settings.child(self._plugin_settings_name, *path_in_settings)
-
-            param.setValue(status.attribute.parameter.value())
+            self._handle_set_info(status)            
 
         elif status.command == LECOCommands.GET_SETTINGS:
             """ The Director requested the content of the actuator settings"""
@@ -907,7 +898,19 @@ class ParameterControlModule(ParameterManager, ControlModule):
             # not handled
             return status
 
+    def _handle_set_info(self, status):
+        path = self._resolve_settings_path(status.attribute.path)
+        param = self.settings.child(*path)
+        param.setValue(status.attribute.parameter.value())
 
+    def _resolve_settings_path(self, path_in_settings):
+        """Override in subclasses to resolve plugin-specific paths"""
+        if self._plugin_settings_name in path_in_settings:
+            return path_in_settings
+        elif 'settings_client' in path_in_settings:
+            return [self._plugin_settings_name, *path_in_settings[1:]]
+        return [self._plugin_settings_name, *path_in_settings]
+    
     @abstractmethod
     def _get_plugin_class_and_params(self):
         """Get the plugin class and parameters for the current component.
@@ -1099,3 +1102,4 @@ class ParameterControlModule(ParameterManager, ControlModule):
             self.settings_tree.setEnabled(True)
 
         self.custom_sig.emit(status)  # to be used if needed in custom application connected to this module            
+
