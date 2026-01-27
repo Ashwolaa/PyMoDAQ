@@ -83,9 +83,10 @@ def get_detector_module(detector):
 def get_actuator_module(actuator):
     return get_module(ACTUATOR_TYPES, actuator.module_name)
 
-def get_plugin(module_dict, name, prefix, class_prefix, params_name):
+def _get_plugin(module_dict, name, prefix, class_prefix, params_name):
     """
-    Get the plugin class and its parameters from its name
+    Internal function to get the plugin class and its parameters from its name.
+
     Parameters
     ----------
     module_dict : list of dict
@@ -98,53 +99,104 @@ def get_plugin(module_dict, name, prefix, class_prefix, params_name):
         Prefix used for the class name
     params_name : str
         Name of the parameters group
+
     Returns
     -------
     obj : class
         The plugin class
     params : Parameter
         The parameters of the plugin
-    """    
+    """
     parent_module = get_module(module_dict, name)
-    class_name = f"{class_prefix}{name}" 
+    class_name = f"{class_prefix}{name}"
     obj = getattr(getattr(parent_module, prefix + name), class_name)
     params = getattr(obj, 'params')
     params = Parameter.create(name=params_name, type='group', children=params)
     return obj, params
 
-def get_detector_plugin(daq_type, det_name):
-    """
-    Get the detector plugin class and its parameters from its name
-    Parameters
-    ----------
-    daq_type : str
-        Type of the DAQ (e.g. 'DAQ0D', 'DAQ1D', etc.)
-    det_name : str
-        Name of the detector plugin
-    Returns
-    -------
-    obj : class
-        The viewer plugin class
-    params : Parameter
-        The parameters of the viewer plugin        
-    """
-    match_name = daq_type.lower()
-    match_name = f'{match_name[0:3]}_{match_name[3:].upper()}viewer_'
-    class_prefix = f"{match_name[0:7].upper()}{match_name[7:]}"
-    return get_plugin(DET_TYPES[daq_type], det_name, match_name, class_prefix, 'Det Settings')
 
-def get_actuator_plugin(act_name):
+def get_plugin_class_and_params(selected_module: Union[SelectedActuator, SelectedDetector]):
     """
-    Get the actuator plugin class and its parameters from its name
+    Get the plugin class and its parameters for a selected module.
+
     Parameters
     ----------
-    act_name : str
-        Name of the actuator plugin
+    selected_module : SelectedActuator or SelectedDetector
+        The selected actuator or detector
+
+    Returns
+    -------
+    obj : class
+        The plugin class
+    params : Parameter
+        The parameters of the plugin
+
+    Raises
+    ------
+    ValueError
+        If selected_module is not a SelectedActuator or SelectedDetector
+    """
+    if isinstance(selected_module, SelectedDetector):
+        daq_type = selected_module.daq_type.name
+        match_name = daq_type.lower()
+        match_name = f'{match_name[0:3]}_{match_name[3:].upper()}viewer_'
+        class_prefix = f"{match_name[0:7].upper()}{match_name[7:]}"
+        return _get_plugin(DET_TYPES[daq_type], selected_module.module_name,
+                          match_name, class_prefix, 'Det Settings')
+    elif isinstance(selected_module, SelectedActuator):
+        return _get_plugin(ACTUATOR_TYPES, selected_module.module_name,
+                          "daq_move_", "DAQ_Move_", "move_settings")
+    else:
+        raise ValueError("selected_module must be of type SelectedActuator or SelectedDetector")
+
+
+def get_detector_plugin(detector: Union[SelectedDetector, str], det_name: str = None):
+    """
+    Get the detector plugin class and its parameters.
+
+    Parameters
+    ----------
+    detector : SelectedDetector or str
+        Either a SelectedDetector object, or the DAQ type string (for backward compatibility)
+    det_name : str, optional
+        Name of the detector plugin (only used if detector is a string)
+
     Returns
     -------
     obj : class
         The viewer plugin class
     params : Parameter
-        The parameters of the viewer plugin        
-    """    
-    return get_plugin(ACTUATOR_TYPES, act_name, "daq_move_", "DAQ_Move_", "move_settings")
+        The parameters of the viewer plugin
+    """
+    if isinstance(detector, SelectedDetector):
+        return get_plugin_class_and_params(detector)
+    else:
+        # Backward compatibility: detector is daq_type string
+        daq_type = detector
+        match_name = daq_type.lower()
+        match_name = f'{match_name[0:3]}_{match_name[3:].upper()}viewer_'
+        class_prefix = f"{match_name[0:7].upper()}{match_name[7:]}"
+        return _get_plugin(DET_TYPES[daq_type], det_name, match_name, class_prefix, 'Det Settings')
+
+
+def get_actuator_plugin(actuator: Union[SelectedActuator, str]):
+    """
+    Get the actuator plugin class and its parameters.
+
+    Parameters
+    ----------
+    actuator : SelectedActuator or str
+        Either a SelectedActuator object, or the actuator name string (for backward compatibility)
+
+    Returns
+    -------
+    obj : class
+        The actuator plugin class
+    params : Parameter
+        The parameters of the actuator plugin
+    """
+    if isinstance(actuator, SelectedActuator):
+        return get_plugin_class_and_params(actuator)
+    else:
+        # Backward compatibility: actuator is name string
+        return _get_plugin(ACTUATOR_TYPES, actuator, "daq_move_", "DAQ_Move_", "move_settings")
