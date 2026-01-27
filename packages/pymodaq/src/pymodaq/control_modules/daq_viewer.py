@@ -300,20 +300,6 @@ class DAQ_Viewer(ParameterControlModule):
         return self.viewer_docks
 
     @property
-    def master(self) -> bool:
-        """ Get/Set programmatically the Master/Slave status of a detector"""
-        if self.initialized_state:
-            return self.settings['detector_settings', 'controller_status'] == ControllerStatus.MASTER
-        else:
-            return True
-
-    @master.setter
-    def master(self, is_master: bool):
-        if self.initialized_state:
-            self.settings.child('detector_settings', 'controller_status').setValue(
-                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE)
-
-    @property
     def daq_type(self) -> DAQTypesEnum:
         """Get/Set the daq_type as a DAQTypesEnum
 
@@ -353,12 +339,6 @@ class DAQ_Viewer(ParameterControlModule):
     def Naverage(self, ngrab: int):
         if ngrab >= 1:
             self.settings.child('main_settings', 'Naverage').setValue(ngrab)
-
-    # def update_plugin_config(self):
-    #     parent_module = get_detector_module(self.detector)
-    #     mod = import_module(parent_module.__package__.split('.')[0])
-    #     if hasattr(mod, 'config'):
-    #         self.plugin_config = mod.config
 
     @property
     def grab_state(self):

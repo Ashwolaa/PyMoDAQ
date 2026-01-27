@@ -256,21 +256,6 @@ class DAQ_Move(ParameterControlModule):
         elif cmd.command == UiToMainMove.REL_VALUE:
             self._relative_value = cmd.attribute
 
-    @property
-    def master(self) -> bool:
-        """Get/Set programmatically the Master/Slave status of an actuator"""
-        if self.initialized_state:
-            return self.settings["move_settings", "controller", "controller_status"] == ControllerStatus.MASTER
-        else:
-            return True
-
-    @master.setter
-    def master(self, is_master: bool):
-        if self.initialized_state:
-            self.settings.child("move_settings", "controller", "controller_status").setValue(
-                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE
-            )
-
 
     def append_data(
         self, dte: Optional[DataToExport] = None, where: Union[Node, str, None] = None
@@ -670,16 +655,11 @@ class DAQ_Move(ParameterControlModule):
         self._actuator = actuator
         self.settings.child('main_settings').setValue(actuator.module_name)
         self.plugin_config = update_plugin_config(self.actuator)
-        self.update_settings()
+        self._set_setting_tree()
 
     @property
     def actuator(self):
-        """str: the selected actuator's type
-
-        Returns
-        -------
-
-        """
+        """Get/Set the currently selected actuator among available detectors"""
         return self._actuator
 
     @actuator.setter
@@ -688,7 +668,7 @@ class DAQ_Move(ParameterControlModule):
             self.plugin_config = update_plugin_config(self.actuator)
             if self.ui is not None:
                 self.ui.actuator = act_type
-            self.update_settings()
+            self._set_setting_tree()
         else:
             raise ActuatorError(
                 f"{act_type} is an invalid actuator, should be within {ACTUATOR_NAMES}"
@@ -776,7 +756,7 @@ class DAQ_Move(ParameterControlModule):
                     return config("actuator", "allowed_units", key)
             return str(Q_(1, unit).to_base_units().units)
 
-    def update_settings(self):
+    def _set_setting_tree(self):
         self.settings.child("main_settings", "move_type").setValue(self._actuator)
         self.settings.child("main_settings", "module_name").setValue(self._title)
         try:

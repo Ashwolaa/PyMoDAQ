@@ -309,6 +309,26 @@ class ControlModule(QObject):
     def title(self):
         """str: get the title of the module"""
         return self._title
+    
+    @property
+    def _plugin_settings_name(self) -> str:
+        """Return the name of the plugin settings parameter group."""
+        return 'module_settings'
+
+    @property
+    def master(self) -> bool:
+        """Get/Set programmatically the Master/Slave status."""
+        if self.initialized_state:
+            return self.settings[self._plugin_settings_name, "controller", "controller_status"] == ControllerStatus.MASTER
+        else:
+            return True
+
+    @master.setter
+    def master(self, is_master: bool):
+        if self.initialized_state:
+            self.settings.child(self._plugin_settings_name, "controller", "controller_status").setValue(
+                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE
+            )
 
     def grab(self):
         """Programmatic entry to grab data from detectors or current value from actuator"""
