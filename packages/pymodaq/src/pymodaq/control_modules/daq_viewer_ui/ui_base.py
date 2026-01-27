@@ -93,7 +93,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.update_viewers([self.selector.selected_module.daq_type.to_viewer_type()])
         self.connect_things()
 
-        self.enable_actions(False, all_except=('init', 'selector', 'show_settings', 'show_graphs'))
+        self.enable_actions(False, all_except=('init', 'selector', 'show_settings', 'show_graph'))
         self.settings_tree.setVisible(False)
 
     @property
@@ -124,13 +124,14 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.add_widget('selector', self.selector.add_widget)
         self.setup_init_action(label='Ini. Detector')
         self.setup_settings_action()
+        self.setup_show_graph_action('show_graph', 'Show Graphs', 'Show/Hide the Graphs Area')        
+        self.toolbar.addSeparator()
+        self.add_widget('grab_done', self.grab_done_led)
         self.toolbar.addSeparator()
         self.add_action('snap', 'Snap', ActionIconNames.SNAP, "Take a snapshot from the detector")
         self.add_action('grab', 'Grab', ActionIconNames.GRAB, "Grab data from the detector", checkable=True,
                         icon_checked=ActionIconNames.GRAB_STOP,
                         icon_checked_color=self.get_theme().green)
-        self.add_widget('grab_done', self.grab_done_led)
-        self.setup_show_graph_action('show_graphs', 'Show Graphs', 'Show/Hide the Graphs Area')
         self.add_action('save_current', 'Save Current Data', 'save_as', "Save Current Data")
         self.toolbar.addSeparator()
         self.add_action('background_snap', 'Snap Background', 'background_replace',
@@ -150,10 +151,10 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
                             lambda checked: self.command_sig.emit(ThreadCommand(UiToMainViewer.DO_BKG, checked)))
         self.connect_action('background_snap',
                             lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.TAKE_BKG)))
-        self.connect_action('show_graphs', lambda checked: self.show_graphs(not checked))
+        self.connect_action('show_graph', lambda checked: self.show_graph(not checked))
 
-    def show_graphs(self, show: bool = True):
-        self.show_widget_with_close_handling(self.parent, show, 'show_graphs')
+    def show_graph(self, show: bool = True):
+        self.show_widget_with_close_handling(self.parent, show, 'show_graph')
 
     def update_viewers(self, viewers_type: List[Union[str, ViewersEnum]],
                        viewers_name: List[str] = None, force=False):
@@ -197,7 +198,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         """Slot from the *grab* action"""
         self.command_sig.emit(ThreadCommand(UiToMainViewer.GRAB, attribute=self.is_action_checked('grab')))
         self.enable_actions(not self.is_action_checked('grab'),
-                            all_except=('grab', 'selector', 'show_settings', 'show_graphs'))
+                            all_except=('grab', 'selector', 'show_settings', 'show_graph'))
 
         if not self.config('viewer', 'allow_settings_edition'):
             self.settings_tree.setEnabled(not self.is_action_checked('grab'))

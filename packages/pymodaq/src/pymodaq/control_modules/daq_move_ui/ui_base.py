@@ -85,7 +85,7 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.setup_docks()
         self.setup_actions()  # see ActionManager MixIn class
         self.connect_things()
-        self.enable_actions(False, all_except=('init', 'selector', 'show_settings', 'show_graphs'))
+        self.enable_actions(False, all_except=('init', 'selector', 'show_settings', 'show_graph'))
 
 
         self.enable_move_buttons(False)
