@@ -921,7 +921,7 @@ class ParameterControlModule(ParameterManager, ControlModule):
             (plugin_class, plugin_params) where plugin_params is a Parameter object
         """
 
-    def _update_selected_component(self, component, from_ui: bool = False):
+    def _update_selected_component(self, component):
         """Generic method to update the selected component (actuator/detector).
 
         Parameters
@@ -936,10 +936,6 @@ class ParameterControlModule(ParameterManager, ControlModule):
 
         setattr(self, f"_{self._component_name}", component)
         self.plugin_config = update_plugin_config(component)
-
-        if self.ui is not None and not from_ui:
-            setattr(self.ui, self._component_name, component)
-
         self._update_main_settings_on_component_change(component)
         self._set_setting_tree()
 

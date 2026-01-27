@@ -280,7 +280,7 @@ class DAQ_Viewer(ParameterControlModule):
             self.save_current()
         elif cmd.command == UiToMainViewer.DETECTOR_CHANGED:
             if isinstance(cmd.attribute, SelectedDetector):
-                self._update_selected_component(cmd.attribute, from_ui=True)
+                self._update_selected_component(cmd.attribute)
         elif cmd.command == UiToMainViewer.TAKE_BKG:
             self.take_bkg()
         elif cmd.command == UiToMainViewer.DO_BKG:
@@ -326,7 +326,7 @@ class DAQ_Viewer(ParameterControlModule):
 
     @detector.setter
     def detector(self, det: SelectedDetector):
-        self._update_selected_component(det, from_ui=False)
+        self._update_selected_component(det)
 
     @property
     def Naverage(self):

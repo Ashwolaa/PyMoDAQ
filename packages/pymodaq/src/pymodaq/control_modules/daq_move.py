@@ -259,7 +259,7 @@ class DAQ_Move(ParameterControlModule):
             self.ui.config = self.config
         elif cmd.command == UiToMainMove.ACTUATOR_CHANGED:
             if isinstance(cmd.attribute, SelectedActuator):
-                self._update_selected_component(cmd.attribute, from_ui=True)
+                self._update_selected_component(cmd.attribute)
         elif cmd.command == UiToMainMove.REL_VALUE:
             self._relative_value = cmd.attribute
 
@@ -658,7 +658,7 @@ class DAQ_Move(ParameterControlModule):
             raise ActuatorError(
                 f"{act_type} is an invalid actuator, should be within {ACTUATOR_NAMES}"
             )
-        self._update_selected_component(act_type, from_ui=False)
+        self._update_selected_component(act_type)
         
 
     @property
