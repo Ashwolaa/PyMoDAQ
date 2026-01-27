@@ -353,22 +353,24 @@ class DAQ_Move_UI_Base(ControlModuleUI):
                         toolbar=toolbar)
 
     def connect_things(self):
-        if 'show_controls' in self.actions_names:
+        super().connect_things()
+        if self.has_action('show_controls'):            
             self.connect_action('show_controls', self.show_controls)
-        if 'show_settings' in self.actions_names:
-            self.connect_action('show_settings', self.show_settings)
-        if 'show_graph' in self.actions_names:
+        # if self.has_action('show_settings'):            
+        #     self.connect_action('show_settings', self.show_settings)
+        # if self.has_action('init'):
+        #     self.connect_action('init', self.ini_actuator_pb.click)            
+        if self.has_action('show_graph'):            
             self.connect_action('show_graph', self.show_graph)
-        if 'move_abs' in self.actions_names:
+        if self.has_action('move_abs'):
             self.connect_action('move_abs', lambda: self.emit_move_abs(self.abs_value_sb))
-        if 'move_abs_2' in self.actions_names:
+        if self.has_action('move_abs_2'):
             self.connect_action('move_abs_2', lambda: self.emit_move_abs(self.abs_value_sb_2))
-        if 'stop' in self.actions_names:
+        if self.has_action('stop'):
             self.connect_action('stop', lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.STOP, )))
-        if 'show_config' in self.actions_names:
+        if self.has_action('show_config'):
             self.connect_action('show_config', lambda: self.command_sig.emit(ThreadCommand(UiToMainMove.SHOW_CONFIG, )))
-        if 'init' in self.actions_names:
-            self.connect_action('init', self.ini_actuator_pb.click)
+
 
         self.move_abs_pb.clicked.connect(lambda: self.emit_move_abs(self.abs_value_sb_bis))
         self.abs_value_sb.shortcut["Ctrl+E"].activated.connect(lambda: self.emit_move_abs(self.abs_value_sb))
