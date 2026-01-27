@@ -832,4 +832,127 @@ class ParameterControlModule(ParameterManager, ControlModule):
             # not handled
             return status
 
+    @property
+    def master(self) -> bool:
+        """Get/Set programmatically the Master/Slave status."""
+        if self.initialized_state:
+            return self.settings[self._plugin_settings_name, "controller", "controller_status"] == ControllerStatus.MASTER
+        else:
+            return True
 
+    @master.setter
+    def master(self, is_master: bool):
+        if self.initialized_state:
+            self.settings.child(self._plugin_settings_name, "controller", "controller_status").setValue(
+                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE
+            )            
+
+    def thread_status(self, status: ThreadCommand, control_module_type='detector'):
+        """Get back info (using the ThreadCommand object) from the hardware
+
+        And re-emit this ThreadCommand using the custom_sig signal if it should be used in a higher level module
+
+
+        Parameters
+        ----------
+        status: ThreadCommand
+            The info returned from the hardware, the command (str) can be either:
+                * Update_Status: display messages and log info (deprecated)
+                * update_status: display info on the UI status bar
+                * close: close the current thread and delete corresponding attribute on cascade.
+                * update_settings: Update the "detector setting" node in the settings tree.
+                * update_main_settings: update the "main setting" node in the settings tree
+                * raise_timeout:
+                * show_splash: Display the splash screen with attribute as message
+                * close_splash
+                * show_config: display the plugin configuration
+        """
+
+        if status.command == "Update_Status":
+            # legacy
+            if len(status.attribute) > 1:
+                self.update_status(status.attribute[0], log=status.attribute[1])
+            else:
+                self.update_status(status.attribute[0])
+
+        elif status.command == ThreadStatus.UPDATE_STATUS:
+            self.update_status(status.attribute)
+
+        elif status.command == ThreadStatus.CLOSE:
+            try:
+                self.update_status(status.attribute[0])
+                self._hardware_thread.quit()
+                terminated = self._hardware_thread.wait(5000)
+                if not terminated:
+                    self._hardware_thread.terminate()
+                    self._hardware_thread.wait()
+                    self.update_status('thread is locked?!', 'log')
+            except Exception as e:
+                logger.exception(f'Wrong call to the "close" command: \n{str(e)}')
+
+            self._initialized_state = False
+            self.init_signal.emit(self._initialized_state)
+
+        elif status.command == ThreadStatus.UPDATE_MAIN_SETTINGS:
+            # this is a way for the plugins to update main settings of the ui (solely values, limits and options)
+            try:
+                if status.attribute[2] == 'value':
+                    self.settings.child('main_settings', *status.attribute[0]).setValue(status.attribute[1])
+                elif status.attribute[2] == 'limits':
+                    self.settings.child('main_settings', *status.attribute[0]).setLimits(status.attribute[1])
+                elif status.attribute[2] == 'options':
+                    self.settings.child('main_settings', *status.attribute[0]).setOpts(**status.attribute[1])
+            except Exception as e:
+                logger.exception(f'Wrong call to the "update_main_settings" command: \n{str(e)}')
+
+        elif status.command == ThreadStatus.UPDATE_SETTINGS:
+            # using this the settings shown in the UI for the plugin reflects the real plugin settings
+            try:
+                self.settings.sigTreeStateChanged.disconnect(
+                    self.parameter_tree_changed)  # any changes on the detcetor settings will update accordingly the gui
+            except Exception as e:
+                logger.exception(str(e))
+            try:
+                if status.attribute[2] == 'value':
+                    self.settings.child(f'{control_module_type}_settings',
+                                        *status.attribute[0]).setValue(status.attribute[1])
+                elif status.attribute[2] == 'limits':
+                    self.settings.child(f'{control_module_type}_settings',
+                                        *status.attribute[0]).setLimits(status.attribute[1])
+
+                elif status.attribute[2] == 'options':
+                    self.settings.child(f'{control_module_type}_settings',
+                                        *status.attribute[0]).setOpts(**status.attribute[1])
+                elif status.attribute[2] == 'childAdded':
+                    child = Parameter.create(name='tmp')
+                    child.restoreState(status.attribute[1][0])
+                    self.settings.child(f'{control_module_type}_settings',
+                                        *status.attribute[0]).addChild(status.attribute[1][0])
+
+            except Exception as e:
+                logger.exception(f'Wrong call to the "update_settings" command: \n{str(e)}')
+            self.settings.sigTreeStateChanged.connect(self.parameter_tree_changed)
+
+        elif status.command == ThreadStatus.UPDATE_UI:
+            try:
+                if self.ui is not None:
+                    if hasattr(self.ui, status.attribute):
+                        getattr(self.ui, status.attribute)(*status.args,
+                                                           **status.kwargs)
+            except Exception as e:
+                logger.info(f'Wrong call to the "update_ui" command: \n{str(e)}')
+
+        elif status.command == ThreadStatus.RAISE_TIMEOUT:
+            self.raise_timeout()
+
+        elif status.command == ThreadStatus.SHOW_SPLASH:
+            self.settings_tree.setEnabled(False)
+            self.splash_sc.show()
+            self.splash_sc.raise_()
+            self.splash_sc.showMessage(status.attribute, color=Qt.white)
+
+        elif status.command == ThreadStatus.CLOSE_SPLASH:
+            self.splash_sc.close()
+            self.settings_tree.setEnabled(True)
+
+        self.custom_sig.emit(status)  # to be used if needed in custom application connected to this module            
