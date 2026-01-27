@@ -35,7 +35,7 @@ from pymodaq_gui.parameter import utils as putils
 from pymodaq_gui.qt_utils import mkQApp
 
 from pymodaq.utils.h5modules import module_saving
-from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES, get_actuator_plugin, get_actuator_module, update_plugin_config
+from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES, get_actuator_plugin
 from pymodaq.control_modules.utils import ParameterControlModule
 from pymodaq.control_modules.daq_move_ui.actuator_selector import SelectedActuator
 
@@ -107,6 +107,19 @@ class DAQ_Move(ParameterControlModule):
     def _plugin_settings_name(self) -> str:
         """Return the name of the plugin settings parameter group."""
         return 'move_settings'
+
+    @property
+    def _component_name(self) -> str:
+        """Return the component name."""
+        return 'actuator'
+
+    def _get_plugin_class_and_params(self):
+        """Get the actuator plugin class and parameters."""
+        return get_actuator_plugin(self._actuator)
+
+    def _update_main_settings_on_component_change(self, component):
+        """Update move_type setting when actuator changes."""
+        self.settings.child("main_settings", "move_type").setValue(component)
 
     @property
     def _saver_class(self):
@@ -252,7 +265,7 @@ class DAQ_Move(ParameterControlModule):
             self.ui.config = self.config
         elif cmd.command == UiToMainMove.ACTUATOR_CHANGED:
             if isinstance(cmd.attribute, SelectedActuator):
-                self.actuator_changed_from_ui(cmd.attribute)
+                self._update_selected_component(cmd.attribute, from_ui=True)
         elif cmd.command == UiToMainMove.REL_VALUE:
             self._relative_value = cmd.attribute
 
@@ -651,28 +664,18 @@ class DAQ_Move(ParameterControlModule):
         else:
             self._refresh_timer.stop()
 
-    def actuator_changed_from_ui(self, actuator: SelectedActuator):
-        self._actuator = actuator
-        self.settings.child('main_settings').setValue(actuator.module_name)
-        self.plugin_config = update_plugin_config(self.actuator)
-        self._set_setting_tree()
-
     @property
     def actuator(self):
-        """Get/Set the currently selected actuator among available detectors"""
+        """Get/Set the currently selected actuator among available actuators"""
         return self._actuator
 
     @actuator.setter
     def actuator(self, act_type: SelectedActuator):
-        if isinstance(act_type, SelectedActuator):
-            self.plugin_config = update_plugin_config(self.actuator)
-            if self.ui is not None:
-                self.ui.actuator = act_type
-            self._set_setting_tree()
-        else:
+        if not isinstance(act_type, SelectedActuator):
             raise ActuatorError(
                 f"{act_type} is an invalid actuator, should be within {ACTUATOR_NAMES}"
             )
+        self._update_selected_component(act_type, from_ui=False)
         
 
     @property
@@ -755,18 +758,6 @@ class DAQ_Move(ParameterControlModule):
                 if key in unit:
                     return config("actuator", "allowed_units", key)
             return str(Q_(1, unit).to_base_units().units)
-
-    def _set_setting_tree(self):
-        self.settings.child("main_settings", "move_type").setValue(self._actuator)
-        self.settings.child("main_settings", "module_name").setValue(self._title)
-        try:
-            for child in self.settings.child("move_settings").children():
-                child.remove()            
-            _class, move_params = get_actuator_plugin(self._actuator.module_name)
-            self.settings.child("move_settings").addChildren(move_params.children())
-            self.ui.set_settings(self.settings) # Apply settings on UI
-        except Exception as e:
-            self.logger.exception(str(e))
 
     def connect_tcp_ip(self):
         super().connect_tcp_ip(
@@ -880,7 +871,7 @@ class DAQ_Move_Hardware(QObject):
 
         status = edict(initialized=False, info="")
         try:
-            class_, params = get_actuator_plugin(self.actuator.module_name)  # to make sure the plugin is valid
+            class_, params = get_actuator_plugin(self.actuator)  # to make sure the plugin is valid
             self.hardware = class_(self, params_state)
             assert self.hardware is not None
             try:

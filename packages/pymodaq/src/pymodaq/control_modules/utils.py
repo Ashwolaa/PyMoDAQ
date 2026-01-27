@@ -131,6 +131,7 @@ class ControlModule(QObject):
         super().__init__()
         self._title = ""
         self.config = config
+        self.logger = set_logger(f'{logger.name}')
         # the hardware controller instance set after initialization and to be used by other modules if they share the
         # same controller
         self.controller = None
@@ -185,116 +186,6 @@ class ControlModule(QObject):
     def custom_command(self, command: str, **kwargs):
         self.command_hardware.emit(ThreadCommand(command, kwargs))
 
-    def thread_status(self, status: ThreadCommand, control_module_type='detector'):
-        """Get back info (using the ThreadCommand object) from the hardware
-
-        And re-emit this ThreadCommand using the custom_sig signal if it should be used in a higher level module
-
-
-        Parameters
-        ----------
-        status: ThreadCommand
-            The info returned from the hardware, the command (str) can be either:
-                * Update_Status: display messages and log info (deprecated)
-                * update_status: display info on the UI status bar
-                * close: close the current thread and delete corresponding attribute on cascade.
-                * update_settings: Update the "detector setting" node in the settings tree.
-                * update_main_settings: update the "main setting" node in the settings tree
-                * raise_timeout:
-                * show_splash: Display the splash screen with attribute as message
-                * close_splash
-                * show_config: display the plugin configuration
-        """
-
-        if status.command == "Update_Status":
-            # legacy
-            if len(status.attribute) > 1:
-                self.update_status(status.attribute[0], log=status.attribute[1])
-            else:
-                self.update_status(status.attribute[0])
-
-        elif status.command == ThreadStatus.UPDATE_STATUS:
-            self.update_status(status.attribute)
-
-        elif status.command == ThreadStatus.CLOSE:
-            try:
-                self.update_status(status.attribute[0])
-                self._hardware_thread.quit()
-                terminated = self._hardware_thread.wait(5000)
-                if not terminated:
-                    self._hardware_thread.terminate()
-                    self._hardware_thread.wait()
-                    self.update_status('thread is locked?!', 'log')
-            except Exception as e:
-                logger.exception(f'Wrong call to the "close" command: \n{str(e)}')
-
-            self._initialized_state = False
-            self.init_signal.emit(self._initialized_state)
-
-        elif status.command == ThreadStatus.UPDATE_MAIN_SETTINGS:
-            # this is a way for the plugins to update main settings of the ui (solely values, limits and options)
-            try:
-                if status.attribute[2] == 'value':
-                    self.settings.child('main_settings', *status.attribute[0]).setValue(status.attribute[1])
-                elif status.attribute[2] == 'limits':
-                    self.settings.child('main_settings', *status.attribute[0]).setLimits(status.attribute[1])
-                elif status.attribute[2] == 'options':
-                    self.settings.child('main_settings', *status.attribute[0]).setOpts(**status.attribute[1])
-            except Exception as e:
-                logger.exception(f'Wrong call to the "update_main_settings" command: \n{str(e)}')
-
-        elif status.command == ThreadStatus.UPDATE_SETTINGS:
-            # using this the settings shown in the UI for the plugin reflects the real plugin settings
-            try:
-                self.settings.sigTreeStateChanged.disconnect(
-                    self.parameter_tree_changed)  # any changes on the detcetor settings will update accordingly the gui
-            except Exception as e:
-                logger.exception(str(e))
-            try:
-                if status.attribute[2] == 'value':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setValue(status.attribute[1])
-                elif status.attribute[2] == 'limits':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setLimits(status.attribute[1])
-
-                elif status.attribute[2] == 'options':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setOpts(**status.attribute[1])
-                elif status.attribute[2] == 'childAdded':
-                    child = Parameter.create(name='tmp')
-                    child.restoreState(status.attribute[1][0])
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).addChild(status.attribute[1][0])
-
-            except Exception as e:
-                logger.exception(f'Wrong call to the "update_settings" command: \n{str(e)}')
-            self.settings.sigTreeStateChanged.connect(self.parameter_tree_changed)
-
-        elif status.command == ThreadStatus.UPDATE_UI:
-            try:
-                if self.ui is not None:
-                    if hasattr(self.ui, status.attribute):
-                        getattr(self.ui, status.attribute)(*status.args,
-                                                           **status.kwargs)
-            except Exception as e:
-                logger.info(f'Wrong call to the "update_ui" command: \n{str(e)}')
-
-        elif status.command == ThreadStatus.RAISE_TIMEOUT:
-            self.raise_timeout()
-
-        elif status.command == ThreadStatus.SHOW_SPLASH:
-            self.settings_tree.setEnabled(False)
-            self.splash_sc.show()
-            self.splash_sc.raise_()
-            self.splash_sc.showMessage(status.attribute, color=Qt.white)
-
-        elif status.command == ThreadStatus.CLOSE_SPLASH:
-            self.splash_sc.close()
-            self.settings_tree.setEnabled(True)
-
-        self.custom_sig.emit(status)  # to be used if needed in custom application connected to this module
-
     @property
     def module_type(self) -> ControleModuleType:
         """Get the module type, either DAQ_Move or DAQ_viewer"""
@@ -314,21 +205,11 @@ class ControlModule(QObject):
     def _plugin_settings_name(self) -> str:
         """Return the name of the plugin settings parameter group."""
         return 'module_settings'
-
+    
     @property
-    def master(self) -> bool:
-        """Get/Set programmatically the Master/Slave status."""
-        if self.initialized_state:
-            return self.settings[self._plugin_settings_name, "controller", "controller_status"] == ControllerStatus.MASTER
-        else:
-            return True
-
-    @master.setter
-    def master(self, is_master: bool):
-        if self.initialized_state:
-            self.settings.child(self._plugin_settings_name, "controller", "controller_status").setValue(
-                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE
-            )
+    @abstractmethod
+    def _component_name(self) -> str:
+        """Return the component name ('actuator' or 'detector' typically)."""    
 
     def grab(self):
         """Programmatic entry to grab data from detectors or current value from actuator"""
@@ -430,8 +311,7 @@ class ControlModule(QObject):
                     if callable(attr):
                         attr(value)
                     else:
-                        attr = value
-
+                        attr = value                      
 
 class ParameterControlModule(ParameterManager, ControlModule):
     """Base class for a control module with parameters."""
@@ -827,10 +707,77 @@ class ParameterControlModule(ParameterManager, ControlModule):
                 ThreadCommand(LECOCommands.SET_DIRECTOR_SETTINGS,
                               ioxml.parameter_to_xml_string(
                                   self.settings.child(common_param))))
-
         else:
             # not handled
             return status
+
+
+    @abstractmethod
+    def _get_plugin_class_and_params(self):
+        """Get the plugin class and parameters for the current component.
+
+        Returns
+        -------
+        tuple
+            (plugin_class, plugin_params) where plugin_params is a Parameter object
+        """
+
+    def _update_selected_component(self, component, from_ui: bool = False):
+        """Generic method to update the selected component (actuator/detector).
+
+        Parameters
+        ----------
+        component : SelectedActuator or SelectedDetector
+            The newly selected component
+        from_ui : bool
+            If True, called from UI change (skip UI update to avoid loops)
+        """
+        # Lazy import to avoid circular import issues with CONTROL_MODULES
+        from pymodaq.control_modules.instruments import update_plugin_config
+
+        setattr(self, f"_{self._component_name}", component)
+        self.plugin_config = update_plugin_config(component)
+
+        if self.ui is not None and not from_ui:
+            setattr(self.ui, self._component_name, component)
+
+        self._update_main_settings_on_component_change(component)
+        self._set_setting_tree()
+
+    def _update_main_settings_on_component_change(self, component):
+        """Hook for module-specific main_settings updates when component changes.
+
+        Override in subclasses to update specific settings like move_type or DAQ_type.
+
+        Parameters
+        ----------
+        component : SelectedActuator or SelectedDetector
+            The newly selected component
+        """
+        pass
+
+    def _set_setting_tree(self):
+        """Apply the specific settings of the selected plugin.
+
+        Remove previous plugin settings and load the new ones.
+        """
+        try:
+            # Clear existing children
+            settings_node = self.settings.child(self._plugin_settings_name)
+            for child in settings_node.children():
+                child.remove()
+
+            # Load new plugin parameters
+            _class, params = self._get_plugin_class_and_params()
+            settings_node.addChildren(params.children())
+
+            # Update module name in main_settings
+            self.settings.child("main_settings", "module_name").setValue(self._title)
+
+            if self.ui is not None:
+                self.ui.set_settings(self.settings)
+        except Exception as e:
+            self.logger.exception(str(e))
 
     @property
     def master(self) -> bool:

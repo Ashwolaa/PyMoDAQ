@@ -42,7 +42,7 @@ from pymodaq_gui.utils import Dock
 
 from pymodaq.utils.gui_utils import get_splash_sc
 from pymodaq.control_modules.daq_viewer_ui.ui_base import DAQ_Viewer_UI
-from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum,get_detector_plugin, get_detector_module, update_plugin_config)
+from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum, get_detector_plugin, get_detector_module)
 from pymodaq.control_modules.utils import ControllerStatus
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusViewer, ControlToHardwareViewer,
                                                      UiToMainViewer)
@@ -110,6 +110,19 @@ class DAQ_Viewer(ParameterControlModule):
     def _plugin_settings_name(self) -> str:
         """Return the name of the plugin settings parameter group."""
         return 'detector_settings'
+
+    @property
+    def _component_name(self) -> str:
+        """Return the component name."""
+        return 'detector'
+
+    def _get_plugin_class_and_params(self):
+        """Get the detector plugin class and parameters."""
+        return get_detector_plugin(self.detector)
+
+    def _update_main_settings_on_component_change(self, component):
+        """Update DAQ_type setting when detector changes."""
+        self.settings.child('main_settings', 'DAQ_type').setValue(component.daq_type.name)
 
     @property
     def _saver_class(self):
@@ -231,7 +244,6 @@ class DAQ_Viewer(ParameterControlModule):
         self.detector = self._detector
 
         self.grab_done_signal.connect(self._save_export_data)
-        self.plugin_config = update_plugin_config(self.detector)
 
 
     def __repr__(self):
@@ -273,7 +285,7 @@ class DAQ_Viewer(ParameterControlModule):
             self.save_current()
         elif cmd.command == UiToMainViewer.DETECTOR_CHANGED:
             if isinstance(cmd.attribute, SelectedDetector):
-                self.detector_changed_from_ui(cmd.attribute)
+                self._update_selected_component(cmd.attribute, from_ui=True)
         elif cmd.command == UiToMainViewer.TAKE_BKG:
             self.take_bkg()
         elif cmd.command == UiToMainViewer.DO_BKG:
@@ -312,12 +324,6 @@ class DAQ_Viewer(ParameterControlModule):
         """List of available DAQ_TYPES as keys of the DAQTypesEnum"""
         return DAQTypesEnum.names()
 
-    def detector_changed_from_ui(self, detector: SelectedDetector):
-        self._detector = detector
-        self.settings.child('main_settings', 'DAQ_type').setValue(detector.daq_type.name)
-        self.plugin_config = update_plugin_config(self.detector)
-        self._set_setting_tree()
-
     @property
     def detector(self) -> SelectedDetector:
         """Get/Set the currently selected detector among available detectors"""
@@ -325,11 +331,7 @@ class DAQ_Viewer(ParameterControlModule):
 
     @detector.setter
     def detector(self, det: SelectedDetector):
-        self._detector = det
-        self.plugin_config = update_plugin_config(self.detector)
-        if self.ui is not None:
-            self.ui.detector = det
-        self._set_setting_tree()
+        self._update_selected_component(det, from_ui=False)
 
     @property
     def Naverage(self):
@@ -882,29 +884,6 @@ class DAQ_Viewer(ParameterControlModule):
 
         self._update_settings(param=param)
 
-    def _set_setting_tree(self):
-        """Apply the specific settings of the selected detector (plugin)
-
-        Remove previous ones and load on the fly the new ones
-
-        See Also
-        --------
-        pymodaq.control_modules.utils:get_detector_plugin
-        """
-
-        try:
-            if len(self.settings.child('detector_settings').children()) > 0:
-                for child in self.settings.child('detector_settings').children():
-                    child.remove()
-
-            _class, det_params = get_detector_plugin(self.detector.daq_type.name,
-                                                    self.detector.module_name)
-            self.settings.child('detector_settings').addChildren(det_params.children())
-            self.settings.child('main_settings', 'module_name').setValue(self._title)
-            self.ui.set_settings(self.settings)
-        except Exception as e:
-            self.logger.exception(str(e))
-
     def _process_overshoot(self, dte: DataToExport):
         """Compare data value (0D) to the given overshoot setting
         """
@@ -1056,7 +1035,7 @@ class DAQ_Detector(QObject):
         self.controller = None
         self.logger = set_logger(f'{logger.name}.{title}.detector')
         self._title = title
-        self.detector_name = detector.module_name
+        self._selected_detector = detector
         self.detector: DAQ_Viewer_base = None
         self.controller_adress: int = None
         self.grab_state = False
@@ -1068,7 +1047,16 @@ class DAQ_Detector(QObject):
         self.hardware_averaging = False
         self.show_averaging = False
         self.wait_time = settings_parameter['main_settings', 'wait_time']
-        self.daq_type = detector.daq_type
+
+    @property
+    def detector_name(self) -> str:
+        """Get the detector module name."""
+        return self._selected_detector.module_name
+
+    @property
+    def daq_type(self):
+        """Get the DAQ type."""
+        return self._selected_detector.daq_type
 
     @property
     def title(self):
@@ -1171,7 +1159,7 @@ class DAQ_Detector(QObject):
         try:
             # status="Not initialized"
             status = edict(initialized=False, info="", x_axis=None, y_axis=None)
-            class_, det_params = get_detector_plugin(self.daq_type.name, self.detector_name)
+            class_, det_params = get_detector_plugin(self._selected_detector)
             self.detector: DAQ_Viewer_base = class_(self, params_state)
 
             try:

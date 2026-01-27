@@ -110,12 +110,8 @@ class DAQ_Move_UI_Base(ControlModuleUI):
     @actuator_init.setter
     def actuator_init(self, status):
         self._set_init_state(status)
-
-        # self._ini_state = status
-        # self.ini_state_led.set_as(status)
         self.enable_move_buttons(status)
         icon = self.update_init_icon(status, 'init')
-        # self.ini_actuator_pb.setIcon(icon)
 
     @property
     def actuator(self) -> SelectedActuator:
