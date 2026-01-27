@@ -147,7 +147,7 @@ class ControlModuleUI(CustomApp):
 
 
     def _set_init_state(self, status: bool):
-        self._ini_state = status        
+        self._ini_state = status
         self.enable_actions(status, all_except=('init', 'selector', 'show_settings', 'show_graphs'))
         try:
             self.set_action_enabled('selector', not status)

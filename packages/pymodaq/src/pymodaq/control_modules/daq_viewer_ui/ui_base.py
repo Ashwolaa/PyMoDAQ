@@ -248,10 +248,6 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
     @detector_init.setter
     def detector_init(self, status):
         self._set_init_state(status)
-        # self._ini_state = status
-        # self.enable_actions(status, all_except=('init', 'selector', 'show_settings', 'show_graphs'))
-        # self.set_action_enabled('selector', not status)
-        # self.update_init_icon(status, 'init')
 
 
 def main(init_qt=True):

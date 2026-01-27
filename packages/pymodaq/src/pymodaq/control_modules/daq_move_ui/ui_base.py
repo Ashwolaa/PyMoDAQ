@@ -67,7 +67,6 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.abs_value_sb_2: QSpinBoxWithShortcut = None
         self.abs_value_sb_bis: QSpinBoxWithShortcut = None
         self.ini_actuator_pb: PushButtonIcon = None
-        self.ini_state_led: QLED = None
         self.move_done_led: QLED = None
         self.current_value_sb: QSpinBox_ro = None
         self.find_home_pb: PushButtonIcon = None
@@ -218,7 +217,6 @@ class DAQ_Move_UI_Base(ControlModuleUI):
         self.abs_value_sb_bis = QSpinBoxWithShortcut(step=0.1, dec=True, siPrefix=config('actuator', 'siprefix'))
         self.ini_actuator_pb = PushButtonIcon('cable', 'Initialization', checkable=True,
                                               tip='Start This actuator initialization')
-        self.ini_state_led = QLED(readonly=True)
         self.move_done_led = QLED(readonly=True)
         self.current_value_sb = QSpinBox_ro(font_size=20, min_height=27,
                                             siPrefix=config('actuator', 'siprefix'),
