@@ -83,6 +83,32 @@ class H5SaverLowLevel(H5Backend):
         self._raw_group: Union[GROUP, str] = '/RawData'
         self._logger_array = None
 
+        self._flush_interval = 0
+        self._write_count = 0
+
+    def set_swmr_flush_interval(self, interval: int):
+        """Set how often to flush data for SWMR readers.
+
+        Parameters
+        ----------
+        interval: int
+            0 = flush only at end, N = every N writes
+        """
+        self._flush_interval = interval
+        self._write_count = 0
+
+    def tick_flush(self):
+        """Increment the write counter and flush if the interval is reached.
+
+        No-op if SWMR is not active or flush interval is 0.
+        To be called by data savers after each logical data write.
+        """
+        if not self.is_swmr_active or self._flush_interval <= 0:
+            return
+        self._write_count += 1
+        if self._write_count % self._flush_interval == 0:
+            self.flush()
+
     @property
     def raw_group(self):
         return self._raw_group
@@ -92,7 +118,7 @@ class H5SaverLowLevel(H5Backend):
         return self._h5file
 
     def init_file(self, file_name: Path, raw_group_name='RawData', new_file=False,
-                  metadata: dict = None):
+                  metadata: dict = None, swmr_mode: bool = False):
         """Initializes a new h5 file.
 
         Parameters
@@ -105,6 +131,8 @@ class H5SaverLowLevel(H5Backend):
             If True create a new file, otherwise append to a potential existing one
         metadata: dict
             A dictionary to be saved as attributes
+        swmr_mode: bool
+            If True, prepare the file for SWMR (h5py backend only)
 
         Returns
         -------
@@ -116,14 +144,27 @@ class H5SaverLowLevel(H5Backend):
         if file_name is not None and isinstance(file_name, Path):
             self.h5_file_name = file_name.stem + ".h5"
             self.h5_file_path = file_name.parent
-            if not self.h5_file_path.joinpath(self.h5_file_name).is_file():
+            fullpath = self.h5_file_path.joinpath(self.h5_file_name)
+            if not fullpath.is_file():
                 new_file = True
+            elif swmr_mode and not new_file and self.is_swmr_capable:
+                # SWMR requires the file to have been created with libver='latest'
+                # (superblock v3+). Check for the marker attribute.
+                try:
+                    with self.h5_library.File(str(fullpath), 'r') as tmp:
+                        if not tmp.attrs.get('swmr_compatible', False):
+                            logger.info('Existing file is not SWMR-compatible, '
+                                        'creating a new file')
+                            new_file = True
+                except Exception:
+                    new_file = True
 
         else:
             return
 
         self.close_file()
-        self.open_file(self.h5_file_path.joinpath(self.h5_file_name), 'w' if new_file else 'a', title='PyMoDAQ file')
+        self.open_file(self.h5_file_path.joinpath(self.h5_file_name), 'w' if new_file else 'a',
+                       title='PyMoDAQ file', swmr_mode=swmr_mode)
 
         self._raw_group = self.get_set_group(self.root(), raw_group_name, title='Data from PyMoDAQ modules')
         self.get_set_logger(self._raw_group)
@@ -402,7 +443,7 @@ class H5SaverLowLevel(H5Backend):
                           group_type=GroupType.scan):
         """Add a new group of type given by the input argument group_type
 
-        At creation adds the attributes description and scan_done to be used elsewhere
+        At creation adds the attributes description to be used elsewhere
 
         See Also
         -------
@@ -410,7 +451,7 @@ class H5SaverLowLevel(H5Backend):
         """
         if metadata is None:
             metadata = {}
-        metadata.update(dict(description='', scan_done=False))
+        metadata.update(dict(description=''))
         group = self.add_incremental_group(group_type, where, title, settings_as_xml, metadata)
         return group
 
@@ -421,7 +462,7 @@ class H5SaverLowLevel(H5Backend):
         """
         if metadata is None:
             metadata = {}
-        metadata.update(dict(description='', scan_done=False))
+        metadata.update(dict(description=''))
         group = self.add_generic_group(where, title, settings_as_xml, metadata, group_type=GroupType.scan)
         return group
 

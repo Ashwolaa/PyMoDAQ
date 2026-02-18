@@ -43,6 +43,7 @@ names = [
     'motion_play',
     'moving',
     'not_started',
+    'pause_circle',
     'plug_connect',
     'refresh',
     'remove',
