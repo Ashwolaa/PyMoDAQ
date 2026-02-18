@@ -152,8 +152,6 @@ class DAQ_Viewer(ParameterControlModule):
                                           module_saving.DetectorTimeSaver,
                                           module_saving.DetectorExtendedSaver] = None
         self._h5saver_continuous: Optional[H5Saver] = None
-        self._ind_continuous_grab = 0
-
         self.settings.child('main_settings', 'DAQ_type').setValue(self._detector.module_name)
         self.settings.child('main_settings', 'detector_type').setValue(self._detector.daq_type)
         for hidden_param in ('custom_name',
@@ -241,6 +239,12 @@ class DAQ_Viewer(ParameterControlModule):
             self.take_bkg()
         elif cmd.command == UiToMainViewer.DO_BKG:
             self.do_bkg = cmd.attribute
+        elif cmd.command == UiToMainViewer.NAVERAGE:
+            self.settings.child('main_settings', 'Naverage').setValue(cmd.attribute)
+        elif cmd.command == UiToMainViewer.ACQ_MODE:
+            self.settings.child('main_settings', 'acq_mode').setValue(cmd.attribute)
+        elif cmd.command == UiToMainViewer.SHOW_AVERAGING:
+            self.settings.child('main_settings', 'show_averaging').setValue(cmd.attribute)
         elif cmd.command == UiToMainViewer.VIEWERS_CHANGED:
             self._viewer_types: List[ViewersEnum] = cmd.attribute['viewer_types']
             self.viewers = cmd.attribute['viewers']
@@ -779,18 +783,9 @@ class DAQ_Viewer(ParameterControlModule):
             if self.ui is not None:
                 self.ui.data_ready = True
 
-            if self.settings['main_settings', 'live_averaging']:
-                self.settings.child('main_settings', 'N_live_averaging').setValue(self._ind_continuous_grab)
-                _current_data = dte.deepcopy()
-
-                self._ind_continuous_grab += 1
-                if self._ind_continuous_grab > 1:
-                    self._data_to_save_export = \
-                        _current_data.average(self._data_to_save_export, self._ind_continuous_grab)
-            else:
-                for dwa in dte:
-                    dwa.origin = self._title
-                self._data_to_save_export = DataToExport(self._title, control_module='DAQ_Viewer', data=dte.data)
+            for dwa in dte:
+                dwa.origin = self._title
+            self._data_to_save_export = DataToExport(self._title, control_module='DAQ_Viewer', data=dte.data)
 
             if self._take_bkg:
                 self._bkg = self._data_to_save_export.deepcopy()
@@ -842,6 +837,8 @@ class DAQ_Viewer(ParameterControlModule):
         if self.ui is not None:
             if self.ui.viewer_types != self._viewer_types:
                 self.ui.update_viewers(self._viewer_types)
+                for ind, dwa in enumerate(dte):
+                    self.viewer_docks[ind].setTitle(self._title + ' ' + dwa.name)
 
     def set_data_to_viewers(self, dte: DataToExport, temp=False):
         """Process data dimensionality and send appropriate data to their data viewers
@@ -860,7 +857,6 @@ class DAQ_Viewer(ParameterControlModule):
             if ('do_plot' not in dwa.extra_attributes) or \
                     ('do_plot' in dwa.extra_attributes and dwa.do_plot):
                 self.viewers[ind].title = dwa.name
-                self.viewer_docks[ind].setTitle(self._title + ' ' + dwa.name)
 
                 if temp:
                     self.viewers[ind].show_data_temp(dwa)
@@ -882,19 +878,18 @@ class DAQ_Viewer(ParameterControlModule):
             self.settings.child('saver_settings', 'do_save').setValue(False)
             self.settings.child('main_settings', 'axes').show(param.value() == 'DAQ2D')
 
-        elif param.name() == 'show_averaging':
-            self.settings.child('main_settings', 'live_averaging').setValue(False)
-            self._update_settings_signal.emit(edict(path=path, param=param, change='value'))
+        elif param.name() == 'Naverage':
+            if self.ui is not None:
+                self.ui.set_naverage(param.value())
 
-        elif param.name() == 'live_averaging':
-            self.settings.child('main_settings', 'show_averaging').setValue(False)
-            if param.value():
-                self.settings.child('main_settings', 'N_live_averaging').show()
-                self._ind_continuous_grab = 0
-                self.settings.child('main_settings', 'N_live_averaging').setValue(0)
-            else:
-                self.settings.child('main_settings', 'N_live_averaging').hide()
-            #self._update_settings_signal.emit(edict(path=path, param=param, change='value'))
+        elif param.name() == 'acq_mode':
+            if self.ui is not None:
+                self.ui.set_acq_mode(param.value())
+
+        elif param.name() == 'show_averaging':
+            self._update_settings_signal.emit(edict(path=path, param=param, change='value'))
+            if self.ui is not None:
+                self.ui.set_show_averaging(param.value())
 
         elif param.name() in putils.iter_children(self.settings.child('main_settings', 'axes'), []):
             if self.daq_type.name == "DAQ2D":
@@ -1025,6 +1020,11 @@ class DAQ_Viewer(ParameterControlModule):
             self.update_status("detector initialized: " + str(status.attribute['initialized']))
             if self.ui is not None:
                 self.ui.detector_init = status.attribute['initialized']
+                if status.attribute['initialized']:
+                    # Sync toolbar widgets with current settings (e.g. loaded from preset)
+                    self.ui.set_naverage(self.settings['main_settings', 'Naverage'])
+                    self.ui.set_acq_mode(self.settings['main_settings', 'acq_mode'])
+                    self.ui.set_show_averaging(self.settings['main_settings', 'show_averaging'])
             if status.attribute['initialized']:
                 self.controller = status.attribute['controller']
                 self._initialized_state = True
@@ -1038,6 +1038,12 @@ class DAQ_Viewer(ParameterControlModule):
 
         elif status.command == ThreadStatusViewer.GRAB_STOPPED:
             self.grab_status.emit(False)
+            if self.ui is not None:
+                self.ui.set_acq_progress(0, 0)  # hide progress label when grab stops
+
+        elif status.command == ThreadStatusViewer.ACQ_PROGRESS:
+            if self.ui is not None:
+                self.ui.set_acq_progress(status.attribute['current'], status.attribute['total'])
 
         elif status.command == ThreadStatusViewer.INI_LCD:
             if self._lcd is not None:
@@ -1134,6 +1140,7 @@ class DAQ_Detector(QObject):
         self.average_done = False
         self.hardware_averaging = False
         self.show_averaging = False
+        self.acq_mode = 'Average'
         self.wait_time = settings_parameter['main_settings', 'wait_time']
         self.daq_type = detector.daq_type
 
@@ -1290,8 +1297,13 @@ class DAQ_Detector(QObject):
             self.ind_average += 1
             if self.ind_average == 1:
                 self.datas = data.deepcopy()
-            else:
+            elif self.acq_mode == 'Sum':
+                self.datas = self.datas + data
+            else:  # Average
                 self.datas = data.average(self.datas, self.ind_average)
+
+            self.status_sig.emit(ThreadCommand(ThreadStatusViewer.ACQ_PROGRESS,
+                                               {'current': self.ind_average, 'total': self.Naverage}))
 
             if self.show_averaging:
                 self.emit_temp_data(self.datas)

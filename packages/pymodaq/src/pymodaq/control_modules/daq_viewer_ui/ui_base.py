@@ -11,7 +11,7 @@ import sys
 
 from qtpy import QtWidgets, QtGui, QtCore
 from qtpy.QtCore import Signal
-from qtpy.QtWidgets import QVBoxLayout,  QWidget, QComboBox
+from qtpy.QtWidgets import QVBoxLayout, QWidget, QComboBox, QSpinBox, QLabel
 
 import qt_themes
 
@@ -148,6 +148,31 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.add_action('grab', 'Grab', ActionIconNames.GRAB, "Grab data from the detector", checkable=True,
                         icon_checked=ActionIconNames.GRAB_STOP,
                         icon_checked_color=self.get_theme().green)
+        self.toolbar.addSeparator()
+        # --- Accumulation controls ---
+        self._naverage_sb = QSpinBox()
+        self._naverage_sb.setMinimum(1)
+        self._naverage_sb.setValue(1)
+        self._naverage_sb.setFixedWidth(55)
+        self._naverage_sb.setToolTip('Number of acquisitions to accumulate')
+        self.add_widget('naverage', self._naverage_sb)
+
+        self._acq_mode_cb = QComboBox()
+        self._acq_mode_cb.addItems(['Average', 'Sum'])
+        self._acq_mode_cb.setFixedWidth(80)
+        self._acq_mode_cb.setToolTip('Accumulation mode: Average or Sum')
+        self.add_widget('acq_mode', self._acq_mode_cb)
+
+        self.add_action('show_averaging', 'Show steps', 'show_chart',
+                        tip='Show each accumulation step as it builds up',
+                        checkable=True, icon_checked_color=self.get_theme().green)
+
+        self._acq_progress_label = QLabel('')
+        self._acq_progress_label.setVisible(False)
+        self._acq_progress_label.setToolTip('Accumulation progress (current / total)')
+        self.add_widget('acq_progress', self._acq_progress_label)
+        # --- End accumulation controls ---
+        self.toolbar.addSeparator()
         self.add_action('show_graphs', 'ShowGraphs', 'bid_landscape', 'Show/Hide the Graphs Area',
                         checkable=True, icon_checked='bid_landscape_disabled',
                         icon_color=self.get_theme().green, icon_checked_color=self.get_theme().red)
@@ -174,6 +199,13 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.connect_action('background_snap',
                             lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.TAKE_BKG)))
         self.connect_action('show_graphs', lambda checked: self.show_graphs(not checked))
+
+        # Accumulation controls
+        self._naverage_sb.valueChanged.connect(
+            lambda n: self.command_sig.emit(ThreadCommand(UiToMainViewer.NAVERAGE, n)))
+        self._acq_mode_cb.currentTextChanged.connect(
+            lambda mode: self.command_sig.emit(ThreadCommand(UiToMainViewer.ACQ_MODE, mode)))
+        self.connect_action('show_averaging', self._show_averaging_toggled)
 
     def show_graphs(self, show: bool = True):
         self.parent.setVisible(show)
@@ -222,7 +254,8 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         """Slot from the *grab* action"""
         self.command_sig.emit(ThreadCommand(UiToMainViewer.GRAB, attribute=self.is_action_checked('grab')))
         self.enable_actions(not self.is_action_checked('grab'),
-                            all_except=('grab', 'selector', 'show_settings', 'show_graphs'))
+                            all_except=('grab', 'selector', 'show_settings', 'show_graphs',
+                                        'show_averaging', 'acq_progress'))
 
         if not self.config('pymodaq', 'viewer', 'allow_settings_edition'):
             self._settings_widget.setEnabled(not self.is_action_checked('grab'))
@@ -282,9 +315,50 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
     @detector_init.setter
     def detector_init(self, status):
         self._ini_state = status
-        self.enable_actions(status, all_except=('ini_detector', 'selector', 'show_settings', 'show_graphs'))
+        self.enable_actions(status, all_except=('ini_detector', 'selector', 'show_settings', 'show_graphs',
+                                                'acq_progress'))
         self.set_action_enabled('selector', not status)
         self.update_init_icon(status, action_name='ini_detector')
+
+    def _show_averaging_toggled(self, checked: bool):
+        self.command_sig.emit(ThreadCommand(UiToMainViewer.SHOW_AVERAGING, checked))
+
+    def set_acq_progress(self, current: int, total: int):
+        """Update the accumulation progress label.
+
+        Parameters
+        ----------
+        current: int
+            Current accumulation step (1-based).
+        total: int
+            Total number of steps. Pass 0 to indicate live/unlimited mode.
+        """
+        if total <= 1 and current == 0:
+            self._acq_progress_label.setVisible(False)
+        else:
+            total_str = str(total) if total > 0 else '∞'
+            self._acq_progress_label.setText(f'{current}/{total_str}')
+            self._acq_progress_label.setVisible(True)
+
+    def set_naverage(self, n: int):
+        """Update the N acquisitions spinbox without emitting a command (settings→UI direction)."""
+        self._naverage_sb.blockSignals(True)
+        self._naverage_sb.setValue(n)
+        self._naverage_sb.blockSignals(False)
+        if n <= 1:
+            self.set_acq_progress(0, 0)  # hide progress when N=1
+
+    def set_acq_mode(self, mode: str):
+        """Update the acq mode combobox without emitting a command (settings→UI direction)."""
+        self._acq_mode_cb.blockSignals(True)
+        idx = self._acq_mode_cb.findText(mode)
+        if idx >= 0:
+            self._acq_mode_cb.setCurrentIndex(idx)
+        self._acq_mode_cb.blockSignals(False)
+
+    def set_show_averaging(self, checked: bool):
+        """Update the show_averaging action check state (settings→UI direction)."""
+        self.set_action_checked('show_averaging', checked)
 
     def enable_actions(self, status=True, all_except=()):
         for action in self.actions_names:

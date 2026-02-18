@@ -54,6 +54,7 @@ class ThreadStatusViewer(StrEnum):
     LCD = 'lcd'
     STOP = 'stop'
     UPDATE_CHANNELS = 'update_channels'
+    ACQ_PROGRESS = 'acq_progress'
 
 
 
@@ -134,3 +135,7 @@ class UiToMainViewer(StrEnum):
 
     DO_BKG = 'do_bkg'
     TAKE_BKG = 'take_bkg'
+
+    NAVERAGE = 'naverage'
+    ACQ_MODE = 'acq_mode'
+    SHOW_AVERAGING = 'show_averaging'
