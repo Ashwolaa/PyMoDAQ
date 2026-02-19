@@ -155,7 +155,7 @@ class ItemSelect(ContextMenuListWidget):
             if value not in allitems_text:  # Test if object already exists
                 item = QtWidgets.QListWidgetItem(value) # Create object
                 if self.hasCheckbox:  # Add checkbox if required
-                    item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)      
+                    item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)      
                     self.select_item(item, doSelect=False)
                     # Make sure item is not selected (checkbox not appearing somehow without)
                 self.addItem(item)  # Add object to widget
@@ -194,9 +194,9 @@ class ItemSelectParameterItem(WidgetParameterItem):
 
             
         if 'dragdrop' in opts and opts['dragdrop']:        
-            w.itemselect.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
+            w.itemselect.setDragDropMode(QtWidgets.QAbstractItemView.DragDropMode.InternalMove)
 
-        w.itemselect.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        w.itemselect.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
 
         # w.itemselect.setMinimumHeight(opts.get('min_height', 0))
         # w.itemselect.setMaximumHeight(opts.get('height', 70))
@@ -226,7 +226,7 @@ class ItemSelectParameterItem(WidgetParameterItem):
         """
 
         text, ok = QtWidgets.QInputDialog.getText(None, "Enter a value to add to the parameter",
-                                                  "String value:", QtWidgets.QLineEdit.Normal)
+                                                  "String value:", QtWidgets.QLineEdit.EchoMode.Normal)
         if text in self.param.value()['all_items']:
             print('Entry already exists, please use a different name.')
             return
