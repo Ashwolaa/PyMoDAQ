@@ -263,7 +263,7 @@ class ParameterManager:
         )  # create a Parameter
         # object containing the settings defined in the preamble
         self._settings_tree.tree.header().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeToContents
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
         )
 
     @property
