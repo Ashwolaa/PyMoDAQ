@@ -1983,3 +1983,254 @@ class TestDeepCopyBugFix:
 
         # Should not emit (comparison works correctly with deep copy)
         assert len(changes) == 0
+
+
+class TestValueSyncBindParameter:
+    """Test ValueSync.bind_parameter() — single-parameter binding."""
+
+    def test_basic_sync_to_param(self, qtbot):
+        """sync value change propagates to parameter."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=1)
+        sync.bind_parameter(param)
+
+        sync.value = 5
+        assert param.value() == 5
+
+    def test_basic_param_to_sync(self, qtbot):
+        """Parameter value change propagates to sync."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=1)
+        sync.bind_parameter(param)
+
+        param.setValue(10)
+        assert sync.value == 10
+
+    def test_bidirectional(self, qtbot):
+        """Changes flow both ways without getting stuck."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=1)
+        sync.bind_parameter(param)
+
+        param.setValue(3)
+        assert sync.value == 3
+
+        sync.value = 7
+        assert param.value() == 7
+
+        param.setValue(2)
+        assert sync.value == 2
+
+    def test_no_feedback_loop(self, qtbot):
+        """Changing param or sync does not trigger more than one emission."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=1)
+        sync.bind_parameter(param)
+
+        emissions = []
+        sync.value_changed.connect(lambda v: emissions.append(v))
+
+        sync.value = 42
+        # Exactly one emission from the sync change; no echo from the param
+        assert len(emissions) == 1
+        assert emissions[0] == 42
+
+    def test_init_from_sync(self, qtbot):
+        """Default init_from='sync': param is updated to match sync's value."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=99)
+        sync.bind_parameter(param, init_from='sync')
+
+        assert param.value() == 99
+
+    def test_init_from_widget(self, qtbot):
+        """init_from='widget': sync is updated to match param's current value."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 7}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=1)
+        sync.bind_parameter(param, init_from='widget')
+
+        assert sync.value == 7
+
+    def test_widget_and_param_together(self, qtbot):
+        """Spinbox ↔ ValueSync ↔ Parameter all stay in sync."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        spinbox = QSpinBox()
+        spinbox.setRange(1, 100)
+
+        sync = ValueSync(initial_value=1)
+        sync.bind(spinbox, signal=spinbox.valueChanged,
+                  getter=spinbox.value, setter=spinbox.setValue)
+        sync.bind_parameter(param)
+
+        # spinbox → sync → param
+        spinbox.setValue(4)
+        assert sync.value == 4
+        assert param.value() == 4
+
+        # param → sync → spinbox
+        param.setValue(8)
+        assert sync.value == 8
+        assert spinbox.value() == 8
+
+        # sync → both
+        sync.value = 15
+        assert spinbox.value() == 15
+        assert param.value() == 15
+
+    def test_unbind_param(self, qtbot):
+        """After unbind, changes no longer propagate."""
+        from pymodaq_gui.parameter import Parameter
+
+        params = [{'title': 'N:', 'name': 'naverage', 'type': 'int', 'value': 1}]
+        settings = Parameter.create(name='settings', type='group', children=params)
+        param = settings.child('naverage')
+
+        sync = ValueSync(initial_value=1)
+        sync.bind_parameter(param)
+
+        sync.unbind(param)
+
+        sync.value = 50
+        assert param.value() == 1  # unchanged
+
+        param.setValue(99)
+        assert sync.value == 50  # unchanged
+
+
+class TestQActionBinding:
+    """Test that QAction (QObject subclass) can be bound like any widget."""
+
+    def test_bind_checkable_action(self, qtbot):
+        """A checkable QAction syncs its checked state bidirectionally."""
+        from qtpy.QtWidgets import QAction
+
+        action = QAction()
+        action.setCheckable(True)
+        action.setChecked(False)
+
+        sync = ValueSync(initial_value=False)
+        sync.bind(
+            action,
+            signal=action.toggled,
+            getter=action.isChecked,
+            setter=action.setChecked,
+            init_from='sync',
+        )
+
+        # sync → action
+        sync.value = True
+        assert action.isChecked() is True
+
+        # action → sync
+        action.setChecked(False)
+        assert sync.value is False
+
+    def test_action_no_feedback_loop(self, qtbot):
+        """Toggling a QAction triggers exactly one sync emission."""
+        from qtpy.QtWidgets import QAction
+
+        action = QAction()
+        action.setCheckable(True)
+        action.setChecked(False)
+
+        sync = ValueSync(initial_value=False)
+        sync.bind(action, signal=action.toggled,
+                  getter=action.isChecked, setter=action.setChecked)
+
+        emissions = []
+        sync.value_changed.connect(lambda v: emissions.append(v))
+
+        action.setChecked(True)
+        assert len(emissions) == 1
+        assert emissions[0] is True
+
+    def test_action_synced_with_spinbox(self, qtbot):
+        """QAction and QSpinBox can share the same DictSync."""
+        from qtpy.QtWidgets import QAction
+
+        action = QAction()
+        action.setCheckable(True)
+        action.setChecked(False)
+
+        spinbox = QSpinBox()
+        spinbox.setRange(1, 100)
+
+        sync = DictSync(initial_value={'enabled': False, 'count': 1})
+        sync.bind_dict({
+            'enabled': {
+                'widget': action,
+                'signal': action.toggled,
+                'getter': action.isChecked,
+                'setter': action.setChecked,
+            },
+            'count': {
+                'widget': spinbox,
+                'signal': spinbox.valueChanged,
+                'getter': spinbox.value,
+                'setter': spinbox.setValue,
+            },
+        })
+
+        sync.update_key('enabled', True)
+        assert action.isChecked() is True
+
+        sync.update_key('count', 5)
+        assert spinbox.value() == 5
+
+    def test_action_via_property(self, qtbot):
+        """QAction 'checked' Qt property can be used for auto-detection."""
+        from qtpy.QtWidgets import QAction
+
+        action = QAction()
+        action.setCheckable(True)
+        action.setChecked(False)
+
+        # Use bind_dict with 'property' key — auto-detects 'toggled' signal
+        sync = DictSync(initial_value={'show': False})
+        sync.bind_dict({
+            'show': {
+                'widget': action,
+                'property': 'checked',
+            },
+        })
+
+        sync.update_key('show', True)
+        assert action.isChecked() is True
+
+        action.setChecked(False)
+        assert sync.value['show'] is False
