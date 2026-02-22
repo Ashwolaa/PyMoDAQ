@@ -11,7 +11,7 @@ Because the tree operates **directly** on the original Parameter object — not
 a copy — all edits are immediately live in the canonical settings state.  No
 additional synchronisation (widget_sync, blockSignals, …) is required.
 
-The panel uses ``Qt.Tool | Qt.FramelessWindowHint``:
+The panel uses ``Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint``:
 
 * stays above the main window without appearing in the taskbar
 * persists while child dialogs (file browsers, colour pickers) are open,
@@ -85,13 +85,13 @@ class _PanelTitleBar(QWidget):
     # ------------------------------------------------------------------
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._drag_pos = (
                 event.globalPos() - self.parent().frameGeometry().topLeft()
             )
 
     def mouseMoveEvent(self, event):
-        if self._drag_pos is not None and (event.buttons() & Qt.LeftButton):
+        if self._drag_pos is not None and (event.buttons() & Qt.MouseButton.LeftButton):
             self.parent().move(event.globalPos() - self._drag_pos)
 
     def mouseReleaseEvent(self, event):
@@ -124,9 +124,9 @@ class SettingsPanel(QFrame):
         title: str = '',
         min_width: int = 260,
     ):
-        super().__init__(None, Qt.Tool | Qt.FramelessWindowHint)
-        self.setFrameShape(QFrame.StyledPanel)
-        self.setFrameShadow(QFrame.Raised)
+        super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFrameShadow(QFrame.Shadow.Raised)
         self.setMinimumWidth(min_width)
 
         layout = QVBoxLayout(self)
@@ -144,7 +144,7 @@ class SettingsPanel(QFrame):
         param.setOpts(expanded=True)
         self._tree.setParameters(param, showTop=False)
         # self._tree.setMinimumHeight(150)
-        self._tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._tree.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self._tree)
 
     # ------------------------------------------------------------------
@@ -208,7 +208,7 @@ class ToolbarPopupTree(QToolButton):
         self._panel.closed.connect(lambda: self.setChecked(False))
 
         self.setCheckable(True)
-        self.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
         if title:
             self.setText(f'{title} ▾')
