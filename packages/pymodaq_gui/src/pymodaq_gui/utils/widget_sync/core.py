@@ -8,9 +8,11 @@ from __future__ import annotations
 import copy
 
 from qtpy.QtCore import QObject, Signal
-from qtpy.QtWidgets import QWidget
 from enum import Enum
-from typing import Callable, Any, Iterator, Type, Literal
+from typing import TYPE_CHECKING, Callable, Any, Iterator, Type, Literal
+
+if TYPE_CHECKING:
+    from qtpy.QtWidgets import QWidget  # kept for type-checker users only
 from contextlib import contextmanager
 from weakref import ref, ReferenceType
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -212,7 +214,7 @@ class BaseWidgetSync(QObject):
 
     def _create_connection_info(
         self,
-        widget: QWidget,
+        widget: QObject,
         widget_ref: ReferenceType,
         signal: Signal | None = None,
         getter: WidgetGetter | None = None,
@@ -232,7 +234,7 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget
+        widget : QObject
             The widget being connected
         widget_ref : ReferenceType
             Weak reference to the widget
@@ -354,7 +356,7 @@ class BaseWidgetSync(QObject):
 
     def _setup_widget_destruction_callback(
         self,
-        widget: QWidget,
+        widget: QObject,
         connection_keys: list[tuple[int, str | None]]
     ) -> None:
         """Setup callback for widget destruction."""
@@ -382,7 +384,7 @@ class BaseWidgetSync(QObject):
         """
         self.unbind(widget_id)
 
-    def unbind(self, widget: QWidget | int) -> None:
+    def unbind(self, widget: QObject | int) -> None:
         """
         Unbind a widget by reference or ID.
 
@@ -390,8 +392,8 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget | int
-            The widget to unbind, or its ID
+        widget : QObject | int
+            The widget, action, or its ID to unbind
         """
         # Handle both widget object and widget_id
         widget_id = widget if isinstance(widget, int) else id(widget)
@@ -410,7 +412,7 @@ class BaseWidgetSync(QObject):
 
     # Widget Control Methods
 
-    def enable(self, widget: QWidget | int) -> None:
+    def enable(self, widget: QObject | int) -> None:
         """
         Enable a widget's connections.
 
@@ -419,8 +421,8 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget | int
-            The widget to enable, or its ID
+        widget : QObject | int
+            The widget or action to enable, or its ID
 
         Raises
         ------
@@ -439,7 +441,7 @@ class BaseWidgetSync(QObject):
             if conn is not None:
                 conn['enabled'] = True
 
-    def disable(self, widget: QWidget | int) -> None:
+    def disable(self, widget: QObject | int) -> None:
         """
         Disable a widget's connections temporarily.
 
@@ -456,8 +458,8 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget | int
-            The widget to disable, or its ID
+        widget : QObject | int
+            The widget or action to disable, or its ID
 
         Raises
         ------
@@ -569,7 +571,7 @@ class BaseWidgetSync(QObject):
         self,
         init_from: InitFrom,
         mode: SyncMode,
-        widget: QWidget,
+        widget: QObject,
         getter: WidgetGetter | None,
         setter: WidgetSetter | None,
         property_key: str | None,
@@ -588,7 +590,7 @@ class BaseWidgetSync(QObject):
             Initialization source: 'sync' (widget←sync), 'widget' (sync←widget), or None (no init)
         mode : SyncMode
             Synchronization mode
-        widget : QWidget
+        widget : QObject
             Widget being initialized
         getter : WidgetGetter, optional
             Function to get value from widget
@@ -678,7 +680,7 @@ class BaseWidgetSync(QObject):
                 # Always clear sender
                 self._sender_widget_id = None
 
-    def is_enabled(self, widget: QWidget | int) -> bool:
+    def is_enabled(self, widget: QObject | int) -> bool:
         """
         Check if a widget's connections are enabled.
 
@@ -686,8 +688,8 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget | int
-            The widget to check, or its ID
+        widget : QObject | int
+            The widget or action to check, or its ID
 
         Returns
         -------
@@ -713,7 +715,7 @@ class BaseWidgetSync(QObject):
 
     # Widget Binding Methods
 
-    def bind(self, widget: QWidget, signal: Signal | None = None,
+    def bind(self, widget: QObject, signal: Signal | None = None,
              getter: WidgetGetter | None = None, setter: WidgetSetter | None = None,
              mode: SyncMode | None = None,
              to_sync_transform: ValueTransform | None = None,
@@ -732,7 +734,7 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget
+        widget : QObject
             The widget to connect
         signal : Signal, optional
             The signal to listen to (required for TO_SYNC/BIDIRECTIONAL modes)
@@ -839,7 +841,7 @@ class BaseWidgetSync(QObject):
     # Callback Creation Methods
 
     @contextmanager
-    def _block_signals(self, widget: QWidget) -> Iterator[None]:
+    def _block_signals(self, widget: QObject) -> Iterator[None]:
         """
         Context manager for exception-safe signal blocking.
 
@@ -847,7 +849,7 @@ class BaseWidgetSync(QObject):
 
         Parameters
         ----------
-        widget : QWidget
+        widget : QObject
             The widget whose signals to block
 
         Yields
@@ -978,7 +980,7 @@ class BaseWidgetSync(QObject):
     # Properties
 
     @property
-    def connected_widgets(self) -> list[QWidget]:
+    def connected_widgets(self) -> list[QObject]:
         """
         Get list of currently connected widgets.
 
@@ -987,8 +989,8 @@ class BaseWidgetSync(QObject):
 
         Returns
         -------
-        list[QWidget]
-            List of active widget references (unique widgets)
+        list[QObject]
+            List of active widget/action references (unique objects)
 
         Example
         -------
@@ -1147,7 +1149,7 @@ class ValueSync(BaseWidgetSync):
         """Return unwrapped value for ValueSync bind() initialization."""
         return self._value.get("__value__")
 
-    def add(self, widget: QWidget, mode: SyncMode = SyncMode.BIDIRECTIONAL,
+    def add(self, widget: QObject, mode: SyncMode = SyncMode.BIDIRECTIONAL,
             match: str = 'type',
             to_sync_transform: ValueTransform | None = None,
             from_sync_transform: ValueTransform | None = None,
@@ -1159,7 +1161,7 @@ class ValueSync(BaseWidgetSync):
 
         Parameters
         ----------
-        widget : QWidget
+        widget : QObject
             Widget to add
         mode : SyncMode, optional
             Sync mode (default: BIDIRECTIONAL)
@@ -1249,6 +1251,110 @@ class ValueSync(BaseWidgetSync):
         # Bind the widget
         self.bind(widget, signal, getter, setter, mode,
                   to_sync_transform, from_sync_transform, init_from)
+
+    def bind_parameter(self, param, init_from: InitFrom = 'sync') -> None:
+        """
+        Bind a pyqtgraph Parameter to this ValueSync.
+
+        Use this method instead of bind() for pyqtgraph Parameters.
+        bind() uses blockSignals() which prevents parameter tree widgets from
+        updating correctly. This method uses callback disconnection instead.
+
+        Parameters
+        ----------
+        param : Parameter
+            The pyqtgraph Parameter to bind. Uses sigValueChanged, value(),
+            and setValue() automatically.
+        init_from : InitFrom, optional
+            Initialization source: 'sync' (default — param gets sync's value),
+            'widget' (sync gets param's current value), or None (no init).
+
+        Notes
+        -----
+        Parameter signals emit (param, value) pairs, which is handled
+        automatically. Feedback loop prevention uses callback disconnection
+        (not blockSignals) to allow parameter tree widgets to update correctly.
+
+        Example
+        -------
+        >>> sync = ValueSync(initial_value=5)
+        >>> sync.bind(spinbox, signal=spinbox.valueChanged,
+        ...           getter=spinbox.value, setter=spinbox.setValue)
+        >>> sync.bind_parameter(my_param)
+        >>> # Now spinbox ↔ sync ↔ my_param are all in sync
+        """
+        param_id = id(param)
+        param_ref = ref(param)
+        connection_key = (param_id, None)
+
+        getter = param.value
+        setter = param.setValue
+        signal = param.sigValueChanged
+
+        # Initialize value based on init_from
+        if init_from == 'sync' and self.value is not None:
+            if getter() != self.value:
+                setter(self.value)
+        elif init_from == 'widget':
+            self.set_value(getter(), emit=True)
+
+        # Shared callbacks dict for feedback loop prevention.
+        # Uses tuple keys (property_key, direction) to match the format
+        # expected by _disconnect_callbacks: key[1] == 'param_to_sync'.
+        param_callbacks: dict = {}
+
+        connection_info: ConnectionInfo = {
+            'widget_id': param_id,
+            'widget_ref': param_ref,
+            'widget_type': type(param).__name__,
+            'signal': signal,
+            'getter': getter,
+            'setter': setter,
+            'mode': SyncMode.BIDIRECTIONAL,
+            'to_sync_transform': None,
+            'from_sync_transform': None,
+            'property_key': None,
+            'property_name': None,
+            'signal_name': None,
+            'callbacks': [],
+            'enabled': True,
+            'param_callbacks': param_callbacks,
+        }
+
+        # param → sync: disconnect reverse callback while updating sync
+        def on_param_change(p, value):
+            actual_value = getter()
+            if actual_value != self.value:
+                reverse_cb = param_callbacks.get((None, 'sync_to_param'))
+                if reverse_cb:
+                    self.value_changed.disconnect(reverse_cb)
+                try:
+                    self.set_value(actual_value, emit=True)
+                finally:
+                    if reverse_cb:
+                        self.value_changed.connect(reverse_cb)
+
+        signal.connect(on_param_change)
+        param_callbacks[(None, 'param_to_sync')] = (signal, on_param_change)
+
+        # sync → param: disconnect forward callback while updating param
+        def on_sync_change(value):
+            if value != getter():
+                forward_cb_info = param_callbacks.get((None, 'param_to_sync'))
+                if forward_cb_info:
+                    forward_cb_info[0].disconnect(forward_cb_info[1])
+                try:
+                    setter(value)
+                finally:
+                    if forward_cb_info:
+                        forward_cb_info[0].connect(forward_cb_info[1])
+
+        self.value_changed.connect(on_sync_change)
+        param_callbacks[(None, 'sync_to_param')] = on_sync_change
+        connection_info['callbacks'].append(('sync', on_sync_change))
+
+        self._setup_widget_destruction_callback(param, [connection_key])
+        self._set_connection(param_id, None, connection_info)
 
     # Helper Methods
 
@@ -1448,7 +1554,7 @@ class DictSync(BaseWidgetSync):
         """Return full dict for DictSync bind() initialization."""
         return self._value
 
-    def _setup_property_binding(self, widget: QWidget, widget_ref: ReferenceType,
+    def _setup_property_binding(self, widget: QObject, widget_ref: ReferenceType,
                                 property_key: str, config: dict[str, Any],
                                 global_init_from: InitFrom = 'sync') -> dict:
         """
@@ -1543,7 +1649,7 @@ class DictSync(BaseWidgetSync):
 
         return connection_info
 
-    def bind_properties(self, widget: QWidget,
+    def bind_properties(self, widget: QObject,
                        property_map: dict[str, dict[str, Any]],
                        init_from: InitFrom = 'sync') -> None:
         """
@@ -1555,7 +1661,7 @@ class DictSync(BaseWidgetSync):
 
         Parameters
         ----------
-        widget : QWidget
+        widget : QObject
             The widget to bind (all properties control THIS widget)
         property_map : dict[str, dict]
             Mapping of dict keys to property configurations.
@@ -1807,7 +1913,7 @@ class DictSync(BaseWidgetSync):
             Each key maps to a dict that MUST include:
 
             **Required:**
-            - 'widget': QWidget - The widget for this property
+            - 'widget': QObject - The widget or QAction for this property
 
             **Simple syntax (recommended for Qt properties):**
             - 'property': str - Qt property name (auto-generates getter/setter)

@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any
 from weakref import ref
 
 if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
+    from qtpy.QtCore import QObject
+    from qtpy.QtWidgets import QWidget  # kept for backwards-compatible type hints
     from .core import WidgetSync, SyncMode
 
 
@@ -30,7 +31,7 @@ class WidgetSyncFactories:
 
     @classmethod
     def for_property(cls,
-                     widget: QWidget,
+                     widget: QObject,
                      property_name: str,
                      signal_name: str | None = None,
                      initial: Any = None,
@@ -44,7 +45,7 @@ class WidgetSyncFactories:
 
         Parameters
         ----------
-        widget : QWidget
+        widget : QObject
             The first widget to sync
         property_name : str
             Name of the Qt property (e.g., 'checked', 'value', 'text')
