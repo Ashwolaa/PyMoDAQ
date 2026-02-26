@@ -52,6 +52,29 @@ def replace_names_in_formula(formula: str):
     return formula_tmp, names
 
 
+def replace_names_in_formula_xr(formula: str, ctx_var: str = '_xr') -> Tuple[str, List[str]]:
+    """Like replace_names_in_formula but maps {name} → ctx_var["name"].
+
+    Use when the eval context provides an xarray dict instead of a DataToExport.
+    ``{some/path}`` becomes ``_xr["some/path"]`` which resolves to the
+    ``xr.Dataset`` stored under that key.
+    """
+    formula_tmp = formula[:]
+    names = []
+    while True:
+        m = data_name_regexp.search(formula_tmp)
+        if m is not None:
+            names.append(m.group())
+            key = m.group()[1:-1]  # strip { and }
+            formula_tmp = formula_tmp.replace(
+                formula_tmp[m.start(): m.end()],
+                f'{ctx_var}["{key}"]',
+            )
+        else:
+            break
+    return formula_tmp, names
+
+
 def parse_named_formulae(formulae: str) -> List[Tuple[str, str]]:
     """Parse 'name = expression' or bare 'expression' lines.
 

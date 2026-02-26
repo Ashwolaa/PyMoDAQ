@@ -6,7 +6,7 @@ import numpy as np  # must be importable in eval() scope
 from pymodaq.extensions.data_mixer.model import DataMixerModel
 from pymodaq.extensions.data_mixer.parser import (
     parse_named_formulae, extract_formula_output_names,
-    replace_names_in_formula)
+    replace_names_in_formula, replace_names_in_formula_xr)
 
 from pymodaq_data.h5modules.data_saving import DataLoader
 from pymodaq_data.h5modules.saving import H5SaverLowLevel
@@ -18,6 +18,8 @@ def _wrap_result(result, name: str) -> DataWithAxes:
     """Coerce any eval() return value to a named DataWithAxes.
 
     Handled types:
+      xr.Dataset             — convert via DataWithAxes.from_xarray(), rename
+      xr.DataArray           — promote to Dataset, convert, rename
       DataWithAxes           — rename in place and return
       np.ndarray             — wrap as single-array DataWithAxes
       tuple/list of ndarray  — np.gradient & similar return one array per axis;
@@ -26,6 +28,31 @@ def _wrap_result(result, name: str) -> DataWithAxes:
                                {name}.data[1] gives axis-1, etc.
       scalar (int/float/…)   — wrap as 1-element array
     """
+    try:
+        import xarray as xr
+        if isinstance(result, xr.Dataset):
+            # Dataset arithmetic (e.g. ds * 3) may reorder Dataset-level dims
+            # differently from the individual data-variable dim order, which
+            # breaks from_xarray's axis reconstruction.  Extracting the DataArray
+            # from single-variable Datasets avoids this: DataArray dims always
+            # follow the original variable's order.  Also drops inherited
+            # pymodaq_* attrs so from_xarray uses clean defaults.
+            if len(result.data_vars) == 1:
+                var_name = list(result.data_vars)[0]
+                da = result[var_name]
+                dwa = DataWithAxes.from_xarray(da.to_dataset(name=var_name))
+            else:
+                dwa = DataWithAxes.from_xarray(result.drop_attrs())
+            dwa.name = name
+            return dwa
+        if isinstance(result, xr.DataArray):
+            # DataArrays carry no pymodaq attrs; just promote to Dataset.
+            var_name = result.name or name
+            dwa = DataWithAxes.from_xarray(result.to_dataset(name=var_name))
+            dwa.name = name
+            return dwa
+    except ImportError:
+        pass
     if isinstance(result, DataWithAxes):
         result.name = name
         return result
@@ -38,7 +65,7 @@ def _wrap_result(result, name: str) -> DataWithAxes:
                             data=[np.array([float(result)])])
     raise TypeError(
         f'Formula returned {type(result).__name__!r} — expected a DataWithAxes, '
-        f'numpy array, tuple of arrays, or scalar.')
+        f'xarray Dataset/DataArray, numpy array, tuple of arrays, or scalar.')
 
 
 class FormulaDTE(DataToExport):
@@ -211,34 +238,97 @@ class DataMixerModelH5(DataMixerModel):
         if self._h5saver_low is None or not self._h5saver_low.isopen():
             return
         try:
+            import xarray as xr
+            _xarray_available = True
+        except ImportError:
+            _xarray_available = False
+
+        try:
             loader = DataLoader(self._h5saver_low)
             dte_from_h5 = loader.load_all('/')
 
             formulae = parse_named_formulae(self.settings['edit_formula'])
             dte_processed = DataToExport('Computed')
-            dte_combined = FormulaDTE('Combined')
-            for dwa in dte_from_h5.data:
-                dte_combined.append(dwa)
 
-            for name, formula in formulae:
-                try:
-                    dwa = self._compute_formula(formula, dte_combined, name)
-                    dte_processed.append(dwa)
+            if _xarray_available:
+                # Build xarray context dict keyed by full name (e.g. 'test/Mock2D_0').
+                # Each value is an xr.Dataset so formulas can use sel/isel/mean etc.
+                xr_ctx = {}
+                for full_name in dte_from_h5.get_full_names():
+                    dwa = dte_from_h5.get_data_from_full_name(full_name)
+                    xr_ctx[full_name] = dwa.to_xarray()
+
+                for name, formula in formulae:
+                    try:
+                        dwa = self._compute_formula_xr(formula, xr_ctx, xr, name)
+                        dte_processed.append(dwa)
+                    except Exception as e:
+                        logger.exception(f'Formula "{name}": {e}')
+            else:
+                # Fallback: DataWithAxes-based evaluation (no xarray installed)
+                dte_combined = FormulaDTE('Combined')
+                for dwa in dte_from_h5.data:
                     dte_combined.append(dwa)
-                except Exception as e:
-                    logger.exception(f'Formula "{name}": {e}')
+                for name, formula in formulae:
+                    try:
+                        dwa = self._compute_formula(formula, dte_combined, name)
+                        dte_processed.append(dwa)
+                        dte_combined.append(dwa)
+                    except Exception as e:
+                        logger.exception(f'Formula "{name}": {e}')
 
             self.data_mixer.dte_computed_signal.emit(dte_processed)
         except Exception as e:
             logger.exception(str(e))
 
-    def _compute_formula(self, formula: str, dte: DataToExport, name: str):
-        """Evaluate one formula line. np and dte are available in the eval scope.
+    def _compute_formula_xr(self, formula: str, xr_ctx: dict, xr, name: str) -> DataWithAxes:
+        """Evaluate one formula using an xarray context dict.
 
-        If the expression returns a plain numpy array (e.g. from np.gradient or
-        np.convolve called on {key}.data[0]) it is automatically wrapped in a
-        DataWithAxes so downstream code can always treat the result uniformly.
+        ``{some/name}`` in the formula resolves to ``xr_ctx["some/name"]``, which
+        is an ``xr.Dataset``.  The eval scope also exposes ``np`` and ``xr`` so
+        users can call ``np.sqrt(...)``, ``xr.concat(...)``, ``.mean('dim')``, etc.
+
+        The result (Dataset, DataArray, ndarray, scalar, or DataWithAxes) is
+        coerced to a DataWithAxes by ``_wrap_result``.
+
+        Cross-referencing: the xarray result is stored back into ``xr_ctx`` under
+        ``name`` so later formula lines can reference it via ``{name}``.
+        For DataArray results the data variable is named ``name`` so that
+        ``{name}["name"]`` works intuitively (no need to remember the original
+        channel label).  The raw xarray object is stored directly — never
+        round-tripped through DataWithAxes — to avoid spurious size/spread errors
+        caused by pymodaq metadata attrs inherited from the source Dataset.
         """
+        formula_to_eval, _ = replace_names_in_formula_xr(formula)
+        result = eval(formula_to_eval, {'np': np, 'xr': xr, '_xr': xr_ctx})
+        dwa = _wrap_result(result, name)
+
+        # Update xr_ctx so subsequent formulas can reference this result.
+        # Store the xarray object directly to skip the DWA→xarray round-trip:
+        # round-tripping can fail when pymodaq spread/nav attrs from the source
+        # dataset are inherited by the arithmetic result.
+        if isinstance(result, xr.DataArray):
+            # Name the data variable after the formula output so users write
+            # {name}["name"] consistently regardless of the original channel label.
+            xr_ctx[name] = result.to_dataset(name=name)
+        elif isinstance(result, xr.Dataset):
+            xr_ctx[name] = result
+        else:
+            # ndarray / scalar / DataWithAxes — strip pymodaq attrs before
+            # storing so we don't inherit spread/nav metadata that may no longer
+            # apply to the computed result.
+            try:
+                ds = dwa.to_xarray()
+                xr_ctx[name] = ds.assign_attrs(
+                    {k: v for k, v in ds.attrs.items()
+                     if not k.startswith('pymodaq_')})
+            except Exception:
+                pass  # cross-referencing this result won't be available
+
+        return dwa
+
+    def _compute_formula(self, formula: str, dte: DataToExport, name: str):
+        """Fallback: evaluate one formula using a DataToExport context (no xarray)."""
         formula_to_eval, _ = replace_names_in_formula(formula)
         result = eval(formula_to_eval)  # np and dte are in local scope
         return _wrap_result(result, name)
