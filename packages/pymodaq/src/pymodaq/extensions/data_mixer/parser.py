@@ -1,5 +1,5 @@
 import re
-from typing import List
+from typing import List, Tuple
 
 
 data_name_regexp = re.compile(r"({.*?})+")  # first occurrences of things between {}
@@ -50,4 +50,43 @@ def replace_names_in_formula(formula: str):
         else:
             break
     return formula_tmp, names
+
+
+def parse_named_formulae(formulae: str) -> List[Tuple[str, str]]:
+    """Parse 'name = expression' or bare 'expression' lines.
+
+    Returns list of (output_name, expression) tuples.
+    Lines starting with '#' and blank lines are skipped.
+    Lines without '=' or whose left side is not a valid identifier
+    get an auto-name like 'Formula_000'.
+    """
+    result = []
+    for i, line in enumerate(re.split(r'\n', formulae)):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' in line:
+            name, expr = line.split('=', 1)
+            name = name.strip()
+            if name.isidentifier():
+                result.append((name, expr.strip()))
+                continue
+        result.append((f'Formula_{i:03d}', line))
+    return result
+
+
+def extract_formula_output_names(formulae: str) -> List[str]:
+    """Return all identifiers defined on the left-hand side of '=' in formulae text.
+
+    Used for real-time autocomplete: as soon as the user writes 'myvar = ...',
+    'myvar' becomes available in the '{' autocomplete for subsequent lines.
+    """
+    names = []
+    for line in re.split(r'\n', formulae):
+        line = line.strip()
+        if '=' in line and not line.startswith('#'):
+            name = line.split('=', 1)[0].strip()
+            if name.isidentifier():
+                names.append(name)
+    return names
 
