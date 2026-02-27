@@ -1,14 +1,14 @@
 from qtpy.QtWidgets import (
     QWidget,
-    QCompleter,
     QLineEdit,
     QTextEdit,
     QPlainTextEdit,
     QStyledItemDelegate,
-    QListView,  # For word wrap
+    QListWidget,
+    QAbstractItemView,
 )
-from qtpy.QtCore import Qt, QRect
-from qtpy.QtGui import QStandardItemModel, QStandardItem, QTextCursor, QFontMetrics
+from qtpy.QtCore import Qt, QPoint
+from qtpy.QtGui import QTextCursor, QFontMetrics
 
 
 class PatternCompleter:
@@ -37,11 +37,9 @@ class PatternCompleter:
                 - max_width (int): Maximum popup width in pixels (default: 500)
                 - visual_indicator (bool): Enable visual indicator globally (default: False)
                 - case_sensitive (bool): Case sensitive completion (default: False)
-                - completion_mode (str): 'popup' or 'inline' (default: 'popup')
                 - auto_resize (bool): Auto-resize popup to content (default: True)
                 - word_wrap (bool): Enable word wrap in popup (default: False)
         """
-        # Initialize all attributes first
         self: QWidget  # Type hint for IDEs
         self.completers = {}
         self.active_pattern = None
@@ -55,10 +53,21 @@ class PatternCompleter:
             "max_width": kwargs.get("max_width", 500),
             "visual_indicator": kwargs.get("visual_indicator", False),
             "case_sensitive": kwargs.get("case_sensitive", False),
-            "completion_mode": kwargs.get("completion_mode", "popup"),
             "auto_resize": kwargs.get("auto_resize", True),
             "word_wrap": kwargs.get("word_wrap", False),
         }
+
+        # Single shared popup replaces per-pattern QCompleter instances
+        self._popup = QListWidget(self)
+        self._popup.setWindowFlags(Qt.WindowType.ToolTip)
+        self._popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._popup.setFocusProxy(self)
+        self._popup.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._popup.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._popup.itemClicked.connect(
+            lambda item: self._pattern_insert_completion(item.text())
+        )
+        self._popup.hide()
 
         # Connect to text changes
         if hasattr(self, "textChanged"):
@@ -73,76 +82,41 @@ class PatternCompleter:
 
         Args:
             pattern (str): Trigger string (e.g., '@', '#', '::')
-            completions (list): List of completion strings
+            completions (list | callable): Static list of completion strings, or a
+                callable ``(text_before_cursor: str, prefix: str) -> list[str]`` that
+                returns candidates dynamically on every keystroke.
             **kwargs: Per-pattern configuration (overrides global config)
                 - visual_indicator (bool): Show visual indicator for this pattern
                 - case_sensitive (bool): Case sensitive completion
                 - min_width (int): Minimum popup width
                 - max_width (int): Maximum popup width
-                - completion_mode (str): 'popup' or 'inline'
                 - auto_resize (bool): Auto-resize popup
                 - word_wrap (bool): Word wrap in popup
                 - padding (int): Extra padding for width calculation (default: 20)
+                - on_insert (callable): Custom insertion hook called instead of the
+                    default replacement logic.  Signature:
+                    ``(completion, text, trigger_pos, cursor_pos) -> (new_text, new_cursor_pos)``
         """
-        model = QStandardItemModel()
-        for item in completions:
-            model.appendRow(QStandardItem(item))
+        on_insert = kwargs.pop('on_insert', None)
 
-        completer = QCompleter(model, self)
-
-        # Apply configuration (pattern-specific overrides global)
         config = {**self.global_config, **kwargs}
 
-        case_sensitivity = (
-            Qt.CaseSensitivity.CaseSensitive
-            if config.get("case_sensitive", False)
-            else Qt.CaseSensitivity.CaseInsensitive
-        )
-        completer.setCaseSensitivity(case_sensitivity)
-
-        completion_mode_str = config.get("completion_mode", "popup")
-        if completion_mode_str == "inline":
-            completer.setCompletionMode(QCompleter.CompletionMode.InlineCompletion)
-        else:
-            completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-
-        completer.activated.connect(self._pattern_insert_completion)
-
-        # Configure popup
-        popup = completer.popup()
-        min_width = config.get("min_width", 150)
-        max_width = config.get("max_width", 500)
-        popup.setMinimumWidth(min_width)
-        popup.setMaximumWidth(max_width)
-
-        if isinstance(popup, QListView):
-            word_wrap = config.get("word_wrap", False)
-            popup.setWordWrap(word_wrap)
-            popup.setTextElideMode(
-                Qt.TextElideMode.ElideNone
-                if not word_wrap
-                else Qt.TextElideMode.ElideRight
-            )
-            popup.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            popup.setResizeMode(QListView.ResizeMode.Adjust)
-
         self.completers[pattern] = {
-            "completer": completer,
-            "model": model,
             "completions": completions,
+            "on_insert": on_insert,
             "config": config,
         }
 
     def update_completions(self, pattern, completions):
-        """Update completion list for a pattern"""
+        """Update completion list for a pattern.
+
+        ``completions`` may be a static list or a callable
+        ``(text_before_cursor, prefix) -> list[str]``.  The popup is not updated
+        until the next keystroke.
+        """
         if pattern not in self.completers:
             return
-
-        config = self.completers[pattern]
-        config["completions"] = completions
-        config["model"].clear()
-        for item in completions:
-            config["model"].appendRow(QStandardItem(item))
+        self.completers[pattern]["completions"] = completions
 
     def update_completer_config(self, pattern, **kwargs):
         """
@@ -150,45 +124,17 @@ class PatternCompleter:
 
         Args:
             pattern (str): The pattern to update
-            **kwargs: Configuration options to update
+            **kwargs: Configuration options to update.  ``on_insert`` is handled
+                separately and stored directly on the completer entry rather than
+                in the ``config`` sub-dict.
         """
         if pattern not in self.completers:
             return
 
-        config = self.completers[pattern]
-        config["config"].update(kwargs)
+        if 'on_insert' in kwargs:
+            self.completers[pattern]['on_insert'] = kwargs.pop('on_insert')
 
-        # Apply updates to completer
-        completer: QCompleter = config["completer"]
-
-        if "case_sensitive" in kwargs:
-            case_sensitivity = (
-                Qt.CaseSensitivity.CaseSensitive
-                if kwargs["case_sensitive"]
-                else Qt.CaseSensitivity.CaseInsensitive
-            )
-            completer.setCaseSensitivity(case_sensitivity)
-
-        if "completion_mode" in kwargs:
-            mode_str = kwargs["completion_mode"]
-            if mode_str == "inline":
-                completer.setCompletionMode(QCompleter.CompletionMode.InlineCompletion)
-            else:
-                completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-
-        # Update popup settings
-        if any(k in kwargs for k in ["min_width", "max_width", "word_wrap"]):
-            popup = completer.popup()
-
-            if "min_width" in kwargs:
-                popup.setMinimumWidth(kwargs["min_width"])
-            if "max_width" in kwargs:
-                popup.setMaximumWidth(kwargs["max_width"])
-            if "word_wrap" in kwargs:
-                from PyQt6.QtWidgets import QListView
-
-                if isinstance(popup, QListView):
-                    popup.setWordWrap(kwargs["word_wrap"])
+        self.completers[pattern]["config"].update(kwargs)
 
     def set_global_config(self, **kwargs):
         """Update global configuration for all completers"""
@@ -207,31 +153,85 @@ class PatternCompleter:
             except (TypeError, RuntimeError):
                 pass
 
-        # Clean up completers
-        for pattern, config in list(self.completers.items()):
+        # Clean up the shared popup
+        if hasattr(self, '_popup'):
             try:
-                completer: QCompleter = config.get("completer")
-                if completer:
-                    # Hide and disconnect popup
-                    popup = completer.popup()
-                    if popup and popup.isVisible():
-                        popup.hide()
-
-                    # Disconnect signals
-                    try:
-                        completer.activated.disconnect()
-                    except (TypeError, RuntimeError):
-                        pass
-
-                    # Delete completer
-                    completer.setWidget(None)
-                    completer.setModel(None)
-                    completer.deleteLater()
-            except (TypeError, RuntimeError, AttributeError) as e:
-                print(f"Error cleaning up completer for pattern '{pattern}': {e}")
+                self._popup.itemClicked.disconnect()
+            except (TypeError, RuntimeError):
                 pass
+            self._popup.hide()
+            self._popup.deleteLater()
 
         self.completers.clear()
+
+    def _get_candidates(self, pattern_config, text, cursor_pos, prefix):
+        """Return completion candidates for the current prefix.
+
+        Handles both callable and static-list completions, applying prefix
+        filtering (case-aware) for static lists.
+        """
+        completions = pattern_config["completions"]
+        config = pattern_config["config"]
+
+        if callable(completions):
+            return completions(text[:cursor_pos], prefix)
+
+        case_sensitive = config.get("case_sensitive", False)
+        if case_sensitive:
+            return [c for c in completions if c.startswith(prefix)]
+        else:
+            return [c for c in completions if c.lower().startswith(prefix.lower())]
+
+    def _show_popup(self, items, config):
+        """Populate, size, and position the shared popup."""
+        self._popup.clear()
+        for item in items:
+            self._popup.addItem(item)
+
+        if not items:
+            self._popup.hide()
+            return
+
+        # Word-wrap / elide settings
+        word_wrap = config.get("word_wrap", False)
+        self._popup.setWordWrap(word_wrap)
+        self._popup.setTextElideMode(
+            Qt.TextElideMode.ElideNone if not word_wrap else Qt.TextElideMode.ElideRight
+        )
+
+        # Auto-resize width to fit the widest item
+        if config.get("auto_resize", True):
+            fm = QFontMetrics(self._popup.font())
+            padding = config.get("padding", 20)
+            min_w = config.get("min_width", 150)
+            max_w = config.get("max_width", 500)
+            content_width = max(fm.horizontalAdvance(item) + padding for item in items)
+            width = max(min_w, min(content_width, max_w))
+        else:
+            width = config.get("min_width", 150)
+
+        # Height: fit content but cap at 260 px
+        row_h = self._popup.sizeHintForRow(0) if self._popup.count() > 0 else 20
+        height = min(len(items) * row_h, 260)
+
+        self._popup.setFixedWidth(width)
+        self._popup.setFixedHeight(height)
+
+        # Position below the cursor
+        if hasattr(self, "cursorRect"):
+            # QTextEdit / QPlainTextEdit: cursorRect() gives cursor bounding box
+            pos = self.mapToGlobal(self.cursorRect().bottomLeft())
+        else:
+            # QLineEdit: approximate cursor x via font metrics
+            text, cursor_pos = self._get_text_and_cursor()
+            fm_widget = QFontMetrics(self.font())
+            pos = self.mapToGlobal(
+                QPoint(fm_widget.horizontalAdvance(text[:cursor_pos]), self.height())
+            )
+
+        self._popup.move(pos)
+        self._popup.setCurrentRow(0)
+        self._popup.show()
 
     def _get_text_and_cursor(self):
         """Get text and cursor position (works for different widget types)"""
@@ -346,84 +346,29 @@ class PatternCompleter:
         active_pattern, trigger_pos = self._find_active_trigger(text, cursor_pos)
 
         if active_pattern and trigger_pos >= 0:
-            # If pattern changed, hide popups from other patterns
-            if self.active_pattern != active_pattern:
-                for pattern, pattern_config in self.completers.items():
-                    if pattern != active_pattern:
-                        try:
-                            if pattern_config["completer"].popup().isVisible():
-                                pattern_config["completer"].popup().hide()
-                        except (RuntimeError, AttributeError):
-                            pass
-
             self.active_pattern = active_pattern
             self.trigger_start_pos = trigger_pos
 
             pattern_config = self.completers[active_pattern]
-            completer: QCompleter = pattern_config["completer"]
             config = pattern_config["config"]
 
             pattern_len = len(active_pattern)
-            prefix = text[trigger_pos + pattern_len : cursor_pos]
+            prefix = text[trigger_pos + pattern_len: cursor_pos]
 
-            completer.setCompletionPrefix(prefix)
-            completer.setWidget(self)
+            candidates = self._get_candidates(pattern_config, text, cursor_pos, prefix)
+            if not candidates:
+                self._popup.hide()
+                self._apply_visual_indicator(False)
+                return
 
-            # Calculate optimal width based on content
-            popup = completer.popup()
-            popup.setUpdatesEnabled(False)
-
-            # Position the popup at the cursor for multi-line widgets
-            if hasattr(self, "cursorRect"):
-                # QTextEdit/QPlainTextEdit - position at cursor
-                cursor_rect: QRect = self.cursorRect()
-                popup_pos = self.mapToGlobal(cursor_rect.bottomLeft())
-                popup.move(popup_pos)
-                completer.complete(cursor_rect)
-            else:
-                # QLineEdit - default positioning is fine
-                completer.complete()
-
-            # Auto-select first item to indicate it will be chosen
-            if completer.completionCount() > 0:
-                popup.setCurrentIndex(completer.completionModel().index(0, 0))
-
-            # Auto-resize popup width to fit content using font metrics
-            if config.get("auto_resize", True) and completer.completionCount() > 0:
-                # Get font metrics from the popup
-                font_metrics = QFontMetrics(popup.font())
-
-                max_width = config.get("min_width", 150)
-                padding = config.get("padding", 20)
-
-                for i in range(completer.completionCount()):
-                    index = completer.completionModel().index(i, 0)
-                    item_text = completer.completionModel().data(index)
-                    if item_text:
-                        # Get actual pixel width of the text
-                        text_width = font_metrics.horizontalAdvance(str(item_text))
-                        max_width = max(max_width, text_width + padding)
-
-                # Set width with limits
-                max_limit = config.get("max_width", 500)
-                max_width = min(max_width, max_limit)
-                popup.setFixedWidth(max_width)
-
-            popup.setUpdatesEnabled(True)
+            self._show_popup(candidates, config)
 
             if config.get("visual_indicator", False):
                 self._apply_visual_indicator(True)
         else:
             self.active_pattern = None
             self.trigger_start_pos = -1
-
-            for pattern_config in self.completers.values():
-                try:
-                    if pattern_config["completer"].popup().isVisible():
-                        pattern_config["completer"].popup().hide()
-                except (RuntimeError, AttributeError):
-                    pass
-
+            self._popup.hide()
             self._apply_visual_indicator(False)
 
     def _pattern_insert_completion(self, completion):
@@ -434,26 +379,24 @@ class PatternCompleter:
         self.inserting_completion = True
 
         try:
-            # Remove the trigger pattern and any text after it up to cursor
             text, cursor_pos = self._get_text_and_cursor()
 
-            # Replace with just the completion (without the pattern prefix)
-            new_text = text[: self.trigger_start_pos] + completion + text[cursor_pos:]
-            new_cursor_pos = self.trigger_start_pos + len(completion)
+            on_insert = self.completers[self.active_pattern].get("on_insert")
+            if callable(on_insert):
+                new_text, new_cursor_pos = on_insert(
+                    completion, text, self.trigger_start_pos, cursor_pos
+                )
+            else:
+                # Default: replace trigger + typed prefix with the completion
+                new_text = text[: self.trigger_start_pos] + completion + text[cursor_pos:]
+                new_cursor_pos = self.trigger_start_pos + len(completion)
             self._set_text_with_cursor(new_text, new_cursor_pos)
 
             # Reset state BEFORE hiding popup to prevent re-triggering
             self.trigger_start_pos = -1
             self.active_pattern = None
 
-            # Hide all popups
-            for pattern_config in self.completers.values():
-                try:
-                    if pattern_config["completer"].popup().isVisible():
-                        pattern_config["completer"].popup().hide()
-                except (RuntimeError, AttributeError):
-                    pass
-
+            self._popup.hide()
             self._apply_visual_indicator(False)
         finally:
             self.inserting_completion = False
@@ -466,32 +409,33 @@ class PatternCompleter:
         Returns:
             bool: True if event was handled (don't call super), False otherwise
         """
-        # Find the active completer with a visible popup
-        active_completer:QCompleter = None
-        for pattern, pattern_config in self.completers.items():
-            if pattern_config["completer"].popup().isVisible():
-                if pattern == self.active_pattern:
-                    active_completer = pattern_config["completer"]
-                break
-
-        if active_completer:
-            if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Tab):
-                # Get current index, or use first item if none selected
-                index = active_completer.popup().currentIndex()
-                if not index.isValid():
-                    # Auto-select first item if nothing selected
-                    index = active_completer.completionModel().index(0, 0)
-
-                if index.isValid():
-                    completion = active_completer.completionModel().data(index)
-                    self._pattern_insert_completion(completion)
+        if self._popup.isVisible():
+            key = event.key()
+            if key in (Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Tab):
+                current = self._popup.currentItem()
+                if current is None and self._popup.count() > 0:
+                    current = self._popup.item(0)
+                if current:
+                    self._pattern_insert_completion(current.text())
                 event.accept()
-                return True  # Event handled
-            elif event.key() == Qt.Key.Key_Escape:
-                active_completer.popup().hide()
+                return True
+            elif key == Qt.Key.Key_Down:
+                self._popup.setCurrentRow(
+                    min(self._popup.currentRow() + 1, self._popup.count() - 1)
+                )
+                event.accept()
+                return True
+            elif key == Qt.Key.Key_Up:
+                self._popup.setCurrentRow(
+                    max(self._popup.currentRow() - 1, 0)
+                )
+                event.accept()
+                return True
+            elif key == Qt.Key.Key_Escape:
+                self._popup.hide()
                 self._apply_visual_indicator(False)
                 event.accept()
-                return True  # Event handled
+                return True
 
         return False  # Event not handled, continue normal processing
 
@@ -509,6 +453,11 @@ class PatternLineEdit(QLineEdit, PatternCompleter):
             # Event not handled by pattern completer, process normally
             super().keyPressEvent(event)
 
+    def focusOutEvent(self, event):
+        if hasattr(self, '_popup'):
+            self._popup.hide()
+        super().focusOutEvent(event)
+
 
 class PatternTextEdit(QTextEdit, PatternCompleter):
     """QTextEdit with pattern completion"""
@@ -523,6 +472,11 @@ class PatternTextEdit(QTextEdit, PatternCompleter):
             # Event not handled by pattern completer, process normally
             super().keyPressEvent(event)
 
+    def focusOutEvent(self, event):
+        if hasattr(self, '_popup'):
+            self._popup.hide()
+        super().focusOutEvent(event)
+
 
 class PatternPlainTextEdit(QPlainTextEdit, PatternCompleter):
     """QPlainTextEdit with pattern completion"""
@@ -536,6 +490,11 @@ class PatternPlainTextEdit(QPlainTextEdit, PatternCompleter):
         if not self._pattern_key_press_event(event):
             # Event not handled by pattern completer, process normally
             super().keyPressEvent(event)
+
+    def focusOutEvent(self, event):
+        if hasattr(self, '_popup'):
+            self._popup.hide()
+        super().focusOutEvent(event)
 
 
 class PatternCompleterDelegate(QStyledItemDelegate):

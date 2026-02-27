@@ -1,5 +1,5 @@
 """
-PatternCompleter Examples - PyQt6 Auto-completion System
+PatternCompleter Examples - qtpy Auto-completion System
 
 This demonstrates various use cases for the PatternCompleter mixin class.
 All examples are accessible through tabs in a single window.
@@ -16,6 +16,7 @@ from qtpy.QtWidgets import (
     QTabWidget,
     QHBoxLayout,
     QPushButton,
+    QLineEdit,
 )
 from qtpy.QtCore import QTimer
 from pymodaq_gui.utils.widgets.pattern_completer import (
@@ -384,6 +385,79 @@ def create_code_editor_example():
 
 
 # ============================================================================
+# EXAMPLE 9: Callable Completions + Custom Insertion (on_insert)
+# ============================================================================
+def create_callable_completion_example():
+    """Context-aware {variable} completion with auto-closing braces."""
+    widget = QWidget()
+    layout = QVBoxLayout(widget)
+
+    layout.addWidget(QLabel("<b>Example 9: Callable Completions + Custom Insertion</b>"))
+    layout.addWidget(QLabel(
+        "Type <b>{</b> to insert a variable reference.  "
+        "The completion list is built dynamically from the live context below."
+    ))
+
+    # Shared context — simulates a live variable namespace
+    context: dict = {
+        "signal_A": None,
+        "signal_B": None,
+        "time_axis": None,
+    }
+
+    editor = PatternPlainTextEdit()
+    editor.setPlaceholderText(
+        "# Type { to autocomplete variable names\n"
+        "result = {signal_A} + {signal_B}\n"
+        "normalised = {result} / {result}.max()"
+    )
+
+    # Callable: returns names that contain the current prefix (case-insensitive)
+    def get_var_names(text_before: str, prefix: str) -> list:
+        return [name for name in context if prefix.lower() in name.lower()]
+
+    # on_insert: keep the { and close with }
+    def insert_with_braces(completion: str, text: str, trigger_pos: int, cursor_pos: int):
+        new_text = text[:trigger_pos] + '{' + completion + '}' + text[cursor_pos:]
+        new_cursor = trigger_pos + 1 + len(completion) + 1
+        return new_text, new_cursor
+
+    editor.add_completer('{', get_var_names, on_insert=insert_with_braces)
+    layout.addWidget(editor, stretch=1)
+
+    # ── Controls to add/remove variables ──────────────────────────────────────
+    layout.addWidget(QLabel("<b>Live context</b> (add variables to see completions update):"))
+
+    controls = QHBoxLayout()
+    name_input = QLineEdit()
+    name_input.setPlaceholderText("New variable name (must be a valid identifier)…")
+
+    add_btn = QPushButton("Add")
+    status_label = QLabel(", ".join(sorted(context)))
+    status_label.setWordWrap(True)
+
+    def refresh_status():
+        status_label.setText(", ".join(sorted(context)) or "<i>empty</i>")
+
+    def add_variable():
+        name = name_input.text().strip()
+        if name and name.isidentifier():
+            context[name] = None
+            name_input.clear()
+            refresh_status()
+
+    add_btn.clicked.connect(add_variable)
+    name_input.returnPressed.connect(add_variable)
+
+    controls.addWidget(name_input, stretch=1)
+    controls.addWidget(add_btn)
+    layout.addLayout(controls)
+    layout.addWidget(status_label)
+
+    return widget
+
+
+# ============================================================================
 # Main Application with Tabs
 # ============================================================================
 class PatternCompleterDemo(QMainWindow):
@@ -405,7 +479,8 @@ class PatternCompleterDemo(QMainWindow):
         tabs.addTab(create_word_wrap_example(), "5. Word Wrap")
         tabs.addTab(create_dynamic_updates_example(), "6. Dynamic Updates")
         tabs.addTab(create_table_delegate_example(), "7. Table Delegate")
-        tabs.addTab(create_code_editor_example(), "8. Code Editor") #Not working currently
+        tabs.addTab(create_code_editor_example(), "8. Code Editor")  # Not working currently
+        tabs.addTab(create_callable_completion_example(), "9. Callable + on_insert")
 
         self.setCentralWidget(tabs)
 

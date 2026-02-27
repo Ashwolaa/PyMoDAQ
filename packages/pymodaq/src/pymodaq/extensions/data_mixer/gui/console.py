@@ -172,7 +172,7 @@ class _FallbackEditor(QPlainTextEdit):
     -----|-----------------------------|------------------
     M1   | inside ``{…}``              | all H5 + computed names
     M2   | after ``{h5name}["``        | data_vars of that H5 Dataset
-    M3   | after ``}.`` or ``}[v].``   | static xarray method list
+    M3   | after ``}.``, ``].``, ``).`` | static xarray method list
     M4   | after ``.mean("`` etc.      | dims of referenced object
     M5   | after ``.isel(`` / ``.sel(``| ``dim=`` stubs
     """
@@ -203,6 +203,7 @@ class _FallbackEditor(QPlainTextEdit):
         self._popup.hide()
 
         FormulaHighlighter(self.document(), self.palette())
+        QShortcut(QKeySequence('Ctrl+/'), self).activated.connect(self._toggle_comment)
 
     def set_context(self, h5_ctx: dict, computed: dict) -> None:
         self._h5_ctx = h5_ctx
@@ -247,7 +248,7 @@ class _FallbackEditor(QPlainTextEdit):
                 candidates = [c for c in coords if prefix.lower() in c.lower()]
                 return ('M2b', prefix, candidates)
 
-        m3 = re.search(r'\}(\["[^"]+"\])?\.(\w*)$', text)
+        m3 = re.search(r'[}\])](\["[^"]+"\])?\.(\w*)$', text)
         if m3:
             prefix = m3.group(2)
             candidates = [m for m in self._XR_METHODS if m.lower().startswith(prefix.lower())]
@@ -280,20 +281,42 @@ class _FallbackEditor(QPlainTextEdit):
                 pass
         return sorted(dims)
 
+    def _consumed_dims(self, text: str) -> set[str]:
+        """Return dim names already consumed by reductions in the expression chain.
+
+        Detects patterns like ``.mean("x")``, ``.squeeze("x")``,
+        ``.isel(x=…)``, ``.sel(x=…)`` and returns the dim names used,
+        so they can be excluded from subsequent completion suggestions.
+        """
+        consumed: set[str] = set()
+        # .op("dim") reductions
+        for m in re.finditer(
+            r'\.(mean|sum|std|min|max|median|squeeze|diff|integrate|differentiate)\("(\w+)"',
+            text,
+        ):
+            consumed.add(m.group(2))
+        # .isel(dim=…) / .sel(dim=…)
+        for m in re.finditer(r'\.(isel|sel)\(([^)]*)\)', text):
+            for kw in re.finditer(r'(\w+)\s*=', m.group(2)):
+                consumed.add(kw.group(1))
+        return consumed
+
     def _dims_for_context(self, text: str) -> list[str]:
-        """Return dims relevant to the innermost ``{name}`` reference in *text*.
+        """Return dims relevant to the innermost ``{name}`` reference in *text*,
+        excluding dims already consumed by reductions earlier in the chain.
 
         Resolution priority:
           P1/P2: ``{h5}["var"]…``  → dims of that specific DataArray
           P3:    ``{name}…``       → dims of the Dataset (computed or H5)
           fallback:                  all dims from all datasets
         """
+        consumed = self._consumed_dims(text)
         # P1/P2: {h5name}["var_name"]… — resolve to a specific DataArray
         m = re.search(r'\{([^}]+)\}\["([^"]+)"\][^{]*$', text)
         if m:
             ds = self._h5_ctx.get(m.group(1))
             if ds is not None and m.group(2) in ds.data_vars:
-                return list(ds[m.group(2)].dims)
+                return [d for d in ds[m.group(2)].dims if d not in consumed]
         # P3: {name}… — computed Dataset or bare H5 Dataset
         m = re.search(r'\{([^}]+)\}[^{]*$', text)
         if m:
@@ -302,10 +325,10 @@ class _FallbackEditor(QPlainTextEdit):
                 ds = ctx.get(name)
                 if ds is not None:
                     try:
-                        return list(ds.dims.keys())
+                        return [d for d in ds.dims.keys() if d not in consumed]
                     except Exception:
                         pass
-        return self._collect_dims()
+        return [d for d in self._collect_dims() if d not in consumed]
 
     # ── popup management ─────────────────────────────────────────────────────
 
@@ -345,15 +368,87 @@ class _FallbackEditor(QPlainTextEdit):
                 cursor.setPosition(quote + 1)
                 cursor.setPosition(pos, QTextCursor.KeepAnchor)
                 cursor.insertText(text + '"]')
-        elif mode in ('M3', 'M4', 'M5'):
+        elif mode == 'M3':
             start = pos - len(prefix)
             cursor.setPosition(start)
             cursor.setPosition(pos, QTextCursor.KeepAnchor)
+            if text.endswith('('):
+                # Method: auto-close the paren and place cursor inside
+                cursor.insertText(text + ')')
+                cursor.setPosition(cursor.position() - 1)
+            else:
+                # Property attribute (values, dims, …): insert as-is
+                cursor.insertText(text)
+        elif mode == 'M4':
+            start = pos - len(prefix)
+            cursor.setPosition(start)
+            cursor.setPosition(pos, QTextCursor.KeepAnchor)
+            # Close the opened string quote and the method paren
+            cursor.insertText(text + '")')
+        elif mode == 'M5':
+            start = pos - len(prefix)
+            cursor.setPosition(start)
+            cursor.setPosition(pos, QTextCursor.KeepAnchor)
+            # Insert dim= stub; user types the value next
             cursor.insertText(text)
 
         self.setTextCursor(cursor)
         self._popup.hide()
         self.setFocus()
+
+    # ── comment toggle ────────────────────────────────────────────────────────
+
+    def _toggle_comment(self) -> None:
+        """Toggle ``# `` comment prefix on selected lines (or current line)."""
+        cursor = self.textCursor()
+        sel_start = cursor.selectionStart()
+        sel_end = cursor.selectionEnd()
+
+        c = QTextCursor(self.document())
+        c.setPosition(sel_start)
+        first_block = c.blockNumber()
+        c.setPosition(sel_end)
+        last_block = c.blockNumber()
+        # Don't include a trailing block if the selection ends at its very start
+        if c.atBlockStart() and last_block > first_block:
+            last_block -= 1
+
+        # Determine whether all non-empty lines in range are already commented
+        c.setPosition(sel_start)
+        c.movePosition(QTextCursor.StartOfBlock)
+        all_commented = True
+        for _ in range(last_block - first_block + 1):
+            line = c.block().text()
+            if line.strip() and not line.lstrip().startswith('#'):
+                all_commented = False
+                break
+            if not c.movePosition(QTextCursor.NextBlock):
+                break
+
+        # Apply the toggle
+        c.setPosition(sel_start)
+        c.movePosition(QTextCursor.StartOfBlock)
+        c.beginEditBlock()
+        for _ in range(last_block - first_block + 1):
+            c.movePosition(QTextCursor.StartOfBlock)
+            line = c.block().text()
+            indent = len(line) - len(line.lstrip())
+            stripped = line.lstrip()
+            if all_commented:
+                if stripped.startswith('# '):
+                    c.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, indent)
+                    c.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, 2)
+                    c.removeSelectedText()
+                elif stripped.startswith('#'):
+                    c.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, indent)
+                    c.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, 1)
+                    c.removeSelectedText()
+            else:
+                c.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, indent)
+                c.insertText('# ')
+            if not c.movePosition(QTextCursor.NextBlock):
+                break
+        c.endEditBlock()
 
     # ── key events ───────────────────────────────────────────────────────────
 

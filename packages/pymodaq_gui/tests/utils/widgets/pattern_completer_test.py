@@ -51,8 +51,8 @@ class TestPatternLineEdit:
 
         assert '@' in pattern_line_edit.completers
         assert pattern_line_edit.completers['@']['completions'] == ['alice', 'bob', 'charlie']
-        assert 'completer' in pattern_line_edit.completers['@']
-        assert 'model' in pattern_line_edit.completers['@']
+        assert 'config' in pattern_line_edit.completers['@']
+        assert 'on_insert' in pattern_line_edit.completers['@']
 
     def test_add_multiple_completers(self, pattern_line_edit):
         """Test adding multiple different pattern completers"""
@@ -255,11 +255,9 @@ class TestPatternCompletion:
         # Wait for popup to appear
         qtbot.wait(100)
 
-        completer = pattern_line_edit.completers['@']['completer']
-        # Note: Popup visibility may be flaky in tests without full event loop
-        # Just verify completer is configured correctly
-        assert completer.widget() == pattern_line_edit
-        assert completer.completionPrefix() == ""
+        # Verify popup is shown with correct items
+        assert pattern_line_edit.active_pattern == '@'
+        assert pattern_line_edit._popup.count() > 0
 
     def test_insert_completion(self, pattern_line_edit, qtbot):
         """Test inserting a completion"""
@@ -304,3 +302,128 @@ class TestPatternCompletion:
 
         assert pattern_line_edit.active_pattern is None
         assert pattern_line_edit.trigger_start_pos == -1
+
+
+class TestCallableCompletions:
+    """Tests for callable completions and on_insert hook."""
+
+    def test_add_callable_completer(self, pattern_line_edit):
+        """Callable is accepted and stored without pre-populating the popup."""
+        fn = lambda text_before, prefix: [x for x in ['alice', 'bob'] if prefix in x]
+        pattern_line_edit.add_completer('@', fn)
+
+        assert '@' in pattern_line_edit.completers
+        assert callable(pattern_line_edit.completers['@']['completions'])
+        # Popup starts empty because population is deferred
+        assert pattern_line_edit._popup.count() == 0
+
+    def test_callable_completions_refreshed_on_text_change(self, pattern_line_edit, qtbot):
+        """Callable is invoked on each keystroke and the popup is updated."""
+        called_with = []
+
+        def fn(text_before, prefix):
+            called_with.append((text_before, prefix))
+            return [x for x in ['alice', 'alicia', 'bob'] if prefix.lower() in x.lower()]
+
+        pattern_line_edit.add_completer('@', fn)
+        pattern_line_edit.setText("@al")
+        pattern_line_edit.setCursorPosition(3)
+        qtbot.wait(50)
+
+        assert len(called_with) > 0
+        assert called_with[-1][1] == 'al'
+
+        items = [pattern_line_edit._popup.item(i).text() for i in range(pattern_line_edit._popup.count())]
+        assert 'alice' in items
+        assert 'alicia' in items
+        assert 'bob' not in items
+
+    def test_callable_receives_full_text_before_cursor(self, pattern_line_edit, qtbot):
+        """The first argument to the callable is text up to the cursor."""
+        received = []
+
+        def fn(text_before, prefix):
+            received.append(text_before)
+            return []
+
+        pattern_line_edit.add_completer('@', fn)
+        pattern_line_edit.setText("hello @wo")
+        pattern_line_edit.setCursorPosition(9)
+        qtbot.wait(50)
+
+        assert len(received) > 0
+        assert received[-1] == 'hello @wo'
+
+    def test_update_completions_with_callable(self, pattern_line_edit):
+        """update_completions accepts a callable; popup is not rebuilt immediately."""
+        pattern_line_edit.add_completer('@', ['alice'])
+        fn = lambda text_before, prefix: ['dynamic1', 'dynamic2']
+        pattern_line_edit.update_completions('@', fn)
+
+        assert callable(pattern_line_edit.completers['@']['completions'])
+        # Popup is NOT updated until the next text-change event
+        assert pattern_line_edit._popup.count() == 0
+
+    def test_update_completions_with_list_after_callable(self, pattern_line_edit):
+        """Switching back from a callable to a static list works correctly."""
+        fn = lambda text_before, prefix: ['dynamic']
+        pattern_line_edit.add_completer('@', fn)
+        pattern_line_edit.update_completions('@', ['alice', 'bob'])
+
+        assert not callable(pattern_line_edit.completers['@']['completions'])
+        pattern_config = pattern_line_edit.completers['@']
+        candidates = pattern_line_edit._get_candidates(pattern_config, '', 0, '')
+        assert candidates == ['alice', 'bob']
+
+    def test_on_insert_callback_used(self, pattern_line_edit, qtbot):
+        """on_insert hook controls the final text and cursor position."""
+        def insert_with_braces(completion, text, trigger_pos, cursor_pos):
+            new_text = text[:trigger_pos] + '{' + completion + '}' + text[cursor_pos:]
+            new_cursor = trigger_pos + 1 + len(completion) + 1
+            return new_text, new_cursor
+
+        pattern_line_edit.add_completer('{', ['var_a', 'var_b'], on_insert=insert_with_braces)
+
+        # Manually set up state as if the user typed "result = {va"
+        pattern_line_edit.setText("result = {va")
+        pattern_line_edit.setCursorPosition(12)
+        pattern_line_edit.active_pattern = '{'
+        pattern_line_edit.trigger_start_pos = 9
+
+        pattern_line_edit._pattern_insert_completion("var_a")
+
+        assert pattern_line_edit.text() == "result = {var_a}"
+        assert pattern_line_edit.cursorPosition() == 16
+
+    def test_on_insert_stored_in_completer_dict(self, pattern_line_edit):
+        """on_insert is stored on the completer entry, not inside config."""
+        hook = lambda c, t, tp, cp: (t[:tp] + c + t[cp:], tp + len(c))
+        pattern_line_edit.add_completer('@', ['alice'], on_insert=hook)
+
+        entry = pattern_line_edit.completers['@']
+        assert entry['on_insert'] is hook
+        assert 'on_insert' not in entry['config']
+
+    def test_update_completer_config_on_insert(self, pattern_line_edit):
+        """update_completer_config can replace the on_insert hook."""
+        hook1 = lambda c, t, tp, cp: (t[:tp] + c + t[cp:], tp + len(c))
+        hook2 = lambda c, t, tp, cp: (t[:tp] + '[' + c + ']' + t[cp:], tp + len(c) + 2)
+
+        pattern_line_edit.add_completer('@', ['alice'], on_insert=hook1)
+        pattern_line_edit.update_completer_config('@', on_insert=hook2)
+
+        assert pattern_line_edit.completers['@']['on_insert'] is hook2
+
+    def test_default_insert_without_on_insert(self, pattern_line_edit):
+        """Without on_insert the default replacement behaviour is preserved."""
+        pattern_line_edit.add_completer('@', ['alice', 'bob'])
+
+        pattern_line_edit.setText("Hello @a")
+        pattern_line_edit.setCursorPosition(8)
+        pattern_line_edit.active_pattern = '@'
+        pattern_line_edit.trigger_start_pos = 6
+
+        pattern_line_edit._pattern_insert_completion("alice")
+
+        assert pattern_line_edit.text() == "Hello alice"
+        assert pattern_line_edit.cursorPosition() == 11
