@@ -3,6 +3,7 @@ import pytest
 from pymodaq.extensions.data_mixer.parser import (
     parse_named_formulae,
     extract_formula_output_names,
+    replace_names_in_formula_xr,
 )
 
 
@@ -122,3 +123,67 @@ class TestExtractFormulaOutputNames:
         text = 'good = {x}\n1bad = {y}\nalso_good = {z}'
         result = extract_formula_output_names(text)
         assert result == ['good', 'also_good']
+
+
+class TestReplaceNamesInFormulaXr:
+
+    def test_single_h5_ref_becomes_xr_lookup(self):
+        result, names = replace_names_in_formula_xr('{scan/CH00}')
+        assert result == '_xr["scan/CH00"]'
+        assert names == ['{scan/CH00}']
+
+    def test_computed_ref_auto_dereferences(self):
+        result, _ = replace_names_in_formula_xr('{a}', computed_names={'a'})
+        assert result == '_xr["a"]["a"]'
+
+    def test_h5_ref_no_computed_names_stays_dataset(self):
+        result, _ = replace_names_in_formula_xr('{scan/CH00}', computed_names=set())
+        assert result == '_xr["scan/CH00"]'
+
+    def test_computed_names_none_always_produces_dataset(self):
+        result, _ = replace_names_in_formula_xr('{a}', computed_names=None)
+        assert result == '_xr["a"]'
+
+    def test_multiple_refs_in_one_formula(self):
+        result, names = replace_names_in_formula_xr(
+            '{x} + {y}', computed_names={'x'})
+        assert '_xr["x"]["x"]' in result   # computed → DataArray
+        assert '_xr["y"]' in result         # H5 → Dataset
+        assert len(names) == 2
+
+    def test_ref_mixed_with_operators(self):
+        result, _ = replace_names_in_formula_xr('{a}.mean("t")', computed_names={'a'})
+        assert result.startswith('_xr["a"]["a"]')
+        assert '.mean("t")' in result
+
+    def test_custom_ctx_var(self):
+        result, _ = replace_names_in_formula_xr('{k}', ctx_var='ctx')
+        assert result == 'ctx["k"]'
+
+    def test_no_refs_returns_formula_unchanged(self):
+        formula = 'np.ones(10) * 2'
+        result, names = replace_names_in_formula_xr(formula)
+        assert result == formula
+        assert names == []
+
+    def test_returns_tuple_of_str_and_list(self):
+        result, names = replace_names_in_formula_xr('{k}')
+        assert isinstance(result, str)
+        assert isinstance(names, list)
+
+    def test_name_in_computed_set_not_present_stays_dataset(self):
+        # {other} is NOT in computed_names → should remain Dataset lookup
+        result, _ = replace_names_in_formula_xr('{other}', computed_names={'a'})
+        assert result == '_xr["other"]'
+
+    def test_path_with_slash_treated_as_h5_key(self):
+        result, _ = replace_names_in_formula_xr(
+            '{origin/name}', computed_names={'a'})
+        assert result == '_xr["origin/name"]'
+
+    def test_sequential_refs_replaced_independently(self):
+        result, names = replace_names_in_formula_xr(
+            '{a} * {b}', computed_names={'a', 'b'})
+        assert '_xr["a"]["a"]' in result
+        assert '_xr["b"]["b"]' in result
+        assert len(names) == 2
