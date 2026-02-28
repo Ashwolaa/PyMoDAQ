@@ -114,10 +114,10 @@ class FormulaHighlighter(QSyntaxHighlighter):
         self._init_rules()
 
     def _init_rules(self,):
-        base_text     = self._palette.color(QPalette.Text)
-        secondary     = self._palette.color(QPalette.PlaceholderText)
-        highlight     = self._palette.color(QPalette.Highlight)
-        keyword_base  = self._palette.color(QPalette.Link)
+        base_text     = self._palette.color(QPalette.ColorRole.Text)
+        secondary     = self._palette.color(QPalette.ColorRole.PlaceholderText)
+        highlight     = self._palette.color(QPalette.ColorRole.Highlight)
+        keyword_base  = self._palette.color(QPalette.ColorRole.Link)
         comment_color   = adjust(secondary, 1.0)
         string_color    = adjust(QColor(46, 139, 87), 1.2)   # stable green
         brace_color     = adjust(highlight, 1.1)
@@ -127,7 +127,7 @@ class FormulaHighlighter(QSyntaxHighlighter):
             fmt = QTextCharFormat()
             fmt.setForeground(color)
             if bold:
-                fmt.setFontWeight(QFont.Bold)
+                fmt.setFontWeight(QFont.Weight.Bold)
             if italic:
                 fmt.setFontItalic(True)
             return fmt
@@ -194,11 +194,11 @@ class _FallbackEditor(QPlainTextEdit):
         self._all_names: list[str] = []
 
         self._popup = QListWidget(self)
-        self._popup.setWindowFlags(Qt.ToolTip)
-        self._popup.setFocusPolicy(Qt.NoFocus)
+        self._popup.setWindowFlags(Qt.WindowType.ToolTip)
+        self._popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._popup.setFocusProxy(self)
-        self._popup.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._popup.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._popup.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._popup.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._popup.itemClicked.connect(self._do_complete)
         self._popup.hide()
 
@@ -360,18 +360,18 @@ class _FallbackEditor(QPlainTextEdit):
             brace = full.rfind('{', 0, pos)
             if brace >= 0:
                 cursor.setPosition(brace + 1)
-                cursor.setPosition(pos, QTextCursor.KeepAnchor)
+                cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
                 cursor.insertText(text + '}')
         elif mode in ('M2', 'M2b'):
             quote = full.rfind('"', 0, pos)
             if quote >= 0:
                 cursor.setPosition(quote + 1)
-                cursor.setPosition(pos, QTextCursor.KeepAnchor)
+                cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
                 cursor.insertText(text + '"]')
         elif mode == 'M3':
             start = pos - len(prefix)
             cursor.setPosition(start)
-            cursor.setPosition(pos, QTextCursor.KeepAnchor)
+            cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
             if text.endswith('('):
                 # Method: auto-close the paren and place cursor inside
                 cursor.insertText(text + ')')
@@ -382,13 +382,13 @@ class _FallbackEditor(QPlainTextEdit):
         elif mode == 'M4':
             start = pos - len(prefix)
             cursor.setPosition(start)
-            cursor.setPosition(pos, QTextCursor.KeepAnchor)
+            cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
             # Close the opened string quote and the method paren
             cursor.insertText(text + '")')
         elif mode == 'M5':
             start = pos - len(prefix)
             cursor.setPosition(start)
-            cursor.setPosition(pos, QTextCursor.KeepAnchor)
+            cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
             # Insert dim= stub; user types the value next
             cursor.insertText(text)
 
@@ -427,26 +427,26 @@ class _FallbackEditor(QPlainTextEdit):
 
         # Apply the toggle
         c.setPosition(sel_start)
-        c.movePosition(QTextCursor.StartOfBlock)
+        c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
         c.beginEditBlock()
         for _ in range(last_block - first_block + 1):
-            c.movePosition(QTextCursor.StartOfBlock)
+            c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
             line = c.block().text()
             indent = len(line) - len(line.lstrip())
             stripped = line.lstrip()
             if all_commented:
                 if stripped.startswith('# '):
-                    c.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, indent)
-                    c.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, 2)
+                    c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, indent)
+                    c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 2)
                     c.removeSelectedText()
                 elif stripped.startswith('#'):
-                    c.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, indent)
-                    c.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, 1)
+                    c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, indent)
+                    c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
                     c.removeSelectedText()
             else:
-                c.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, indent)
+                c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, indent)
                 c.insertText('# ')
-            if not c.movePosition(QTextCursor.NextBlock):
+            if not c.movePosition(QTextCursor.MoveOperation.NextBlock):
                 break
         c.endEditBlock()
 
@@ -455,19 +455,19 @@ class _FallbackEditor(QPlainTextEdit):
     def keyPressEvent(self, event) -> None:
         if self._popup.isVisible():
             key = event.key()
-            if key == Qt.Key_Escape:
+            if key == Qt.Key.Key_Escape:
                 self._popup.hide()
                 return
-            if key in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Tab):
+            if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Tab):
                 item = self._popup.currentItem()
                 if item:
                     self._do_complete(item)
                 return
-            if key == Qt.Key_Down:
+            if key == Qt.Key.Key_Down:
                 self._popup.setCurrentRow(
                     min(self._popup.currentRow() + 1, self._popup.count() - 1))
                 return
-            if key == Qt.Key_Up:
+            if key == Qt.Key.Key_Up:
                 self._popup.setCurrentRow(
                     max(self._popup.currentRow() - 1, 0))
                 return
