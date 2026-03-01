@@ -66,3 +66,4 @@ for _pkg in (
 
 _load_direct("pymodaq.extensions.data_mixer.parser", "parser.py")
 _load_direct("pymodaq.extensions.data_mixer.gui.formatters", "gui/formatters.py")
+_load_direct("pymodaq.extensions.data_mixer.gui.incremental", "gui/incremental.py")

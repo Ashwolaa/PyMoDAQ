@@ -67,6 +67,57 @@ class TestH5SaverLowLevel:
         #todo
         pass
 
+    # ── open_for_reading ──────────────────────────────────────────────────────
+
+    @pytest.mark.parametrize('backend', tested_backend)
+    def test_open_for_reading_returns_saver_and_bool(self, tmp_path, backend):
+        """open_for_reading on a valid file returns (H5SaverLowLevel, bool)."""
+        h5saver = saving.H5SaverLowLevel(backend=backend)
+        path = tmp_path / f'readable_{backend}.h5'
+        h5saver.init_file(file_name=path, new_file=True)
+        h5saver.close_file()
+
+        saver, is_swmr = saving.H5SaverLowLevel.open_for_reading(path)
+        try:
+            assert isinstance(saver, saving.H5SaverLowLevel)
+            assert isinstance(is_swmr, bool)
+            assert saver.isopen()
+            assert is_swmr is False   # normal file, no SWMR
+        finally:
+            saver.close_file()
+
+    def test_open_for_reading_nonexistent_raises(self, tmp_path):
+        with pytest.raises(RuntimeError):
+            saving.H5SaverLowLevel.open_for_reading(tmp_path / 'ghost.h5')
+
+    def test_open_for_reading_invalid_file_raises(self, tmp_path):
+        bad = tmp_path / 'bad.h5'
+        bad.write_bytes(b'this is not hdf5')
+        with pytest.raises(Exception):
+            saving.H5SaverLowLevel.open_for_reading(bad)
+
+    @pytest.mark.parametrize('backend', tested_backend)
+    def test_open_for_reading_file_is_readable(self, tmp_path, backend):
+        """Data written by init_file can be read back via open_for_reading."""
+        from pymodaq_data.h5modules.data_saving import DataLoader
+        import numpy as np
+        from pymodaq_data.data import DataToExport, DataRaw
+
+        # Write a minimal file
+        writer = saving.H5SaverLowLevel(backend=backend)
+        path = tmp_path / f'check_{backend}.h5'
+        writer.init_file(file_name=path, new_file=True)
+        writer.close_file()
+
+        # Read it back via open_for_reading
+        saver, is_swmr = saving.H5SaverLowLevel.open_for_reading(path)
+        try:
+            loader = DataLoader(saver)
+            dte = loader.load_all('/')
+            assert dte is not None
+        finally:
+            saver.close_file()
+
     def test_add_array_default_fill_is_zero(self, h5saver_lowlevel):
         h5saver = h5saver_lowlevel
         assert h5saver.fill_value == 0

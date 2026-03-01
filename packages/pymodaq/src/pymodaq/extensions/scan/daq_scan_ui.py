@@ -9,6 +9,8 @@ from typing import List, TYPE_CHECKING
 
 from qtpy import QtWidgets, QtCore
 from qtpy.QtCore import Signal
+from qtpy.QtGui import  QKeySequence
+from qtpy.QtWidgets import QShortcut
 
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -73,6 +75,7 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
         self.add_action('navigator', 'Show Navigator', '', menu=self._extensions_menu, auto_toolbar=False)
         self.add_action('batch', 'Show Batch Scanner', '', menu=self._extensions_menu, auto_toolbar=False)
         self.set_action_visible('start_batch', False)
+        QShortcut(QKeySequence('Space'), self).activated.connect(lambda: self.command_sig.emit(ThreadCommand('pause')))
 
     def enable_start_stop(self, enable=True):
         """If True enable main buttons to launch/stop scan"""

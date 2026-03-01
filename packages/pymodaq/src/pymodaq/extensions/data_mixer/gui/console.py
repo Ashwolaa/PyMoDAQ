@@ -30,11 +30,12 @@ import traceback as _traceback
 from typing import Optional
 
 import numpy as np
-from qtpy.QtCore import Qt, Signal
+from qtpy.QtCore import Qt, Signal, QSize
 from qtpy.QtGui import QFont, QTextCursor, QSyntaxHighlighter, QTextCharFormat, QColor, QKeySequence
 from qtpy.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QTextEdit,
     QListWidget, QAbstractItemView, QSplitter, QLabel, QPushButton, QShortcut,
+    QFileDialog, QToolBar, QAction, QSizePolicy,
 )
 
 from pymodaq.extensions.data_mixer.parser import (
@@ -45,6 +46,9 @@ from pymodaq.extensions.data_mixer.gui.formatters import (
     _wrap_result, _format_xr_html, _format_xr_lazy_html,
 )
 from pymodaq_data.data import DataToExport
+from pymodaq_utils.logger import set_logger, get_module_name
+
+logger = set_logger(get_module_name(__file__))
 
 
 
@@ -215,6 +219,13 @@ class _FallbackEditor(QPlainTextEdit):
         if name not in self._all_names:
             self._all_names.append(name)
 
+    def remove_computed(self, name: str) -> None:
+        self._computed.pop(name, None)
+        try:
+            self._all_names.remove(name)
+        except ValueError:
+            pass
+
     # ── completion detection ──────────────────────────────────────────────────
 
     def _text_before_cursor(self) -> str:
@@ -255,7 +266,7 @@ class _FallbackEditor(QPlainTextEdit):
             return ('M3', prefix, candidates)
 
         m4 = re.search(
-            r'\.(mean|sum|std|min|max|median|diff|integrate|differentiate)\("([^"]*)$', text)
+            r'\.(mean|sum|std|min|max|median|squeeze|diff|integrate|differentiate)\("([^"]*)$', text)
         if m4:
             prefix = m4.group(2)
             dims = self._dims_for_context(text)
@@ -287,16 +298,24 @@ class _FallbackEditor(QPlainTextEdit):
         Detects patterns like ``.mean("x")``, ``.squeeze("x")``,
         ``.isel(x=…)``, ``.sel(x=…)`` and returns the dim names used,
         so they can be excluded from subsequent completion suggestions.
+
+        Only the *current line* is examined to avoid cross-formula contamination
+        (a ``.mean("time")`` on a previous line must not suppress ``time`` here).
+        Operations that merely transform a dimension without removing it
+        (``diff``, ``differentiate``) are intentionally excluded.
         """
+        # Restrict to the current line so previous formula lines don't bleed in.
+        line = text.rsplit('\n', 1)[-1]
         consumed: set[str] = set()
-        # .op("dim") reductions
+        # Aggregations that remove the dimension entirely.
+        # Use [^"]+ instead of \w+ so dim names that contain spaces are matched.
         for m in re.finditer(
-            r'\.(mean|sum|std|min|max|median|squeeze|diff|integrate|differentiate)\("(\w+)"',
-            text,
+            r'\.(mean|sum|std|min|max|median|squeeze|integrate)\("([^"]+)"',
+            line,
         ):
             consumed.add(m.group(2))
-        # .isel(dim=…) / .sel(dim=…)
-        for m in re.finditer(r'\.(isel|sel)\(([^)]*)\)', text):
+        # .isel(dim=…) / .sel(dim=…) with scalar index also remove the dim
+        for m in re.finditer(r'\.(isel|sel)\(([^)]*)\)', line):
             for kw in re.finditer(r'(\w+)\s*=', m.group(2)):
                 consumed.add(kw.group(1))
         return consumed
@@ -355,27 +374,42 @@ class _FallbackEditor(QPlainTextEdit):
         cursor = self.textCursor()
         pos = cursor.position()
         full = self.toPlainText()
+        # Text that already follows the cursor — used to avoid duplicating
+        # closing chars when the user edits inside an existing completion.
+        rest = full[pos:]
 
         if mode == 'M1':
             brace = full.rfind('{', 0, pos)
             if brace >= 0:
                 cursor.setPosition(brace + 1)
                 cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
-                cursor.insertText(text + '}')
+                suffix = '' if rest.startswith('}') else '}'
+                cursor.insertText(text + suffix)
         elif mode in ('M2', 'M2b'):
             quote = full.rfind('"', 0, pos)
             if quote >= 0:
                 cursor.setPosition(quote + 1)
                 cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
-                cursor.insertText(text + '"]')
+                if rest.startswith('"]'):
+                    suffix = ''
+                elif rest.startswith(']'):
+                    suffix = '"'
+                else:
+                    suffix = '"]'
+                cursor.insertText(text + suffix)
         elif mode == 'M3':
             start = pos - len(prefix)
             cursor.setPosition(start)
             cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
             if text.endswith('('):
                 # Method: auto-close the paren and place cursor inside
-                cursor.insertText(text + ')')
-                cursor.setPosition(cursor.position() - 1)
+                if rest.startswith(')'):
+                    # Paren already present — just insert the method name,
+                    # cursor lands between '(' and the existing ')'.
+                    cursor.insertText(text)
+                else:
+                    cursor.insertText(text + ')')
+                    cursor.setPosition(cursor.position() - 1)
             else:
                 # Property attribute (values, dims, …): insert as-is
                 cursor.insertText(text)
@@ -383,8 +417,17 @@ class _FallbackEditor(QPlainTextEdit):
             start = pos - len(prefix)
             cursor.setPosition(start)
             cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
-            # Close the opened string quote and the method paren
-            cursor.insertText(text + '")')
+            # Close the opened string quote and the method paren,
+            # skipping whichever closing chars are already present after cursor.
+            if rest.startswith('")'):
+                suffix = ''           # both already present
+            elif rest.startswith('"'):
+                suffix = ')'          # string closed, paren missing
+            elif rest.startswith(')'):
+                suffix = '"'          # paren present (e.g. typed .mean()), just close string
+            else:
+                suffix = '")'
+            cursor.insertText(text + suffix)
         elif mode == 'M5':
             start = pos - len(prefix)
             cursor.setPosition(start)
@@ -450,6 +493,51 @@ class _FallbackEditor(QPlainTextEdit):
                 break
         c.endEditBlock()
 
+    # ── line duplication ─────────────────────────────────────────────────────
+
+    def _copy_lines(self, down: bool) -> None:
+        """Duplicate selected lines (or current line) below (down=True) or above.
+
+        Mirrors the VS Code Alt+Shift+Down / Alt+Shift+Up behaviour.
+        """
+        cursor = self.textCursor()
+        c = QTextCursor(self.document())
+
+        # Expand selection to whole-line boundaries
+        c.setPosition(cursor.selectionStart())
+        c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+        first_pos = c.position()
+
+        c.setPosition(cursor.selectionEnd())
+        # If the selection ends exactly at a block start (empty trailing line),
+        # don't include that line in the copied range.
+        if c.atBlockStart() and c.position() > cursor.selectionStart():
+            c.movePosition(QTextCursor.MoveOperation.PreviousBlock)
+        c.movePosition(QTextCursor.MoveOperation.EndOfBlock)
+        last_pos = c.position()
+
+        # Extract text (QTextCursor uses \u2029 as paragraph separator)
+        c.setPosition(first_pos)
+        c.setPosition(last_pos, QTextCursor.MoveMode.KeepAnchor)
+        lines_text = c.selectedText().replace('\u2029', '\n')
+
+        c.beginEditBlock()
+        if down:
+            c.setPosition(last_pos)
+            c.insertText('\n' + lines_text)
+            new_start = last_pos + 1
+            new_end = new_start + len(lines_text)
+        else:
+            c.setPosition(first_pos)
+            c.insertText(lines_text + '\n')
+            new_start = first_pos
+            new_end = first_pos + len(lines_text)
+        c.endEditBlock()
+
+        c.setPosition(new_start)
+        c.setPosition(new_end, QTextCursor.MoveMode.KeepAnchor)
+        self.setTextCursor(c)
+
     # ── key events ───────────────────────────────────────────────────────────
 
     def keyPressEvent(self, event) -> None:
@@ -465,12 +553,22 @@ class _FallbackEditor(QPlainTextEdit):
                 return
             if key == Qt.Key.Key_Down:
                 self._popup.setCurrentRow(
-                    min(self._popup.currentRow() + 1, self._popup.count() - 1))
+                    (self._popup.currentRow() + 1) % self._popup.count())
                 return
             if key == Qt.Key.Key_Up:
                 self._popup.setCurrentRow(
-                    max(self._popup.currentRow() - 1, 0))
+                    (self._popup.currentRow() - 1) % self._popup.count())
                 return
+        # Alt+Shift+Down/Up: duplicate current lines below/above (VS Code style)
+        mods = event.modifiers()
+        if mods == (Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.ShiftModifier):
+            if event.key() == Qt.Key.Key_Down:
+                self._copy_lines(down=True)
+                return
+            if event.key() == Qt.Key.Key_Up:
+                self._copy_lines(down=False)
+                return
+
         super().keyPressEvent(event)
         self._update_popup()
 
@@ -513,24 +611,34 @@ class FormulaConsole(QWidget):
     """
 
     variable_stored_sig = Signal(str, object, str)   # (name, ds, formula_expr)
+    clear_computed_sig  = Signal()                    # request full clear (routed via DataMixerGUI)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self._h5_ctx: dict = {}
         self._computed: dict = {}
+        self._computed_formulas: dict = {}   # name → raw RHS expression string
         self._lazy_mode: bool = False
+        self._lazy_action: Optional[QAction] = None
+        self._validation_label: Optional[QLabel] = None
+        self._ipython_container: Optional[QWidget] = None
+        self._ipython_action: Optional[QAction] = None
+        self._outer_splitter: Optional[QSplitter] = None
+        self._km = None   # kernel manager — created lazily on first IPython open
+        # Optional on-demand H5 loader provided by DataMixerGUI.
+        # Signature: loader(rel_path: str) -> xr.Dataset | None
+        self._h5_loader = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        formula_widget = self._build_formula_widget()
         if _QTCONSOLE:
-            outer = QSplitter(Qt.Vertical)
-            outer.addWidget(self._build_formula_widget())
-            outer.addWidget(self._build_ipython_widget())
-            outer.setSizes([400, 300])
-            layout.addWidget(outer)
+            self._outer_splitter = QSplitter(Qt.Orientation.Vertical)
+            self._outer_splitter.addWidget(formula_widget)
+            layout.addWidget(self._outer_splitter)
         else:
-            layout.addWidget(self._build_formula_widget())
+            layout.addWidget(formula_widget)
 
     # ── Formula editor (always present) ───────────────────────────────────────
 
@@ -539,10 +647,63 @@ class FormulaConsole(QWidget):
         vbox = QVBoxLayout(w)
         vbox.setContentsMargins(0, 0, 0, 4)
 
-        label = QLabel('<b>Named Formulas</b>  (one per line,  <code>name = expr</code>)')
-        label.setTextFormat(Qt.RichText)
-        vbox.addWidget(label)
+        # ── Toolbar ───────────────────────────────────────────────────────────
+        toolbar = QToolBar()
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setIconSize(QSize(16, 16))
 
+        compute_action = QAction('\u25b6  Compute & Store', toolbar)
+        compute_action.setToolTip(
+            'Evaluate formulas in the editor and store results  (Ctrl+Enter)')
+        compute_action.triggered.connect(self._compute_and_store)
+        toolbar.addAction(compute_action)
+
+        toolbar.addSeparator()
+
+        save_action = QAction('Save\u2026', toolbar)
+        save_action.setToolTip('Save current formulas to a TOML file')
+        save_action.triggered.connect(self._save_formulas)
+        toolbar.addAction(save_action)
+
+        load_action = QAction('Load\u2026', toolbar)
+        load_action.setToolTip('Load formulas from a TOML file (replaces editor content)')
+        load_action.triggered.connect(self._load_formulas)
+        toolbar.addAction(load_action)
+
+        if _DASK:
+            toolbar.addSeparator()
+            self._lazy_action = QAction('Lazy', toolbar)
+            self._lazy_action.setCheckable(True)
+            self._lazy_action.setChecked(False)
+            self._lazy_action.setToolTip(
+                'Lazy mode (dask): build a computation graph instead of running immediately.\n'
+                'Results show structure and chunk layout — no data is loaded into memory.')
+            self._lazy_action.toggled.connect(self._on_lazy_toggled)
+            toolbar.addAction(self._lazy_action)
+
+        # Validation indicator — live formula status (updated on every keystroke)
+        toolbar.addSeparator()
+        self._validation_label = QLabel('')
+        self._validation_label.setTextFormat(Qt.TextFormat.RichText)
+        toolbar.addWidget(self._validation_label)
+
+        # Expanding spacer pushes IPython toggle to the right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(spacer)
+
+        if _QTCONSOLE:
+            self._ipython_action = QAction('IPython \u25be', toolbar)
+            self._ipython_action.setCheckable(True)
+            self._ipython_action.setChecked(False)
+            self._ipython_action.setToolTip('Show / hide the IPython scratchpad')
+            self._ipython_action.toggled.connect(self._toggle_ipython)
+            toolbar.addAction(self._ipython_action)
+
+        vbox.addWidget(toolbar)
+
+        # ── Editor ────────────────────────────────────────────────────────────
         self._editor = _FallbackEditor(w)
         self._editor.setPlaceholderText(
             '# Type {  to autocomplete variable names\n'
@@ -552,39 +713,42 @@ class FormulaConsole(QWidget):
         f = QFont('Courier New')
         f.setPointSize(10)
         self._editor.setFont(f)
-        vbox.addWidget(self._editor, stretch=1)
+        self._editor.textChanged.connect(self._validate_formulas)
 
-        # Button row: [Compute & Store]  [Clear]  [Lazy toggle if dask]
-        btn_row = QHBoxLayout()
-
-        compute_btn = QPushButton('\u25b6  Compute & Store  (Ctrl+Enter)')
-        compute_btn.clicked.connect(self._compute_and_store)
-        btn_row.addWidget(compute_btn, stretch=1)
-
-        clear_btn = QPushButton('\u27f3  Clear')
-        clear_btn.setToolTip('Clear computed variables and output (keeps formula text)')
-        clear_btn.clicked.connect(self._clear_computed)
-        btn_row.addWidget(clear_btn)
-
-        if _DASK:
-            self._lazy_btn = QPushButton('Lazy')
-            self._lazy_btn.setCheckable(True)
-            self._lazy_btn.setChecked(False)
-            self._lazy_btn.setToolTip(
-                'Lazy mode (dask): build a computation graph instead of running immediately.\n'
-                'Results show structure and chunk layout — no data is loaded into memory.')
-            self._lazy_btn.toggled.connect(self._on_lazy_toggled)
-            btn_row.addWidget(self._lazy_btn)
-        else:
-            self._lazy_btn = None
-
-        vbox.addLayout(btn_row)
-
+        # ── Output section ────────────────────────────────────────────────────
         self._output_widget = OutputWidget(w)
-        self._output_widget.setMaximumHeight(140)
-        vbox.addWidget(self._output_widget)
+
+        output_header = QHBoxLayout()
+        output_header.setContentsMargins(0, 2, 0, 0)
+        output_label = QLabel('Output')
+        output_label.setStyleSheet('font-weight: bold; color: #555;')
+        output_header.addWidget(output_label, stretch=1)
+        clear_out_btn = QPushButton('\u2715 clear output')
+        clear_out_btn.setFlat(True)
+        clear_out_btn.setStyleSheet('color: #888; font-size: 9pt;')
+        clear_out_btn.setToolTip('Clear the output panel')
+        clear_out_btn.clicked.connect(self._output_widget.clear_output)
+        output_header.addWidget(clear_out_btn)
+
+        output_container = QWidget()
+        out_vbox = QVBoxLayout(output_container)
+        out_vbox.setContentsMargins(0, 0, 0, 0)
+        out_vbox.setSpacing(2)
+        out_vbox.addLayout(output_header)
+        out_vbox.addWidget(self._output_widget)
+
+        # Resizable splitter between editor and output
+        inner_splitter = QSplitter(Qt.Orientation.Vertical)
+        inner_splitter.addWidget(self._editor)
+        inner_splitter.addWidget(output_container)
+        inner_splitter.setStretchFactor(0, 3)
+        inner_splitter.setStretchFactor(1, 1)
+
+        vbox.addWidget(inner_splitter, stretch=1)
 
         QShortcut(QKeySequence('Ctrl+Return'), self._editor).activated.connect(
+            self._compute_and_store)
+        QShortcut(QKeySequence('Ctrl+Key_Enter'), self._editor).activated.connect(
             self._compute_and_store)
 
         return w
@@ -635,19 +799,43 @@ class FormulaConsole(QWidget):
 
     def _on_lazy_toggled(self, checked: bool) -> None:
         self._lazy_mode = checked
-        if self._lazy_btn is not None:
-            self._lazy_btn.setStyleSheet(
-                'font-weight: bold; color: #1a5cb5;' if checked else '')
+
+    def _toggle_ipython(self, checked: bool) -> None:
+        if checked:
+            if self._ipython_container is None:
+                # First open: build the widget and kernel now, attach to splitter
+                self._ipython_container = self._build_ipython_widget()
+                self._outer_splitter.addWidget(self._ipython_container)
+            self._ipython_container.setVisible(True)
+        else:
+            if self._ipython_container is not None:
+                self._ipython_container.setVisible(False)
 
     # ── Clear computed ────────────────────────────────────────────────────────
 
     def _clear_computed(self) -> None:
-        """Clear all computed variables and reset the output log."""
+        """Request a full clear.
+
+        Emits ``clear_computed_sig`` so that ``DataMixerGUI`` can sync the
+        browser and every other component before calling ``reset_computed()``.
+        The console does NOT touch ``self._computed`` here — DataMixerGUI
+        owns the coordination and calls ``reset_computed()`` when ready.
+        """
+        self.clear_computed_sig.emit()
+
+    def reset_computed(self) -> None:
+        """Reset internal computed state.
+
+        Called by ``DataMixerGUI`` after it has cleared the browser and its
+        own tracking dicts.  Keeps the formula editor text intact.
+        """
         self._computed.clear()
+        self._computed_formulas.clear()
         self._editor.set_context(self._h5_ctx, self._computed)
         self._output_widget.clear_output()
-        if _QTCONSOLE:
-            self._km.kernel.shell.user_ns['_xr'] = dict(self._h5_ctx)
+        if self._km is not None:
+            loaded = {k: v for k, v in self._h5_ctx.items() if v is not None}
+            self._km.kernel.shell.user_ns['_xr'] = loaded
 
     # ── Restart IPython kernel ────────────────────────────────────────────────
 
@@ -655,11 +843,12 @@ class FormulaConsole(QWidget):
         """Reset the in-process IPython kernel namespace (kernel stays alive)."""
         kernel = self._km.kernel
         kernel.shell.reset()
+        loaded_h5 = {k: v for k, v in self._h5_ctx.items() if v is not None}
         try:
             import xarray as xr
-            kernel.shell.push({'np': np, 'xr': xr, '_xr': dict(self._h5_ctx)})
+            kernel.shell.push({'np': np, 'xr': xr, '_xr': loaded_h5})
         except ImportError:
-            kernel.shell.push({'np': np, '_xr': dict(self._h5_ctx)})
+            kernel.shell.push({'np': np, '_xr': loaded_h5})
         xr_ns = kernel.shell.user_ns['_xr']
         for name, ds in self._computed.items():
             xr_ns[name] = ds
@@ -667,14 +856,46 @@ class FormulaConsole(QWidget):
     # ── Compute & Store ───────────────────────────────────────────────────────
 
     def _compute_and_store(self) -> None:
-        """Parse editor, evaluate each formula, store results."""
-        text = self._editor.toPlainText()
-        pairs = parse_named_formulae(text)
+        """Parse the editor text, evaluate each formula, store results."""
+        pairs = parse_named_formulae(self._editor.toPlainText())
         if not pairs:
             return
+        self._run_formula_pairs(pairs)
 
-        xr_ctx = {**self._h5_ctx, **self._computed}
+    def _run_formula_pairs(self, pairs: list) -> None:
+        """Evaluate a list of (name, expr) pairs and store/emit results.
+
+        Shared by ``_compute_and_store`` (editor-sourced pairs) and
+        ``recompute_all`` (stored-formula pairs).
+        """
+        # Build eval context.  h5_ctx may contain None values for datasets that
+        # haven't been loaded yet (names-only mode).  Ask the on-demand loader
+        # to fetch each such entry; cache the result back into _h5_ctx so that
+        # repeated evaluations don't trigger redundant file opens.
+        xr_ctx: dict = {}
+        for k, v in self._h5_ctx.items():
+            if v is None and self._h5_loader is not None:
+                try:
+                    v = self._h5_loader(k)
+                    if v is not None:
+                        self._h5_ctx[k] = v          # cache for next call
+                        if self._km is not None:      # sync IPython kernel
+                            self._km.kernel.shell.user_ns['_xr'][k] = v
+                except Exception as exc:
+                    logger.warning(f'On-demand H5 loader failed for {k!r}: {exc}')
+            if v is not None:
+                xr_ctx[k] = v
+        xr_ctx.update(self._computed)
         computed_names = set(self._computed.keys())
+        # Names whose stored Dataset has a variable with the *same* name — i.e.
+        # results that were DataArrays, wrapped via .to_dataset(name=name).
+        # Only these can be safely auto-dereferenced as _xr["name"]["name"].
+        # Dataset-derived results (e.g. from .mean() on a whole Dataset) keep
+        # their original variable names and must stay as _xr["name"].
+        da_computed_names: set = {
+            n for n, ds in self._computed.items()
+            if hasattr(ds, 'data_vars') and n in ds.data_vars
+        }
 
         try:
             import xarray as xr
@@ -698,7 +919,7 @@ class FormulaConsole(QWidget):
         for name, expr in pairs:
             try:
                 formula_eval, _ = replace_names_in_formula_xr(
-                    expr, computed_names=computed_names)
+                    expr, computed_names=da_computed_names)
                 ns = {'np': np, '_xr': xr_ctx_eval}
                 if xr is not None:
                     ns['xr'] = xr
@@ -710,8 +931,10 @@ class FormulaConsole(QWidget):
                 # DataWithAxes.from_xarray and materialises dask arrays).
                 if xr is not None and isinstance(result, xr.DataArray):
                     ds = result.to_dataset(name=name)
+                    da_computed_names.add(name)   # auto-deref safe for this name
                 elif xr is not None and isinstance(result, xr.Dataset):
                     ds = result
+                    # Dataset keeps its original variable names — not safe to deref
                 else:
                     # Non-xarray result: wrap via DWA then convert
                     try:
@@ -725,8 +948,9 @@ class FormulaConsole(QWidget):
                     xr_ctx_eval[name] = ds
                     computed_names.add(name)
                     self._computed[name] = ds
+                    self._computed_formulas[name] = expr
                     self._editor.update_computed(name, ds)
-                    if _QTCONSOLE:
+                    if self._km is not None:
                         self._km.kernel.shell.user_ns['_xr'][name] = ds
                     self.variable_stored_sig.emit(name, ds, expr)
 
@@ -756,21 +980,234 @@ class FormulaConsole(QWidget):
                     f'<br><details><summary style="color:#888">traceback</summary>'
                     f'<pre style="font-size:9pt">{tb}</pre></details>')
 
+    # ── Save / Load formulas (TOML) ───────────────────────────────────────────
+
+    def _save_formulas(self) -> None:
+        """Save the current editor formulas to a TOML file.
+
+        Format::
+
+            version = 1
+
+            [formulas]
+            a = '{det/source}["CH00"].mean("time")'
+            b = '{a} + 1'
+        """
+        text = self._editor.toPlainText().strip()
+        if not text:
+            return
+        pairs = parse_named_formulae(text)
+        if not pairs:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, 'Save formulas', '',
+            'TOML files (*.toml);;All files (*)')
+        if not path:
+            return
+        try:
+            lines = ['version = 1\n', '\n', '[formulas]\n']
+            for name, expr in pairs:
+                # TOML literal strings (single-quoted) need no escaping and
+                # work perfectly for expressions which only use double-quotes.
+                # Fall back to a basic string with escaping if a single quote
+                # appears in the expression (extremely rare).
+                if "'" not in expr:
+                    lines.append(f"{name} = '{expr}'\n")
+                else:
+                    escaped = expr.replace('\\', '\\\\').replace('"', '\\"')
+                    lines.append(f'{name} = "{escaped}"\n')
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.writelines(lines)
+        except Exception as exc:
+            self._output_widget.log(
+                f'<span style="color:red"><b>\u2717 Save failed:</b> '
+                f'{_html.escape(str(exc))}</span>')
+
+    def _load_formulas(self) -> None:
+        """Load formulas from a TOML file into the editor (replaces content)."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Load formulas', '',
+            'TOML files (*.toml);;All files (*)')
+        if not path:
+            return
+        try:
+            try:
+                import tomllib  # stdlib ≥ Python 3.11
+            except ImportError:
+                try:
+                    import tomli as tomllib  # third-party fallback
+                except ImportError:
+                    raise ImportError(
+                        'TOML support requires Python ≥ 3.11 (tomllib) '
+                        'or the "tomli" package.')
+            with open(path, 'rb') as fh:
+                data = tomllib.load(fh)
+            formulas: dict = data.get('formulas', {})
+            if not formulas:
+                return
+            text = '\n'.join(f'{name} = {expr}' for name, expr in formulas.items())
+            self._editor.setPlainText(text)
+        except Exception as exc:
+            self._output_widget.log(
+                f'<span style="color:red"><b>\u2717 Load failed:</b> '
+                f'{_html.escape(str(exc))}</span>')
+
     # ── Public API ────────────────────────────────────────────────────────────
 
+    def set_h5_loader(self, loader) -> None:
+        """Register an on-demand H5 dataset loader.
+
+        Parameters
+        ----------
+        loader:
+            Callable ``(rel_path: str) -> xr.Dataset | None``.  Called by
+            ``_run_formula_pairs`` when it encounters a None value in
+            ``_h5_ctx`` (i.e. a dataset that hasn't been loaded yet).
+        """
+        self._h5_loader = loader
+
     def push_h5_context(self, xr_ctx: dict) -> None:
-        """Inject the H5 xarray context dict into the console namespace."""
+        """Inject the H5 xarray context dict into the console namespace.
+
+        *xr_ctx* may map names to ``None`` (names-only / lazy mode).  Only
+        non-None values are pushed into the IPython kernel namespace; the
+        editor autocomplete sees all names regardless.
+        """
         self._h5_ctx = xr_ctx
         self._editor.set_context(self._h5_ctx, self._computed)
-        if _QTCONSOLE:
-            self._km.kernel.shell.user_ns['_xr'].update(xr_ctx)
+        if self._km is not None:
+            loaded = {k: v for k, v in xr_ctx.items() if v is not None}
+            self._km.kernel.shell.user_ns['_xr'].update(loaded)
+        self._validate_formulas()
 
     def push_computed(self, name: str, ds) -> None:
         """Add or update a computed variable in the console namespace."""
         self._computed[name] = ds
         self._editor.update_computed(name, ds)
-        if _QTCONSOLE:
+        if self._km is not None:
             self._km.kernel.shell.user_ns['_xr'][name] = ds
+
+    def update_computed_live(self, name: str, ds) -> None:
+        """Refresh a computed variable's data without touching the IPython namespace.
+
+        Called by DataMixerGUI._eval_formulas on every live-sync tick so that
+        chained formulas always see the latest result.  The IPython scratchpad
+        is intentionally left at the last user-committed state.
+
+        ``_editor._computed`` is the same dict object as ``self._computed``
+        (assigned by reference in ``set_context``), so no extra call is needed.
+        """
+        self._computed[name] = ds
+
+    def remove_computed(self, name: str) -> None:
+        """Remove a single computed variable and release its reference."""
+        self._computed.pop(name, None)
+        self._computed_formulas.pop(name, None)
+        self._editor.remove_computed(name)
+        if self._km is not None:
+            self._km.kernel.shell.user_ns['_xr'].pop(name, None)
+
+    def _validate_formulas(self) -> None:
+        """Live-check formula {name} refs and update the toolbar indicator.
+
+        Runs on every keystroke (via textChanged).  Only the parser and a
+        set-lookup are called — no H5 I/O or eval — so it is fast.
+        """
+        if self._validation_label is None:
+            return
+        text = self._editor.toPlainText().strip()
+        if not text:
+            self._validation_label.setText('')
+            return
+        pairs = parse_named_formulae(text)
+        if not pairs:
+            self._validation_label.setText(
+                '<span style="color:#999">no formula</span>')
+            return
+        available = set(self._h5_ctx.keys()) | set(self._computed.keys())
+        errors: list[str] = []
+        for name, expr in pairs:
+            missing = [r for r in re.findall(r'\{([^}]+)\}', expr)
+                       if r not in available]
+            if missing:
+                errors.append(f'{name}: {", ".join(missing)}')
+            available.add(name)   # cascading — later formulas may use this output
+        if errors:
+            tip = 'Unresolved references:\n' + '\n'.join(errors)
+            self._validation_label.setToolTip(tip)
+            self._validation_label.setText(
+                f'<span style="color:#c87000">⚠ {len(errors)} broken ref(s)</span>')
+        else:
+            n = len(pairs)
+            self._validation_label.setToolTip('')
+            self._validation_label.setText(
+                f'<span style="color:#1a6b1a">✓ {n} formula(s) ready</span>')
+
+    def recompute_all(self) -> None:
+        """Re-run all stored formulas (from ``_computed_formulas``) in order.
+
+        Runs a validation pass first: each formula's ``{name}`` references are
+        checked against the H5 context and the formulas that precede it.  The
+        output panel shows a per-formula status (✓ ready / ⚠ broken refs)
+        before evaluation begins.
+
+        Useful after loading a new H5 file with the same dataset structure.
+        """
+        pairs = list(self._computed_formulas.items())
+        if not pairs:
+            self._output_widget.log(
+                '<span style="color:#888"><i>\u21ba No stored formulas to recompute.</i></span>')
+            return
+
+        # ── Validation pass ───────────────────────────────────────────────────
+        available: set = set(self._h5_ctx.keys())
+        validation: dict[str, list[str]] = {}
+        for name, expr in pairs:
+            missing = [
+                r for r in re.findall(r'\{([^}]+)\}', expr)
+                if r not in available
+            ]
+            validation[name] = missing
+            available.add(name)   # assume it will succeed for downstream deps
+
+        n_broken = sum(1 for m in validation.values() if m)
+        status_color = '#c87000' if n_broken else '#1a6b1a'
+        self._output_widget.log(
+            f'<b>\u21ba Recompute all</b> — '
+            f'<span style="color:{status_color}">'
+            f'{len(pairs) - n_broken}/{len(pairs)} formula(s) valid</span>')
+
+        for name, missing in validation.items():
+            if missing:
+                refs = ', '.join(f'<code>{{{_html.escape(r)}}}</code>' for r in missing)
+                self._output_widget.log(
+                    f'&nbsp;&nbsp;<span style="color:#c87000">'
+                    f'\u26a0 <b>{_html.escape(name)}</b>: missing {refs}</span>')
+            else:
+                self._output_widget.log(
+                    f'&nbsp;&nbsp;<span style="color:#1a6b1a">'
+                    f'\u2713 <b>{_html.escape(name)}</b></span>')
+
+        if n_broken == len(pairs):
+            return   # nothing can run
+
+        # ── Evaluation ───────────────────────────────────────────────────────
+        self._run_formula_pairs(pairs)
+
+    def recall_formula(self, name: str) -> None:
+        """Append ``name = <formula>`` for *name* to the formula editor.
+
+        Called when the user selects "→ Send formula to editor" from the
+        VariableBrowserWidget right-click context menu.
+        """
+        if name not in self._computed_formulas:
+            return
+        line = f'{name} = {self._computed_formulas[name]}'
+        current = self._editor.toPlainText()
+        if current and not current.endswith('\n'):
+            line = '\n' + line
+        self._editor.appendPlainText(line)
+        self._editor.setFocus()
 
     def insert_at_cursor(self, text: str) -> None:
         """Insert *text* into the formula editor at the current cursor position."""

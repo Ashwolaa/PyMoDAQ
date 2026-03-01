@@ -784,6 +784,91 @@ class H5Backend:
         if not keep_open:
             self.close_file()
 
+    @classmethod
+    def open_for_reading(cls, path: 'Path', force_swmr: bool = False) -> tuple['H5Backend', bool]:
+        """Open an H5 file read-only, with automatic SWMR fallback.
+
+        This is the recommended way to open a PyMoDAQ H5 file for reading
+        when the file may simultaneously be open for writing by a running
+        DAQ scan (with or without SWMR mode).
+
+        Strategy:
+
+        1. If *force_swmr* is ``True``, skip the normal-open attempts and go
+           straight to h5py SWMR reader mode (used by ``H5Browser.load_file``
+           when called with ``swmr=True``).
+        2. Otherwise, try each available backend with ``mode='r'`` and
+           ``locking=False``.  The ``tables`` backend will raise ``TypeError``
+           (unknown keyword); this is caught and the next attempt is made.
+        3. If all normal opens fail, retry with h5py in SWMR reader mode.
+
+        Parameters
+        ----------
+        path : Path or str
+            Path to the HDF5 file.
+        force_swmr : bool
+            When ``True``, skip the normal-open attempts and open directly
+            in SWMR reader mode.
+
+        Returns
+        -------
+        instance : H5Backend (or subclass)
+            An open instance (the concrete type depends on which subclass
+            ``cls`` refers to — polymorphic via ``cls(backend=backend)``).
+        is_swmr : bool
+            ``True`` when the file was opened in SWMR reader mode.
+
+        Raises
+        ------
+        RuntimeError
+            When the file cannot be opened with any strategy.
+        """
+        from pathlib import Path as _Path
+        path = _Path(path)
+        errors: dict = {}
+
+        # HDF5 prints diagnostic messages to stderr on every failed open().
+        # Since we are *probing* (failures are expected), silence those messages
+        # while preserving the Python exception for our own error handling.
+        try:
+            from h5py import h5e as _h5e
+            _silence = _h5e.silence_errors
+        except (ImportError, AttributeError):
+            from contextlib import nullcontext as _silence
+
+        if not force_swmr:
+            for backend in [b for b in ('tables', 'h5py') if b in backends_available]:
+                instance = cls(backend=backend)
+                with _silence():
+                    try:
+                        instance.open_file(path, 'r', locking=False)
+                        return instance, False
+                    except Exception as exc:
+                        errors[backend] = exc
+                        try:
+                            instance.close_file()
+                        except Exception:
+                            pass
+
+        # Last resort (or forced): h5py SWMR reader
+        if 'h5py' in backends_available:
+            instance = cls(backend='h5py')
+            with _silence():
+                try:
+                    instance.open_file(path, 'r', swmr_mode=True, locking=False)
+                    return instance, True
+                except Exception as exc:
+                    errors['h5py-swmr'] = exc
+                    try:
+                        instance.close_file()
+                    except Exception:
+                        pass
+
+        raise RuntimeError(
+            f'Cannot open {path.name} for reading:\n'
+            + '\n'.join(f'  {b}: {e}' for b, e in errors.items())
+        )
+
     def define_compression(self, compression, compression_opts):
         """Define cmpression library and level of compression
         Parameters

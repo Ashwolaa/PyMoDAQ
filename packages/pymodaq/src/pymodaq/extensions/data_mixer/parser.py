@@ -70,12 +70,14 @@ def replace_names_in_formula_xr(
     ctx_var:
         The Python identifier for the context dict in the eval scope.
     computed_names:
-        Optional set of names that are *computed* results (as opposed to raw H5
-        datasets).  For computed names the Dataset always holds exactly one
-        variable named after the result, so we can auto-dereference:
-        ``{name}`` → ``_xr["name"]["name"]``  (yields a DataArray directly).
-        For H5 names or when *computed_names* is ``None`` the original
-        ``_xr["name"]`` (a Dataset) is produced.
+        Optional set of computed names whose stored Dataset has a variable with
+        the *same* name as the key — i.e. results that originated as a
+        ``DataArray`` and were wrapped via ``.to_dataset(name=name)``.
+        For these, ``{name}`` is auto-dereferenced to
+        ``_xr["name"]["name"]`` (yields the DataArray directly).
+        Dataset-derived computed results keep their original variable names and
+        must NOT be listed here; they are treated like H5 datasets and produce
+        the plain ``_xr["name"]`` form.
     """
     formula_tmp = formula[:]
     names = []

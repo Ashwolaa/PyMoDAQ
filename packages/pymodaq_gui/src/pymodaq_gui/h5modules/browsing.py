@@ -229,21 +229,9 @@ class H5Browser(QObject, ActionManager):
             if Path(h5file_path).is_file():
                 if self.h5utils.isopen():
                     self.h5utils.close_file()
-                try:
-                    self.h5utils.open_file(h5file_path, 'r', swmr_mode=swmr, locking=False)
-                except Exception as e:
-                    if not swmr:
-                        # The file may be locked by an SWMR writer — retry
-                        # with h5py backend in SWMR reader mode
-                        logger.info(f'Could not open file ({e}), retrying '
-                                    f'with h5py SWMR reader mode')
-                        self.h5utils.close_file()
-                        self.h5utils.set_backend('h5py')
-                        self.h5utils.open_file(h5file_path, 'r',
-                                               swmr_mode=True, locking=False)
-                        self._swmr = True
-                    else:
-                        raise
+                self.h5utils, self._swmr = H5BrowserUtil.open_for_reading(
+                    h5file_path, force_swmr=swmr
+                )
             else:
                 return
         else:
