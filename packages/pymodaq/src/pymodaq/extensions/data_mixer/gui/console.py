@@ -48,6 +48,8 @@ from pymodaq.extensions.data_mixer.gui.formatters import (
 from pymodaq_data.data import DataToExport
 from pymodaq_utils.logger import set_logger, get_module_name
 
+from pymodaq_gui.utils.styling import create_icon
+
 logger = set_logger(get_module_name(__file__))
 
 
@@ -657,6 +659,7 @@ class FormulaConsole(QWidget):
         compute_action.setToolTip(
             'Evaluate formulas in the editor and store results  (Ctrl+Enter)')
         compute_action.triggered.connect(self._compute_and_store)
+        compute_action.setIcon(create_icon('function'))
         toolbar.addAction(compute_action)
 
         toolbar.addSeparator()
@@ -664,11 +667,13 @@ class FormulaConsole(QWidget):
         save_action = QAction('Save\u2026', toolbar)
         save_action.setToolTip('Save current formulas to a TOML file')
         save_action.triggered.connect(self._save_formulas)
+        save_action.setIcon(create_icon('save_as'))
         toolbar.addAction(save_action)
 
         load_action = QAction('Load\u2026', toolbar)
         load_action.setToolTip('Load formulas from a TOML file (replaces editor content)')
         load_action.triggered.connect(self._load_formulas)
+        load_action.setIcon(create_icon('folder_data'))
         toolbar.addAction(load_action)
 
         if _DASK:

@@ -1,25 +1,33 @@
 """Variable browser widget for the DataMixer GUI.
 
-Shows H5 datasets and computed results in a two-section tree.  Double-clicking
-a node inserts a ``{name}`` reference into the formula console.
+Shows H5 datasets (top pane) and computed results (bottom pane) in two
+independent tree widgets separated by a vertical splitter so that computed
+variables remain visible regardless of how many H5 datasets are loaded.
+Double-clicking a node inserts a ``{name}`` reference into the formula console.
 """
 from __future__ import annotations
 
 from typing import Optional
 
 from qtpy.QtCore import Qt, Signal
-from pymodaq_utils.logger import set_logger, get_module_name
 from qtpy.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QLineEdit, QAbstractItemView, QMenu, QAction, QPushButton,
+    QApplication,
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QTreeWidget, QTreeWidgetItem,
+    QLineEdit, QAbstractItemView,
+    QMenu, QAction, QPushButton, QSplitter,
 )
 from qtpy.QtGui import QFont
 
+from pymodaq_utils.logger import set_logger, get_module_name
+
 logger = set_logger(get_module_name(__file__))
+
+from pymodaq_gui.utils.styling import create_icon
 
 
 class VariableBrowserWidget(QWidget):
-    """Tree widget showing H5 datasets (read-only) and computed variables.
+    """Two-pane tree: H5 datasets (top) and computed variables (bottom).
 
     Signals
     -------
@@ -32,27 +40,29 @@ class VariableBrowserWidget(QWidget):
         User asked to delete the named computed variable.
     show_var_sig(name, display)
         User toggled the Display checkbox on a computed variable row.
-        The main GUI opens/closes the viewer tab for this variable.
     send_formula_sig(name)
         Recall the formula for *name* in the formula editor.
     recompute_all_sig()
         Request recompute of all stored formulas.
     clear_all_computed_sig()
         Request full clear of computed vars.
+    load_and_show_h5_sig(name)
+        User requested to load and display an H5 dataset in the viewer window.
     """
 
-    item_selected_sig   = Signal(str, str)    # (ds_name, var_name)
-    insert_ref_sig      = Signal(str)          # text to insert at cursor
-    delete_computed_sig = Signal(str)          # name to remove
-    show_var_sig        = Signal(str, bool)    # (computed_name, display)
-    send_formula_sig    = Signal(str)          # name → recall formula in editor
-    recompute_all_sig   = Signal()             # request recompute of all stored formulas
-    clear_all_computed_sig = Signal()          # request full clear of computed vars
+    item_selected_sig      = Signal(str, str)
+    insert_ref_sig         = Signal(str)
+    delete_computed_sig    = Signal(str)
+    show_var_sig           = Signal(str, bool)
+    send_formula_sig       = Signal(str)
+    recompute_all_sig      = Signal()
+    clear_all_computed_sig = Signal()
+    load_and_show_h5_sig   = Signal(str)
 
     # Tree column indices
     _COL_NAME = 0
     _COL_INFO = 1
-    _COL_DISP = 2   # Display-in-viewer checkbox (Computed rows)
+    _COL_DISP = 2   # Display-in-viewer checkbox (Computed rows only)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -61,62 +71,74 @@ class VariableBrowserWidget(QWidget):
 
     # ── setup ─────────────────────────────────────────────────────────────────
 
+    def _make_tree(self, header_label: str) -> tuple[QTreeWidget, QTreeWidgetItem]:
+        """Create a QTreeWidget with 3 standard columns and a bold root item."""
+        tree = QTreeWidget()
+        tree.setColumnCount(3)
+        tree.setHeaderLabels([header_label, 'Info', '👁'])
+        tree.header().setStretchLastSection(False)
+        tree.header().resizeSection(self._COL_NAME, 200)
+        tree.header().resizeSection(self._COL_INFO, 160)
+        tree.header().resizeSection(self._COL_DISP,  24)
+        tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        tree.customContextMenuRequested.connect(self._on_context_menu)
+        tree.itemDoubleClicked.connect(self._on_double_click)
+        tree.itemClicked.connect(self._on_single_click)
+
+        bold = QFont()
+        bold.setBold(True)
+        root = QTreeWidgetItem(tree, [header_label, '', ''])
+        root.setFont(self._COL_NAME, bold)
+        root.setFlags(root.flags() & ~Qt.ItemIsSelectable)
+        root.setExpanded(True)
+        return tree, root
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
 
-        # Search box
+        # Shared filter box — applies to both trees
         self._search = QLineEdit()
         self._search.setPlaceholderText('Filter variables…')
         self._search.textChanged.connect(self._apply_filter)
         layout.addWidget(self._search)
 
-        # Tree
-        self._tree = QTreeWidget()
-        self._tree.setColumnCount(3)
-        self._tree.setHeaderLabels(['Name', 'Info', '👁'])
-        self._tree.header().setStretchLastSection(False)
-        self._tree.header().resizeSection(self._COL_NAME, 200)
-        self._tree.header().resizeSection(self._COL_INFO, 160)
-        self._tree.header().resizeSection(self._COL_DISP,  24)
-        self._tree.setToolTip('Computed: 👁 = send to viewer window')
-        self._tree.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self._tree.customContextMenuRequested.connect(self._on_context_menu)
-        self._tree.itemDoubleClicked.connect(self._on_double_click)
-        self._tree.itemClicked.connect(self._on_single_click)
-        layout.addWidget(self._tree)
+        # Two independent trees in a vertical splitter
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        splitter.setChildrenCollapsible(False)
 
-        # Top-level section headers
-        bold = QFont()
-        bold.setBold(True)
+        self._h5_tree, self._h5_root = self._make_tree('H5 Data')
+        self._h5_tree.setToolTip('Double-click to insert {reference} at cursor')
 
-        self._h5_root = QTreeWidgetItem(self._tree, ['H5 Data', '', ''])
-        self._h5_root.setFont(self._COL_NAME, bold)
-        self._h5_root.setFlags(self._h5_root.flags() & ~Qt.ItemIsSelectable)
+        self._comp_tree, self._comp_root = self._make_tree('Computed')
+        self._comp_tree.setToolTip('👁 = display in viewer window')
 
-        self._comp_root = QTreeWidgetItem(self._tree, ['Computed', '', ''])
-        self._comp_root.setFont(self._COL_NAME, bold)
-        self._comp_root.setFlags(self._comp_root.flags() & ~Qt.ItemIsSelectable)
-
-        self._tree.expandAll()
+        splitter.addWidget(self._h5_tree)
+        splitter.addWidget(self._comp_tree)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 1)
+        layout.addWidget(splitter)
 
         # Mini-toolbar at bottom
         bottom_row = QHBoxLayout()
         bottom_row.setContentsMargins(0, 2, 0, 0)
-        recompute_btn = QPushButton('\u21ba  Recompute all')
+
+        recompute_btn = QPushButton('Recompute all')
         recompute_btn.setFlat(True)
         recompute_btn.setToolTip(
             'Re-run all previously stored formulas with current H5 data.\n'
             'A validation pass is shown in the output panel first.')
         recompute_btn.clicked.connect(self.recompute_all_sig.emit)
+        recompute_btn.setIcon(create_icon('repeat'))
         bottom_row.addWidget(recompute_btn)
 
-        clear_btn = QPushButton('\u27f3  Clear computed')
+        clear_btn = QPushButton('Clear computed')
         clear_btn.setFlat(True)
         clear_btn.setToolTip('Clear all computed variables from browser and console')
         clear_btn.clicked.connect(self.clear_all_computed_sig.emit)
+        clear_btn.setIcon(create_icon('ink_eraser'))
         bottom_row.addWidget(clear_btn)
 
         layout.addLayout(bottom_row)
@@ -136,7 +158,6 @@ class VariableBrowserWidget(QWidget):
             When present the Info column is filled immediately without loading
             any array data.  Falls back to ``_ds_info(ds)`` when absent.
         """
-        # Remove old H5 children
         while self._h5_root.childCount():
             self._h5_root.removeChild(self._h5_root.child(0))
         self._h5_names = []
@@ -153,7 +174,6 @@ class VariableBrowserWidget(QWidget):
 
         for origin, items in scan_groups.items():
             if multi_scan:
-                # Create a collapsible sub-header for each scan
                 scan_item = QTreeWidgetItem(self._h5_root, [origin, '', '', ''])
                 scan_item.setFont(self._COL_NAME, italic_font)
                 scan_item.setFlags(scan_item.flags() & ~Qt.ItemIsSelectable)
@@ -164,7 +184,6 @@ class VariableBrowserWidget(QWidget):
 
             for full_name, ds in items:
                 self._h5_names.append(full_name)
-                # Strip the scan prefix from the label when grouped
                 display = full_name.split('/', 1)[-1] if multi_scan else full_name
                 if info is not None:
                     info_str = info.get(full_name, '—')
@@ -176,14 +195,14 @@ class VariableBrowserWidget(QWidget):
                 ds_item.setData(self._COL_NAME, Qt.UserRole, ('h5_ds', full_name))
                 ds_item.setToolTip(self._COL_NAME, full_name)
 
-                # Add one leaf per data variable (only when ds is not None)
                 if ds is not None:
                     try:
                         for var_name, var in ds.data_vars.items():
                             dims = ', '.join(str(d) for d in var.dims)
                             leaf_info = f'{var.dtype} ({dims})'
                             leaf = QTreeWidgetItem(ds_item, [var_name, leaf_info, ''])
-                            leaf.setData(self._COL_NAME, Qt.UserRole, ('h5_var', full_name, var_name))
+                            leaf.setData(self._COL_NAME, Qt.UserRole,
+                                         ('h5_var', full_name, var_name))
                     except Exception as exc:
                         logger.debug(f'Cannot build leaf nodes for {full_name!r}: {exc}')
 
@@ -192,14 +211,12 @@ class VariableBrowserWidget(QWidget):
 
     def add_computed(self, name: str, ds):
         """Add or update a computed variable node."""
-        # Update existing item if present
         for i in range(self._comp_root.childCount()):
             item = self._comp_root.child(i)
             if item.text(self._COL_NAME) == name:
                 item.setText(self._COL_INFO, self._ds_info(ds))
                 return
 
-        # Create new item
         info = self._ds_info(ds)
         item = QTreeWidgetItem(self._comp_root, [name, info, ''])
         item.setData(self._COL_NAME, Qt.UserRole, ('computed', name))
@@ -227,19 +244,13 @@ class VariableBrowserWidget(QWidget):
         self._search.setText(text)
 
     def _iter_h5_ds_items(self):
-        """Yield every ``h5_ds`` QTreeWidgetItem, regardless of nesting depth.
-
-        Handles both flat mode (single scan — items are direct children of
-        ``_h5_root``) and grouped mode (multiple scans — items are children
-        of scan sub-header nodes).
-        """
+        """Yield every ``h5_ds`` QTreeWidgetItem, regardless of nesting depth."""
         for i in range(self._h5_root.childCount()):
             item = self._h5_root.child(i)
             data = item.data(self._COL_NAME, Qt.UserRole)
             if data and data[0] == 'h5_ds':
-                yield item   # flat / single-scan mode
+                yield item
             else:
-                # Scan sub-group header — yield its dataset children
                 for j in range(item.childCount()):
                     child = item.child(j)
                     cdata = child.data(self._COL_NAME, Qt.UserRole)
@@ -268,8 +279,7 @@ class VariableBrowserWidget(QWidget):
     def update_h5_info(self, name: str, ds) -> None:
         """Populate Info column (and child variable nodes) for an H5 row.
 
-        Called lazily after *ds* has been loaded on demand, so the browser
-        shows shape/dtype without having to load all datasets upfront.
+        Called lazily after *ds* has been loaded on demand.
         """
         if ds is None:
             return
@@ -277,7 +287,6 @@ class VariableBrowserWidget(QWidget):
             data = item.data(self._COL_NAME, Qt.UserRole)
             if data and data[0] == 'h5_ds' and data[1] == name:
                 item.setText(self._COL_INFO, self._ds_info(ds))
-                # Add per-variable leaf nodes if they aren't there yet
                 if item.childCount() == 0:
                     try:
                         for var_name, var in ds.data_vars.items():
@@ -303,12 +312,12 @@ class VariableBrowserWidget(QWidget):
     def _apply_filter(self, text: str):
         text = text.lower()
 
-        # ── H5 section (may have an extra scan-group level) ──────────────────
+        # ── H5 tree ──────────────────────────────────────────────────────────
         for i in range(self._h5_root.childCount()):
             item = self._h5_root.child(i)
             data = item.data(self._COL_NAME, Qt.UserRole)
             if data and data[0] == 'h5_ds':
-                # Flat mode: item is a dataset row
+                # Flat / single-scan mode
                 name_match = (not text) or (text in item.text(self._COL_NAME).lower())
                 item.setHidden(not name_match)
                 for j in range(item.childCount()):
@@ -316,7 +325,7 @@ class VariableBrowserWidget(QWidget):
                     child.setHidden(not (name_match or (
                         text and text in child.text(self._COL_NAME).lower())))
             else:
-                # Grouped mode: item is a scan sub-header
+                # Multi-scan: item is a scan sub-header
                 any_visible = False
                 for j in range(item.childCount()):
                     ds_item = item.child(j)
@@ -332,7 +341,7 @@ class VariableBrowserWidget(QWidget):
                             text and text in leaf.text(self._COL_NAME).lower())))
                 item.setHidden(not any_visible)
 
-        # ── Computed section ─────────────────────────────────────────────────
+        # ── Computed tree ─────────────────────────────────────────────────────
         for i in range(self._comp_root.childCount()):
             item = self._comp_root.child(i)
             visible = (not text) or (text in item.text(self._COL_NAME).lower())
@@ -375,23 +384,63 @@ class VariableBrowserWidget(QWidget):
             self.insert_ref_sig.emit(f'{{{name}}}')
 
     def _on_context_menu(self, pos):
-        item = self._tree.itemAt(pos)
+        tree = self.sender()
+        item = tree.itemAt(pos)
         if item is None:
             return
         data = item.data(self._COL_NAME, Qt.UserRole)
-        if data is None or data[0] != 'computed':
+        if data is None:
             return
-        name = data[1]
+
+        kind = data[0]
         menu = QMenu(self)
-        send_action = QAction('\u2192 Send formula to editor', self)
-        send_action.setToolTip('Append  name = <formula>  to the formula editor')
-        send_action.triggered.connect(lambda: self.send_formula_sig.emit(name))
-        menu.addAction(send_action)
-        menu.addSeparator()
-        delete_action = QAction('Delete variable', self)
-        delete_action.triggered.connect(lambda: self.delete_computed_sig.emit(name))
-        menu.addAction(delete_action)
-        menu.exec_(self._tree.viewport().mapToGlobal(pos))
+
+        if kind in ('h5_ds', 'h5_var'):
+            if kind == 'h5_ds':
+                _, ds_name = data
+                ref_text = f'{{{ds_name}}}'
+            else:
+                _, ds_name, var_name = data
+                ref_text = f'{{{ds_name}}}["{var_name}"]'
+
+            copy_action = QAction('Copy reference', self)
+            copy_action.setToolTip(f'Copy  {ref_text}  to clipboard')
+            copy_action.triggered.connect(
+                lambda checked=False, t=ref_text: QApplication.clipboard().setText(t)
+            )
+            menu.addAction(copy_action)
+
+            insert_action = QAction('Insert reference', self)
+            insert_action.setToolTip('Insert reference at formula cursor (same as double-click)')
+            insert_action.triggered.connect(
+                lambda checked=False, t=ref_text: self.insert_ref_sig.emit(t)
+            )
+            menu.addAction(insert_action)
+
+            menu.addSeparator()
+
+            show_action = QAction('Open in viewer', self)
+            show_action.setToolTip('Load this dataset and display it in the viewer window')
+            show_action.triggered.connect(
+                lambda checked=False, n=ds_name: self.load_and_show_h5_sig.emit(n)
+            )
+            menu.addAction(show_action)
+
+        elif kind == 'computed':
+            name = data[1]
+            send_action = QAction('\u2192 Send formula to editor', self)
+            send_action.setToolTip('Append  name = <formula>  to the formula editor')
+            send_action.triggered.connect(lambda: self.send_formula_sig.emit(name))
+            menu.addAction(send_action)
+            menu.addSeparator()
+            delete_action = QAction('Delete variable', self)
+            delete_action.triggered.connect(lambda: self.delete_computed_sig.emit(name))
+            menu.addAction(delete_action)
+
+        else:
+            return
+
+        menu.exec_(tree.viewport().mapToGlobal(pos))
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -407,4 +456,3 @@ class VariableBrowserWidget(QWidget):
         except Exception as exc:
             logger.debug(f'Cannot format dataset info: {exc}')
             return ''
-

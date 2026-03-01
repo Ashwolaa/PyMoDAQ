@@ -43,6 +43,8 @@ logger = set_logger(get_module_name(__file__))
 config = Config()
 logger = set_logger(get_module_name(__file__))
 
+from pymodaq_gui.utils.styling import create_icon
+
 class DataMixerGUI(QWidget):
     """Main DataMixer GUI widget.
 
@@ -123,6 +125,7 @@ class DataMixerGUI(QWidget):
         file_row = QHBoxLayout()
         browse_btn = QPushButton('Browse')
         browse_btn.clicked.connect(self._browse)
+        browse_btn.setIcon(create_icon('folder_data'))
         self._path_edit = QLineEdit()
         self._path_edit.setPlaceholderText('Path to .h5 file …')
         load_btn = QPushButton('Load / Reload')
@@ -130,24 +133,20 @@ class DataMixerGUI(QWidget):
             'Scan the H5 file and populate the variable browser.\n'
             'Stored formulas are re-evaluated automatically afterward.')
         load_btn.clicked.connect(self._load_keys)
+        load_btn.setIcon(create_icon('refresh'))
 
-        refresh_btn = QPushButton('\u21bb Refresh Tree')
-        refresh_btn.setToolTip(
+        self._refresh_btn = QPushButton('Refresh Tree')
+        self._refresh_btn.setToolTip(
             'Rescan the H5 file for new datasets without recomputing formulas.\n'
-            'Use this when new scans have been added to the file.')
-        refresh_btn.clicked.connect(self._refresh_tree)
-
-        mode_text = 'IPython + Editor ✓' if _QTCONSOLE else 'text editor'
-        mode_label = QLabel(f'[{mode_text}]')
-        mode_label.setStyleSheet(
-            'color: #1a6b1a; font-weight: bold;' if _QTCONSOLE
-            else 'color: #888;')
+            'Use this when new scans have been added to the file.\n'
+            '(Disabled during live sync — the live handle owns the file.)')
+        self._refresh_btn.clicked.connect(self._refresh_tree)
+        self._refresh_btn.setIcon(create_icon('account_tree'))
 
         file_row.addWidget(browse_btn)
         file_row.addWidget(self._path_edit, stretch=1)
         file_row.addWidget(load_btn)
-        file_row.addWidget(refresh_btn)
-        file_row.addWidget(mode_label)
+        file_row.addWidget(self._refresh_btn)
         root.addLayout(file_row, 0)
 
         # Live-sync toolbar row
@@ -158,6 +157,9 @@ class DataMixerGUI(QWidget):
             'Start/stop periodic refresh of H5 datasets used by stored formulas.'
         )
         self._sync_btn.toggled.connect(self._toggle_live_sync)
+        self._sync_icon_start = create_icon('start')
+        self._sync_icon_stop  = create_icon('stop_circle')
+        self._sync_btn.setIcon(self._sync_icon_start)
 
         self._interval_spin = QSpinBox()
         self._interval_spin.setRange(100, 60_000)
@@ -177,12 +179,18 @@ class DataMixerGUI(QWidget):
             'Click ↻ Reload after a new scan finishes to refresh this list.')
         self._scan_combo.currentTextChanged.connect(self._on_active_scan_changed)
 
+        show_viewers_btn = QPushButton('Show Viewers')
+        show_viewers_btn.setToolTip('Raise the floating viewer window to the front')
+        show_viewers_btn.clicked.connect(self._raise_viewers)
+        show_viewers_btn.setIcon(create_icon('visibility'))
+
         sync_row.addWidget(self._sync_btn)
         sync_row.addWidget(QLabel('Interval:'))
         sync_row.addWidget(self._interval_spin)
         sync_row.addWidget(self._status_label, stretch=1)
         sync_row.addWidget(QLabel('Active scan:'))
         sync_row.addWidget(self._scan_combo)
+        sync_row.addWidget(show_viewers_btn)
         root.addLayout(sync_row, 0)
 
         # Main horizontal splitter
@@ -212,6 +220,10 @@ class DataMixerGUI(QWidget):
 
         root.addWidget(h_splitter, 1)  # stretch=1: splitter takes all remaining height
 
+        # Set console tooltip to show IPython availability (replaces the old mode label)
+        mode_text = 'IPython + Editor' if _QTCONSOLE else 'Plain-text editor'
+        self._console.setToolTip(f'Formula console  [{mode_text}]')
+
         # Signal wiring
         self._browser.item_selected_sig.connect(self._on_item_selected)
         self._browser.insert_ref_sig.connect(self._console.insert_at_cursor)
@@ -220,6 +232,7 @@ class DataMixerGUI(QWidget):
         self._browser.send_formula_sig.connect(self._console.recall_formula)
         self._browser.recompute_all_sig.connect(self._console.recompute_all)
         self._browser.clear_all_computed_sig.connect(self._on_clear_computed)
+        self._browser.load_and_show_h5_sig.connect(self._on_load_and_show_h5)
         self._console.variable_stored_sig.connect(self._on_new_variable)
         self._console.clear_computed_sig.connect(self._on_clear_computed)
 
@@ -293,6 +306,35 @@ class DataMixerGUI(QWidget):
         self._display_names.discard(name)
         self._browser.uncheck_display(name)
 
+    def _on_load_and_show_h5(self, name: str) -> None:
+        """Load an H5 dataset on demand and open it in the viewer window."""
+        ds = self._load_h5_dataset_for(name)
+        if ds is None:
+            self._status_label.setText(f'Cannot load {name!r}')
+            self._status_label.setStyleSheet('color: #c00; font-style: italic;')
+            return
+        try:
+            dwa = DataWithAxes.from_xarray(ds)
+        except Exception as exc:
+            logger.warning(f'Cannot convert {name!r} to DataWithAxes for viewer: {exc}')
+            return
+        if self._viewer_window is None:
+            self._viewer_window = DataViewerWindow()
+            self._viewer_window.tab_closed_sig.connect(self._on_viewer_tab_closed)
+        self._viewer_window.show_variable(name, dwa)
+        self._viewer_window.show()
+        self._viewer_window.raise_()
+
+    def _raise_viewers(self) -> None:
+        """Raise the viewer window to the front, or report if no tabs are open."""
+        if self._viewer_window is None or not self._viewer_window.variable_names:
+            self._status_label.setText('No viewer tabs open yet')
+            self._status_label.setStyleSheet('color: #666; font-style: italic;')
+            return
+        self._viewer_window.show()
+        self._viewer_window.raise_()
+        self._viewer_window.activateWindow()
+
     def _on_interval_changed(self, ms: int) -> None:
         if self._sync_timer.isActive():
             self._sync_timer.setInterval(ms)
@@ -325,6 +367,8 @@ class DataMixerGUI(QWidget):
             self._scan_progress = -1
             self._sync_timer.start(self._interval_spin.value())
             self._sync_btn.setText('■ Live Sync')
+            self._sync_btn.setIcon(self._sync_icon_stop)
+            self._refresh_btn.setEnabled(False)
             self._status_label.setText('Live sync started')
             # Fire an immediate first tick so existing formulas are evaluated
             # right away rather than waiting for the first timer interval.
@@ -338,6 +382,8 @@ class DataMixerGUI(QWidget):
                     logger.debug(f'Error closing live H5 handle: {exc}')
                 self._h5saver_live = None
             self._sync_btn.setText('▶ Live Sync')
+            self._sync_btn.setIcon(self._sync_icon_start)
+            self._refresh_btn.setEnabled(True)
             self._status_label.setText('Live sync stopped')
 
     def _on_new_variable(self, name: str, ds, formula: str) -> None:
