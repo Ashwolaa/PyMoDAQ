@@ -97,6 +97,14 @@ class TestSetupDocks:
 
 class TestSetupActions:
 
+    def test_show_settings_action_exists(self, gui):
+        assert gui.has_action('show_settings')
+
+    def test_show_settings_action_is_checkable_and_checked(self, gui):
+        action = gui.get_action('show_settings')
+        assert action.isCheckable()
+        assert action.isChecked()   # settings dock starts visible
+
     def test_browse_action_exists(self, gui):
         assert gui.has_action('browse')
 
@@ -173,6 +181,31 @@ class TestToggleLiveSync:
         gui._toggle_live_sync(False)
         assert fake.closed
         assert gui._h5saver_live is None
+
+    def test_toggle_on_locks_browse_and_load(self, gui, tmp_path):
+        """Starting sync must disable Browse + Load and make h5_path read-only."""
+        import h5py
+        h5path = tmp_path / 'lock_test.h5'
+        with h5py.File(h5path, 'w') as f:
+            f.create_dataset('d', data=[1, 2])
+        gui.settings.child('h5_path').setValue(str(h5path))
+        gui._toggle_live_sync(True)
+        assert not gui.get_action('browse').isEnabled()
+        assert not gui.get_action('load').isEnabled()
+        assert not gui.get_action('refresh_tree').isEnabled()
+        assert gui.settings.child('h5_path').opts.get('readonly', False)
+        gui._toggle_live_sync(False)
+
+    def test_toggle_off_unlocks_browse_and_load(self, gui):
+        gui.set_action_enabled('browse', False)
+        gui.set_action_enabled('load', False)
+        gui.set_action_enabled('refresh_tree', False)
+        gui.settings.child('h5_path').setOpts(readonly=True)
+        gui._toggle_live_sync(False)
+        assert gui.get_action('browse').isEnabled()
+        assert gui.get_action('load').isEnabled()
+        assert gui.get_action('refresh_tree').isEnabled()
+        assert not gui.settings.child('h5_path').opts.get('readonly', False)
 
     def test_toggle_off_re_enables_refresh_tree(self, gui):
         gui.set_action_enabled('refresh_tree', False)
