@@ -112,3 +112,11 @@ class TestDataViewerWindow:
         dwa = _dwa_0d('scalar')
         win.show_variable('scalar', dwa)
         assert win.has_variable('scalar')
+
+    def test_update_shape_change_recreates_tab(self, win):
+        win.clear()
+        win.show_variable('x', _dwa_1d('x', n=5))
+        # Update with different shape — tab should be recreated
+        win.update('x', _dwa_1d('x', n=10))
+        assert win.has_variable('x')
+        assert win._viewer_shapes['x'] == (1, 10)

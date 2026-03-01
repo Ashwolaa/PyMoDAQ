@@ -70,19 +70,6 @@ class DataViewerWindow(QWidget):
     def update(self, name: str, dwa: DataWithAxes) -> None:  # noqa: A003
         """Update an existing tab with new data.  No-op if the tab is absent.
 
-        If the data shape changed (e.g. the formula was replaced), the tab is
-        recreated so the viewer initialises with the right axis ranges.
-
-        For ViewerND (data with navigation axes), ``force_update=True`` is
-        passed to ``show_data`` to refresh the axes manager; without it,
-        ``BaseDataDisplayer.update_data`` uses a fast-path that replaces raw
-        arrays but leaves the axes manager stale, causing ``update_viewer_data``
-        to bail early and the navigator / signal panels to stop responding.
-
-        ``force_update=True`` has the side-effect of calling ``init_rois``,
-        which resets the navigator crosshair to the axis centre.  The crosshair
-        positions are therefore saved before the call and restored afterward so
-        the user's navigation position is preserved across live-sync ticks.
         """
         if name not in self._viewers:
             return

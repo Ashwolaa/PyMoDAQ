@@ -226,6 +226,13 @@ class VariableBrowserWidget(QWidget):
         self._comp_root.setExpanded(True)
         self._apply_filter(self._search.text())
 
+    def has_computed(self, name: str) -> bool:
+        """Return True if a computed variable with *name* is in the tree."""
+        for i in range(self._comp_root.childCount()):
+            if self._comp_root.child(i).text(self._COL_NAME) == name:
+                return True
+        return False
+
     def remove_computed(self, name: str):
         """Remove a computed variable by name."""
         for i in range(self._comp_root.childCount()):
