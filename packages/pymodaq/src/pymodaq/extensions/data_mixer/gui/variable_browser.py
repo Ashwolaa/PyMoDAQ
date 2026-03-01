@@ -14,7 +14,7 @@ from qtpy.QtWidgets import (
     QApplication,
     QWidget, QVBoxLayout, QHBoxLayout,
     QTreeWidget, QTreeWidgetItem,
-    QLineEdit, QAbstractItemView,
+    QHeaderView, QLineEdit, QAbstractItemView,
     QMenu, QAction, QPushButton, QSplitter,
 )
 from qtpy.QtGui import QFont
@@ -76,10 +76,15 @@ class VariableBrowserWidget(QWidget):
         tree = QTreeWidget()
         tree.setColumnCount(3)
         tree.setHeaderLabels([header_label, 'Info', '👁'])
-        tree.header().setStretchLastSection(False)
-        tree.header().resizeSection(self._COL_NAME, 200)
-        tree.header().resizeSection(self._COL_INFO, 160)
-        tree.header().resizeSection(self._COL_DISP,  24)
+        hdr = tree.header()
+        hdr.setStretchLastSection(False)
+        # Name: stretches to fill; user can drag the divider
+        hdr.setSectionResizeMode(self._COL_NAME, QHeaderView.ResizeMode.Stretch)
+        # Info: auto-sized to content; user can drag after initial sizing
+        hdr.setSectionResizeMode(self._COL_INFO, QHeaderView.ResizeMode.ResizeToContents)
+        # Eye column: fixed narrow strip
+        hdr.setSectionResizeMode(self._COL_DISP, QHeaderView.ResizeMode.Fixed)
+        hdr.resizeSection(self._COL_DISP, 28)
         tree.setSelectionMode(QAbstractItemView.SingleSelection)
         tree.setContextMenuPolicy(Qt.CustomContextMenu)
         tree.customContextMenuRequested.connect(self._on_context_menu)
@@ -111,6 +116,8 @@ class VariableBrowserWidget(QWidget):
 
         self._h5_tree, self._h5_root = self._make_tree('H5 Data')
         self._h5_tree.setToolTip('Double-click to insert {reference} at cursor')
+        # H5 data is for input only — display-in-viewer is a computed-only feature
+        self._h5_tree.setColumnHidden(self._COL_DISP, True)
 
         self._comp_tree, self._comp_root = self._make_tree('Computed')
         self._comp_tree.setToolTip('👁 = display in viewer window')

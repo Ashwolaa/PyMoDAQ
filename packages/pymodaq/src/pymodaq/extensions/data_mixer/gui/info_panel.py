@@ -7,6 +7,7 @@ from __future__ import annotations
 import html as _html
 from typing import Optional
 
+from qtpy.QtGui import QPalette
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 
 from pymodaq.extensions.data_mixer.gui.formatters import _format_xr_html
@@ -28,6 +29,33 @@ class InfoPanelWidget(QWidget):
         self._text.setReadOnly(True)
         self._text.setAcceptRichText(True)
         layout.addWidget(self._text)
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _palette_colors(self) -> dict:
+        """Derive HTML-safe colours from the widget's current palette.
+
+        Returns a dict suitable for passing to :func:`_format_xr_html`.
+        All colours adapt automatically to light / dark themes.
+        """
+        p = self._text.palette()
+        text = p.color(QPalette.ColorRole.Text)
+        window = p.color(QPalette.ColorRole.Window)
+        highlight = p.color(QPalette.ColorRole.Highlight)
+        # A "dim" colour sits midway between text and window — visible on
+        # both white and dark backgrounds without being as harsh as the
+        # full text colour.
+        dim = '#{:02x}{:02x}{:02x}'.format(
+            (text.red()   + window.red())   // 2,
+            (text.green() + window.green()) // 2,
+            (text.blue()  + window.blue())  // 2,
+        )
+        return {
+            'dim':     dim,
+            'type':    highlight.name(),
+            'dataset': highlight.name(),
+            'lazy':    highlight.name(),
+        }
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -53,7 +81,8 @@ class InfoPanelWidget(QWidget):
             return
 
         try:
-            badge_color = '#1a6b1a' if source == 'Computed' else '#555'
+            colors = self._palette_colors()
+            badge_color = colors['dataset'] if source == 'Computed' else colors['dim']
             badge = (f'<span style="color:{badge_color}; font-weight:bold">'
                      f'xr.Dataset</span> &nbsp;·&nbsp; '
                      f'<b>{_html.escape(ds_name)}</b> '
@@ -63,10 +92,10 @@ class InfoPanelWidget(QWidget):
 
             if formula:
                 html_parts.append(
-                    f'<br><span style="color:#555">Formula:</span> '
+                    f'<br><span style="color:{colors["dim"]}">Formula:</span> '
                     f'<code>{_html.escape(formula)}</code>')
 
-            html_parts.append('<br>' + _format_xr_html(ds, ds_name))
+            html_parts.append('<br>' + _format_xr_html(ds, ds_name, colors=colors))
 
             if var_name:
                 try:

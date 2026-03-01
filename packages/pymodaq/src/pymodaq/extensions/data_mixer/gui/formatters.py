@@ -140,10 +140,21 @@ def _wrap_result(result, name: str) -> DataWithAxes:
 
 # ── Rich output formatting ────────────────────────────────────────────────────
 
-def _format_xr_html(ds, result_name: str) -> str:
-    """HTML summary of an xr.Dataset — similar to IPython's xarray display."""
-    _C = 'color:#555'
-    _B = 'color:#1a3c6b'
+def _format_xr_html(ds, result_name: str, colors: dict | None = None) -> str:
+    """HTML summary of an xr.Dataset — similar to IPython's xarray display.
+
+    Parameters
+    ----------
+    colors:
+        Optional dict with keys ``'dim'`` (secondary label colour),
+        ``'type'`` (dtype/coord label colour) and ``'dataset'`` (header
+        colour).  When omitted, defaults that look reasonable in both light
+        and dark themes are used.
+    """
+    _c = colors or {}
+    _C = f'color:{_c.get("dim", "#888")}'
+    _B = f'color:{_c.get("type", "#1a3c6b")}'
+    _DS_COLOR = _c.get('dataset', '#1a6b1a')
 
     rows = []
 
@@ -185,20 +196,27 @@ def _format_xr_html(ds, result_name: str) -> str:
 
     ref = (f'{{<b>{_html.escape(result_name)}</b>}}'
            f'[&quot;<b>{_html.escape(result_name)}</b>&quot;]')
-    header = (f'<span style="color:#1a6b1a"><b>xr.Dataset</b></span>'
+    header = (f'<span style="color:{_DS_COLOR}"><b>xr.Dataset</b></span>'
               f' — stored in context, reference as {ref}')
     body = '<br>'.join('&nbsp;&nbsp;' + r for r in rows)
     return header + '<br>' + body
 
 
-def _format_xr_lazy_html(ds, result_name: str) -> str:
+def _format_xr_lazy_html(ds, result_name: str, colors: dict | None = None) -> str:
     """HTML summary for a lazy (dask-backed) xr.Dataset.
 
     Unlike ``_format_xr_html``, this never calls ``.values`` on data variables
     so it is safe to call on very large dask-backed arrays.  Coordinates
     (small axis arrays) are still materialised for range display.
+
+    Parameters
+    ----------
+    colors:
+        Same palette-derived dict accepted by :func:`_format_xr_html`.
     """
-    _C = 'color:#555'
+    _c = colors or {}
+    _C = f'color:{_c.get("dim", "#888")}'
+    _LAZY_COLOR = _c.get('lazy', '#1a5cb5')
 
     rows = []
 
@@ -235,11 +253,11 @@ def _format_xr_lazy_html(ds, result_name: str) -> str:
             f'&nbsp;&nbsp;<span style="{_C}">var</span> '
             f'<b>{_html.escape(vname)}</b> '
             f'({dims_str}) {var.dtype}{chunks_info}'
-            f'  <span style="color:#1a5cb5"><i>[lazy — not yet computed]</i></span>')
+            f'  <span style="color:{_LAZY_COLOR}"><i>[lazy — not yet computed]</i></span>')
 
     ref = (f'{{<b>{_html.escape(result_name)}</b>}}'
            f'[&quot;<b>{_html.escape(result_name)}</b>&quot;]')
-    header = (f'<span style="color:#1a5cb5"><b>xr.Dataset [lazy]</b></span>'
+    header = (f'<span style="color:{_LAZY_COLOR}"><b>xr.Dataset [lazy]</b></span>'
               f' — stored in context, reference as {ref}')
     body = '<br>'.join('&nbsp;&nbsp;' + r for r in rows)
     return header + '<br>' + body

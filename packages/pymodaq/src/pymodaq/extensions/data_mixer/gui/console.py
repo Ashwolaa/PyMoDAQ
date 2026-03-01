@@ -198,6 +198,7 @@ class _FallbackEditor(QPlainTextEdit):
         self._h5_ctx: dict = {}
         self._computed: dict = {}
         self._all_names: list[str] = []
+        self._h5_loader = None   # optional (rel_path) -> xr.Dataset | None
 
         self._popup = QListWidget(self)
         self._popup.setWindowFlags(Qt.WindowType.ToolTip)
@@ -234,8 +235,13 @@ class _FallbackEditor(QPlainTextEdit):
         cursor = self.textCursor()
         return self.toPlainText()[:cursor.position()]
 
-    def _detect_completion(self) -> tuple[str, str, list[str]]:
-        text = self._text_before_cursor()
+    def _detect_completion(self, _text: str | None = None) -> tuple[str, str, list[str]]:
+        """Determine the current autocomplete mode from text before the cursor.
+
+        The optional *_text* parameter is used in tests to inject a fixed
+        string without needing a real QPlainTextEdit cursor.
+        """
+        text = _text if _text is not None else self._text_before_cursor()
 
         m1 = re.search(r'\{([^}]*)$', text)
         if m1:
@@ -246,16 +252,22 @@ class _FallbackEditor(QPlainTextEdit):
         m2 = re.search(r'\{([^}]+)\}\["([^"]*)$', text)
         if m2:
             ds_name, prefix = m2.group(1), m2.group(2)
-            ds = self._h5_ctx.get(ds_name)
+            # Prefer loaded datasets (computed or already-fetched H5)
+            ds = self._computed.get(ds_name) or self._h5_ctx.get(ds_name)
             if ds is not None:
                 candidates = [v for v in ds.data_vars if prefix.lower() in v.lower()]
                 return ('M2', prefix, candidates)
+            # Fallback: dataset not yet loaded — infer channel name from the
+            # last path component (e.g. "CH00" from "Scan001/Det/Data1D/CH00")
+            inferred = ds_name.rsplit('/', 1)[-1]
+            if prefix.lower() in inferred.lower():
+                return ('M2', prefix, [inferred])
 
         # M2b: after {h5name}["var"]["  — coordinate name completion
         m2b = re.search(r'\{([^}]+)\}\["([^"]+)"\]\["([^"]*)$', text)
         if m2b:
             ds_name, var_name, prefix = m2b.group(1), m2b.group(2), m2b.group(3)
-            ds = self._h5_ctx.get(ds_name)
+            ds = self._computed.get(ds_name) or self._h5_ctx.get(ds_name)
             if ds is not None and var_name in ds.data_vars:
                 coords = list(ds[var_name].coords)
                 candidates = [c for c in coords if prefix.lower() in c.lower()]
@@ -327,28 +339,42 @@ class _FallbackEditor(QPlainTextEdit):
         excluding dims already consumed by reductions earlier in the chain.
 
         Resolution priority:
-          P1/P2: ``{h5}["var"]…``  → dims of that specific DataArray
-          P3:    ``{name}…``       → dims of the Dataset (computed or H5)
-          fallback:                  all dims from all datasets
+          P1/P2: ``{name}["var"]…``  → dims of that specific DataArray
+          P3:    ``{name}…``         → dims of the Dataset (computed or H5)
+          fallback:                    all dims from all loaded datasets
+
+        When a dataset entry is ``None`` (not yet loaded), ``_h5_loader`` is
+        called on demand and the result is cached back into ``_h5_ctx``.
         """
         consumed = self._consumed_dims(text)
-        # P1/P2: {h5name}["var_name"]… — resolve to a specific DataArray
+
+        def _resolve(name: str):
+            """Return dataset for *name*, loading on demand if needed."""
+            ds = self._computed.get(name) or self._h5_ctx.get(name)
+            if ds is None and self._h5_loader is not None:
+                try:
+                    ds = self._h5_loader(name)
+                    if ds is not None:
+                        self._h5_ctx[name] = ds
+                except Exception:
+                    pass
+            return ds
+
+        # P1/P2: {name}["var_name"]… — resolve to a specific DataArray
         m = re.search(r'\{([^}]+)\}\["([^"]+)"\][^{]*$', text)
         if m:
-            ds = self._h5_ctx.get(m.group(1))
+            ds = _resolve(m.group(1))
             if ds is not None and m.group(2) in ds.data_vars:
                 return [d for d in ds[m.group(2)].dims if d not in consumed]
         # P3: {name}… — computed Dataset or bare H5 Dataset
         m = re.search(r'\{([^}]+)\}[^{]*$', text)
         if m:
-            name = m.group(1)
-            for ctx in (self._computed, self._h5_ctx):
-                ds = ctx.get(name)
-                if ds is not None:
-                    try:
-                        return [d for d in ds.dims.keys() if d not in consumed]
-                    except Exception:
-                        pass
+            ds = _resolve(m.group(1))
+            if ds is not None:
+                try:
+                    return [d for d in ds.dims.keys() if d not in consumed]
+                except Exception:
+                    pass
         return [d for d in self._collect_dims() if d not in consumed]
 
     # ── popup management ─────────────────────────────────────────────────────
@@ -1068,8 +1094,11 @@ class FormulaConsole(QWidget):
             Callable ``(rel_path: str) -> xr.Dataset | None``.  Called by
             ``_run_formula_pairs`` when it encounters a None value in
             ``_h5_ctx`` (i.e. a dataset that hasn't been loaded yet).
+            Also forwarded to the editor so that ``_dims_for_context`` can
+            resolve dims for unloaded datasets while the user is typing.
         """
         self._h5_loader = loader
+        self._editor._h5_loader = loader
 
     def push_h5_context(self, xr_ctx: dict) -> None:
         """Inject the H5 xarray context dict into the console namespace.

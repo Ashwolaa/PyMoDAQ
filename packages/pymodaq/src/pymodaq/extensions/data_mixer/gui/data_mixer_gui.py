@@ -149,21 +149,32 @@ class DataMixerGUI(CustomExt):
         self.docks['viewer'].addWidget(self._viewer_widget)
 
     def setup_actions(self) -> None:
+        _theme = self.get_theme()
+        _green = _theme.green if _theme is not None else None
+        _red = _theme.red if _theme is not None else None
+        self.add_action('show_settings', 'Show Settings', 'settings',
+                        'Show/hide the settings panel',
+                        checkable=True, checked=True,
+                        icon_checked_color=_green)
         self.add_action('browse', 'Browse', 'folder_data', 'Open H5 file')
         self.add_action('load', 'Load / Reload', 'refresh',
                         'Scan the H5 file and populate the variable browser.\n'
-                        'Stored formulas are re-evaluated automatically afterward.')
+                        'Stored formulas are re-evaluated automatically afterward.',
+                        icon_color=_green)
         self.add_action('refresh_tree', 'Refresh Tree', 'account_tree',
                         'Rescan the H5 file for new datasets without recomputing formulas.\n'
                         'Use this when new scans have been added to the file.\n'
                         '(Disabled during live sync — the live handle owns the file.)')
         self.add_action('live_sync', 'Live Sync', 'start',
                         'Start/stop periodic refresh of H5 datasets used by stored formulas.',
-                        checkable=True, icon_checked='stop_circle')
+                        checkable=True, icon_checked='stop_circle',
+                        icon_color=_green,
+                        icon_checked_color=_red)
         self.add_action('show_viewer', 'Show Viewer', 'visibility',
                         'Raise the Data Viewer dock')
 
     def connect_things(self) -> None:
+        self.connect_action('show_settings', self._toggle_settings_dock)
         self.connect_action('browse', self._browse)
         self.connect_action('load', self._load_keys)
         self.connect_action('refresh_tree', self._refresh_tree)
@@ -218,6 +229,10 @@ class DataMixerGUI(CustomExt):
                 logger.info(msg)
 
     # ── slots ─────────────────────────────────────────────────────────────────
+
+    def _toggle_settings_dock(self, show: bool) -> None:
+        """Show or hide the Settings dock (mirrors the standard module behaviour)."""
+        self.docks['settings'].setVisible(show)
 
     def _browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -328,7 +343,11 @@ class DataMixerGUI(CustomExt):
             self._h5_snapshot.clear()
             self._scan_progress = -1
             self._sync_timer.start(self.settings.child('live_sync', 'interval').value())
+            # Lock file-selection controls so the live handle stays consistent
+            self.set_action_enabled('browse', False)
+            self.set_action_enabled('load', False)
             self.set_action_enabled('refresh_tree', False)
+            self.settings.child('h5_path').setOpts(readonly=True)
             self._set_status('Live sync started')
             self._tick()
         else:
@@ -339,7 +358,11 @@ class DataMixerGUI(CustomExt):
                 except Exception as exc:
                     logger.debug(f'Error closing live H5 handle: {exc}')
                 self._h5saver_live = None
+            # Unlock file-selection controls
+            self.set_action_enabled('browse', True)
+            self.set_action_enabled('load', True)
             self.set_action_enabled('refresh_tree', True)
+            self.settings.child('h5_path').setOpts(readonly=False)
             self._set_status('Live sync stopped')
 
     def _on_new_variable(self, name: str, ds, formula: str) -> None:
