@@ -1,9 +1,5 @@
 """Tests for DataMixerGUI dependency-map building and H5SaverLowLevel helpers.
 
-Previously tested LiveSyncWorker (now removed in favour of a QTimer in the
-main thread).  The _rebuild_deps logic is reproduced inside DataMixerGUI so
-we test it there.
-
 Qt is required to instantiate DataMixerGUI (it inherits QWidget).
 """
 from __future__ import annotations

@@ -63,9 +63,7 @@ class DataMixerGUI(QWidget):
     No background thread.  A ``QTimer`` fires ``_tick()`` in the main thread
     at the configured interval.  ``_tick()`` opens the H5 file, loads only
     new slices for watched datasets, re-evaluates formulas whose inputs
-    changed, and closes the file.  This is safe, simple, and free of the
-    ``QMetaObject.invokeMethod`` / dict-passing crashes that afflicted the
-    previous ``LiveSyncWorker`` design.
+    changed, and closes the file.
 
     State
     -----
@@ -218,7 +216,6 @@ class DataMixerGUI(QWidget):
         self._browser.item_selected_sig.connect(self._on_item_selected)
         self._browser.insert_ref_sig.connect(self._console.insert_at_cursor)
         self._browser.delete_computed_sig.connect(self._on_delete_computed)
-        self._browser.connect_to_scan_sig.connect(self._on_connect_scan)
         self._browser.show_var_sig.connect(self._on_show_var)
         self._browser.send_formula_sig.connect(self._console.recall_formula)
         self._browser.recompute_all_sig.connect(self._console.recompute_all)
@@ -268,10 +265,6 @@ class DataMixerGUI(QWidget):
         self._deps.pop(name, None)
         self._browser.remove_computed(name)
         self._console.remove_computed(name)
-
-    def _on_connect_scan(self, name: str, flag: bool) -> None:
-        """Kept for backwards compatibility with signals from VariableBrowserWidget."""
-        pass
 
     def _on_show_var(self, name: str, display: bool) -> None:
         """Open or close the viewer tab for a computed variable."""

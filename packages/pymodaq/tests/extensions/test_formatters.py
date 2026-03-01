@@ -1,10 +1,10 @@
 """Tests for pymodaq.extensions.data_mixer.gui.formatters.
 
 Covers:
-  * _wrap_result  — coercion of various return types to DataWithAxes
-  * _format_xr_html   — eager HTML summary (materialises data)
+  * _wrap_result         — coercion of various return types to DataWithAxes
+  * _format_xr_html      — eager HTML summary (materialises data)
   * _format_xr_lazy_html — lazy HTML summary (must NOT call .values on data vars)
-  * _is_lazy_ds   — lazy-detection helper (imported from console module directly)
+  * _is_lazy_ds          — lazy-detection helper (imported from console module directly)
 """
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ import pytest
 import xarray as xr
 
 from pymodaq.extensions.data_mixer.gui.formatters import (
-    _format_dwa_html,
     _format_xr_html,
     _format_xr_lazy_html,
     _wrap_result,

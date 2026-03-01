@@ -99,31 +99,6 @@ class DataViewerWindow(QWidget):
                     self._tabs.setCurrentIndex(new_idx)
         else:
             viewer = self._viewers[name]
-            # try:
-                # from pymodaq_gui.plotting.data_viewers.viewerND import ViewerND
-                # if isinstance(viewer, ViewerND):
-                #     # force_update=True refreshes the axes manager (needed to
-                #     # prevent the stale-axes bail-out in update_viewer_data) but
-                #     # also calls init_rois which resets crosshair positions to
-                #     # the axis centre.  Save and restore to preserve the user's
-                #     # navigation position.
-                    # try:
-                #         pos1d = viewer.navigator1D.crosshair.get_positions()
-                #         pos2d = viewer.navigator2D.crosshair.get_positions()
-                #     except Exception:
-                #         pos1d = pos2d = None
-                    # viewer.show_data(dwa, force_update=True)
-                    # viewer.show_data(dwa)
-                    # try:
-                    #     if pos1d is not None:
-                    #         viewer.navigator1D.crosshair.set_crosshair_position(*pos1d)
-                    #     if pos2d is not None:
-                    #         viewer.navigator2D.crosshair.set_crosshair_position(*pos2d)
-            #         except Exception:
-            #             pass
-            #         return
-            # except ImportError:
-            #     pass
             viewer.show_data(dwa)
 
     def remove_variable(self, name: str) -> None:

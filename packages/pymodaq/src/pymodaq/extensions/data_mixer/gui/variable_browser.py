@@ -33,8 +33,6 @@ class VariableBrowserWidget(QWidget):
     show_var_sig(name, display)
         User toggled the Display checkbox on a computed variable row.
         The main GUI opens/closes the viewer tab for this variable.
-    connect_to_scan_sig(name, connected)
-        Kept for backwards compatibility; mirrors show_var_sig.
     send_formula_sig(name)
         Recall the formula for *name* in the formula editor.
     recompute_all_sig()
@@ -47,7 +45,6 @@ class VariableBrowserWidget(QWidget):
     insert_ref_sig      = Signal(str)          # text to insert at cursor
     delete_computed_sig = Signal(str)          # name to remove
     show_var_sig        = Signal(str, bool)    # (computed_name, display)
-    connect_to_scan_sig = Signal(str, bool)    # backwards compat alias
     send_formula_sig    = Signal(str)          # name → recall formula in editor
     recompute_all_sig   = Signal()             # request recompute of all stored formulas
     clear_all_computed_sig = Signal()          # request full clear of computed vars
@@ -56,7 +53,6 @@ class VariableBrowserWidget(QWidget):
     _COL_NAME = 0
     _COL_INFO = 1
     _COL_DISP = 2   # Display-in-viewer checkbox (Computed rows)
-    _COL_CONN = _COL_DISP   # backwards-compat alias
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -359,7 +355,6 @@ class VariableBrowserWidget(QWidget):
             if column == self._COL_DISP:
                 checked = item.checkState(self._COL_DISP) == Qt.Checked
                 self.show_var_sig.emit(name, checked)
-                self.connect_to_scan_sig.emit(name, checked)  # backwards compat
             else:
                 self.item_selected_sig.emit(name, '')
 
