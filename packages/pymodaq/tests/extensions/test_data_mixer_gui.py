@@ -419,3 +419,70 @@ class TestSetStatus:
             pytest.skip('No statusbar available in this setup')
         gui._set_status('hello')
         assert gui.statusbar.currentMessage() == 'hello'
+
+
+# ── _resolve_scan_alias ───────────────────────────────────────────────────────
+
+class TestResolveScanAlias:
+
+    def test_non_scan_path_unchanged(self, gui):
+        gui._active_scan_prefix = 'Scan001'
+        assert gui._resolve_scan_alias('Scan001/Det/CH00') == 'Scan001/Det/CH00'
+
+    def test_scan_alias_no_prefix_unchanged(self, gui):
+        gui._active_scan_prefix = None
+        assert gui._resolve_scan_alias('Scan/Det/CH00') == 'Scan/Det/CH00'
+
+    def test_scan_alias_resolves_to_active_prefix(self, gui):
+        gui._active_scan_prefix = 'Scan002'
+        assert gui._resolve_scan_alias('Scan/Det/CH00') == 'Scan002/Det/CH00'
+
+    def test_scan_alias_empty_prefix_unchanged(self, gui):
+        gui._active_scan_prefix = ''
+        assert gui._resolve_scan_alias('Scan/foo') == 'Scan/foo'
+
+
+# ── _update_active_scan ───────────────────────────────────────────────────────
+
+class TestUpdateActiveScan:
+
+    def test_empty_scan_set_clears_prefix(self, gui):
+        gui._active_scan_prefix = 'Scan001'
+        gui._update_active_scan([], preserve=False)
+        assert gui._active_scan_prefix is None
+
+    def test_no_preserve_always_picks_last(self, gui):
+        gui._active_scan_prefix = 'Scan000'
+        gui._update_active_scan(['Scan000', 'Scan001', 'Scan002'], preserve=False)
+        assert gui._active_scan_prefix == 'Scan002'
+
+    def test_preserve_keeps_current_when_still_valid(self, gui):
+        gui._active_scan_prefix = 'Scan001'
+        gui._update_active_scan(['Scan000', 'Scan001', 'Scan002'], preserve=True)
+        assert gui._active_scan_prefix == 'Scan001'
+
+    def test_preserve_falls_back_to_last_when_gone(self, gui):
+        gui._active_scan_prefix = 'Scan999'
+        gui._update_active_scan(['Scan000', 'Scan001'], preserve=True)
+        assert gui._active_scan_prefix == 'Scan001'
+
+    def test_preserve_false_single_scan(self, gui):
+        gui._update_active_scan(['Scan000'], preserve=False)
+        assert gui._active_scan_prefix == 'Scan000'
+
+
+# ── _show_ds_in_viewer ───────────────────────────────────────────────────────
+
+class TestShowDsInViewer:
+
+    def test_valid_ds_returns_true_and_calls_show(self, gui):
+        ds = _make_xr_ds('r', (5,))
+        calls = []
+        gui._viewer_widget.show_variable = lambda name, dwa: calls.append(name)
+        result = gui._show_ds_in_viewer('r', ds)
+        assert result is True
+        assert calls == ['r']
+
+    def test_unconvertible_ds_returns_false(self, gui):
+        result = gui._show_ds_in_viewer('bad', object())
+        assert result is False
