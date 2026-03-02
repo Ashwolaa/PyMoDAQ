@@ -84,12 +84,14 @@ class DataMixerGUI(CustomExt):
             {'title': 'Size',     'name': 'file_size', 'type': 'str',
              'value': '—', 'readonly': True},
         ]},
+        {'title': 'Scan', 'name': 'scan', 'type': 'group', 'children': [
+            {'title': 'Active scan', 'name': 'active_scan',     'type': 'list', 'limits': []},
+            {'title': 'Use latest',  'name': 'use_latest_scan', 'type': 'action'},
+        ]},
         {'title': 'Live sync', 'name': 'live_sync', 'type': 'group', 'children': [
-            {'title': 'Active',        'name': 'live_led',        'type': 'led',    'value': False, 'readonly': True},
-            {'title': 'Interval (ms)', 'name': 'interval',        'type': 'int',
+            {'title': 'Active',        'name': 'live_led',  'type': 'led', 'value': False, 'readonly': True},
+            {'title': 'Interval (ms)', 'name': 'interval',  'type': 'int',
              'value': 1000, 'min': 100, 'max': 60000},
-            {'title': 'Active scan',   'name': 'active_scan',     'type': 'list',   'limits': []},
-            {'title': 'Use latest',    'name': 'use_latest_scan', 'type': 'action'},
         ]},
     ]
 
@@ -167,12 +169,14 @@ class DataMixerGUI(CustomExt):
                         checkable=True, checked=True,
                         icon_checked_color=_green)
         self.add_action('browse', 'Browse', 'folder_data', 'Open H5 file')
-        self.add_action('load', 'Load / Reload', 'refresh',
-                        'Scan the H5 file and populate the variable browser.\n'
-                        'Stored formulas are re-evaluated automatically afterward.',
+        self.add_action('load', 'Reload file', 'refresh',
+                        'Reload the H5 file from scratch: clears the snapshot cache,\n'
+                        'resets computed variable inputs, and re-evaluates all formulas.\n'
+                        '(Disabled during live sync.)',
                         icon_color=_green)
-        self.add_action('refresh_tree', 'Refresh Tree', 'account_tree',
+        self.add_action('refresh_tree', 'Scan for new data', 'account_tree',
                         'Rescan the H5 file for new datasets without recomputing formulas.\n'
+                        'Preserves existing computed results and the snapshot cache.\n'
                         'Use this when new scans have been added to the file.\n'
                         '(Disabled during live sync — the live handle owns the file.)')
         self.add_action('live_sync', 'Live Sync', 'start',
@@ -181,7 +185,8 @@ class DataMixerGUI(CustomExt):
                         icon_color=_green,
                         icon_checked_color=_red)
         self.add_action('show_viewer', 'Show Viewer', 'visibility',
-                        'Raise the Data Viewer dock')
+                        'Raise the Data Viewer dock',
+                        enabled=False)   # enabled once the first tab opens
 
     def connect_things(self) -> None:
         self.connect_action('show_settings', self._toggle_settings_dock)
@@ -203,7 +208,7 @@ class DataMixerGUI(CustomExt):
         self._console.variable_stored_sig.connect(self._on_new_variable)
         self._console.clear_computed_sig.connect(self._on_clear_computed)
 
-        self.settings.child('live_sync', 'use_latest_scan').sigActivated.connect(
+        self.settings.child('scan', 'use_latest_scan').sigActivated.connect(
             self._go_to_latest_scan
         )
 
@@ -296,16 +301,19 @@ class DataMixerGUI(CustomExt):
             ds = self._xr_ctx_computed.get(name)
             if ds is None:
                 return
-            if self._show_ds_in_viewer(name, ds):
+            if self._show_ds_in_viewer(name, ds, source='computed'):
                 self.docks['viewer'].setVisible(True)
+                self._update_show_viewer_action()
         else:
             self._display_names.discard(name)
             self._viewer_widget.remove_variable(name)
+            self._update_show_viewer_action()
 
     def _on_viewer_tab_closed(self, name: str) -> None:
         """User closed a viewer tab — uncheck the Display checkbox."""
         self._display_names.discard(name)
         self._browser.uncheck_display(name)
+        self._update_show_viewer_action()
 
     def _on_load_and_show_h5(self, name: str) -> None:
         """Load an H5 dataset on demand and open it in the viewer dock."""
@@ -313,16 +321,19 @@ class DataMixerGUI(CustomExt):
         if ds is None:
             self._set_status(f'Cannot load {name!r}', error=True)
             return
-        if self._show_ds_in_viewer(name, ds):
+        if self._show_ds_in_viewer(name, ds, source='h5'):
             self._raise_viewers()
+            self._update_show_viewer_action()
 
     def _raise_viewers(self) -> None:
         """Raise the Data Viewer dock to the front."""
-        if not self._viewer_widget.variable_names:
-            self._set_status('No viewer tabs open yet')
-            return
         self.docks['viewer'].setVisible(True)
         self.docks['viewer'].raise_()
+
+    def _update_show_viewer_action(self) -> None:
+        """Keep the Show Viewer action enabled only when tabs are open."""
+        self.set_action_enabled('show_viewer',
+                                bool(self._viewer_widget.variable_names))
 
     def _toggle_live_sync(self, active: bool) -> None:
         if active:
@@ -457,7 +468,7 @@ class DataMixerGUI(CustomExt):
         if not self._scan_prefixes:
             self._set_status('No scans available')
             return
-        self.settings.child('live_sync', 'active_scan').setValue(self._scan_prefixes[-1])
+        self.settings.child('scan', 'active_scan').setValue(self._scan_prefixes[-1])
 
     def _update_file_info(self, path: Path, h5saver) -> None:
         """Populate the File info settings group from an open *h5saver* handle.
@@ -530,14 +541,14 @@ class DataMixerGUI(CustomExt):
         When *preserve* is ``False`` (used by ``_load_keys``) the last scan
         in *scan_set* is always selected.
         """
-        self.settings.child('live_sync', 'active_scan').setLimits(scan_set)
+        self.settings.child('scan', 'active_scan').setLimits(scan_set)
         if scan_set:
             if preserve and self._active_scan_prefix in scan_set:
-                self.settings.child('live_sync', 'active_scan').setValue(
+                self.settings.child('scan', 'active_scan').setValue(
                     self._active_scan_prefix)
             else:
                 self._active_scan_prefix = scan_set[-1]
-                self.settings.child('live_sync', 'active_scan').setValue(
+                self.settings.child('scan', 'active_scan').setValue(
                     self._active_scan_prefix)
         else:
             self._active_scan_prefix = None
@@ -580,17 +591,21 @@ class DataMixerGUI(CustomExt):
         dwa = loader.load_data(first_array_path, load_all=True)
         return dwa.to_xarray()
 
-    def _show_ds_in_viewer(self, name: str, ds) -> bool:
+    def _show_ds_in_viewer(self, name: str, ds,
+                           source: str = 'computed') -> bool:
         """Convert *ds* to DataWithAxes and open/update a viewer tab for *name*.
 
         Returns ``True`` on success, ``False`` if conversion fails.
+        *source* is forwarded to :meth:`DataViewerWindow.show_variable` so the
+        tab badge reflects whether the data came from H5 (``'h5'``) or from
+        a formula result (``'computed'``).
         """
         try:
             dwa = DataWithAxes.from_xarray(ds)
         except Exception as exc:
             logger.warning(f'Cannot convert {name!r} to DataWithAxes for viewer: {exc}')
             return False
-        self._viewer_widget.show_variable(name, dwa)
+        self._viewer_widget.show_variable(name, dwa, source=source)
         return True
 
     def _build_h5_context(self) -> dict:
@@ -687,6 +702,8 @@ class DataMixerGUI(CustomExt):
         if self._h5saver_live is None:
             return
 
+        self._set_status(f'⟳ Polling…  {time.strftime("%H:%M:%S")}')
+
         effective_watched: set = set()
         for formula in self._formula_for.values():
             try:
@@ -709,6 +726,7 @@ class DataMixerGUI(CustomExt):
 
         progress = self._read_scan_progress(self._h5saver_live)
         if progress is not None and progress == self._scan_progress:
+            self._set_status(f'Live: no change  {time.strftime("%H:%M:%S")}')
             return
         self._scan_progress = progress
 

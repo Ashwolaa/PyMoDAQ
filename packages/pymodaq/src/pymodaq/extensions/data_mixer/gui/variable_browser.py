@@ -104,9 +104,10 @@ class VariableBrowserWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
 
-        # Shared filter box — applies to both trees
+        # Filter box — applies to the H5 tree only; computed variables are
+        # always fully visible (they're usually few and are output, not input).
         self._search = QLineEdit()
-        self._search.setPlaceholderText('Filter variables…')
+        self._search.setPlaceholderText('Filter H5 data…')
         self._search.textChanged.connect(self._apply_filter)
         layout.addWidget(self._search)
 
@@ -329,11 +330,9 @@ class VariableBrowserWidget(QWidget):
                             text and text in leaf.text(self._COL_NAME).lower())))
                 item.setHidden(not any_visible)
 
-        # ── Computed tree ─────────────────────────────────────────────────────
+        # ── Computed tree: always fully visible ───────────────────────────────
         for i in range(self._comp_root.childCount()):
-            item = self._comp_root.child(i)
-            visible = (not text) or (text in item.text(self._COL_NAME).lower())
-            item.setHidden(not visible)
+            self._comp_root.child(i).setHidden(False)
 
     def _on_single_click(self, item: QTreeWidgetItem, column: int):
         data = item.data(self._COL_NAME, Qt.UserRole)

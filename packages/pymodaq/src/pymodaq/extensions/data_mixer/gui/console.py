@@ -741,6 +741,13 @@ class FormulaConsole(QWidget):
             'a = {origin/name}["CH00"].mean("time")\n'
             'b = {a} + 1\n'
         )
+        self._editor.setToolTip(
+            'Formula editor\n'
+            'Ctrl+Enter / Ctrl+E  — Compute & Store\n'
+            'Ctrl+Z / Ctrl+Y      — Undo / Redo\n'
+            'Ctrl+/               — Toggle comment\n'
+            'Alt+Shift+↓/↑        — Duplicate line down/up'
+        )
         f = QFont('Courier New')
         f.setPointSize(10)
         self._editor.setFont(f)
@@ -780,6 +787,8 @@ class FormulaConsole(QWidget):
         QShortcut(QKeySequence('Ctrl+Return'), self._editor).activated.connect(
             self._compute_and_store)
         QShortcut(QKeySequence('Ctrl+Key_Enter'), self._editor).activated.connect(
+            self._compute_and_store)
+        QShortcut(QKeySequence('Ctrl+E'), self._editor).activated.connect(
             self._compute_and_store)
 
         return w
@@ -1056,6 +1065,18 @@ class FormulaConsole(QWidget):
 
     def _load_formulas(self) -> None:
         """Load formulas from a TOML file into the editor (replaces content)."""
+        if self._editor.toPlainText().strip():
+            from qtpy.QtWidgets import QMessageBox
+            reply = QMessageBox.question(
+                self, 'Load formulas',
+                'Loading will replace the current editor content.\n'
+                'Unsaved formulas will be lost.  Continue?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         path, _ = QFileDialog.getOpenFileName(
             self, 'Load formulas', '',
             'TOML files (*.toml);;All files (*)')
