@@ -203,26 +203,17 @@ class VariableBrowserWidget(QWidget):
                 ds_item.setToolTip(self._COL_NAME, full_name)
 
                 if ds is not None:
-                    try:
-                        for var_name, var in ds.data_vars.items():
-                            dims = ', '.join(str(d) for d in var.dims)
-                            leaf_info = f'{var.dtype} ({dims})'
-                            leaf = QTreeWidgetItem(ds_item, [var_name, leaf_info, ''])
-                            leaf.setData(self._COL_NAME, Qt.UserRole,
-                                         ('h5_var', full_name, var_name))
-                    except Exception as exc:
-                        logger.debug(f'Cannot build leaf nodes for {full_name!r}: {exc}')
+                    self._build_leaf_nodes(ds_item, full_name, ds)
 
         self._h5_root.setExpanded(True)
         self._apply_filter(self._search.text())
 
     def add_computed(self, name: str, ds):
         """Add or update a computed variable node."""
-        for i in range(self._comp_root.childCount()):
-            item = self._comp_root.child(i)
-            if item.text(self._COL_NAME) == name:
-                item.setText(self._COL_INFO, self._ds_info(ds))
-                return
+        item = self._find_computed_item(name)
+        if item is not None:
+            item.setText(self._COL_INFO, self._ds_info(ds))
+            return
 
         info = self._ds_info(ds)
         item = QTreeWidgetItem(self._comp_root, [name, info, ''])
@@ -235,18 +226,13 @@ class VariableBrowserWidget(QWidget):
 
     def has_computed(self, name: str) -> bool:
         """Return True if a computed variable with *name* is in the tree."""
-        for i in range(self._comp_root.childCount()):
-            if self._comp_root.child(i).text(self._COL_NAME) == name:
-                return True
-        return False
+        return self._find_computed_item(name) is not None
 
     def remove_computed(self, name: str):
         """Remove a computed variable by name."""
-        for i in range(self._comp_root.childCount()):
-            item = self._comp_root.child(i)
-            if item.text(self._COL_NAME) == name:
-                self._comp_root.removeChild(item)
-                return
+        item = self._find_computed_item(name)
+        if item is not None:
+            self._comp_root.removeChild(item)
 
     def clear_computed(self):
         """Reset the Computed section."""
@@ -284,11 +270,9 @@ class VariableBrowserWidget(QWidget):
 
     def update_computed_info(self, name: str, ds) -> None:
         """Refresh the Info column for an existing computed variable row."""
-        for i in range(self._comp_root.childCount()):
-            item = self._comp_root.child(i)
-            if item.text(self._COL_NAME) == name:
-                item.setText(self._COL_INFO, self._ds_info(ds))
-                return
+        item = self._find_computed_item(name)
+        if item is not None:
+            item.setText(self._COL_INFO, self._ds_info(ds))
 
     def update_h5_info(self, name: str, ds) -> None:
         """Populate Info column (and child variable nodes) for an H5 row.
@@ -302,24 +286,14 @@ class VariableBrowserWidget(QWidget):
             if data and data[0] == 'h5_ds' and data[1] == name:
                 item.setText(self._COL_INFO, self._ds_info(ds))
                 if item.childCount() == 0:
-                    try:
-                        for var_name, var in ds.data_vars.items():
-                            dims = ', '.join(str(d) for d in var.dims)
-                            leaf_info = f'{var.dtype} ({dims})'
-                            leaf = QTreeWidgetItem(item, [var_name, leaf_info, ''])
-                            leaf.setData(self._COL_NAME, Qt.UserRole,
-                                         ('h5_var', name, var_name))
-                    except Exception as exc:
-                        logger.debug(f'Cannot build leaf nodes for {name!r}: {exc}')
+                    self._build_leaf_nodes(item, name, ds)
                 return
 
     def uncheck_display(self, name: str) -> None:
         """Uncheck the Display checkbox for *name* (e.g. when a viewer tab is closed)."""
-        for i in range(self._comp_root.childCount()):
-            item = self._comp_root.child(i)
-            if item.text(self._COL_NAME) == name:
-                item.setCheckState(self._COL_DISP, Qt.Unchecked)
-                return
+        item = self._find_computed_item(name)
+        if item is not None:
+            item.setCheckState(self._COL_DISP, Qt.Unchecked)
 
     # ── internal slots ────────────────────────────────────────────────────────
 
@@ -457,6 +431,25 @@ class VariableBrowserWidget(QWidget):
         menu.exec_(tree.viewport().mapToGlobal(pos))
 
     # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _find_computed_item(self, name: str) -> 'Optional[QTreeWidgetItem]':
+        """Return the Computed tree item for *name*, or None if absent."""
+        for i in range(self._comp_root.childCount()):
+            item = self._comp_root.child(i)
+            if item.text(self._COL_NAME) == name:
+                return item
+        return None
+
+    def _build_leaf_nodes(self, parent_item: QTreeWidgetItem,
+                          ds_name: str, ds) -> None:
+        """Append variable leaf nodes to *parent_item* from *ds*.data_vars."""
+        try:
+            for var_name, var in ds.data_vars.items():
+                dims = ', '.join(str(d) for d in var.dims)
+                leaf = QTreeWidgetItem(parent_item, [var_name, f'{var.dtype} ({dims})', ''])
+                leaf.setData(self._COL_NAME, Qt.UserRole, ('h5_var', ds_name, var_name))
+        except Exception as exc:
+            logger.debug(f'Cannot build leaf nodes for {ds_name!r}: {exc}')
 
     @staticmethod
     def _ds_info(ds) -> str:

@@ -75,11 +75,21 @@ class DataMixerGUI(CustomExt):
 
     params = [
         {'title': 'H5 file', 'name': 'h5_path', 'type': 'browsepath', 'value': ''},
+        {'title': 'File info', 'name': 'file_info', 'type': 'group', 'children': [
+            {'title': 'Backend',  'name': 'backend',   'type': 'str',
+             'value': '—', 'readonly': True},
+            {'title': 'SWMR live', 'name': 'swmr_mode', 'type': 'led', 'value': False, 'readonly': True},
+            {'title': 'Scans',    'name': 'n_scans',   'type': 'int',
+             'value': 0,   'readonly': True},
+            {'title': 'Size',     'name': 'file_size', 'type': 'str',
+             'value': '—', 'readonly': True},
+        ]},
         {'title': 'Live sync', 'name': 'live_sync', 'type': 'group', 'children': [
-            {'title': 'Interval (ms)', 'name': 'interval',
-             'type': 'int', 'value': 1000, 'min': 100, 'max': 60000},
-            {'title': 'Active scan', 'name': 'active_scan',
-             'type': 'list', 'limits': []},
+            {'title': 'Active',        'name': 'live_led',        'type': 'led',    'value': False, 'readonly': True},
+            {'title': 'Interval (ms)', 'name': 'interval',        'type': 'int',
+             'value': 1000, 'min': 100, 'max': 60000},
+            {'title': 'Active scan',   'name': 'active_scan',     'type': 'list',   'limits': []},
+            {'title': 'Use latest',    'name': 'use_latest_scan', 'type': 'action'},
         ]},
     ]
 
@@ -193,6 +203,10 @@ class DataMixerGUI(CustomExt):
         self._console.variable_stored_sig.connect(self._on_new_variable)
         self._console.clear_computed_sig.connect(self._on_clear_computed)
 
+        self.settings.child('live_sync', 'use_latest_scan').sigActivated.connect(
+            self._go_to_latest_scan
+        )
+
     def do_things_after_ui_setup(self) -> None:
         mode_text = 'IPython + Editor' if _QTCONSOLE else 'Plain-text editor'
         self._console.setToolTip(f'Formula console  [{mode_text}]')
@@ -282,13 +296,8 @@ class DataMixerGUI(CustomExt):
             ds = self._xr_ctx_computed.get(name)
             if ds is None:
                 return
-            try:
-                dwa = DataWithAxes.from_xarray(ds)
-            except Exception as exc:
-                logger.warning(f'Cannot convert {name!r} to DataWithAxes for viewer: {exc}')
-                return
-            self._viewer_widget.show_variable(name, dwa)
-            self.docks['viewer'].setVisible(True)
+            if self._show_ds_in_viewer(name, ds):
+                self.docks['viewer'].setVisible(True)
         else:
             self._display_names.discard(name)
             self._viewer_widget.remove_variable(name)
@@ -304,13 +313,8 @@ class DataMixerGUI(CustomExt):
         if ds is None:
             self._set_status(f'Cannot load {name!r}', error=True)
             return
-        try:
-            dwa = DataWithAxes.from_xarray(ds)
-        except Exception as exc:
-            logger.warning(f'Cannot convert {name!r} to DataWithAxes for viewer: {exc}')
-            return
-        self._viewer_widget.show_variable(name, dwa)
-        self._raise_viewers()
+        if self._show_ds_in_viewer(name, ds):
+            self._raise_viewers()
 
     def _raise_viewers(self) -> None:
         """Raise the Data Viewer dock to the front."""
@@ -348,10 +352,13 @@ class DataMixerGUI(CustomExt):
             self.set_action_enabled('load', False)
             self.set_action_enabled('refresh_tree', False)
             self.settings.child('h5_path').setOpts(readonly=True)
+            self.settings.child('live_sync', 'live_led').setValue(True)
+            self.settings.child('file_info', 'swmr_mode').setValue(self._is_swmr_live)
             self._set_status('Live sync started')
             self._tick()
         else:
             self._sync_timer.stop()
+            self.settings.child('live_sync', 'live_led').setValue(False)
             if self._h5saver_live is not None:
                 try:
                     self._h5saver_live.close_file()
@@ -401,44 +408,12 @@ class DataMixerGUI(CustomExt):
         path = Path(self.settings.child('h5_path').value().strip())
         if not path.is_file():
             return
-
-        try:
-            h5saver, _ = H5SaverLowLevel.open_for_reading(path)
-            try:
-                h5saver.get_node('/RawData')
-                self._h5_base = '/RawData'
-            except Exception:
-                self._h5_base = '/'
-            names, h5_info = _collect_h5_names_and_info(h5saver)
-            h5saver.close_file()
-        except Exception as exc:
-            self._set_status(f'Cannot open: {exc}', error=True)
+        result = self._scan_h5_file(path)
+        if result is None:
             return
-
-        scan_set = sorted(set(
-            m.group(0)
-            for n in names
-            for m in [re.match(r'^Scan\d+', n)]
-            if m
-        ))
-        self._scan_prefixes = scan_set
-        # Update scan list param without triggering value_changed
-        self.settings.child('live_sync', 'active_scan').setLimits(scan_set)
-        if scan_set:
-            if self._active_scan_prefix in scan_set:
-                self.settings.child('live_sync', 'active_scan').setValue(
-                    self._active_scan_prefix)
-            else:
-                self._active_scan_prefix = scan_set[-1]
-                self.settings.child('live_sync', 'active_scan').setValue(
-                    self._active_scan_prefix)
-        else:
-            self._active_scan_prefix = None
-
-        self._h5_meta = {name: None for name in names}
-        self._browser.load_h5(self._h5_meta, info=h5_info)
-        self._console.push_h5_context(self._build_h5_context())
-        self._console.set_h5_loader(self._load_h5_dataset_for)
+        names, h5_info, scan_set = result
+        self._update_active_scan(scan_set, preserve=True)
+        self._apply_tree_scan(names, h5_info)
         self._set_status('Tree refreshed')
 
     def _load_keys(self) -> None:
@@ -446,39 +421,12 @@ class DataMixerGUI(CustomExt):
         path = Path(self.settings.child('h5_path').value().strip())
         if not path.is_file():
             return
-
-        try:
-            h5saver, _ = H5SaverLowLevel.open_for_reading(path)
-            try:
-                h5saver.get_node('/RawData')
-                self._h5_base = '/RawData'
-            except Exception:
-                self._h5_base = '/'
-            names, h5_info = _collect_h5_names_and_info(h5saver)
-            h5saver.close_file()
-        except Exception as exc:
-            self._set_status(f'Cannot open: {exc}', error=True)
+        result = self._scan_h5_file(path)
+        if result is None:
             return
-
-        scan_set = sorted(set(
-            m.group(0)
-            for n in names
-            for m in [re.match(r'^Scan\d+', n)]
-            if m
-        ))
-        self._scan_prefixes = scan_set
-        self.settings.child('live_sync', 'active_scan').setLimits(scan_set)
-        if scan_set:
-            self._active_scan_prefix = scan_set[-1]
-            self.settings.child('live_sync', 'active_scan').setValue(
-                self._active_scan_prefix)
-        else:
-            self._active_scan_prefix = None
-
-        self._h5_meta = {name: None for name in names}
-        self._browser.load_h5(self._h5_meta, info=h5_info)
-        self._console.push_h5_context(self._build_h5_context())
-        self._console.set_h5_loader(self._load_h5_dataset_for)
+        names, h5_info, scan_set = result
+        self._update_active_scan(scan_set, preserve=False)
+        self._apply_tree_scan(names, h5_info)
         self._info_panel.clear()
         self._set_status('')
 
@@ -503,6 +451,147 @@ class DataMixerGUI(CustomExt):
         self._eval_formulas(set(self._h5_snapshot) | set(self._xr_ctx_computed))
         if self._formula_for:
             self._console.recompute_all()
+
+    def _go_to_latest_scan(self) -> None:
+        """Select the most recently added scan as the active scan."""
+        if not self._scan_prefixes:
+            self._set_status('No scans available')
+            return
+        self.settings.child('live_sync', 'active_scan').setValue(self._scan_prefixes[-1])
+
+    def _update_file_info(self, path: Path, h5saver) -> None:
+        """Populate the File info settings group from an open *h5saver* handle.
+
+        Called at the end of :meth:`_load_keys` and :meth:`_refresh_tree`
+        while the handle is still open so that backend detection works.
+        SWMR status is shown as False here and updated by
+        :meth:`_toggle_live_sync` once the live handle is actually opened.
+        """
+        try:
+            mod = type(h5saver.h5file).__module__
+            if 'h5py' in mod:
+                backend = 'h5py'
+            elif 'tables' in mod:
+                backend = 'PyTables'
+            else:
+                backend = mod.split('.')[0]
+        except Exception:
+            backend = '?'
+
+        try:
+            nb = path.stat().st_size
+            if nb >= 1_073_741_824:
+                size_str = f'{nb / 1_073_741_824:.2f} GB'
+            elif nb >= 1_048_576:
+                size_str = f'{nb / 1_048_576:.2f} MB'
+            else:
+                size_str = f'{nb / 1024:.1f} KB'
+        except Exception:
+            size_str = '?'
+
+        self.settings.child('file_info', 'backend').setValue(backend)
+        self.settings.child('file_info', 'swmr_mode').setValue(False)
+        self.settings.child('file_info', 'n_scans').setValue(len(self._scan_prefixes))
+        self.settings.child('file_info', 'file_size').setValue(size_str)
+
+    def _scan_h5_file(self, path: 'Path') -> 'Optional[tuple]':
+        """Open *path*, walk H5 nodes and return ``(names, h5_info, scan_set)``.
+
+        Updates ``_h5_base`` and ``_scan_prefixes`` as a side-effect.
+        Returns ``None`` on error (status message already set).
+        """
+        try:
+            h5saver, _ = H5SaverLowLevel.open_for_reading(path)
+            try:
+                h5saver.get_node('/RawData')
+                self._h5_base = '/RawData'
+            except Exception:
+                self._h5_base = '/'
+            names, h5_info = _collect_h5_names_and_info(h5saver)
+            scan_set = sorted(set(
+                m.group(0)
+                for n in names
+                for m in [re.match(r'^Scan\d+', n)]
+                if m
+            ))
+            self._scan_prefixes = scan_set
+            self._update_file_info(path, h5saver)
+            h5saver.close_file()
+        except Exception as exc:
+            self._set_status(f'Cannot open: {exc}', error=True)
+            return None
+        return names, h5_info, scan_set
+
+    def _update_active_scan(self, scan_set: list, preserve: bool) -> None:
+        """Sync the *active_scan* param with *scan_set*.
+
+        When *preserve* is ``True`` the current selection is kept if it is
+        still present in *scan_set* (used by ``_refresh_tree``).
+        When *preserve* is ``False`` (used by ``_load_keys``) the last scan
+        in *scan_set* is always selected.
+        """
+        self.settings.child('live_sync', 'active_scan').setLimits(scan_set)
+        if scan_set:
+            if preserve and self._active_scan_prefix in scan_set:
+                self.settings.child('live_sync', 'active_scan').setValue(
+                    self._active_scan_prefix)
+            else:
+                self._active_scan_prefix = scan_set[-1]
+                self.settings.child('live_sync', 'active_scan').setValue(
+                    self._active_scan_prefix)
+        else:
+            self._active_scan_prefix = None
+
+    def _apply_tree_scan(self, names: list, h5_info: dict) -> None:
+        """Populate ``_h5_meta``, browser and console from a fresh tree scan."""
+        self._h5_meta = {name: None for name in names}
+        self._browser.load_h5(self._h5_meta, info=h5_info)
+        self._console.push_h5_context(self._build_h5_context())
+        self._console.set_h5_loader(self._load_h5_dataset_for)
+
+    def _resolve_scan_alias(self, rel_path: str) -> str:
+        """Resolve a ``Scan/…`` alias to the active scan prefix, or return unchanged."""
+        if rel_path.startswith('Scan/') and self._active_scan_prefix:
+            return self._active_scan_prefix + '/' + rel_path[len('Scan/'):]
+        return rel_path
+
+    @staticmethod
+    def _load_dwa_from_node(h5saver, abs_path: str):
+        """Walk *abs_path* in *h5saver*, find the first data array, load as xr.Dataset.
+
+        Returns the ``xr.Dataset`` or ``None`` if no data node is found.
+        """
+        from pymodaq_data.h5modules.data_saving import DataLoader
+        from pymodaq_data.h5modules.backends import GROUP
+
+        first_array_path = None
+        for node in h5saver.walk_nodes(abs_path):
+            if isinstance(node, GROUP):
+                continue
+            try:
+                if 'data' in str(node.attrs['data_type']):
+                    first_array_path = node.path
+                    break
+            except Exception:
+                continue
+        if first_array_path is None:
+            return None
+        loader = DataLoader(h5saver)
+        dwa = loader.load_data(first_array_path, load_all=True)
+        return dwa.to_xarray()
+
+    def _show_ds_in_viewer(self, name: str, ds) -> bool:
+        """Convert *ds* to DataWithAxes and open/update a viewer tab for *name*.
+
+        Returns ``True`` on success, ``False`` if conversion fails.
+        """
+        try:
+            dwa = DataWithAxes.from_xarray(ds)
+        except Exception as exc:
+            logger.warning(f'Cannot convert {name!r} to DataWithAxes for viewer: {exc}')
+            return False
+        self._viewer_widget.show_variable(name, dwa)
+        return True
 
     def _build_h5_context(self) -> dict:
         """Return the context dict to push to the formula console.
@@ -545,12 +634,11 @@ class DataMixerGUI(CustomExt):
         ``Scan/…`` aliases are transparently resolved to the path under the
         currently active scan prefix (``_active_scan_prefix``).
         """
-        actual_rel = rel_path
-        if rel_path.startswith('Scan/') and self._active_scan_prefix:
-            actual_rel = self._active_scan_prefix + '/' + rel_path[len('Scan/'):]
-            if actual_rel in self._h5_snapshot:
+        actual_rel = self._resolve_scan_alias(rel_path)
+        if actual_rel in self._h5_snapshot:
+            if actual_rel != rel_path:
                 self._h5_snapshot[rel_path] = self._h5_snapshot[actual_rel]
-                return self._h5_snapshot[rel_path]
+            return self._h5_snapshot[actual_rel]
 
         if rel_path in self._h5_snapshot:
             return self._h5_snapshot[rel_path]
@@ -559,29 +647,13 @@ class DataMixerGUI(CustomExt):
         if not path.is_file():
             return None
 
-        from pymodaq_data.h5modules.data_saving import DataLoader
-        from pymodaq_data.h5modules.backends import GROUP
-
         try:
             h5saver, _ = H5SaverLowLevel.open_for_reading(path, force_swmr=True)
             try:
                 abs_path = f'{self._h5_base}/{actual_rel}'.replace('//', '/')
-                first_array_path = None
-                for node in h5saver.walk_nodes(abs_path):
-                    if isinstance(node, GROUP):
-                        continue
-                    try:
-                        dt = node.attrs['data_type']
-                        if 'data' in str(dt):
-                            first_array_path = node.path
-                            break
-                    except Exception:
-                        continue
-                if first_array_path is None:
+                ds = self._load_dwa_from_node(h5saver, abs_path)
+                if ds is None:
                     return None
-                loader = DataLoader(h5saver)
-                dwa = loader.load_data(first_array_path, load_all=True)
-                ds = dwa.to_xarray()
                 self._h5_snapshot[actual_rel] = ds
                 if actual_rel != rel_path:
                     self._h5_snapshot[rel_path] = ds
@@ -716,30 +788,10 @@ class DataMixerGUI(CustomExt):
 
         Returns the ``xr.Dataset`` or ``None`` on failure.
         """
-        from pymodaq_data.h5modules.data_saving import DataLoader
-        from pymodaq_data.h5modules.backends import GROUP
-
-        actual_rel = rel_path
-        if rel_path.startswith('Scan/') and self._active_scan_prefix:
-            actual_rel = self._active_scan_prefix + '/' + rel_path[len('Scan/'):]
-
+        actual_rel = self._resolve_scan_alias(rel_path)
         abs_path = f'{self._h5_base}/{actual_rel}'.replace('//', '/')
         try:
-            first_array_path = None
-            for node in h5saver.walk_nodes(abs_path):
-                if isinstance(node, GROUP):
-                    continue
-                try:
-                    if 'data' in str(node.attrs['data_type']):
-                        first_array_path = node.path
-                        break
-                except Exception:
-                    continue
-            if first_array_path is None:
-                return None
-            loader = DataLoader(h5saver)
-            dwa = loader.load_data(first_array_path, load_all=True)
-            return dwa.to_xarray()
+            return self._load_dwa_from_node(h5saver, abs_path)
         except Exception as exc:
             logger.warning(f'Live load failed for {rel_path!r}: {exc}')
             return None
