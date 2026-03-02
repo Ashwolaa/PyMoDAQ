@@ -10,62 +10,9 @@ from pymodaq.extensions.data_mixer.parser import (
 
 from pymodaq_data.h5modules.data_saving import DataLoader
 from pymodaq_data.h5modules.saving import H5SaverLowLevel
-from pymodaq_data.h5modules.backends import backends_available
+from pymodaq_data.h5modules import H5FileScanner, wrap_result
 from pymodaq_data.data import DataToExport, DataWithAxes, DataSource
 
-
-def _wrap_result(result, name: str) -> DataWithAxes:
-    """Coerce any eval() return value to a named DataWithAxes.
-
-    Handled types:
-      xr.Dataset             — convert via DataWithAxes.from_xarray(), rename
-      xr.DataArray           — promote to Dataset, convert, rename
-      DataWithAxes           — rename in place and return
-      np.ndarray             — wrap as single-array DataWithAxes
-      tuple/list of ndarray  — np.gradient & similar return one array per axis;
-                               each component is stored as a separate array in
-                               DataWithAxes.data so {name}.data[0] gives axis-0,
-                               {name}.data[1] gives axis-1, etc.
-      scalar (int/float/…)   — wrap as 1-element array
-    """
-    try:
-        import xarray as xr
-        if isinstance(result, xr.Dataset):
-            # Dataset arithmetic (e.g. ds * 3) may reorder Dataset-level dims
-            # differently from the individual data-variable dim order, which
-            # breaks from_xarray's axis reconstruction.  Extracting the DataArray
-            # from single-variable Datasets avoids this: DataArray dims always
-            # follow the original variable's order.  Also drops inherited
-            # pymodaq_* attrs so from_xarray uses clean defaults.
-            if len(result.data_vars) == 1:
-                var_name = list(result.data_vars)[0]
-                da = result[var_name]
-                dwa = DataWithAxes.from_xarray(da.to_dataset(name=var_name))
-            else:
-                dwa = DataWithAxes.from_xarray(result.drop_attrs())
-            dwa.name = name
-            return dwa
-        if isinstance(result, xr.DataArray):
-            # DataArrays carry no pymodaq attrs; just promote to Dataset.
-            var_name = result.name or name
-            dwa = DataWithAxes.from_xarray(result.to_dataset(name=var_name))
-            dwa.name = name
-            return dwa
-    except ImportError:
-        pass
-    if isinstance(result, DataWithAxes):
-        result.name = name
-        return result
-    if isinstance(result, np.ndarray):
-        return DataWithAxes(name, source=DataSource['calculated'], data=[result])
-    if isinstance(result, (tuple, list)) and all(isinstance(r, np.ndarray) for r in result):
-        return DataWithAxes(name, source=DataSource['calculated'], data=list(result))
-    if isinstance(result, (int, float, np.integer, np.floating, np.bool_)):
-        return DataWithAxes(name, source=DataSource['calculated'],
-                            data=[np.array([float(result)])])
-    raise TypeError(
-        f'Formula returned {type(result).__name__!r} — expected a DataWithAxes, '
-        f'xarray Dataset/DataArray, numpy array, tuple of arrays, or scalar.')
 
 
 class FormulaDTE(DataToExport):
@@ -180,31 +127,10 @@ class DataMixerModelH5(DataMixerModel):
 
     def _open_h5(self, path: Path):
         self._close_h5()
-        # Try each backend in preference order; scan files are almost always
-        # written with 'tables', so try that first regardless of env default.
-        errors = {}
-        for backend in [b for b in ('tables', 'h5py') if b in backends_available]:
-            h5saver = H5SaverLowLevel(backend=backend)
-            try:
-                h5saver.init_file(file_name=path, new_file=False)
-                loader = DataLoader(h5saver)
-                loader.load_all('/')          # probe: fails fast if wrong backend
-                h5saver.close_file()
-                # Re-open cleanly for actual use
-                h5saver2 = H5SaverLowLevel(backend=backend)
-                h5saver2.init_file(file_name=path, new_file=False)
-                self._h5saver_low = h5saver2
-                return
-            except Exception as exc:
-                errors[backend] = exc
-                try:
-                    h5saver.close_file()
-                except Exception:
-                    pass
-        raise RuntimeError(
-            f'Could not open {path} with any backend.\n'
-            + '\n'.join(f'  {b}: {e}' for b, e in errors.items())
-        )
+        # open_for_reading() tries each available backend with automatic SWMR
+        # fallback — no need to probe with load_all() as was done previously.
+        h5saver, _ = H5SaverLowLevel.open_for_reading(path)
+        self._h5saver_low = h5saver
 
     def _close_h5(self):
         if self._h5saver_low is not None and self._h5saver_low.isopen():
@@ -301,7 +227,7 @@ class DataMixerModelH5(DataMixerModel):
         """
         formula_to_eval, _ = replace_names_in_formula_xr(formula)
         result = eval(formula_to_eval, {'np': np, 'xr': xr, '_xr': xr_ctx})
-        dwa = _wrap_result(result, name)
+        dwa = wrap_result(result, name)
 
         # Update xr_ctx so subsequent formulas can reference this result.
         # Store the xarray object directly to skip the DWA→xarray round-trip:

@@ -21,6 +21,7 @@ from qtpy.QtWidgets import (
 )
 
 from pymodaq_data.h5modules.saving import H5SaverLowLevel
+from pymodaq_data.h5modules import H5FileScanner, wrap_result
 from pymodaq_data.data import DataWithAxes
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.config import GlobalConfig as Config
@@ -28,9 +29,6 @@ from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_gui.utils.dock import DockArea, Dock
 
 from pymodaq.extensions.custom_ext import CustomExt
-from pymodaq.extensions.data_mixer.gui.formatters import (
-    _collect_h5_names_and_info, _wrap_result,
-)
 from pymodaq.extensions.data_mixer.gui.variable_browser import VariableBrowserWidget
 from pymodaq.extensions.data_mixer.gui.info_panel import InfoPanelWidget
 from pymodaq.extensions.data_mixer.gui.console import FormulaConsole, _QTCONSOLE
@@ -86,7 +84,8 @@ class DataMixerGUI(CustomExt):
         ]},
         {'title': 'Scan', 'name': 'scan', 'type': 'group', 'children': [
             {'title': 'Active scan', 'name': 'active_scan',     'type': 'list', 'limits': []},
-            {'title': 'Use latest',  'name': 'use_latest_scan', 'type': 'action'},
+            {'title': 'Use latest',  'name': 'use_latest_scan', 'type': 'action_led',
+             'label': 'Use latest', 'value': False},
         ]},
         {'title': 'Live sync', 'name': 'live_sync', 'type': 'group', 'children': [
             {'title': 'Active',        'name': 'live_led',  'type': 'led', 'value': False, 'readonly': True},
@@ -301,7 +300,7 @@ class DataMixerGUI(CustomExt):
             ds = self._xr_ctx_computed.get(name)
             if ds is None:
                 return
-            if self._show_ds_in_viewer(name, ds, source='computed'):
+            if self._show_ds_in_viewer(name, ds):
                 self.docks['viewer'].setVisible(True)
                 self._update_show_viewer_action()
         else:
@@ -321,7 +320,7 @@ class DataMixerGUI(CustomExt):
         if ds is None:
             self._set_status(f'Cannot load {name!r}', error=True)
             return
-        if self._show_ds_in_viewer(name, ds, source='h5'):
+        if self._show_ds_in_viewer(name, ds):
             self._raise_viewers()
             self._update_show_viewer_action()
 
@@ -464,11 +463,15 @@ class DataMixerGUI(CustomExt):
             self._console.recompute_all()
 
     def _go_to_latest_scan(self) -> None:
-        """Select the most recently added scan as the active scan."""
+        """Refresh the H5 tree then select the most recently added scan."""
+        param = self.settings.child('scan', 'use_latest_scan')
+        self._refresh_tree()
         if not self._scan_prefixes:
+            param.setValue(False)
             self._set_status('No scans available')
             return
         self.settings.child('scan', 'active_scan').setValue(self._scan_prefixes[-1])
+        param.setValue(True)
 
     def _update_file_info(self, path: Path, h5saver) -> None:
         """Populate the File info settings group from an open *h5saver* handle.
@@ -512,22 +515,18 @@ class DataMixerGUI(CustomExt):
         Returns ``None`` on error (status message already set).
         """
         try:
-            h5saver, _ = H5SaverLowLevel.open_for_reading(path)
-            try:
-                h5saver.get_node('/RawData')
-                self._h5_base = '/RawData'
-            except Exception:
-                self._h5_base = '/'
-            names, h5_info = _collect_h5_names_and_info(h5saver)
-            scan_set = sorted(set(
-                m.group(0)
-                for n in names
-                for m in [re.match(r'^Scan\d+', n)]
-                if m
-            ))
-            self._scan_prefixes = scan_set
-            self._update_file_info(path, h5saver)
-            h5saver.close_file()
+            with H5FileScanner.open(path) as scanner:
+                self._h5_base = scanner.base
+                h5_info = scanner.scan()
+                names = list(h5_info.keys())
+                scan_set = sorted(set(
+                    m.group(0)
+                    for n in names
+                    for m in [re.match(r'^Scan\d+', n)]
+                    if m
+                ))
+                self._scan_prefixes = scan_set
+                self._update_file_info(path, scanner.h5saver)
         except Exception as exc:
             self._set_status(f'Cannot open: {exc}', error=True)
             return None
@@ -566,46 +565,18 @@ class DataMixerGUI(CustomExt):
             return self._active_scan_prefix + '/' + rel_path[len('Scan/'):]
         return rel_path
 
-    @staticmethod
-    def _load_dwa_from_node(h5saver, abs_path: str):
-        """Walk *abs_path* in *h5saver*, find the first data array, load as xr.Dataset.
 
-        Returns the ``xr.Dataset`` or ``None`` if no data node is found.
-        """
-        from pymodaq_data.h5modules.data_saving import DataLoader
-        from pymodaq_data.h5modules.backends import GROUP
-
-        first_array_path = None
-        for node in h5saver.walk_nodes(abs_path):
-            if isinstance(node, GROUP):
-                continue
-            try:
-                if 'data' in str(node.attrs['data_type']):
-                    first_array_path = node.path
-                    break
-            except Exception:
-                continue
-        if first_array_path is None:
-            return None
-        loader = DataLoader(h5saver)
-        dwa = loader.load_data(first_array_path, load_all=True)
-        return dwa.to_xarray()
-
-    def _show_ds_in_viewer(self, name: str, ds,
-                           source: str = 'computed') -> bool:
+    def _show_ds_in_viewer(self, name: str, ds) -> bool:
         """Convert *ds* to DataWithAxes and open/update a viewer tab for *name*.
 
         Returns ``True`` on success, ``False`` if conversion fails.
-        *source* is forwarded to :meth:`DataViewerWindow.show_variable` so the
-        tab badge reflects whether the data came from H5 (``'h5'``) or from
-        a formula result (``'computed'``).
         """
         try:
             dwa = DataWithAxes.from_xarray(ds)
         except Exception as exc:
             logger.warning(f'Cannot convert {name!r} to DataWithAxes for viewer: {exc}')
             return False
-        self._viewer_widget.show_variable(name, dwa, source=source)
+        self._viewer_widget.show_variable(name, dwa)
         return True
 
     def _build_h5_context(self) -> dict:
@@ -663,21 +634,15 @@ class DataMixerGUI(CustomExt):
             return None
 
         try:
-            h5saver, _ = H5SaverLowLevel.open_for_reading(path, force_swmr=True)
-            try:
+            with H5FileScanner.open(path) as scanner:
                 abs_path = f'{self._h5_base}/{actual_rel}'.replace('//', '/')
-                ds = self._load_dwa_from_node(h5saver, abs_path)
-                if ds is None:
-                    return None
-                self._h5_snapshot[actual_rel] = ds
-                if actual_rel != rel_path:
-                    self._h5_snapshot[rel_path] = ds
-                return ds
-            finally:
-                try:
-                    h5saver.close_file()
-                except Exception as exc:
-                    logger.debug(f'Error closing H5 handle after dataset load: {exc}')
+                ds = H5FileScanner.load_from_handle(scanner.h5saver, abs_path)
+            if ds is None:
+                return None
+            self._h5_snapshot[actual_rel] = ds
+            if actual_rel != rel_path:
+                self._h5_snapshot[rel_path] = ds
+            return ds
         except Exception as exc:
             logger.warning(f'Failed to load H5 dataset {rel_path!r}: {exc}')
             return None
@@ -809,7 +774,7 @@ class DataMixerGUI(CustomExt):
         actual_rel = self._resolve_scan_alias(rel_path)
         abs_path = f'{self._h5_base}/{actual_rel}'.replace('//', '/')
         try:
-            return self._load_dwa_from_node(h5saver, abs_path)
+            return H5FileScanner.load_from_handle(h5saver, abs_path)
         except Exception as exc:
             logger.warning(f'Live load failed for {rel_path!r}: {exc}')
             return None
@@ -866,7 +831,7 @@ class DataMixerGUI(CustomExt):
                     formula, computed_names=computed_names,
                 )
                 result = eval(formula_eval, {'np': np, 'xr': xr, '_xr': xr_ctx})
-                dwa = _wrap_result(result, name)
+                dwa = wrap_result(result, name)
 
                 if isinstance(result, xr.DataArray):
                     ds_result = result.to_dataset(name=name)

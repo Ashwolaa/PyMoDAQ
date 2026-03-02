@@ -3,6 +3,7 @@ from .utils import register_exporter, register_exporters
 from .backends import backends_available
 from .swmr import collect_datasets, refresh_datasets, refresh_cached
 from .saving import H5SaverLowLevel
+from .scanner import H5FileScanner, wrap_result
 
 from pymodaq_utils.logger import set_logger
 

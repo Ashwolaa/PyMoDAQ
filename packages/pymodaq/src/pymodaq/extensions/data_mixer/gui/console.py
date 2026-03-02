@@ -43,8 +43,9 @@ from pymodaq.extensions.data_mixer.parser import (
     parse_named_formulae,
 )
 from pymodaq.extensions.data_mixer.gui.formatters import (
-    _wrap_result, _format_xr_html, _format_xr_lazy_html,
+    _format_xr_html, _format_xr_lazy_html,
 )
+from pymodaq_data.h5modules import wrap_result
 from pymodaq_data.data import DataToExport
 from pymodaq_utils.logger import set_logger, get_module_name
 
@@ -966,9 +967,8 @@ class FormulaConsole(QWidget):
 
                 result = eval(formula_eval, ns)
 
-                # Convert to xr.Dataset for storage.
-                # For xarray results we avoid _wrap_result (which calls
-                # DataWithAxes.from_xarray and materialises dask arrays).
+                # Convert to xr.Dataset for storage.  Keep everything in xarray
+                # to avoid materialising dask arrays through DataWithAxes.
                 if xr is not None and isinstance(result, xr.DataArray):
                     ds = result.to_dataset(name=name)
                     da_computed_names.add(name)   # auto-deref safe for this name
@@ -976,10 +976,23 @@ class FormulaConsole(QWidget):
                     ds = result
                     # Dataset keeps its original variable names — not safe to deref
                 else:
-                    # Non-xarray result: wrap via DWA then convert
+                    # Non-xarray result: coerce to xr.Dataset.
+                    # Prefer a direct xarray path for arrays/scalars to avoid
+                    # materialising dask graphs through DataWithAxes.
+                    # Fall back to wrap_result → to_xarray for DataWithAxes.
                     try:
-                        dwa = _wrap_result(result, name)
-                        ds = dwa.to_xarray()
+                        if xr is not None and isinstance(result, np.ndarray):
+                            da = xr.DataArray(result, name=name)
+                            ds = da.to_dataset(name=name)
+                            da_computed_names.add(name)
+                        elif xr is not None and isinstance(
+                                result, (int, float, np.integer, np.floating, np.bool_)):
+                            da = xr.DataArray(np.array([float(result)]), name=name)
+                            ds = da.to_dataset(name=name)
+                            da_computed_names.add(name)
+                        else:
+                            dwa = wrap_result(result, name)
+                            ds = dwa.to_xarray()
                     except Exception:
                         ds = None
 

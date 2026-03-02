@@ -605,7 +605,8 @@ class H5Backend:
                 raise ImportError('the h5pyd module is not present')
         else:
             raise ValueError(f"Unknown backend: {backend!r}. Must be one of {backends_available}")
-
+        self.backend = backend
+        
     @property
     def h5file(self):
         return self._h5file
