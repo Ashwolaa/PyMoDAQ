@@ -47,27 +47,33 @@ def _ds(data_vars: dict, coords_per_var: dict | None = None):
     return ds
 
 
-# ── M1: inside {…} ───────────────────────────────────────────────────────────
+# ── M1: @ trigger (inserts {name}) ───────────────────────────────────────────
 
 class TestM1:
 
     def test_partial_name(self, qapp):
         ed = _editor({'Scan001/Det/CH00': None, 'Scan001/Det/CH01': None})
-        mode, prefix, cands = ed._detect_completion('{CH0')
+        mode, prefix, cands = ed._detect_completion('@CH0')
         assert mode == 'M1'
         assert 'Scan001/Det/CH00' in cands
 
     def test_empty_prefix_returns_all_names(self, qapp):
         ed = _editor({'a': None, 'b': None})
-        mode, _, cands = ed._detect_completion('{')
+        mode, _, cands = ed._detect_completion('@')
         assert mode == 'M1'
         assert {'a', 'b'} <= set(cands)
 
     def test_includes_computed_names(self, qapp):
         ed = _editor(h5_ctx={'raw': None}, computed={'result': _ds({'result': ['x']})})
-        mode, _, cands = ed._detect_completion('{res')
+        mode, _, cands = ed._detect_completion('@res')
         assert mode == 'M1'
         assert 'result' in cands
+
+    def test_no_trigger_on_open_brace(self, qapp):
+        """Opening { alone must not trigger M1 (dict literal safety)."""
+        ed = _editor({'a': None, 'b': None})
+        mode, _, _ = ed._detect_completion("d = {'key': ")
+        assert mode == 'NONE'
 
 
 # ── M2: after {name}[" ───────────────────────────────────────────────────────
