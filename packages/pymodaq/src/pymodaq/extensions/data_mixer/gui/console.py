@@ -177,7 +177,7 @@ class _FallbackEditor(QPlainTextEdit):
 
     Mode | Trigger                     | Candidates
     -----|-----------------------------|------------------
-    M1   | inside ``{…}``              | all H5 + computed names
+    M1   | ``@`` prefix                | all H5 + computed names  (inserts ``{name}``)
     M2   | after ``{h5name}["``        | data_vars of that H5 Dataset
     M3   | after ``}.``, ``].``, ``).`` | static xarray method list
     M4   | after ``.mean("`` etc.      | dims of referenced object
@@ -209,6 +209,10 @@ class _FallbackEditor(QPlainTextEdit):
         self._popup.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._popup.itemClicked.connect(self._do_complete)
         self._popup.hide()
+
+        # Track the text-position of the @ trigger that the user dismissed with
+        # Escape, so we do not re-show the popup for the same trigger session.
+        self._popup_dismissed_at = -1
 
         FormulaHighlighter(self.document(), self.palette())
         QShortcut(QKeySequence('Ctrl+/'), self).activated.connect(self._toggle_comment)
@@ -244,7 +248,7 @@ class _FallbackEditor(QPlainTextEdit):
         """
         text = _text if _text is not None else self._text_before_cursor()
 
-        m1 = re.search(r'\{([^}]*)$', text)
+        m1 = re.search(r'@(\S*)$', text)
         if m1:
             prefix = m1.group(1)
             names = [n for n in self._all_names if prefix.lower() in n.lower()]
@@ -382,9 +386,24 @@ class _FallbackEditor(QPlainTextEdit):
 
     def _update_popup(self) -> None:
         mode, prefix, candidates = self._detect_completion()
+        if mode != 'M1':
+            # Any non-M1 mode (including NONE) resets the dismissed state so
+            # the next @ the user types will show the popup again.
+            self._popup_dismissed_at = -1
         if mode == 'NONE' or not candidates:
             self._popup.hide()
             return
+        if mode == 'M1':
+            # Find the position of the triggering @ character so we can track
+            # whether the user already dismissed the popup for this trigger.
+            text_before = self._text_before_cursor()
+            m = re.search(r'@(\S*)$', text_before)
+            trigger_start = m.start() if m else -1
+            self._popup._trigger_start = trigger_start
+            if self._popup_dismissed_at >= 0 and trigger_start == self._popup_dismissed_at:
+                return  # user pressed Escape here — don't re-show
+        else:
+            self._popup._trigger_start = -1
         self._popup.clear()
         for c in candidates:
             self._popup.addItem(c)
@@ -408,12 +427,12 @@ class _FallbackEditor(QPlainTextEdit):
         rest = full[pos:]
 
         if mode == 'M1':
-            brace = full.rfind('{', 0, pos)
-            if brace >= 0:
-                cursor.setPosition(brace + 1)
+            # Replace @<prefix> with {completion} — the @ trigger is not kept.
+            at_pos = full.rfind('@', 0, pos)
+            if at_pos >= 0:
+                cursor.setPosition(at_pos)
                 cursor.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
-                suffix = '' if rest.startswith('}') else '}'
-                cursor.insertText(text + suffix)
+                cursor.insertText('{' + text + '}')
         elif mode in ('M2', 'M2b'):
             quote = full.rfind('"', 0, pos)
             if quote >= 0:
@@ -574,6 +593,9 @@ class _FallbackEditor(QPlainTextEdit):
             key = event.key()
             if key == Qt.Key.Key_Escape:
                 self._popup.hide()
+                # Remember which @ trigger was dismissed so _update_popup
+                # does not re-show it on the next keystroke.
+                self._popup_dismissed_at = getattr(self._popup, '_trigger_start', -1)
                 return
             if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Tab):
                 item = self._popup.currentItem()
@@ -738,7 +760,7 @@ class FormulaConsole(QWidget):
         # ── Editor ────────────────────────────────────────────────────────────
         self._editor = _FallbackEditor(w)
         self._editor.setPlaceholderText(
-            '# Type {  to autocomplete variable names\n'
+            '# Type @ to autocomplete variable names\n'
             'a = {origin/name}["CH00"].mean("time")\n'
             'b = {a} + 1\n'
         )
