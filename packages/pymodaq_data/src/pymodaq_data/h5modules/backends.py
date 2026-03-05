@@ -606,7 +606,7 @@ class H5Backend:
         else:
             raise ValueError(f"Unknown backend: {backend!r}. Must be one of {backends_available}")
         self.backend = backend
-        
+
     @property
     def h5file(self):
         return self._h5file
