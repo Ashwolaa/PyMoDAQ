@@ -41,3 +41,11 @@ class MoveDirectorMethods(StrEnum):
 
 class ViewerDirectorMethods(StrEnum):
     SET_DATA = "set_data"
+
+
+class PymodaqActorMethods(StrEnum):
+    QUERY_DATA           = "query_data"
+    CHANGE_TO            = "change_to"
+    GET_CAPABILITIES     = "get_capabilities"
+    SUBSCRIBE_DIRECTOR   = "subscribe_director"
+    UNSUBSCRIBE_DIRECTOR = "unsubscribe_director"
