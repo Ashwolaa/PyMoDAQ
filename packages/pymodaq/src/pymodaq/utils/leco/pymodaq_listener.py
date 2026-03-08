@@ -6,9 +6,12 @@ from threading import Event
 from typing import cast, Optional, Union, List, Sequence, Type
 
 from pyleco.core import COORDINATOR_PORT
+from pyleco.core.data_message import DataMessage
 from pyleco.json_utils.errors import JSONRPCError, RECEIVER_UNKNOWN, NODE_UNKNOWN
 from pyleco.utils.listener import Listener, PipeHandler
 from qtpy.QtCore import QObject, Signal  # type: ignore
+
+log = logging.getLogger(__name__)
 
 from pymodaq_data.data import DataWithAxes
 from serializall import SerializableFactory, SerializableBase
@@ -362,3 +365,65 @@ class ActorListener(PymodaqListener):
 # to be able to separate them later on
 MoveActorListener = ActorListener
 ViewerActorListener = ActorListener
+
+
+class DataSubscriberHandler(PymodaqPipeHandler):
+    """PipeHandler that receives ZMQ data-channel messages from a PymodaqActor.
+
+    Overrides :meth:`handle_subscription_message` to deserialize the
+    ``DataToExport`` payload and forward it as a ``ThreadCommand`` via
+    ``signals.cmd_signal``.
+
+    Emits ``ThreadCommand('data_received', attribute={'topic': str, 'dte': DataToExport})``.
+    """
+
+    def handle_subscription_message(self, message: DataMessage) -> None:
+        """Deserialize a published DataToExport and emit it as a signal."""
+        topic = message.topic.decode()
+        if not message.payload:
+            return
+        try:
+            dte = SerializableFactory().get_apply_deserializer(message.payload[0])
+            self.signals.cmd_signal.emit(
+                ThreadCommand('data_received', attribute={'topic': topic, 'dte': dte})
+            )
+        except Exception:
+            log.warning(
+                "DataSubscriberHandler: failed to deserialize data from topic '%s'.", topic
+            )
+
+
+class PymodaqDataListener(PymodaqListener):
+    """PymodaqListener that also handles ZMQ data-channel subscriptions.
+
+    Use instead of :class:`PymodaqListener` when ``use_legacy_actor=False``:
+    data published by :class:`PymodaqActor` via ``query_data()`` is received
+    through the ZMQ PUB/SUB channel rather than legacy RPC callbacks.
+
+    Exposes :meth:`subscribe` / :meth:`unsubscribe` to register actor topics.
+    Incoming frames are deserialized and emitted via ``cmd_signal`` as
+    ``ThreadCommand('data_received', attribute={'topic': str, 'dte': DataToExport})``.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        host: str = 'localhost',
+        port: int = COORDINATOR_PORT,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            name,
+            handler_class=DataSubscriberHandler,
+            host=host,
+            port=port,
+            **kwargs,
+        )
+
+    def subscribe(self, topic: str) -> None:
+        """Subscribe to data published by the named actor (topic = actor full name)."""
+        self.communicator.subscribe(topic)
+
+    def unsubscribe(self, topic: str) -> None:
+        """Unsubscribe from the named actor's data channel."""
+        self.communicator.unsubscribe(topic)
