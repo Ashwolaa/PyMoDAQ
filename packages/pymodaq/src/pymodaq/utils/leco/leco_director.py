@@ -1,4 +1,5 @@
 
+import logging
 import random
 
 from pyleco.core import COORDINATOR_PORT
@@ -16,12 +17,13 @@ from pymodaq_gui.parameter.utils import ParameterWithPath
 from qtpy.QtCore import QTimer
 
 from pymodaq.utils.leco.director_utils import GenericDirector
-from pymodaq.utils.leco.pymodaq_listener import PymodaqListener
+from pymodaq.utils.leco.pymodaq_listener import PymodaqListener, PymodaqDataListener
 from pymodaq.utils.leco.rpc_method_definitions import GenericDirectorMethods, MoveDirectorMethods
 from serializall import SerializableFactory
 from pymodaq.control_modules.thread_commands import ThreadStatus, ThreadStatusMove
 
 config = Config()
+logger = logging.getLogger(__name__)
 
 class DirectorCommands(StrEnum):
     SET_SETTINGS = GenericDirectorMethods.SET_DIRECTOR_SETTINGS
@@ -43,6 +45,8 @@ leco_parameters = [
     {'title': 'Coordinator Host:', 'name': 'host', 'type': 'str', 'value': config("utils", 'network', "leco-server", "host")},
     {'title': 'Coordinator Port:', 'name': 'port', 'type': 'int', 'value': config("utils", 'network', "leco-server", "port")},
     {'title': 'Settings PyMoDAQ Client:', 'name': 'settings_client', 'type': 'group', 'children': []},
+    {'title': 'Use legacy actor:', 'name': 'use_legacy_actor', 'type': 'bool', 'value': True,
+     'tip': 'True: legacy ActuatorDirector (ActorListener). False: PymodaqActor new API.'},
 ]
 
 
@@ -61,10 +65,23 @@ class LECODirector:
 
         name = f'{self._title}_{random.randrange(0, 10000)}_director'
 
-        self.listener = PymodaqListener(name=name, host=host, port=port)
-        self.listener.start_listen()
+        use_legacy = True
+        try:
+            use_legacy = bool(self.settings['use_legacy_actor'])
+        except Exception:
+            pass
 
-        self.communicator = self.listener.get_communicator()
+        if use_legacy:
+            self.listener = PymodaqListener(name=name, host=host, port=port)
+        else:
+            self.listener = PymodaqDataListener(name=name, host=host, port=port)
+        try:
+            self.listener.start_listen()
+            self.communicator = self.listener.get_communicator()
+        except RecursionError:
+            raise ConnectionError(
+                "LECO coordinator not reachable — start 'python -m pyleco.coordinators.coordinator' first"
+            ) from None
 
         #registering rpc methods common to all Directors
         self.register_rpc_methods((
@@ -108,8 +125,12 @@ class LECODirector:
         self.timer.start(timeout)  # in milli seconds
 
     def check_actor_connection(self) -> None:
+        if not getattr(self, 'controller', None):
+            return
         try:
             self.controller.ask_rpc("pong", timeout=0.1)
+        except TimeoutError:
+            logger.debug("check_actor_connection: timeout (actor not yet reachable)")
         except JSONRPCError as exc:
             if exc.rpc_error.code == RECEIVER_UNKNOWN.code:
                 self.emit_status(ThreadCommand(ThreadStatus.UPDATE_UI, "do_init", args=[False]))

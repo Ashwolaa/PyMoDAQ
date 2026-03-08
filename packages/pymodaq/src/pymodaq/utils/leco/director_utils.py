@@ -83,7 +83,7 @@ class PymodaqDirector(GenericDirector):
     Variable/Observable model matures.
     """
 
-    def query_data(self, names=None, fresh: bool = True) -> None:
+    def query_data(self, names=None, fresh: bool = True) -> Optional[str]:
         """Ask the actor to read one or more observables and publish on data channel.
 
         Parameters
@@ -93,8 +93,16 @@ class PymodaqDirector(GenericDirector):
         fresh : bool
             True  → trigger new hardware acquisition (publish to ZMQ data channel).
             False → re-publish last cached value without touching hardware.
+
+        Returns
+        -------
+        str or None
+            Hex conversation ID of the ZMQ publish triggered by this call.
+            Compare against the ``'cid'`` field in the ``'data_received'``
+            ThreadCommand to identify the matching frame on the data channel.
+            ``None`` if the actor had no data to publish.
         """
-        self.ask_rpc(PymodaqActorMethods.QUERY_DATA, names=names, fresh=fresh)
+        return self.ask_rpc(PymodaqActorMethods.QUERY_DATA, names=names, fresh=fresh)
 
     def get_capabilities(self):
         """Retrieve the actor's Capabilities (observables + variables)."""
@@ -116,6 +124,13 @@ class PymodaqDirector(GenericDirector):
             name=self.communicator.full_name,
         )
 
+    def get_pymodaq_settings(self) -> Optional[str]:
+        """Fetch the actor's parameter tree XML.
+
+        Returns ``None`` if the actor has no settings.
+        """
+        return self.ask_rpc("get_pymodaq_settings")
+
 
 class PymodaqMoveDirector(PymodaqDirector):
     """Director for actuator-type actors (actors that expose Variables).
@@ -124,7 +139,7 @@ class PymodaqMoveDirector(PymodaqDirector):
     for polling the current value (move-done detection).
     """
 
-    def change_to(self, name, value) -> None:
+    def change_to(self, name, value) -> Optional[str]:
         """Write a variable on the actor's device.
 
         Parameters
@@ -133,15 +148,36 @@ class PymodaqMoveDirector(PymodaqDirector):
             Variable name, or list of names for a multi-variable update.
         value :
             New value, or list of values aligned with name.
+
+        Returns
+        -------
+        str or None
+            Hex conversation ID of the auto-publish triggered after writing.
+            Matches the ``'cid'`` in the ``'data_received'`` ThreadCommand for
+            the resulting ZMQ frame.
         """
-        self.ask_rpc(PymodaqActorMethods.CHANGE_TO, name=name, value=value)
+        return self.ask_rpc(PymodaqActorMethods.CHANGE_TO, name=name, value=value)
 
 
 class PymodaqDetectorDirector(PymodaqDirector):
     """Director for detector-type actors (actors that expose Observables).
 
-    query_data() (inherited) is the primary method — it triggers acquisition
-    and causes the actor to publish DataToExport on the ZMQ data channel.
+    For a single frame use ``query_data()``.
+    For continuous acquisition use ``start_grab()`` / ``stop_grab()``:
+    the actor's background loop publishes frames on the ZMQ data channel
+    and the director receives them passively via its ZMQ subscription.
     """
-    # No additional methods for now.  Data arrives via ZMQ subscription managed
-    # at the DAQ_xDViewer_LECODirector level.
+
+    def query_data_continuous(self, rate_hz: float = 0) -> None:
+        """Tell the actor to start a continuous acquisition loop.
+
+        Parameters
+        ----------
+        rate_hz:
+            Target frame rate.  ``0`` (default) = as fast as the device allows.
+        """
+        self.ask_rpc(PymodaqActorMethods.QUERY_DATA_CONTINUOUS, rate_hz=rate_hz)
+
+    def stop_continuous(self) -> None:
+        """Tell the actor to stop its continuous acquisition loop."""
+        self.ask_rpc(PymodaqActorMethods.STOP_CONTINUOUS)

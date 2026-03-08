@@ -49,3 +49,5 @@ class PymodaqActorMethods(StrEnum):
     GET_CAPABILITIES     = "get_capabilities"
     SUBSCRIBE_DIRECTOR   = "subscribe_director"
     UNSUBSCRIBE_DIRECTOR = "unsubscribe_director"
+    QUERY_DATA_CONTINUOUS = "query_data_continuous"
+    STOP_CONTINUOUS       = "stop_continuous"

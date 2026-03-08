@@ -2,6 +2,7 @@
 from pymodaq_utils.enums import StrEnum
 
 import logging
+import warnings
 from threading import Event
 from typing import cast, Optional, Union, List, Sequence, Type
 
@@ -95,6 +96,11 @@ class PymodaqPipeHandler(PipeHandler):
             )
 
 class ActorHandler(PymodaqPipeHandler):
+    """.. deprecated::
+        Use :class:`DataSubscriberHandler` with :class:`PymodaqDataListener` instead.
+        ``ActorHandler`` is part of the legacy actor path (``use_legacy_actor=True``) and
+        will be removed once all plugins have migrated to :class:`PymodaqActor`.
+    """
     def register_data_types_for_deserialization(
         self, types: Optional[Sequence[type[SerializableBase]]] = None
     ) -> None:
@@ -255,7 +261,13 @@ class PymodaqListener(Listener):
 
 
 class ActorListener(PymodaqListener):
-    """Listener for modules being an Actor (being remote controlled)."""
+    """Listener for modules being an Actor (being remote controlled).
+
+    .. deprecated::
+        Use :class:`PymodaqDataListener` with :class:`PymodaqActor` instead.
+        ``ActorListener`` is part of the legacy actor path (``use_legacy_actor=True``) and
+        will be removed once all plugins have migrated to :class:`PymodaqActor`.
+    """
 
     def __init__(self,
                  name: str,
@@ -378,14 +390,23 @@ class DataSubscriberHandler(PymodaqPipeHandler):
     """
 
     def handle_subscription_message(self, message: DataMessage) -> None:
-        """Deserialize a published DataToExport and emit it as a signal."""
+        """Deserialize a published DataToExport and emit it as a signal.
+
+        The ``'data_received'`` ThreadCommand attribute carries:
+        - ``'topic'``: ZMQ topic string (actor full name)
+        - ``'dte'``: deserialized :class:`DataToExport`
+        - ``'cid'``: hex conversation ID matching the one returned by the
+          ``query_data`` / ``change_to`` RPC, for correlation
+        """
         topic = message.topic.decode()
         if not message.payload:
             return
         try:
             dte = SerializableFactory().get_apply_deserializer(message.payload[0])
+            # CID is the first 16 bytes of the header (header = CID + 1-byte message_type)
+            cid = message.header[:16].hex() if message.header else None
             self.signals.cmd_signal.emit(
-                ThreadCommand('data_received', attribute={'topic': topic, 'dte': dte})
+                ThreadCommand('data_received', attribute={'topic': topic, 'dte': dte, 'cid': cid})
             )
         except Exception:
             log.warning(

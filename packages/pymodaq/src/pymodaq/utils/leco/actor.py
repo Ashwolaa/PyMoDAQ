@@ -29,9 +29,12 @@ headless testing a pure-Python mock device is sufficient.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from typing import Any, Optional
 
 from pyleco.actors.actor import Actor
+from pyleco.core.serialization import generate_conversation_id
 from pyleco.utils.data_publisher import DataPublisher
 
 from pymodaq.control_modules.capabilities import Capabilities, infer_capabilities
@@ -76,6 +79,7 @@ class PymodaqActor(Actor):
         self._director_registry = set()
         self._last_data = None
         self._stop_grab_flag = False
+        self._grab_thread: Optional[threading.Thread] = None
 
     # ── RPC method registration ────────────────────────────────────────────────
 
@@ -92,12 +96,16 @@ class PymodaqActor(Actor):
         self.register_rpc_method(self.set_info)
         self.register_rpc_method(self.subscribe_director)
         self.register_rpc_method(self.unsubscribe_director)
+        self.register_rpc_method(self.query_data_continuous)
+        self.register_rpc_method(self.stop_continuous)
+
+        # # Heartbeat — used by directors to check connectivity
+        # self.register_rpc_method(self.pong)
 
         # Legacy aliases — keep existing directors working without changes
         self.register_rpc_method(self._legacy_grab, name='grab')
         self.register_rpc_method(self._legacy_grab, name='snap')
         self.register_rpc_method(self._legacy_grab, name='get_actuator_value')
-        self.register_rpc_method(self._set_stop_grab, name='stop_grab')
         self.register_rpc_method(self._legacy_move_abs, name='move_abs')
         self.register_rpc_method(self._legacy_move_rel, name='move_rel')
         self.register_rpc_method(self._legacy_move_home, name='move_home')
@@ -108,7 +116,7 @@ class PymodaqActor(Actor):
         self,
         names=None,
         fresh: bool = True,
-    ) -> None:
+    ) -> Optional[str]:
         """Read observables from the device and publish on the data channel.
 
         Accepts either a single observable name or a list of names.
@@ -122,6 +130,13 @@ class PymodaqActor(Actor):
             If ``True``, trigger a new hardware acquisition (costly but up-to-date).
             If ``False``, re-publish the last cached :class:`DataToExport` without
             touching hardware.
+
+        Returns
+        -------
+        str or None
+            Hex-encoded conversation ID of the ZMQ publish, so the caller can
+            correlate this RPC response with the matching frame on the data channel.
+            ``None`` if no data was available to publish.
         """
         if isinstance(names, str):
             names = [names]
@@ -130,15 +145,16 @@ class PymodaqActor(Actor):
                 dte = self.device.read(names)
             except Exception:
                 logger.exception("query_data: device.read() raised an exception")
-                return
+                return None
             if dte is not None:
                 self._last_data = dte
-                self._publish(dte)
+                return self._publish(dte)
         else:
             if self._last_data is not None:
-                self._publish(self._last_data)
+                return self._publish(self._last_data)
+        return None
 
-    def change_to(self, name, value: Any) -> None:
+    def change_to(self, name, value: Any) -> Optional[str]:
         """Write one or more variables on the device.
 
         Accepts either a single name/value pair or parallel lists of names and
@@ -158,6 +174,14 @@ class PymodaqActor(Actor):
                 self.device.write(n, v)
         else:
             self.device.write(name, value)
+        # Immediately publish the updated state so directors receive a ZMQ
+        # update without waiting for the next get_actuator_value polling cycle.
+        # Returns the same CID as the ZMQ publish so the caller can correlate.
+        try:
+            return self.query_data(names=None, fresh=True)
+        except Exception:
+            logger.exception("change_to: auto-publish failed")
+            return None
 
     # ── Introspection ──────────────────────────────────────────────────────────
 
@@ -220,6 +244,9 @@ class PymodaqActor(Actor):
         self._director_registry.discard(name)
         logger.debug("Director '%s' unsubscribed from actor '%s'.", name, self.name)
 
+    # def pong(self) -> str:
+    #     """Heartbeat reply — called by directors to verify connectivity."""
+    #     return "pong"
     # ── Data channel (periodic readout) ───────────────────────────────────────
 
     def read_publish(self, device, publisher: DataPublisher) -> None:
@@ -240,14 +267,26 @@ class PymodaqActor(Actor):
 
     # ── Internal helpers ───────────────────────────────────────────────────────
 
-    def _publish(self, dte) -> None:
-        """Serialize *dte* and publish it on the LECO data channel."""
+    def _publish(self, dte) -> Optional[str]:
+        """Serialize *dte* and publish it on the LECO data channel.
+
+        Returns
+        -------
+        str or None
+            Hex-encoded conversation ID embedded in the ZMQ frame header, or
+            ``None`` if serialization / publish failed.  Directors can compare
+            this value against the ``cid`` field in the ``'data_received'``
+            :class:`ThreadCommand` to match a specific frame.
+        """
         try:
             from serializall import SerializableFactory
+            cid = generate_conversation_id()
             payload: bytes = SerializableFactory().get_apply_serializer(dte)
-            self.publisher.send_data(data=payload)
+            self.publisher.send_data(data=payload, conversation_id=cid)
+            return cid.hex()
         except Exception:
             logger.exception("_publish: failed to serialize / publish DataToExport")
+            return None
 
     def _broadcast_settings(self) -> None:
         """Push updated settings XML to all registered directors."""
@@ -275,6 +314,67 @@ class PymodaqActor(Actor):
         except Exception:
             logger.exception("_broadcast_settings: failed to get communicator")
 
+    # ── Continuous acquisition ─────────────────────────────────────────────────
+
+    def query_data_continuous(self, rate_hz: float = 0) -> None:
+        """Start a continuous acquisition loop that publishes on the data channel.
+
+        Analogous to :meth:`query_data` but runs in a background thread and
+        keeps publishing until :meth:`stop_continuous` is called.
+
+        Parameters
+        ----------
+        rate_hz:
+            Target publish rate in frames per second.
+            ``0`` (default) means as fast as ``device.read()`` allows.
+
+        Notes
+        -----
+        Calls :meth:`stop_continuous` first so that a second call safely
+        restarts the loop.  ``device.read()`` is called from a background
+        thread; avoid issuing concurrent ``query_data`` RPC calls while
+        continuous acquisition is running.
+        """
+        self.stop_continuous()              # join any previous loop first
+        self._stop_grab_flag = False
+        self._grab_thread = threading.Thread(
+            target=self._grab_loop,
+            args=(rate_hz,),
+            daemon=True,
+            name=f"continuous-{self.name}",
+        )
+        self._grab_thread.start()
+
+    def stop_continuous(self) -> None:
+        """Stop the continuous acquisition loop started by :meth:`query_data_continuous`.
+
+        Sets the stop flag and waits up to 2 s for the loop thread to exit.
+        Safe to call even when no continuous acquisition is running.
+        """
+        self._stop_grab_flag = True
+        if self._grab_thread is not None and self._grab_thread.is_alive():
+            self._grab_thread.join(timeout=2.0)
+        self._grab_thread = None
+
+    def _grab_loop(self, rate_hz: float) -> None:
+        """Background thread body for continuous acquisition."""
+        interval = 1.0 / rate_hz if rate_hz > 0 else 0.0
+        while not self._stop_grab_flag:
+            t0 = time.monotonic()
+            try:
+                dte = self.device.read()
+            except Exception:
+                logger.exception("_grab_loop: device.read() failed; stopping")
+                break
+            if dte is not None:
+                self._last_data = dte
+                self._publish(dte)
+            if interval > 0:
+                elapsed = time.monotonic() - t0
+                remaining = interval - elapsed
+                if remaining > 0:
+                    time.sleep(remaining)
+
     # ── Legacy aliases ─────────────────────────────────────────────────────────
 
     def _legacy_grab(self) -> None:
@@ -284,10 +384,6 @@ class PymodaqActor(Actor):
         """
         self._stop_grab_flag = False
         self.query_data(names=None, fresh=True)
-
-    def _set_stop_grab(self) -> None:
-        """Legacy alias for ``stop_grab`` RPC name."""
-        self._stop_grab_flag = True
 
     def _legacy_move_abs(self, position: float) -> None:
         """Legacy alias: ``move_abs(position)`` → ``change_to('position', position)``."""

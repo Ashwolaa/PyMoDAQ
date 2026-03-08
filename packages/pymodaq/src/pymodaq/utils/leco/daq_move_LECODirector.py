@@ -22,7 +22,7 @@ from pymodaq_gui.parameter import Parameter
 
 from pymodaq.utils.leco.leco_director import (LECODirector, leco_parameters, DirectorCommands,
                                               DirectorReceivedCommands)
-from pymodaq.utils.leco.director_utils import ActuatorDirector
+from pymodaq.utils.leco.director_utils import ActuatorDirector, PymodaqMoveDirector
 
 from pymodaq_utils.logger import set_logger, get_module_name
 
@@ -45,7 +45,7 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         utility_classes.DAQ_TCP_server
     """
     settings: Parameter
-    controller: Optional[ActuatorDirector]
+    controller: Optional[Union[ActuatorDirector, PymodaqMoveDirector]]
     _axis_names = ['']
     _controller_units = ['']
     _epsilon = 1
@@ -77,6 +77,8 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
             self.set_move_done,  # to set the move as done
         ))
         self.start_timer()
+        # Connect ZMQ data-channel messages (new actor path) to local handler
+        self.listener.cmd_signal.connect(self._on_actor_data)
         # To distinguish how to encode positions, it needs to now if it deals
         # with a json-accepting or a binary-accepting actuator
         # It is set to False by default. It then use the first received message
@@ -102,17 +104,41 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         actor_name = self.settings["actor_name"]
 
         if self.is_master:
-            self.controller = ActuatorDirector(actor=actor_name, communicator=self.communicator)
-            try:
-                self.controller.set_remote_name(self.communicator.full_name)
-            except TimeoutError:
-                logger.warning("Timeout setting remote name.")
+            if self.settings['use_legacy_actor']:
+                self.controller = ActuatorDirector(actor=actor_name, communicator=self.communicator)
+                try:
+                    self.controller.set_remote_name(self.communicator.full_name)
+                except TimeoutError:
+                    logger.warning("Timeout setting remote name.")
+                self.json = False
+                self.controller.get_settings()
+            else:
+                self.controller = PymodaqMoveDirector(actor=actor_name, communicator=self.communicator)
+                try:
+                    caps = self.controller.get_capabilities()
+                    self._variable_names = [v.name for v in caps.variables] or ['position']
+                except Exception:
+                    self._variable_names = ['position']
+                    logger.warning("Could not fetch capabilities; defaulting variable name to 'position'.")
+                try:
+                    self.controller.subscribe_settings()
+                except Exception:
+                    logger.warning("Timeout during subscribe_settings.")
+                # The actor publishes with its full name (namespace.component) as ZMQ topic.
+                # Subscribing to just the component name would miss the namespace prefix.
+                _namespace = self.communicator.namespace
+                self._actor_sub_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                try:
+                    self.listener.subscribe(self._actor_sub_name)
+                except Exception:
+                    logger.warning("Could not subscribe to actor ZMQ data channel.")
+                # Request initial position so the display is populated on startup.
+                try:
+                    self.controller.query_data(fresh=True)
+                except Exception:
+                    logger.warning("Could not request initial position from actor.")
         else:
             self.controller = controller
-
-        self.json = False
-        # send a command to the Actor whose name is actor_name to send its settings
-        self.controller.get_settings()
 
         info = f"LECODirector: {self._title} is initialized"
         initialized = True
@@ -122,44 +148,75 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         position = self.check_bound(position)
         position = self.set_position_with_scaling(position)
         self.target_value = position
-        if self.json:
-            # if it's 0D, just send the position as a scalar
-            if hasattr(self, 'shape') and self.shape == ():
-                position = position.value(self.axis_unit)
-            else:
-                # Until the GUI allows for it (next line), we send the single value repeated
-                # position = [data.m_as(self.axis_unit) for data in position.quantities]
-                position = np.full(self.shape, position.value(self.axis_unit)).tolist()
-        self.controller.move_abs(position=position)
+        if self.settings['use_legacy_actor']:
+            if self.json:
+                if hasattr(self, 'shape') and self.shape == ():
+                    position = position.value(self.axis_unit)
+                else:
+                    position = np.full(self.shape, position.value(self.axis_unit)).tolist()
+            self.controller.move_abs(position=position)
+        else:
+            var_name = getattr(self, '_variable_names', ['position'])[0]
+            self.controller.change_to(var_name, position.value(self.axis_unit))
 
     def move_rel(self, position: DataActuator) -> None:
         position = self.check_bound(self.current_value + position) - self.current_value  # type: ignore  # noqa
         self.target_value = position + self.current_value
-
         position = self.set_position_relative_with_scaling(position)
-        if self.json:
-            # if it's 0D, just send the position as a scalar
-            if hasattr(self, 'ndim') and self.shape == ():
-                position = position.value(self.axis_unit)
-            else:
-                # Until the GUI allows for it (next line), we send the single value repeated
-                #position = [data.m_as(self.axis_unit) for data in position.quantities]
-                position = np.full(self.shape, position.value(self.axis_unit)).tolist()
-
-        self.controller.move_rel(position=position)
+        if self.settings['use_legacy_actor']:
+            if self.json:
+                if hasattr(self, 'ndim') and self.shape == ():
+                    position = position.value(self.axis_unit)
+                else:
+                    position = np.full(self.shape, position.value(self.axis_unit)).tolist()
+            self.controller.move_rel(position=position)
+        else:
+            var_name = getattr(self, '_variable_names', ['position'])[0]
+            self.controller.change_to(var_name, position.value(self.axis_unit))
 
     def move_home(self):
-        self.controller.move_home()
+        if self.settings['use_legacy_actor']:
+            self.controller.move_home()
+        else:
+            var_name = getattr(self, '_variable_names', ['position'])[0]
+            self.controller.change_to(var_name, 0.0)
 
     def get_actuator_value(self) -> DataActuator:
-        """ Get the current hardware value """
-        self.controller.get_actuator_value()
+        """Get the current hardware value."""
+        if self.settings['use_legacy_actor']:
+            self.controller.get_actuator_value()
+        else:
+            # Trigger a fresh read; the actor publishes the result on the ZMQ data channel.
+            # _on_actor_data() receives it asynchronously and updates _current_value.
+            self.controller.query_data(fresh=True)
         return self._current_value
 
     def stop_motion(self) -> None:
+        if self.settings['use_legacy_actor']:
+            self.controller.stop_motion()
+        # else: no equivalent stop in new API yet
+
+    def _on_actor_data(self, cmd: ThreadCommand) -> None:
+        """Handle data published by the PymodaqActor on the ZMQ data channel.
+
+        Deserializes the position from the ``DataToExport`` carried in the
+        ``'data_received'`` ThreadCommand and forwards it to the GUI via
+        ``emit_status``.  Called via the listener's ``cmd_signal`` when
+        ``use_legacy_actor=False``.
         """
-        """
-        self.controller.stop_motion()
+        if cmd.command != 'data_received':
+            return
+        dte = (cmd.attribute or {}).get('dte')
+        if dte is None:
+            return
+        try:
+            pos_val = float(dte.data[0].data[0].ravel()[0])
+            pos = DataActuator(data=[np.atleast_1d(np.array([pos_val]))])
+            pos = self.get_position_with_scaling(pos)
+            self._current_value = pos
+            self.emit_status(ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos))
+        except Exception:
+            logger.warning("_on_actor_data: could not extract position from DataToExport.")
 
     # Methods accessible via remote calls
     def _set_position_value(
@@ -209,8 +266,17 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         self.axis_unit = self.settings['settings_client', 'units']
 
     def close(self) -> None:
-        """ Clear the content of the settings_clients setting"""
+        """Clear the content of the settings_clients setting."""
         self.timer.stop()
+        if not self.settings['use_legacy_actor'] and self.controller is not None:
+            try:
+                self.controller.unsubscribe_settings()
+            except Exception:
+                pass
+            try:
+                self.listener.unsubscribe(getattr(self, '_actor_sub_name', self.settings['actor_name']))
+            except Exception:
+                pass
         super().close()
 
 
