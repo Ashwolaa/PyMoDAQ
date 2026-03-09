@@ -74,6 +74,14 @@ class ListenerSignals(QObject):
 
         For an actuator: move_abs, move_home, move_rel, check_position, stop_motion
     """
+    data_signal = Signal(str, object)
+    """Emitted by DataSubscriberHandler when a ZMQ data frame arrives.
+
+    Arguments: (topic: str, dte: DataToExport)
+
+    Kept separate from cmd_signal so that high-rate data frames never block
+    control commands (stop_grab, move_abs, etc.) in the Qt event queue.
+    """
     # message = Signal(Message)
 
 
@@ -383,31 +391,26 @@ class DataSubscriberHandler(PymodaqPipeHandler):
     """PipeHandler that receives ZMQ data-channel messages from a PymodaqActor.
 
     Overrides :meth:`handle_subscription_message` to deserialize the
-    ``DataToExport`` payload and forward it as a ``ThreadCommand`` via
-    ``signals.cmd_signal``.
+    ``DataToExport`` payload and forward it via ``signals.data_signal``.
 
-    Emits ``ThreadCommand('data_received', attribute={'topic': str, 'dte': DataToExport})``.
+    Emits ``data_signal(topic: str, dte: DataToExport)`` — intentionally on a
+    dedicated signal so that high-rate data frames never block control commands
+    (stop_grab, move_abs, etc.) waiting in the same Qt event queue.
     """
 
     def handle_subscription_message(self, message: DataMessage) -> None:
-        """Deserialize a published DataToExport and emit it as a signal.
+        """Deserialize a published DataToExport and emit it via data_signal.
 
-        The ``'data_received'`` ThreadCommand attribute carries:
-        - ``'topic'``: ZMQ topic string (actor full name)
-        - ``'dte'``: deserialized :class:`DataToExport`
-        - ``'cid'``: hex conversation ID matching the one returned by the
-          ``query_data`` / ``change_to`` RPC, for correlation
+        Emits ``signals.data_signal(topic, dte)`` where:
+        - ``topic``: ZMQ topic string (actor full name, e.g. ``'localhost.stage'``)
+        - ``dte``: deserialized :class:`DataToExport`
         """
         topic = message.topic.decode()
         if not message.payload:
             return
         try:
             dte = SerializableFactory().get_apply_deserializer(message.payload[0])
-            # CID is the first 16 bytes of the header (header = CID + 1-byte message_type)
-            cid = message.header[:16].hex() if message.header else None
-            self.signals.cmd_signal.emit(
-                ThreadCommand('data_received', attribute={'topic': topic, 'dte': dte, 'cid': cid})
-            )
+            self.signals.data_signal.emit(topic, dte)
         except Exception:
             log.warning(
                 "DataSubscriberHandler: failed to deserialize data from topic '%s'.", topic

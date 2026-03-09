@@ -1,8 +1,9 @@
 """Conftest for leco actor tests.
 
-Loads actor.py and capabilities.py directly from their file paths, bypassing the
-Qt-laden pymodaq/__init__.py chain.  All other pymodaq sub-packages are stubbed as
-MagicMock so normal import statements in test files resolve without triggering Qt.
+Loads actor.py, capabilities.py, rpc_method_definitions.py and director_utils.py
+directly from their source paths, bypassing the Qt-laden pymodaq/__init__.py chain.
+All other pymodaq sub-packages are stubbed as MagicMock so normal import statements
+in test files resolve without triggering Qt.
 """
 import importlib.util
 import sys
@@ -30,10 +31,11 @@ def _stub_package(name: str) -> MagicMock:
     return mock
 
 
-# Root of the pymodaq source tree (packages/pymodaq/src/)
-# __file__ is packages/pymodaq/tests/utils/leco/conftest.py
-# parents[0]=leco, [1]=utils, [2]=tests, [3]=pymodaq, [4]=packages
+# ── Paths (cross-platform, relative to this file) ─────────────────────────────
+# __file__ = packages/pymodaq/tests/utils/leco/conftest.py
+# parents[3] = packages/pymodaq/   parents[4] = packages/
 _SRC = Path(__file__).parents[3] / 'src'
+_UTILS_SRC = Path(__file__).parents[4] / 'pymodaq_utils' / 'src'
 
 # ── Step 1: stub parent packages to prevent __init__ from loading Qt ───────────
 for _pkg in (
@@ -45,8 +47,6 @@ for _pkg in (
         _stub_package(_pkg)
 
 # ── Step 2: load pure-Python modules directly ──────────────────────────────────
-_UTILS_SRC = Path('/d/Work/PyMoDAQ/packages/pymodaq_utils/src')
-
 _load_module_from_path(
     'pymodaq_utils.enums',
     _UTILS_SRC / 'pymodaq_utils' / 'enums.py',

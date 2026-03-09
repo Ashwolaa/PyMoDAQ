@@ -77,8 +77,10 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
             self.set_move_done,  # to set the move as done
         ))
         self.start_timer()
-        # Connect ZMQ data-channel messages (new actor path) to local handler
-        self.listener.cmd_signal.connect(self._on_actor_data)
+        # Connect ZMQ data-channel messages (new actor path) to local handler.
+        # data_signal is dedicated to ZMQ frames so high-rate data never blocks
+        # control commands (stop_grab etc.) queued on cmd_signal.
+        self.listener.signals.data_signal.connect(self._on_actor_data)
         # To distinguish how to encode positions, it needs to now if it deals
         # with a json-accepting or a binary-accepting actuator
         # It is set to False by default. It then use the first received message
@@ -196,17 +198,14 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
             self.controller.stop_motion()
         # else: no equivalent stop in new API yet
 
-    def _on_actor_data(self, cmd: ThreadCommand) -> None:
+    def _on_actor_data(self, topic: str, dte) -> None:
         """Handle data published by the PymodaqActor on the ZMQ data channel.
 
-        Deserializes the position from the ``DataToExport`` carried in the
-        ``'data_received'`` ThreadCommand and forwards it to the GUI via
-        ``emit_status``.  Called via the listener's ``cmd_signal`` when
-        ``use_legacy_actor=False``.
+        Receives deserialized ``DataToExport`` directly via ``data_signal``
+        (separate from ``cmd_signal`` so control commands are never blocked).
+        Extracts the position and forwards it to the GUI via ``emit_status``.
+        Called when ``use_legacy_actor=False``.
         """
-        if cmd.command != 'data_received':
-            return
-        dte = (cmd.attribute or {}).get('dte')
         if dte is None:
             return
         try:

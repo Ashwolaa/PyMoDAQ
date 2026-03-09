@@ -219,8 +219,9 @@ class TestRpcMethodsRegistered:
         'query_data', 'change_to',
         'get_capabilities', 'get_pymodaq_settings', 'set_info',
         'subscribe_director', 'unsubscribe_director',
+        'query_data_continuous', 'stop_continuous',
         # Legacy aliases
-        'grab', 'snap', 'get_actuator_value', 'stop_grab',
+        'grab', 'snap', 'get_actuator_value',
         'move_abs', 'move_rel', 'move_home',
         # Inherited from pyleco.actors.Actor
         'get_parameters', 'set_parameters', 'call_action',
@@ -259,12 +260,13 @@ class TestQueryData:
         after = len(viewer_actor.publisher.socket._s)
         assert after > before
 
-    def test_return_value_is_none(self, viewer_actor):
-        """query_data returns None (fire-and-forget; data comes via data channel)."""
+    def test_return_value_is_cid(self, viewer_actor):
+        """query_data returns the hex CID of the ZMQ publish for correlation."""
         handle_request_message(viewer_actor, 'query_data', fresh=True)
-        assert _last_rpc_result(viewer_actor) is None
+        cid = _last_rpc_result(viewer_actor)
+        assert isinstance(cid, str) and len(cid) == 32
 
-    def test_stop_grab_suppresses_read_publish(self, viewer_actor):
+    def test_stop_continuous_suppresses_read_publish(self, viewer_actor):
         viewer_actor._stop_grab_flag = True
         viewer_actor.read_publish(viewer_actor.device, viewer_actor.publisher)
         assert viewer_actor.device.read_count == 0
@@ -405,9 +407,10 @@ class TestLegacyAliases:
         handle_request_message(move_actor, 'get_actuator_value')
         assert move_actor.device.read_count == 1
 
-    def test_stop_grab_sets_flag(self, viewer_actor):
-        handle_request_message(viewer_actor, 'stop_grab')
+    def test_stop_continuous_sets_flag(self, viewer_actor):
+        handle_request_message(viewer_actor, 'stop_continuous')
         assert viewer_actor._stop_grab_flag is True
+        assert viewer_actor._grab_thread is None  # no thread was running
 
     def test_grab_clears_stop_flag(self, viewer_actor):
         viewer_actor._stop_grab_flag = True
@@ -449,6 +452,86 @@ class TestLegacyAliases:
         handle_request_message(viewer_actor, 'move_home')
         # No crash; write was called with position=0.0
         assert viewer_actor.device.write_calls == [('position', 0.0)]
+
+
+class TestContinuousGrab:
+    """Tests for query_data_continuous / stop_continuous continuous acquisition loop."""
+
+    def test_query_data_continuous_spawns_thread(self, viewer_actor):
+        viewer_actor.query_data_continuous()
+        assert viewer_actor._grab_thread is not None
+        assert viewer_actor._grab_thread.is_alive()
+        viewer_actor.stop_continuous()
+
+    def test_query_data_continuous_clears_stop_flag(self, viewer_actor):
+        viewer_actor._stop_grab_flag = True
+        viewer_actor.query_data_continuous()
+        assert viewer_actor._stop_grab_flag is False
+        viewer_actor.stop_continuous()
+
+    def test_stop_continuous_sets_flag_and_joins(self, viewer_actor):
+        viewer_actor.query_data_continuous()
+        viewer_actor.stop_continuous()
+        assert viewer_actor._stop_grab_flag is True
+        assert viewer_actor._grab_thread is None
+
+    def test_stop_continuous_without_start_is_safe(self, viewer_actor):
+        """stop_continuous() when no grab is running must not raise."""
+        viewer_actor.stop_continuous()  # no-op
+
+    def test_query_data_continuous_restarts_existing_loop(self, viewer_actor):
+        """A second query_data_continuous() safely replaces the previous loop."""
+        viewer_actor.query_data_continuous()
+        first_thread = viewer_actor._grab_thread
+        viewer_actor.query_data_continuous()
+        assert viewer_actor._grab_thread is not first_thread
+        viewer_actor.stop_continuous()
+
+    def test_grab_loop_publishes_data(self, viewer_actor):
+        """The grab loop must publish at least one ZMQ frame."""
+        before = len(viewer_actor.publisher.socket._s)
+        viewer_actor.query_data_continuous()
+        import time; time.sleep(0.05)   # let loop spin at least once
+        viewer_actor.stop_continuous()
+        assert len(viewer_actor.publisher.socket._s) > before
+
+    def test_grab_loop_updates_last_data(self, viewer_actor):
+        viewer_actor.query_data_continuous()
+        import time; time.sleep(0.05)
+        viewer_actor.stop_continuous()
+        assert viewer_actor._last_data is not None
+
+    def test_stop_continuous_via_rpc(self, viewer_actor):
+        viewer_actor.query_data_continuous()
+        handle_request_message(viewer_actor, 'stop_continuous')
+        assert viewer_actor._stop_grab_flag is True
+        assert viewer_actor._grab_thread is None
+
+    def test_query_data_continuous_via_rpc(self, viewer_actor):
+        handle_request_message(viewer_actor, 'query_data_continuous')
+        assert viewer_actor._grab_thread is not None
+        assert viewer_actor._grab_thread.is_alive()
+        viewer_actor.stop_continuous()
+
+    def test_query_data_continuous_rate_hz_limits_calls(self, viewer_actor):
+        """With rate_hz=20 the loop must not call device.read more than ~5x in 100 ms."""
+        viewer_actor.query_data_continuous(rate_hz=20)
+        import time; time.sleep(0.15)
+        viewer_actor.stop_continuous()
+        # 20 Hz for 150 ms → ~3 frames; allow up to 6 for timing jitter
+        assert viewer_actor.device.read_count <= 6
+
+    def test_grab_loop_stops_on_device_exception(self, viewer_actor):
+        """If device.read() raises, the loop exits cleanly without crashing the actor."""
+        call_count = [0]
+        def failing_read(names=None):
+            call_count[0] += 1
+            raise RuntimeError("sensor disconnected")
+        viewer_actor.device.read = failing_read
+        viewer_actor.query_data_continuous()
+        import time; time.sleep(0.05)
+        assert not viewer_actor._grab_thread.is_alive()
+        viewer_actor._grab_thread = None  # clean up
 
 
 class TestReadPublish:

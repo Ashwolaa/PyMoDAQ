@@ -73,8 +73,10 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         self.data_mock = None
         self._live_sequential: bool = False  # True only during sequential live grab
         self.start_timer()
-        # Connect ZMQ data-channel messages (new actor path) to local handler
-        self.listener.cmd_signal.connect(self._on_actor_data)
+        # Connect ZMQ data-channel messages (new actor path) to local handler.
+        # data_signal is dedicated to ZMQ frames so high-rate data never blocks
+        # control commands (stop_grab etc.) queued on cmd_signal.
+        self.listener.signals.data_signal.connect(self._on_actor_data)
 
     def ini_detector(self, controller=None):
         """
@@ -175,16 +177,13 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                 except Exception:
                     logger.warning("stop: could not stop actor continuous grab")
 
-    def _on_actor_data(self, cmd: ThreadCommand) -> None:
+    def _on_actor_data(self, topic: str, dte) -> None:
         """Handle data published by the PymodaqActor on the ZMQ data channel.
 
-        Emits the ``DataToExport`` carried in the ``'data_received'``
-        ThreadCommand directly via ``dte_signal``.  Called via the listener's
-        ``cmd_signal`` when ``use_legacy_actor=False``.
+        Receives deserialized ``DataToExport`` directly via ``data_signal``
+        (separate from ``cmd_signal`` so control commands are never blocked).
+        Called when ``use_legacy_actor=False``.
         """
-        if cmd.command != 'data_received':
-            return
-        dte = (cmd.attribute or {}).get('dte')
         if dte is not None:
             self.dte_signal.emit(dte)
             if self._live_sequential:

@@ -1,12 +1,16 @@
+from __future__ import annotations
+import pytest
 from pyleco.core.message import Message, MessageTypes
 from pyleco.json_utils.json_objects import Request, ResultResponse, ErrorResponse
 from pyleco.json_utils.errors import RECEIVER_UNKNOWN
 from pyleco.test import FakeCommunicator
-from pymodaq.control_modules.thread_commands import ThreadStatus
-from pymodaq_utils.utils import ThreadCommand
-import pytest
 
-from pymodaq.utils.leco.leco_director import LECODirector, GenericDirector
+try:
+    from pymodaq.control_modules.thread_commands import ThreadStatus
+    from pymodaq_utils.utils import ThreadCommand
+    from pymodaq.utils.leco.leco_director import LECODirector, GenericDirector
+except Exception:
+    pytest.skip("Requires Qt-laden pymodaq modules", allow_module_level=True)
 
 
 actor_name = "actor"

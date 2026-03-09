@@ -1,12 +1,22 @@
 import pytest
 from pyleco.json_utils.json_objects import Request
 
-from pymodaq.utils.leco.daq_move_LECODirector import DAQ_Move_LECODirector
-from pymodaq.utils.leco.daq_xDviewer_LECODirector import DAQ_xDViewer_LECODirector
+try:
+    from pymodaq.utils.leco.daq_move_LECODirector import DAQ_Move_LECODirector
+    from pymodaq.utils.leco.daq_xDviewer_LECODirector import DAQ_xDViewer_LECODirector
+    _HAS_QT_DIRECTORS = True
+except Exception:
+    _HAS_QT_DIRECTORS = False
+
 from pymodaq.utils.leco.rpc_method_definitions import (
     GenericDirectorMethods,
     MoveDirectorMethods,
     ViewerDirectorMethods,
+)
+
+pytestmark = pytest.mark.skipif(
+    not _HAS_QT_DIRECTORS,
+    reason="Qt-based director plugins unavailable (no display or missing Qt install)",
 )
 
 discover_string = Request(1, "rpc.discover").model_dump_json()

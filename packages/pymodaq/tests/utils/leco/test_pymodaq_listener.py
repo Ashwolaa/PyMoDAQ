@@ -1,4 +1,6 @@
 
+from unittest.mock import MagicMock, patch
+
 from pyleco.core.message import Message, MessageTypes
 from pyleco.json_utils.json_objects import ErrorResponse, ResultResponse, Request
 from pyleco.json_utils.errors import RECEIVER_UNKNOWN, NODE_UNKNOWN
@@ -6,7 +8,11 @@ from pyleco.test import FakeCommunicator
 import pytest
 
 from pymodaq.utils.leco.rpc_method_definitions import GenericMethods, MoveMethods, ViewerMethods
-from pymodaq.utils.leco.pymodaq_listener import ActorListener
+
+try:
+    from pymodaq.utils.leco.pymodaq_listener import ActorListener, DataSubscriberHandler
+except Exception:
+    pytest.skip("Requires Qt-laden pymodaq modules", allow_module_level=True)
 
 
 name = "listener"
@@ -85,3 +91,79 @@ class TestSendRPCToRemote:
         assert self.remote_name not in actorListener.remote_names
 
 
+class TestDataSubscriberSignalSeparation:
+    """Verify that ZMQ data frames are routed to data_signal, NOT cmd_signal."""
+
+    TOPIC = "localhost.stage"
+
+    @pytest.fixture
+    def handler_with_mocks(self):
+        """DataSubscriberHandler with mocked signals, ZMQ __init__ bypassed."""
+        handler = object.__new__(DataSubscriberHandler)
+        mock_signals = MagicMock()
+        handler.signals = mock_signals
+        return handler, mock_signals
+
+    def test_data_signal_emitted_with_topic_and_dte(self, handler_with_mocks):
+        """handle_subscription_message emits data_signal(topic, dte)."""
+        handler, mock_signals = handler_with_mocks
+        fake_dte = MagicMock(name="dte")
+
+        msg = MagicMock()
+        msg.topic = self.TOPIC.encode()
+        msg.payload = [b"fake_bytes"]
+
+        with patch(
+            "pymodaq.utils.leco.pymodaq_listener.SerializableFactory"
+        ) as mock_factory:
+            mock_factory.return_value.get_apply_deserializer.return_value = fake_dte
+            handler.handle_subscription_message(msg)
+
+        mock_signals.data_signal.emit.assert_called_once_with(self.TOPIC, fake_dte)
+
+    def test_cmd_signal_not_emitted_on_data_frame(self, handler_with_mocks):
+        """handle_subscription_message must NOT touch cmd_signal for data frames."""
+        handler, mock_signals = handler_with_mocks
+        fake_dte = MagicMock(name="dte")
+
+        msg = MagicMock()
+        msg.topic = self.TOPIC.encode()
+        msg.payload = [b"fake_bytes"]
+
+        with patch(
+            "pymodaq.utils.leco.pymodaq_listener.SerializableFactory"
+        ) as mock_factory:
+            mock_factory.return_value.get_apply_deserializer.return_value = fake_dte
+            handler.handle_subscription_message(msg)
+
+        mock_signals.cmd_signal.emit.assert_not_called()
+
+    def test_empty_payload_skipped(self, handler_with_mocks):
+        """Empty payload must not emit either signal."""
+        handler, mock_signals = handler_with_mocks
+
+        msg = MagicMock()
+        msg.topic = self.TOPIC.encode()
+        msg.payload = []
+
+        handler.handle_subscription_message(msg)
+
+        mock_signals.data_signal.emit.assert_not_called()
+        mock_signals.cmd_signal.emit.assert_not_called()
+
+    def test_deserialization_error_does_not_emit(self, handler_with_mocks):
+        """If deserialization raises, neither signal must be emitted."""
+        handler, mock_signals = handler_with_mocks
+
+        msg = MagicMock()
+        msg.topic = self.TOPIC.encode()
+        msg.payload = [b"garbage"]
+
+        with patch(
+            "pymodaq.utils.leco.pymodaq_listener.SerializableFactory"
+        ) as mock_factory:
+            mock_factory.return_value.get_apply_deserializer.side_effect = ValueError("bad data")
+            handler.handle_subscription_message(msg)
+
+        mock_signals.data_signal.emit.assert_not_called()
+        mock_signals.cmd_signal.emit.assert_not_called()

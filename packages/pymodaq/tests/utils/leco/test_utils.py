@@ -1,9 +1,10 @@
-
 import pytest
 
-from pymodaq.control_modules.daq_move import DataActuator
-
-from pymodaq.utils.leco.utils import binary_serialization, binary_serialization_to_kwargs
+try:
+    from pymodaq.control_modules.daq_move import DataActuator
+    from pymodaq.utils.leco.utils import binary_serialization, binary_serialization_to_kwargs
+except Exception:
+    pytest.skip("Requires Qt-laden pymodaq modules", allow_module_level=True)
 
 
 @pytest.mark.parametrize("value", (
