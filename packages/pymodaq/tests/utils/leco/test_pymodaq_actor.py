@@ -47,6 +47,14 @@ class _MockViewerDevice:
         self.read_count = 0
         self.last_read_names = None
         self.write_calls: list = []
+        self.connected = False
+        self.closed = False
+
+    def connect(self):
+        self.connected = True
+
+    def close(self):
+        self.closed = True
 
     def read(self, names=None):
         self.read_count += 1
@@ -71,6 +79,14 @@ class _MockMoveDevice:
         self.write_calls: list = []
         self.move_rel_calls: list = []
         self.home_called = False
+        self.connected = False
+        self.closed = False
+
+    def connect(self):
+        self.connected = True
+
+    def close(self):
+        self.closed = True
 
     def read(self, names=None):
         from pymodaq_data.data import DataToExport, DataRaw
@@ -102,6 +118,9 @@ class _MockDeviceWithSettings:
         self.set_info_calls: list = []
         self.write_calls: list = []
 
+    def connect(self): pass
+    def close(self): pass
+
     def read(self, names=None):
         from pymodaq_data.data import DataToExport, DataRaw
         return DataToExport(name='s', data=[DataRaw('ch', data=[np.zeros(1)])])
@@ -124,6 +143,9 @@ class _MockDeviceWithCapabilities:
         variables=[ContinuousVariable(name='wavelength', units='nm',
                                       lo=400.0, hi=900.0, epsilon=0.01)],
     )
+
+    def connect(self): pass
+    def close(self): pass
 
     def read(self, names=None):
         from pymodaq_data.data import DataToExport, DataRaw
@@ -196,6 +218,44 @@ class TestActorInit:
 
     def test_device_created_on_connect(self, viewer_actor):
         assert isinstance(viewer_actor.device, _MockViewerDevice)
+
+    def test_connect_calls_device_connect(self):
+        """PymodaqActor.connect() must call device.connect() after instantiation."""
+        actor = PymodaqActor(
+            name='test_conn',
+            device_class=_MockViewerDevice,
+            context=FakeContext(),
+        )
+        actor.connect()
+        assert actor.device.connected is True
+
+    def test_disconnect_calls_device_close(self):
+        """PymodaqActor.disconnect() must call device.close() instead of pymeasure adapter."""
+        actor = PymodaqActor(
+            name='test_disc',
+            device_class=_MockViewerDevice,
+            context=FakeContext(),
+        )
+        actor.connect()
+        device_ref = actor.device   # keep reference before disconnect deletes it
+        actor.disconnect()
+        assert device_ref.closed is True
+
+    def test_disconnect_without_close_method_does_not_raise(self):
+        """Disconnect is safe even if the device has no close() method."""
+
+        class _NoCloseDevice:
+            def connect(self): pass
+            def read(self, names=None): return None
+            def write(self, name, value): pass
+
+        actor = PymodaqActor(
+            name='test_noclose',
+            device_class=_NoCloseDevice,
+            context=FakeContext(),
+        )
+        actor.connect()
+        actor.disconnect()   # must not raise
 
 
 class TestRpcMethodsRegistered:

@@ -11,8 +11,15 @@ plugins continue to work without changes during the Phase 1 → Phase 2 transiti
 
 **Device interface** — the object passed as ``device_class`` must implement::
 
+    device.connect()                                          — open hardware
+    device.close()                                            — close hardware
     device.read(names: list[str] | None = None) -> DataToExport
     device.write(name: str, value: Any) -> None
+
+``connect()`` is called by :meth:`PymodaqActor.connect` immediately after
+``device_class()`` is instantiated.  ``close()`` is called by
+:meth:`PymodaqActor.disconnect` instead of pyleco's default
+``device.adapter.close()`` (which assumes a pymeasure instrument).
 
 and may optionally implement::
 
@@ -80,6 +87,36 @@ class PymodaqActor(Actor):
         self._last_data = None
         self._stop_grab_flag = False
         self._grab_thread: Optional[threading.Thread] = None
+
+    # ── Hardware lifecycle ─────────────────────────────────────────────────────
+
+    def connect(self, *args, **kwargs) -> None:
+        """Instantiate the device class then call ``device.connect()`` to open hardware.
+
+        pyleco's base :meth:`Actor.connect` only runs ``device = device_class(*args, **kwargs)``.
+        We follow up with an explicit ``device.connect()`` so that PyMoDAQ plugins (which
+        separate construction from hardware open) behave correctly.
+        """
+        super().connect(*args, **kwargs)   # sets self.device = device_class(...)
+        self.device.connect()
+
+    def disconnect(self) -> None:
+        """Call ``device.close()`` then clean up.
+
+        Overrides pyleco's default which assumes a pymeasure instrument
+        (``device.adapter.close()``).  PyMoDAQ plugins use ``close()`` instead.
+        """
+        self.stop_timer()
+        try:
+            self.device.close()
+        except AttributeError:
+            logger.warning("Device has no close() method; skipping hardware disconnect.")
+        except Exception:
+            logger.exception("disconnect: device.close() raised an exception")
+        try:
+            del self.device
+        except AttributeError:
+            pass
 
     # ── RPC method registration ────────────────────────────────────────────────
 
