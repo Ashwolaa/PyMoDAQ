@@ -184,13 +184,23 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
             self.controller.change_to(var_name, 0.0)
 
     def get_actuator_value(self) -> DataActuator:
-        """Get the current hardware value."""
-        if self.settings['use_legacy_actor']:
-            self.controller.get_actuator_value()
-        else:
-            # Trigger a fresh read; the actor publishes the result on the ZMQ data channel.
-            # _on_actor_data() receives it asynchronously and updates _current_value.
-            self.controller.query_data(fresh=True)
+        """Get the current hardware value.
+
+        Triggers a fresh actor read (non-legacy path) or a legacy RPC call.
+        The actual value arrives asynchronously via ``_on_actor_data`` /
+        ``send_position``.  If the actor is unreachable the cached
+        ``_current_value`` is returned without raising, so ``DAQ_Move.ini_stage``
+        is not aborted by a transient coordinator timeout.
+        """
+        try:
+            if self.settings['use_legacy_actor']:
+                self.controller.get_actuator_value()
+            else:
+                # Trigger a fresh read; the actor publishes the result on the ZMQ data channel.
+                # _on_actor_data() receives it asynchronously and updates _current_value.
+                self.controller.query_data(fresh=True)
+        except Exception:
+            logger.warning("get_actuator_value: could not reach actor, returning cached value.")
         return self._current_value
 
     def stop_motion(self) -> None:

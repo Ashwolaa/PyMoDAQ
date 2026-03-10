@@ -52,6 +52,36 @@ def create_load_daq_viewer() -> tuple[SharedUI, 'DAQ_Viewer']:
     return shared_ui, daq_viewer
 
 
+def create_load_actor_gui() -> tuple['SharedUI', 'PymodaqActorGUI']:
+    """Create a standalone PymodaqActor GUI wrapped in a :class:`SharedUI` window.
+
+    The :class:`~pymodaq_gui.utils.DockArea` is set as the central widget of a
+    ``QMainWindow`` *before* constructing :class:`PymodaqActorGUI` so that
+    ``CustomApp`` correctly resolves ``mainwindow = area.parent()``.
+    :class:`SharedUI` then wraps the same window to add the standard PyMoDAQ
+    menu bar (log, config, help, quit …) on top of the actor toolbar.
+
+    Returns
+    -------
+    shared_ui : SharedUI
+        The window wrapper — call ``shared_ui.show()`` to display.
+    actor_gui : PymodaqActorGUI
+        The actor GUI instance.
+    """
+    from pymodaq.utils.leco.actor_gui import PymodaqActorGUI
+    from pymodaq.utils.shared_ui import SharedUI
+
+    area = DockArea()
+    win = QMainWindow()
+    win.setCentralWidget(area)   # area.parent() = win → CustomApp picks it up
+
+    actor_gui = PymodaqActorGUI(area)   # toolbar already added to win
+    shared_ui = SharedUI(win)           # wraps same win; adds its own menus/toolbar
+    shared_ui.affect_application(actor_gui)
+
+    return shared_ui, actor_gui
+
+
 def create_extension(dashboard: 'DashBoard',
                      extension_class: type[CustomExt],
                      *ext_args,

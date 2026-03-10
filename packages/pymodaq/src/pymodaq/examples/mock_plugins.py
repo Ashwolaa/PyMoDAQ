@@ -78,12 +78,23 @@ from pymodaq.control_modules.capabilities import (
     Capabilities, ContinuousVariable, Observable,
 )
 
+class Device:
+    """Base class for mock devices."""
+
+    def __init__(self) -> None:            
+        self.is_connected = False
+
+    def connect(self):
+        self.is_connected = True
+
+    def disconnect(self):
+        self.is_connected = False
 
 # ── Qt-independent device-interface layer ─────────────────────────────────────
 # These two classes implement the actor device interface only.
 # They can be instantiated without Qt / without a DAQ_Move / DAQ_Viewer parent.
 
-class MockStageDevice:
+class MockStageDevice(Device):
     """Single-axis translation stage — pure Python, no Qt.
 
     Implements the actor device interface:
@@ -101,6 +112,7 @@ class MockStageDevice:
     )
 
     def __init__(self) -> None:
+        super().__init__()
         self._position: float = 0.0
 
     def read(self, names=None):
@@ -115,7 +127,7 @@ class MockStageDevice:
             self._position = float(value)
 
 
-class MockCameraDevice:
+class MockCameraDevice(Device):
     """Simple 64 × 64 pixel detector — pure Python, no Qt.
 
     Implements the actor device interface:
@@ -129,6 +141,7 @@ class MockCameraDevice:
     )
 
     def __init__(self) -> None:
+        super().__init__()
         self._frame_idx: int = 0
 
     def read(self, names=None):
@@ -139,6 +152,81 @@ class MockCameraDevice:
             'camera',
             data=[DataRaw('frame', data=[frame])],
         )
+
+
+class MockSpectrometerDevice(Device):
+    """Mock scanning spectrometer with both a variable and an observable.
+
+    Variables
+    ---------
+    wavelength : float, nm, [300 … 900]
+        Centre wavelength of the grating (actuator axis).
+    integration_time : float, ms, [1 … 5000]
+        Exposure / integration time.
+
+    Observables
+    -----------
+    spectrum : float32, shape (256,)
+        Simulated spectrum: a Gaussian peak centred at ``wavelength`` with
+        amplitude proportional to ``integration_time``.
+
+    This device is the canonical test case for the actor GUI because it
+    exercises both DAQ_Move (wavelength, integration_time) and DAQ_Viewer
+    (spectrum) directors simultaneously from a single actor.
+    """
+
+    N_PIXELS = 256
+    _wavelength_axis = np.linspace(300.0, 900.0, N_PIXELS).astype('float32')
+
+    capabilities = Capabilities(
+        variables=[
+            ContinuousVariable('wavelength',        units='nm', lo=300.0,  hi=900.0,  epsilon=0.1),
+            ContinuousVariable('integration_time',  units='ms', lo=1.0,    hi=5000.0, epsilon=0.1),
+        ],
+        observables=[
+            Observable('spectrum', units='counts', shape=(N_PIXELS,), dtype='float32'),
+        ],
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._wavelength: float = 550.0          # nm — grating centre
+        self._integration_time: float = 100.0    # ms
+
+
+    def read(self, names=None):
+        from pymodaq_data.data import DataToExport, DataRaw
+        data = []
+
+        if names is None or 'wavelength' in names:
+            data.append(DataRaw('wavelength', data=[np.array([self._wavelength])]))
+
+        if names is None or 'integration_time' in names:
+            data.append(DataRaw('integration_time',
+                                data=[np.array([self._integration_time])]))
+
+        if names is None or 'spectrum' in names:
+            spectrum = self._make_spectrum()
+            data.append(DataRaw('spectrum', data=[spectrum]))
+
+        return DataToExport('spectrometer', data=data)
+
+    def write(self, name: str, value) -> None:
+        if name == 'wavelength':
+            self._wavelength = float(np.clip(value, 300.0, 900.0))
+        elif name == 'integration_time':
+            self._integration_time = float(np.clip(value, 1.0, 5000.0))
+
+    def _make_spectrum(self) -> np.ndarray:
+        """Gaussian peak at self._wavelength, amplitude ∝ integration_time."""
+        amplitude = self._integration_time * 2.0          # counts/ms × 2
+        sigma = 20.0                                       # nm FWHM ≈ 47 nm
+        spectrum = amplitude * np.exp(
+            -0.5 * ((self._wavelength_axis - self._wavelength) / sigma) ** 2
+        )
+        noise = np.random.normal(0.0, max(1.0, amplitude * 0.01),
+                                 self.N_PIXELS).astype('float32')
+        return (spectrum + noise).astype('float32')
 
 
 # ── Qt-dependent plugin wrappers ───────────────────────────────────────────────

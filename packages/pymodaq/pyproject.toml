@@ -59,6 +59,11 @@ dev = [
     "pytest-xvfb",
 ]
 
+[project.entry-points."pymodaq.hardware"]
+MockSpectrometer = "pymodaq.examples.mock_plugins:MockSpectrometerDevice"
+MockStage        = "pymodaq.examples.mock_plugins:MockStageDevice"
+MockCamera       = "pymodaq.examples.mock_plugins:MockCameraDevice"
+
 [project.scripts]
 daq_logger = "pymodaq.extensions.daq_logger:main"
 daq_move = "pymodaq.control_modules.daq_move:main"

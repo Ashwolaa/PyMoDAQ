@@ -16,9 +16,10 @@ Grabber type is set after creation via `daq_viewer.detector = SelectedModule(DAQ
 The actor GUI no longer imports `instruments.py` or uses `ACTUATOR_TYPES`/`DET_TYPES`.
 Hardware discovery uses `pymodaq.hardware` entry points instead (see Plugin Discovery below).
 
-### Issue 3 — `PymodaqActor` takes `device_class`, not an instance — RESOLVED
-`init_instrument()` simply stores the plugin class; no instantiation, no `ini_stage`.
-`PymodaqActor.connect()` instantiates the class and calls `device.connect()`.
+### Issue 3 — `init_instrument` only updates settings — RESOLVED
+Merged `init_instrument` + `start_actor` into a single `init_instrument(plugin_class, actor_name, host, port)` slot.
+"Init Instrument" is the single action button: instantiates the device class, opens hardware, registers with coordinator, starts listening.
+"Start Actor" button removed. Selecting hardware only previews capabilities (no hardware touched).
 
 ### Issue 4 — `notify_directors` / `NOTIFY_EVENT` scope — DEFERRED
 Useful for pushing actor state changes to remote directors but not needed for `actor_gui.py` itself.
@@ -67,7 +68,12 @@ Hardware init happens entirely on the actor side:
   `DAQ_Move_LECODirector` / `DAQ_xDViewer_LECODirector` when they connect as directors.
 
 The actor GUI's **"Init Instrument"** button records the class and sets the Instrument LED green.
-The **"Start Actor"** button passes the class to `PymodaqActor`.
+The **"Start Actor"** button passes the class to `PymodaqActor`. Init_instrument should initialize the hardware similarly to `DAQ_Move` / `DAQ_Viewer` as currently implemented in start_actor.
+
+Selecting a plugin should update the settings tree with the plugin's parameters.
+Init instrument should start the actor and initialize the hardware.
+Deinit instrument should stop the actor and close the hardware.
+
 
 ---
 
@@ -286,10 +292,10 @@ shared_ui.show()
 | File | Status |
 |---|---|
 | `actor.py` — `connect()` / `disconnect()` overrides | **Done** |
-| `hardware_registry.py` | **TODO** — new file |
-| `actor_gui.py` — instrument list replaces plugin_type/name | **TODO** — needs refactor |
-| `test_actor_gui.py` — update mocks | **TODO** |
-| `conftest.py` — load `hardware_registry` | **TODO** |
+| `hardware_registry.py` | **Done** — new file |
+| `actor_gui.py` — instrument list replaces plugin_type/name | **Done** |
+| `test_actor_gui.py` — update mocks | **Done** |
+| `conftest.py` — load `hardware_registry` + qtpy stubs | **Done** |
 
 ---
 

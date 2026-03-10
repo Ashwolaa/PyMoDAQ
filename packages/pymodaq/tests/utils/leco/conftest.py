@@ -82,8 +82,14 @@ _load_module_from_path(
     'pymodaq.utils.leco.director_utils',
     _SRC / 'pymodaq' / 'utils' / 'leco' / 'director_utils.py',
 )
+_load_module_from_path(
+    'pymodaq.utils.leco.hardware_registry',
+    _SRC / 'pymodaq' / 'utils' / 'leco' / 'hardware_registry.py',
+)
 
 # ── Step 3: stubs for actor_gui.py dependencies ───────────────────────────────
+# Stub qtpy so actor_gui.py can be imported even when no Qt backend is installed.
+# Tests that require real Qt functionality guard themselves with pytest.skip.
 # ThreadCommand: minimal stub (command + attribute, no serialisation needed)
 class _ThreadCommand:
     def __init__(self, command, attribute=None, args=(), kwargs=None):
@@ -303,6 +309,119 @@ class _Signal:
         for slot in self._slots:
             slot(*args)
 
+
+# ── Step 3b: qtpy stubs (needed so actor_gui.py can be imported without Qt) ────
+# These stubs are minimal no-ops.  Tests that require real Qt functionality
+# guard themselves with a try/except or pytest.skip at module or class level.
+
+class _QtSignal:
+    """Descriptor-based stub for Qt Signal used at class definition time."""
+    def __init__(self, *args):
+        self._args = args
+        self._attr = None
+
+    def __set_name__(self, owner, name):
+        self._attr = f'_sig_{name}'
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        if not hasattr(obj, self._attr):
+            object.__setattr__(obj, self._attr, _SignalInstance())
+        return getattr(obj, self._attr)
+
+    def connect(self, slot):  # class-level connect (e.g. on the class, not instance)
+        pass
+
+
+class _SignalInstance:
+    def __init__(self):
+        self._slots = []
+
+    def connect(self, slot):
+        self._slots.append(slot)
+
+    def emit(self, *args):
+        for slot in self._slots:
+            try:
+                slot(*args)
+            except Exception:
+                pass
+
+
+def _Slot(*args, **kwargs):
+    """Stub for @Slot decorator — always returns a pass-through decorator."""
+    def decorator(fn):
+        return fn
+    return decorator
+
+
+class _QObject:
+    """Minimal QObject stub — supports moveToThread (no-op)."""
+    def moveToThread(self, thread): pass
+
+
+class _QThread:
+    """Minimal QThread stub."""
+    def __init__(self): pass
+    def start(self): pass
+    def quit(self): pass
+    def wait(self): pass
+
+
+class _Qt:
+    class ConnectionType:
+        BlockingQueuedConnection = 3
+        QueuedConnection = 2
+
+
+class _QMetaObject:
+    @staticmethod
+    def invokeMethod(obj, method_name, connection_type=None, *args):
+        getattr(obj, method_name)()
+
+
+class _QtWidgets:
+    QWidget = type('QWidget', (), {
+        '__init__': lambda self, *a, **k: None,
+    })
+    QVBoxLayout = type('QVBoxLayout', (), {
+        '__init__': lambda self, *a, **k: None,
+        'addWidget': lambda self, *a, **k: None,
+        'addSpacing': lambda self, *a, **k: None,
+        'addStretch': lambda self, *a, **k: None,
+        'setContentsMargins': lambda self, *a, **k: None,
+    })
+    QHBoxLayout = _QVBoxLayout = type('QHBoxLayout', (), {
+        '__init__': lambda self, *a, **k: None,
+        'addWidget': lambda self, *a, **k: None,
+        'addSpacing': lambda self, *a, **k: None,
+        'addStretch': lambda self, *a, **k: None,
+        'setContentsMargins': lambda self, *a, **k: None,
+    })
+    QLabel = type('QLabel', (), {
+        '__init__': lambda self, *a, **k: None,
+    })
+
+
+if 'qtpy' not in sys.modules:
+    _qtpy_mod = types.ModuleType('qtpy')
+    _qtpy_mod.QtWidgets = _QtWidgets()
+    sys.modules['qtpy'] = _qtpy_mod
+
+if 'qtpy.QtCore' not in sys.modules:
+    _qtcore_mod = types.ModuleType('qtpy.QtCore')
+    _qtcore_mod.QMetaObject = _QMetaObject
+    _qtcore_mod.QObject = _QObject
+    _qtcore_mod.QThread = _QThread
+    _qtcore_mod.Signal = _QtSignal
+    _qtcore_mod.Slot = _Slot
+    _qtcore_mod.Qt = _Qt
+    _qtcore_mod.QCoreApplication = MagicMock()
+    sys.modules['qtpy.QtCore'] = _qtcore_mod
+
+if 'pyleco.core' not in sys.modules:
+    _stub_module_with('pyleco.core', COORDINATOR_PORT=6666)
 
 # ── Step 4: load actor_gui.py ─────────────────────────────────────────────────
 _load_module_from_path(
