@@ -39,7 +39,7 @@ from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.utils.dock import Dock
 from pymodaq_gui.utils.widgets.qled import QLED
 from pymodaq_utils.utils import ThreadCommand
-from pyleco.core import COORDINATOR_PORT
+from pyleco.core import COORDINATOR_PORT, PROXY_RECEIVING_PORT
 
 from pymodaq.control_modules.capabilities import (
     Capabilities, ContinuousVariable, DiscreteVariable,
@@ -71,8 +71,11 @@ class ActorWorker(QObject):
         self._stop_event: Optional[threading.Event] = None
         self._actor_thread: Optional[threading.Thread] = None
 
-    @Slot(object, str, str, int)
-    def init_instrument(self, plugin_class, actor_name: str, host: str, port: int):
+    @Slot(object, str, str, int, str, int, object)
+    def init_instrument(self, plugin_class, actor_name: str, host: str, port: int,
+                        proxy_host: str = 'localhost',
+                        proxy_port: int = PROXY_RECEIVING_PORT,
+                        channel_proxies: Optional[dict] = None):
         """Full initialisation: instantiate device, connect hardware, start actor.
 
         Equivalent to ``ini_stage`` / ``ini_detector`` + LECO actor startup in
@@ -87,6 +90,9 @@ class ActorWorker(QObject):
                 device_class=plugin_class,
                 host=host,
                 port=port,
+                proxy_host=proxy_host,
+                proxy_port=proxy_port,
+                channel_proxies=channel_proxies or {},
             )
             self._actor.connect()
         except Exception as exc:
@@ -145,7 +151,7 @@ class PymodaqActorGUI(CustomApp):
        Capabilities dock reverts to preview.
     """
 
-    sig_init = Signal(object, str, str, int)   # plugin_class, actor_name, host, port
+    sig_init = Signal(object, str, str, int, str, int, object)  # plugin_class, actor_name, host, port, proxy_host, proxy_port, channel_proxies
     sig_stop = Signal()
 
     params = [
@@ -157,6 +163,11 @@ class PymodaqActorGUI(CustomApp):
         {'title': 'Auto-open directors:', 'name': 'auto_open_all', 'type': 'bool',
          'value': False,
          'tip': 'Open a director window for every capability when the actor starts'},
+        {'title': 'Proxy host:', 'name': 'proxy_host', 'type': 'str', 'value': 'localhost',
+         'tip': 'Default ZMQ data-channel proxy host (applies to all channels unless overridden)'},
+        {'title': 'Proxy port:', 'name': 'proxy_port', 'type': 'int',
+         'value': PROXY_RECEIVING_PORT,
+         'tip': 'Default ZMQ data-channel proxy port (applies to all channels unless overridden)'},
     ]
 
     def __init__(self, parent=None, **kwargs):
@@ -169,6 +180,8 @@ class PymodaqActorGUI(CustomApp):
 
         self._plugin_class = None
         self._last_caps: Optional[Capabilities] = None
+        self._current_caps: Optional[Capabilities] = None
+        self._caps_root = None
         self._open_directors: dict = {}
 
         self.led_instrument: Optional[QLED] = None
@@ -254,7 +267,39 @@ class PymodaqActorGUI(CustomApp):
             self.settings['actor_name'],
             self.settings['host'],
             int(self.settings['port']),
+            self.settings['proxy_host'],
+            int(self.settings['proxy_port']),
+            self._collect_channel_proxies(),
         )
+
+    def _collect_channel_proxies(self) -> dict:
+        """Read per-channel proxy overrides from the capabilities tree.
+
+        Returns a dict mapping channel name → (host, port) only for channels
+        whose proxy differs from the global ``proxy_host`` / ``proxy_port`` settings.
+        """
+        proxies: dict = {}
+        if self._caps_root is None or self._current_caps is None:
+            return proxies
+        default_host = self.settings['proxy_host'] or 'localhost'
+        default_port = int(self.settings['proxy_port'] or PROXY_RECEIVING_PORT)
+        for var in self._current_caps.variables:
+            try:
+                ch_host = self._caps_root.child('Variables', var.name, 'Proxy', 'proxy_host').value()
+                ch_port = int(self._caps_root.child('Variables', var.name, 'Proxy', 'proxy_port').value())
+                if ch_host and (ch_host != default_host or ch_port != default_port):
+                    proxies[var.name] = (ch_host, ch_port)
+            except Exception:
+                pass
+        for obs in self._current_caps.observables:
+            try:
+                ch_host = self._caps_root.child('Observables', obs.name, 'Proxy', 'proxy_host').value()
+                ch_port = int(self._caps_root.child('Observables', obs.name, 'Proxy', 'proxy_port').value())
+                if ch_host and (ch_host != default_host or ch_port != default_port):
+                    proxies[obs.name] = (ch_host, ch_port)
+            except Exception:
+                pass
+        return proxies
 
     # ── Worker status dispatcher ───────────────────────────────────────────────
 
@@ -315,6 +360,9 @@ class PymodaqActorGUI(CustomApp):
     # ── Capabilities tree ──────────────────────────────────────────────────────
 
     def _populate_caps_tree(self, caps: Capabilities):
+        default_proxy_host = self.settings['proxy_host'] or 'localhost'
+        default_proxy_port = int(self.settings['proxy_port'] or PROXY_RECEIVING_PORT)
+
         var_children = []
         for var in caps.variables:
             children = [
@@ -333,7 +381,15 @@ class PymodaqActorGUI(CustomApp):
                     {'name': 'choices', 'type': 'str',
                      'value': str(var.choices), 'readonly': True}
                 )
-            children.append({'name': 'Open DAQ_Move', 'type': 'action'})
+            children += [
+                {'name': 'Open DAQ_Move', 'type': 'action'},
+                {'name': 'Proxy', 'type': 'group', 'children': [
+                    {'name': 'proxy_host', 'type': 'str', 'value': default_proxy_host,
+                     'tip': 'ZMQ proxy host for this channel'},
+                    {'name': 'proxy_port', 'type': 'int', 'value': default_proxy_port,
+                     'tip': 'ZMQ proxy port for this channel'},
+                ]},
+            ]
             var_children.append({'name': var.name, 'type': 'group', 'children': children})
 
         obs_children = []
@@ -343,6 +399,12 @@ class PymodaqActorGUI(CustomApp):
                 {'name': 'shape', 'type': 'str', 'value': str(obs.shape), 'readonly': True},
                 {'name': 'dtype', 'type': 'str', 'value': obs.dtype, 'readonly': True},
                 {'name': 'Open DAQ_Viewer', 'type': 'action'},
+                {'name': 'Proxy', 'type': 'group', 'children': [
+                    {'name': 'proxy_host', 'type': 'str', 'value': default_proxy_host,
+                     'tip': 'ZMQ proxy host for this channel'},
+                    {'name': 'proxy_port', 'type': 'int', 'value': default_proxy_port,
+                     'tip': 'ZMQ proxy port for this channel'},
+                ]},
             ]
             obs_children.append({'name': obs.name, 'type': 'group', 'children': children})
 
@@ -360,6 +422,8 @@ class PymodaqActorGUI(CustomApp):
                 lambda _p, n=obs.name: self._open_director_for(n, 'observable')
             )
 
+        self._caps_root = root
+        self._current_caps = caps
         self._caps_tree.setParameters(root, showTop=False)
 
     def _open_all_directors(self, caps: Capabilities):
@@ -394,6 +458,7 @@ class PymodaqActorGUI(CustomApp):
                     daq_move.settings.child('move_settings', 'actor_name').setValue(actor_name)
                     daq_move.settings.child('move_settings', 'host').setValue(host)
                     daq_move.settings.child('move_settings', 'use_legacy_actor').setValue(False)
+                    daq_move.settings.child('move_settings', 'variable_name').setValue(cap_name)
                 except Exception:
                     logger.warning('Could not pre-fill move director settings for %s', cap_name)
 
@@ -415,6 +480,7 @@ class PymodaqActorGUI(CustomApp):
                     daq_viewer.settings.child('detector_settings', 'actor_name').setValue(actor_name)
                     daq_viewer.settings.child('detector_settings', 'host').setValue(host)
                     daq_viewer.settings.child('detector_settings', 'use_legacy_actor').setValue(False)
+                    daq_viewer.settings.child('detector_settings', 'observable_name').setValue(cap_name)
                 except Exception:
                     logger.warning('Could not pre-fill viewer director settings for %s', cap_name)
 

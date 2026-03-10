@@ -72,3 +72,30 @@ def start_coordinator():
                 logger.info('Coordinator already running')
     except ConnectionRefusedError:
         run_coordinator()
+
+
+def start_proxy_server() -> None:
+    """Start a local LECO ZMQ PUB/SUB proxy on the default ports.
+
+    Starts the pyleco proxy server in a daemon thread.  Publishers connect to
+    port ``PROXY_RECEIVING_PORT`` (default 11100); subscribers connect to
+    ``PROXY_RECEIVING_PORT - 1`` (default 11099).
+
+    Safe to call multiple times; logs a warning if the port is already taken.
+    """
+    from pyleco.coordinators.proxy_server import start_proxy
+    from pyleco.core import PROXY_RECEIVING_PORT
+    try:
+        start_proxy()
+        logger.info(
+            'Proxy server started (publishers -> %d, subscribers <- %d)',
+            PROXY_RECEIVING_PORT, PROXY_RECEIVING_PORT - 1,
+        )
+    except TimeoutError:
+        logger.warning(
+            'Proxy server did not start within 1 s - it may already be running '
+            '(ports %d / %d).',
+            PROXY_RECEIVING_PORT, PROXY_RECEIVING_PORT - 1,
+        )
+    except Exception as exc:
+        logger.error('Failed to start proxy server: %s', exc)

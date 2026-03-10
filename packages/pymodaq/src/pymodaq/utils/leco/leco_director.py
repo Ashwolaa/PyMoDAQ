@@ -47,6 +47,8 @@ leco_parameters = [
     {'title': 'Settings PyMoDAQ Client:', 'name': 'settings_client', 'type': 'group', 'children': []},
     {'title': 'Use legacy actor:', 'name': 'use_legacy_actor', 'type': 'bool', 'value': True,
      'tip': 'True: legacy ActuatorDirector (ActorListener). False: PymodaqActor new API.'},
+    {'title': 'Query capabilities', 'name': 'query_caps', 'type': 'action',
+     'tip': 'Ask the actor for its available variables/observables and update the channel selector'},
 ]
 
 

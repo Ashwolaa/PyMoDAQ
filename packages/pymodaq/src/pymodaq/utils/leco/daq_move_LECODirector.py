@@ -52,7 +52,12 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
 
     params_client = []  # parameters of a client grabber
     data_actuator_type = DataActuatorType.DataActuator
-    params = comon_parameters_fun(axis_names=_axis_names, epsilon=_epsilon) + leco_parameters
+    params = comon_parameters_fun(axis_names=_axis_names, epsilon=_epsilon) + leco_parameters + [
+        {'title': 'Variable name:', 'name': 'variable_name', 'type': 'list',
+         'limits': ['position'], 'value': 'position',
+         'tip': 'Which variable (axis) this director controls. '
+                'Populated automatically from actor capabilities on init or via "Query capabilities".'},
+    ]
 
     for param_name in ('multiaxes', 'units', 'epsilon', 'bounds', 'scaling'):
         param_dict = find_dict_in_list_from_key_val(params, 'name', param_name)
@@ -118,10 +123,14 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                 self.controller = PymodaqMoveDirector(actor=actor_name, communicator=self.communicator)
                 try:
                     caps = self.controller.get_capabilities()
-                    self._variable_names = [v.name for v in caps.variables] or ['position']
+                    var_names = [v.name for v in caps.variables] or ['position']
                 except Exception:
-                    self._variable_names = ['position']
+                    var_names = ['position']
                     logger.warning("Could not fetch capabilities; defaulting variable name to 'position'.")
+                # Populate the variable_name list with what this actor actually exposes.
+                # If the user pre-selected a valid name (e.g. from the actor GUI), keep it;
+                # otherwise fall back to the first available name.
+                self._apply_variable_names(var_names)
                 try:
                     self.controller.subscribe_settings()
                 except Exception:
@@ -158,7 +167,7 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                     position = np.full(self.shape, position.value(self.axis_unit)).tolist()
             self.controller.move_abs(position=position)
         else:
-            var_name = getattr(self, '_variable_names', ['position'])[0]
+            var_name = self.settings['variable_name'] or 'position'
             self.controller.change_to(var_name, position.value(self.axis_unit))
 
     def move_rel(self, position: DataActuator) -> None:
@@ -173,14 +182,14 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                     position = np.full(self.shape, position.value(self.axis_unit)).tolist()
             self.controller.move_rel(position=position)
         else:
-            var_name = getattr(self, '_variable_names', ['position'])[0]
+            var_name = self.settings['variable_name'] or 'position'
             self.controller.change_to(var_name, position.value(self.axis_unit))
 
     def move_home(self):
         if self.settings['use_legacy_actor']:
             self.controller.move_home()
         else:
-            var_name = getattr(self, '_variable_names', ['position'])[0]
+            var_name = self.settings['variable_name'] or 'position'
             self.controller.change_to(var_name, 0.0)
 
     def get_actuator_value(self) -> DataActuator:
@@ -219,7 +228,14 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         if dte is None:
             return
         try:
-            pos_val = float(dte.data[0].data[0].ravel()[0])
+            var_name = self.settings['variable_name'] or 'position'
+            # Find the DataWithAxes matching our variable; fall back to first item.
+            dwa = next((d for d in dte.data if d.name == var_name), None)
+            if dwa is None:
+                dwa = dte.data[0] if dte.data else None
+            if dwa is None:
+                return
+            pos_val = float(dwa.data[0].ravel()[0])
             pos = DataActuator(data=[np.atleast_1d(np.array([pos_val]))])
             pos = self.get_position_with_scaling(pos)
             self._current_value = pos
@@ -273,6 +289,34 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         Then set the plugin units from this information"""
         super().set_director_settings(settings)
         self.axis_unit = self.settings['settings_client', 'units']
+
+    # ── Capability refresh ─────────────────────────────────────────────────────
+
+    def commit_leco_settings(self, param) -> None:
+        super().commit_leco_settings(param)
+        if param.name() == 'query_caps':
+            self._query_and_apply_capabilities()
+
+    def _query_and_apply_capabilities(self) -> None:
+        """Ask the actor for its capabilities and update the variable_name selector."""
+        if self.settings['use_legacy_actor']:
+            logger.info("Capability query only supported with use_legacy_actor=False.")
+            return
+        actor_name = self.settings['actor_name']
+        try:
+            tmp = PymodaqMoveDirector(actor=actor_name, communicator=self.communicator)
+            caps = tmp.get_capabilities()
+            var_names = [v.name for v in caps.variables] or ['position']
+            self._apply_variable_names(var_names)
+            logger.info("Capabilities refreshed from actor '%s': variables=%s", actor_name, var_names)
+        except Exception as exc:
+            logger.warning("Could not query capabilities from actor '%s': %s", actor_name, exc)
+
+    def _apply_variable_names(self, var_names: list) -> None:
+        current = self.settings['variable_name']
+        self.settings.child('variable_name').setLimits(var_names)
+        if current not in var_names:
+            self.settings.child('variable_name').setValue(var_names[0])
 
     def close(self) -> None:
         """Clear the content of the settings_clients setting."""

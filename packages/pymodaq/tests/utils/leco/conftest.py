@@ -421,7 +421,7 @@ if 'qtpy.QtCore' not in sys.modules:
     sys.modules['qtpy.QtCore'] = _qtcore_mod
 
 if 'pyleco.core' not in sys.modules:
-    _stub_module_with('pyleco.core', COORDINATOR_PORT=6666)
+    _stub_module_with('pyleco.core', COORDINATOR_PORT=6666, PROXY_RECEIVING_PORT=11100)
 
 # ── Step 4: load actor_gui.py ─────────────────────────────────────────────────
 _load_module_from_path(

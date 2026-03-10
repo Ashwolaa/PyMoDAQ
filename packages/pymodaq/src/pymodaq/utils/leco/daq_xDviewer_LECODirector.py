@@ -33,6 +33,10 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
 
     socket_types = ["GRABBER"]
     params = comon_parameters + leco_parameters + [
+        {'title': 'Observable name:', 'name': 'observable_name', 'type': 'list',
+         'limits': ['data'], 'value': 'data',
+         'tip': 'Which observable (channel) this viewer shows. '
+                'Populated automatically from actor capabilities on init or via "Query capabilities".'},
         {'title': 'Live acquisition mode:', 'name': 'live_mode', 'type': 'list',
          'limits': ['sequential', 'continuous'], 'value': 'sequential',
          'tip': (
@@ -102,6 +106,14 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
             else:
                 self.controller = PymodaqDetectorDirector(actor=actor_name, communicator=self.communicator)
                 try:
+                    caps = self.controller.get_capabilities()
+                    obs_names = [o.name for o in caps.observables] or ['data']
+                except Exception:
+                    obs_names = ['data']
+                    logger.warning("Could not fetch capabilities; defaulting observable name to 'data'.")
+                # Populate the observable_name list with what this actor actually exposes.
+                self._apply_observable_names(obs_names)
+                try:
                     self.controller.subscribe_settings()
                 except Exception:
                     logger.warning("Timeout during subscribe_settings.")
@@ -115,7 +127,8 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                     logger.warning("Could not subscribe to actor ZMQ data channel.")
                 # Request initial frame so the display is populated on startup.
                 try:
-                    self.controller.query_data(fresh=True)
+                    obs_name = self.settings['observable_name'] or None
+                    self.controller.query_data(names=[obs_name] if obs_name else None, fresh=True)
                 except Exception:
                     logger.warning("Could not request initial data from actor.")
         else:
@@ -149,6 +162,8 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
             else:
                 self.controller.send_data_snap()
         else:
+            obs_name = self.settings['observable_name'] or None
+            obs_names = [obs_name] if obs_name else None
             if kwargs.get('live', False):
                 if self.settings['live_mode'] == 'continuous':
                     # Actor background thread streams frames at the configured rate.
@@ -159,11 +174,11 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                     # Sequential: request one frame; _on_actor_data re-requests the next.
                     # Naturally backpressure-safe — rate bounded by device.read() latency.
                     self._live_sequential = True
-                    self.controller.query_data(names=None, fresh=True)
+                    self.controller.query_data(names=obs_names, fresh=True)
             else:
                 # Single snap: actor reads once and publishes one ZMQ frame.
                 self._live_sequential = False
-                self.controller.query_data(names=None, fresh=True)
+                self.controller.query_data(names=obs_names, fresh=True)
 
     def stop(self):
         """Stop grabbing."""
@@ -185,13 +200,21 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         Called when ``use_legacy_actor=False``.
         """
         if dte is not None:
+            obs_name = self.settings['observable_name'] or None
+            if obs_name:
+                # Filter the DTE to only the observable this director is responsible for.
+                matching = [d for d in dte.data if d.name == obs_name]
+                if matching:
+                    from pymodaq_data import DataToExport as _DTE
+                    dte = _DTE(name=dte.name, data=matching)
             self.dte_signal.emit(dte)
             if self._live_sequential:
                 # Sequential mode: request next frame only after this one was received.
                 # Provides automatic backpressure — no frame is requested before the
                 # previous DataToExport has been delivered to the viewer.
                 try:
-                    self.controller.query_data(names=None, fresh=True)
+                    obs_names = [obs_name] if obs_name else None
+                    self.controller.query_data(names=obs_names, fresh=True)
                 except Exception:
                     logger.warning("_on_actor_data: failed to request next frame; stopping sequential grab")
                     self._live_sequential = False
@@ -235,6 +258,34 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         else:
             raise ValueError("Can't set_data when data is None")
         self.dte_signal.emit(dte)
+
+    # ── Capability refresh ─────────────────────────────────────────────────────
+
+    def commit_settings(self, param) -> None:
+        super().commit_settings(param)
+        if param.name() == 'query_caps':
+            self._query_and_apply_capabilities()
+
+    def _query_and_apply_capabilities(self) -> None:
+        """Ask the actor for its capabilities and update the observable_name selector."""
+        if self.settings['use_legacy_actor']:
+            logger.info("Capability query only supported with use_legacy_actor=False.")
+            return
+        actor_name = self.settings['actor_name']
+        try:
+            tmp = PymodaqDetectorDirector(actor=actor_name, communicator=self.communicator)
+            caps = tmp.get_capabilities()
+            obs_names = [o.name for o in caps.observables] or ['data']
+            self._apply_observable_names(obs_names)
+            logger.info("Capabilities refreshed from actor '%s': observables=%s", actor_name, obs_names)
+        except Exception as exc:
+            logger.warning("Could not query capabilities from actor '%s': %s", actor_name, exc)
+
+    def _apply_observable_names(self, obs_names: list) -> None:
+        current = self.settings['observable_name']
+        self.settings.child('observable_name').setLimits(obs_names)
+        if current not in obs_names:
+            self.settings.child('observable_name').setValue(obs_names[0])
 
     def close(self) -> None:
         self.timer.stop()

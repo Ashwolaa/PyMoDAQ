@@ -27,7 +27,7 @@ from pymodaq_utils.enums import StrEnum
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.utils import get_version
 from pymodaq_utils.config import GlobalConfig as Config
-from pymodaq.utils.leco.utils import start_coordinator
+from pymodaq.utils.leco.utils import start_coordinator, start_proxy_server
 from pymodaq_utils.utils import get_module_path
 from pymodaq_gui.utils.custom_app import CustomApp
 
@@ -163,6 +163,9 @@ class SharedUI(CustomApp):
         self.add_action( "restart", "Restart", "", "Restart the affected app", auto_toolbar=False)
         self.add_action("leco", "Run Leco Coordinator", "", "Run a Coordinator on this localhost",
                         auto_toolbar=False,)
+        self.add_action("leco_proxy", "Start LECO Proxy", "",
+                        "Start the ZMQ PUB/SUB data-channel proxy on default ports (11100/11099)",
+                        auto_toolbar=False)
         self.add_action("about", "About", "info",
                         icon_color=self.get_theme().cyan)
         self.add_action("help", "Help", "help", icon_color=self.get_theme().yellow)
@@ -178,6 +181,7 @@ class SharedUI(CustomApp):
         self.connect_action("quit", self.quit_fun)
         self.connect_action("restart", self.restart_fun)
         self.connect_action("leco", start_coordinator)
+        self.connect_action("leco_proxy", start_proxy_server)
 
         self.connect_action("about", self.show_about)
         self.connect_action("help", self.show_help)
@@ -200,6 +204,7 @@ class SharedUI(CustomApp):
 
 
         settings_menu.addAction(self.get_action("leco"))
+        settings_menu.addAction(self.get_action("leco_proxy"))
 
         # help menu
         help_menu = self.add_menu(MenuNames.HELP, '?', menubar)

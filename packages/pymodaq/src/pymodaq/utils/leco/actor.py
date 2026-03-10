@@ -41,6 +41,7 @@ import time
 from typing import Any, Optional
 
 from pyleco.actors.actor import Actor
+from pyleco.core import PROXY_RECEIVING_PORT
 from pyleco.core.serialization import generate_conversation_id
 from pyleco.utils.data_publisher import DataPublisher
 
@@ -73,16 +74,39 @@ class PymodaqActor(Actor):
         name: str,
         device_class,
         periodic_reading: float = -1,
+        proxy_host: str = 'localhost',
+        proxy_port: int = PROXY_RECEIVING_PORT,
+        channel_proxies: Optional[dict] = None,
         **kwargs,
     ) -> None:
         context = kwargs.get('context')
         super().__init__(name=name, device_class=device_class,
                          periodic_reading=periodic_reading, **kwargs)
-        # If a context was provided (e.g. FakeContext in tests), recreate the
-        # publisher with that same context so its socket is also a FakeSocket.
-        if context is not None:
-            self.publisher.close()
-            self.publisher = DataPublisher(full_name=name, context=context)
+        # Always recreate the publisher so we can honour proxy_host/proxy_port.
+        # (super().__init__ creates a default publisher on localhost:11100.)
+        self.publisher.close()
+        self.publisher = DataPublisher(
+            full_name=name,
+            host=proxy_host,
+            port=proxy_port,
+            context=context,
+        )
+        # Per-channel publisher routing.
+        # Maps channel_name → (host, port) key used in _extra_publishers.
+        self._channel_proxy_keys: dict[str, tuple[str, int]] = {}
+        # Maps (host, port) → DataPublisher for channels that use a different proxy.
+        self._extra_publishers: dict[tuple[str, int], DataPublisher] = {}
+        if channel_proxies:
+            for ch_name, (ch_host, ch_port) in channel_proxies.items():
+                key: tuple[str, int] = (ch_host, ch_port)
+                if key not in self._extra_publishers:
+                    self._extra_publishers[key] = DataPublisher(
+                        full_name=name,
+                        host=ch_host,
+                        port=ch_port,
+                        context=context,
+                    )
+                self._channel_proxy_keys[ch_name] = key
         self._director_registry = set()
         self._last_data = None
         self._stop_grab_flag = False
@@ -107,6 +131,13 @@ class PymodaqActor(Actor):
         (``device.adapter.close()``).  PyMoDAQ plugins use ``close()`` instead.
         """
         self.stop_timer()
+        for pub in list(self._extra_publishers.values()):
+            try:
+                pub.close()
+            except Exception:
+                pass
+        self._extra_publishers.clear()
+        self._channel_proxy_keys.clear()
         try:
             self.device.close()
         except AttributeError:
@@ -307,6 +338,11 @@ class PymodaqActor(Actor):
     def _publish(self, dte) -> Optional[str]:
         """Serialize *dte* and publish it on the LECO data channel.
 
+        When per-channel proxy overrides are configured the :class:`DataToExport`
+        is split by channel name: each ``DataWithAxes`` is routed to the publisher
+        whose proxy was selected for that channel in the actor GUI.  Channels
+        with no override go to the default publisher.
+
         Returns
         -------
         str or None
@@ -317,9 +353,39 @@ class PymodaqActor(Actor):
         """
         try:
             from serializall import SerializableFactory
+            factory = SerializableFactory()
             cid = generate_conversation_id()
-            payload: bytes = SerializableFactory().get_apply_serializer(dte)
-            self.publisher.send_data(data=payload, conversation_id=cid)
+
+            if not self._channel_proxy_keys:
+                # Fast path: single publisher for the whole DTE.
+                payload: bytes = factory.get_apply_serializer(dte)
+                self.publisher.send_data(data=payload, conversation_id=cid)
+                return cid.hex()
+
+            # Per-channel routing: split DTE by proxy endpoint.
+            from pymodaq.utils.data import DataToExport
+            default_dwas = []
+            routed: dict[tuple[str, int], list] = {}
+            for dwa in dte.data:
+                key = self._channel_proxy_keys.get(dwa.name)
+                if key is not None:
+                    routed.setdefault(key, []).append(dwa)
+                else:
+                    default_dwas.append(dwa)
+
+            if default_dwas:
+                sub_dte = DataToExport(name=dte.name, data=default_dwas)
+                self.publisher.send_data(
+                    data=factory.get_apply_serializer(sub_dte), conversation_id=cid
+                )
+            for key, dwas in routed.items():
+                pub = self._extra_publishers.get(key)
+                if pub is None:
+                    continue
+                sub_dte = DataToExport(name=dte.name, data=dwas)
+                pub.send_data(
+                    data=factory.get_apply_serializer(sub_dte), conversation_id=cid
+                )
             return cid.hex()
         except Exception:
             logger.exception("_publish: failed to serialize / publish DataToExport")

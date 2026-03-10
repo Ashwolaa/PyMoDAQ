@@ -150,7 +150,7 @@ class TestActorWorkerInit:
         captured = {}
 
         class _CapturingActor:
-            def __init__(self, name, device_class, host, port):
+            def __init__(self, name, device_class, **kwargs):
                 captured['device_class'] = device_class
             def connect(self): pass
             def listen(self, stop_event=None): stop_event.wait()
