@@ -131,6 +131,18 @@ class PymodaqDirector(GenericDirector):
         """
         return self.ask_rpc("get_pymodaq_settings")
 
+    def get_grabbed_names(self) -> Optional[list]:
+        """Return the names currently being grabbed by the actor in continuous mode."""
+        return self.ask_rpc(PymodaqActorMethods.GET_GRABBED_NAMES)
+
+    def set_published_names(self, names: Optional[list]) -> None:
+        """Configure which names the actor publishes in continuous mode."""
+        self.ask_rpc(PymodaqActorMethods.SET_PUBLISHED_NAMES, names=names)
+
+    def get_published_names(self) -> Optional[list]:
+        """Return the actor's current continuous-publish filter."""
+        return self.ask_rpc(PymodaqActorMethods.GET_PUBLISHED_NAMES)
+
 
 class PymodaqMoveDirector(PymodaqDirector):
     """Director for actuator-type actors (actors that expose Variables).
@@ -139,24 +151,25 @@ class PymodaqMoveDirector(PymodaqDirector):
     for polling the current value (move-done detection).
     """
 
-    def change_to(self, name, value) -> Optional[str]:
-        """Write a variable on the actor's device.
+    def change_to(self, name_or_dict, value=None) -> Optional[str]:
+        """Write one or more variables on the actor's device.
 
         Parameters
         ----------
-        name : str | list[str]
-            Variable name, or list of names for a multi-variable update.
+        name_or_dict : str | dict
+            Variable name (str) for a single update, or a dict mapping
+            variable names to new values for a multi-variable update.
         value :
-            New value, or list of values aligned with name.
+            New value. Required when *name_or_dict* is a str; ignored for dict.
 
         Returns
         -------
         str or None
             Hex conversation ID of the auto-publish triggered after writing.
-            Matches the ``'cid'`` in the ``'data_received'`` ThreadCommand for
-            the resulting ZMQ frame.
         """
-        return self.ask_rpc(PymodaqActorMethods.CHANGE_TO, name=name, value=value)
+        if isinstance(name_or_dict, dict):
+            return self.ask_rpc(PymodaqActorMethods.CHANGE_TO, name=name_or_dict)
+        return self.ask_rpc(PymodaqActorMethods.CHANGE_TO, name=name_or_dict, value=value)
 
 
 class PymodaqDetectorDirector(PymodaqDirector):

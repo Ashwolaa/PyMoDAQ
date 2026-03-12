@@ -71,11 +71,12 @@ class ActorWorker(QObject):
         self._stop_event: Optional[threading.Event] = None
         self._actor_thread: Optional[threading.Thread] = None
 
-    @Slot(object, str, str, int, str, int, object)
+    @Slot(object, str, str, int, str, int, object, object)
     def init_instrument(self, plugin_class, actor_name: str, host: str, port: int,
                         proxy_host: str = 'localhost',
                         proxy_port: int = PROXY_RECEIVING_PORT,
-                        channel_proxies: Optional[dict] = None):
+                        channel_proxies: Optional[dict] = None,
+                        published_names: Optional[list] = None):
         """Full initialisation: instantiate device, connect hardware, start actor.
 
         Equivalent to ``ini_stage`` / ``ini_detector`` + LECO actor startup in
@@ -93,6 +94,7 @@ class ActorWorker(QObject):
                 proxy_host=proxy_host,
                 proxy_port=proxy_port,
                 channel_proxies=channel_proxies or {},
+                published_names=published_names,
             )
             self._actor.connect()
         except Exception as exc:
@@ -151,7 +153,7 @@ class PymodaqActorGUI(CustomApp):
        Capabilities dock reverts to preview.
     """
 
-    sig_init = Signal(object, str, str, int, str, int, object)  # plugin_class, actor_name, host, port, proxy_host, proxy_port, channel_proxies
+    sig_init = Signal(object, str, str, int, str, int, object, object)  # plugin_class, actor_name, host, port, proxy_host, proxy_port, channel_proxies, published_names
     sig_stop = Signal()
 
     params = [
@@ -270,7 +272,32 @@ class PymodaqActorGUI(CustomApp):
             self.settings['proxy_host'],
             int(self.settings['proxy_port']),
             self._collect_channel_proxies(),
+            self._collect_published_names(),
         )
+
+    def _collect_published_names(self) -> list:
+        """Read per-channel Publish checkboxes from the capabilities tree.
+
+        Returns a list of observable/variable names whose Publish checkbox is
+        checked.  An empty list means no continuous publication (user must
+        explicitly check at least one item).
+        """
+        names: list = []
+        if self._caps_root is None or self._current_caps is None:
+            return names
+        for var in self._current_caps.variables:
+            try:
+                if self._caps_root.child('Variables', var.name, 'publish').value():
+                    names.append(var.name)
+            except Exception:
+                pass
+        for obs in self._current_caps.observables:
+            try:
+                if self._caps_root.child('Observables', obs.name, 'publish').value():
+                    names.append(obs.name)
+            except Exception:
+                pass
+        return names
 
     def _collect_channel_proxies(self) -> dict:
         """Read per-channel proxy overrides from the capabilities tree.
@@ -382,6 +409,8 @@ class PymodaqActorGUI(CustomApp):
                      'value': str(var.choices), 'readonly': True}
                 )
             children += [
+                {'name': 'publish', 'type': 'bool', 'value': False,
+                 'tip': 'Include this variable in continuous publication'},
                 {'name': 'Open DAQ_Move', 'type': 'action'},
                 {'name': 'Proxy', 'type': 'group', 'children': [
                     {'name': 'proxy_host', 'type': 'str', 'value': default_proxy_host,
@@ -398,6 +427,8 @@ class PymodaqActorGUI(CustomApp):
                 {'name': 'units', 'type': 'str', 'value': obs.units or '—', 'readonly': True},
                 {'name': 'shape', 'type': 'str', 'value': str(obs.shape), 'readonly': True},
                 {'name': 'dtype', 'type': 'str', 'value': obs.dtype, 'readonly': True},
+                {'name': 'publish', 'type': 'bool', 'value': False,
+                 'tip': 'Include this observable in continuous publication'},
                 {'name': 'Open DAQ_Viewer', 'type': 'action'},
                 {'name': 'Proxy', 'type': 'group', 'children': [
                     {'name': 'proxy_host', 'type': 'str', 'value': default_proxy_host,

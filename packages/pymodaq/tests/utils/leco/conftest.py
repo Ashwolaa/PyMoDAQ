@@ -103,7 +103,13 @@ class _ThreadCommand:
 
 
 if 'pymodaq_utils.utils' not in sys.modules:
-    _stub_module_with('pymodaq_utils.utils', ThreadCommand=_ThreadCommand)
+    # Try to load the real module (available when PYTHONPATH includes pymodaq_utils/src).
+    # This is required so that pymodaq_data can import from pymodaq_utils.utils.
+    # Only fall back to the minimal stub when the real module is unavailable.
+    try:
+        import pymodaq_utils.utils as _real_utils  # noqa: F401
+    except Exception:
+        _stub_module_with('pymodaq_utils.utils', ThreadCommand=_ThreadCommand)
 else:
     # Already loaded — patch ThreadCommand if it's not the real one
     _utils_mod = sys.modules['pymodaq_utils.utils']

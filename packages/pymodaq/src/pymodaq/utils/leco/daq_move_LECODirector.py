@@ -75,6 +75,7 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         LECODirector.__init__(self, host=self.settings["host"], port=self.settings["port"])
         self.register_rpc_methods((
             self.set_units,  # to set units accordingly to the one of the actor
+            self.on_grab_status,
         ))
 
         self.register_binary_rpc_methods((
@@ -229,10 +230,8 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
             return
         try:
             var_name = self.settings['variable_name'] or 'position'
-            # Find the DataWithAxes matching our variable; fall back to first item.
+            # Only process frames that contain our variable — drop everything else.
             dwa = next((d for d in dte.data if d.name == var_name), None)
-            if dwa is None:
-                dwa = dte.data[0] if dte.data else None
             if dwa is None:
                 return
             pos_val = float(dwa.data[0].ravel()[0])
@@ -317,6 +316,24 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         self.settings.child('variable_name').setLimits(var_names)
         if current not in var_names:
             self.settings.child('variable_name').setValue(var_names[0])
+
+    def on_grab_status(self, grabbed_names, is_continuous: bool) -> None:
+        """Invoked by the actor when its continuous-grab status changes.
+
+        Allows this director's GUI to mirror the grab state of the actor
+        even when the grab was initiated by a different director.
+
+        Parameters
+        ----------
+        grabbed_names:
+            List of names currently being grabbed, or ``None`` for all.
+        is_continuous:
+            ``True`` while the actor's background grab loop is running.
+        """
+        self.emit_status(ThreadCommand('GRAB_STATUS', {
+            'grabbed_names': grabbed_names,
+            'is_continuous': is_continuous,
+        }))
 
     def close(self) -> None:
         """Clear the content of the settings_clients setting."""

@@ -280,6 +280,7 @@ class TestRpcMethodsRegistered:
         'get_capabilities', 'get_pymodaq_settings', 'set_info',
         'subscribe_director', 'unsubscribe_director',
         'query_data_continuous', 'stop_continuous',
+        'set_published_names', 'get_published_names', 'get_grabbed_names',
         # Legacy aliases
         'grab', 'snap', 'get_actuator_value',
         'move_abs', 'move_rel', 'move_home',
@@ -366,14 +367,14 @@ class TestChangeTo:
         move_actor.change_to('position', 3.0)
         assert move_actor.device.write_calls == [('position', 3.0)]
 
-    def test_plural_names_calls_write_for_each_pair(self, move_actor):
-        """Passing parallel lists writes each (name, value) pair in order."""
-        move_actor.change_to(['x', 'y'], [1.0, 2.0])
-        assert move_actor.device.write_calls == [('x', 1.0), ('y', 2.0)]
+    def test_dict_form_calls_write_for_each_pair(self, move_actor):
+        """Dict form writes each name/value pair."""
+        move_actor.change_to({'x': 1.0, 'y': 2.0})
+        assert ('x', 1.0) in move_actor.device.write_calls
+        assert ('y', 2.0) in move_actor.device.write_calls
 
-    def test_plural_via_rpc(self, move_actor):
-        handle_request_message(move_actor, 'change_to',
-                               name=['x', 'y'], value=[10.0, 20.0])
+    def test_dict_form_via_rpc(self, move_actor):
+        handle_request_message(move_actor, 'change_to', name={'x': 10.0, 'y': 20.0})
         assert ('x', 10.0) in move_actor.device.write_calls
         assert ('y', 20.0) in move_actor.device.write_calls
 
@@ -452,6 +453,90 @@ class TestDirectorRegistry:
         handle_request_message(viewer_actor, 'subscribe_director', name='ns.d1')
         handle_request_message(viewer_actor, 'subscribe_director', name='ns.d2')
         assert {'ns.d1', 'ns.d2'}.issubset(viewer_actor._director_registry)
+
+
+class TestPublishedNames:
+    def test_published_names_default_is_none(self, viewer_actor):
+        assert viewer_actor._published_names is None
+
+    def test_set_published_names_via_rpc(self, viewer_actor):
+        handle_request_message(viewer_actor, 'set_published_names', names=['spectrum'])
+        assert viewer_actor._published_names == {'spectrum'}
+
+    def test_set_published_names_none_removes_filter(self, viewer_actor):
+        viewer_actor._published_names = {'spectrum'}
+        handle_request_message(viewer_actor, 'set_published_names', names=None)
+        assert viewer_actor._published_names is None
+
+    def test_set_published_names_empty_list(self, viewer_actor):
+        handle_request_message(viewer_actor, 'set_published_names', names=[])
+        assert viewer_actor._published_names == set()
+
+    def test_get_published_names_none_when_no_filter(self, viewer_actor):
+        handle_request_message(viewer_actor, 'get_published_names')
+        assert _last_rpc_result(viewer_actor) is None
+
+    def test_get_published_names_returns_sorted_list(self, viewer_actor):
+        viewer_actor._published_names = {'b', 'a'}
+        handle_request_message(viewer_actor, 'get_published_names')
+        result = _last_rpc_result(viewer_actor)
+        assert result == ['a', 'b']
+
+    def test_read_publish_skipped_when_published_names_empty(self, viewer_actor):
+        """Periodic timer does nothing when _published_names is explicitly empty."""
+        viewer_actor._published_names = set()
+        before = len(viewer_actor.publisher.socket._s)
+        viewer_actor.read_publish(viewer_actor.device, viewer_actor.publisher)
+        assert len(viewer_actor.publisher.socket._s) == before
+        assert viewer_actor.device.read_count == 0
+
+    def test_read_publish_uses_published_names_filter(self, viewer_actor):
+        """Periodic timer passes _published_names to device.read()."""
+        viewer_actor._published_names = {'spectrum'}
+        viewer_actor.read_publish(viewer_actor.device, viewer_actor.publisher)
+        assert viewer_actor.device.last_read_names == ['spectrum']
+
+    def test_read_publish_all_when_no_filter(self, viewer_actor):
+        """Periodic timer passes None to device.read() when no filter set."""
+        assert viewer_actor._published_names is None
+        viewer_actor.read_publish(viewer_actor.device, viewer_actor.publisher)
+        assert viewer_actor.device.last_read_names is None
+
+
+class TestGrabbedNames:
+    def test_grabbed_names_default_is_none(self, viewer_actor):
+        assert viewer_actor._grabbed_names is None
+
+    def test_get_grabbed_names_rpc_returns_none_when_not_grabbing(self, viewer_actor):
+        handle_request_message(viewer_actor, 'get_grabbed_names')
+        assert _last_rpc_result(viewer_actor) is None
+
+    def test_query_data_continuous_sets_grabbed_names_from_published(self, viewer_actor):
+        viewer_actor._published_names = {'spectrum', 'intensity'}
+        viewer_actor.query_data_continuous()
+        assert viewer_actor._grabbed_names == {'spectrum', 'intensity'}
+        viewer_actor.stop_continuous()
+
+    def test_query_data_continuous_grabbed_names_none_when_no_filter(self, viewer_actor):
+        """When _published_names is None (no filter), _grabbed_names is also None."""
+        assert viewer_actor._published_names is None
+        viewer_actor.query_data_continuous()
+        assert viewer_actor._grabbed_names is None
+        viewer_actor.stop_continuous()
+
+    def test_stop_continuous_clears_grabbed_names(self, viewer_actor):
+        viewer_actor._published_names = {'spectrum'}
+        viewer_actor.query_data_continuous()
+        viewer_actor.stop_continuous()
+        assert viewer_actor._grabbed_names is None
+
+    def test_get_grabbed_names_rpc_returns_sorted_list_while_grabbing(self, viewer_actor):
+        viewer_actor._published_names = {'b', 'a'}
+        viewer_actor.query_data_continuous()
+        handle_request_message(viewer_actor, 'get_grabbed_names')
+        result = _last_rpc_result(viewer_actor)
+        assert result == ['a', 'b']
+        viewer_actor.stop_continuous()
 
 
 class TestLegacyAliases:
@@ -539,12 +624,12 @@ class TestContinuousGrab:
         """stop_continuous() when no grab is running must not raise."""
         viewer_actor.stop_continuous()  # no-op
 
-    def test_query_data_continuous_restarts_existing_loop(self, viewer_actor):
-        """A second query_data_continuous() safely replaces the previous loop."""
+    def test_query_data_continuous_is_idempotent(self, viewer_actor):
+        """A second query_data_continuous() while the loop is alive does not restart it."""
         viewer_actor.query_data_continuous()
         first_thread = viewer_actor._grab_thread
-        viewer_actor.query_data_continuous()
-        assert viewer_actor._grab_thread is not first_thread
+        viewer_actor.query_data_continuous()   # second call — idempotent
+        assert viewer_actor._grab_thread is first_thread   # same thread, not replaced
         viewer_actor.stop_continuous()
 
     def test_grab_loop_publishes_data(self, viewer_actor):

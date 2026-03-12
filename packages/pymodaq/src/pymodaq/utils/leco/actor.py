@@ -77,6 +77,7 @@ class PymodaqActor(Actor):
         proxy_host: str = 'localhost',
         proxy_port: int = PROXY_RECEIVING_PORT,
         channel_proxies: Optional[dict] = None,
+        published_names: Optional[list] = None,
         **kwargs,
     ) -> None:
         context = kwargs.get('context')
@@ -107,10 +108,12 @@ class PymodaqActor(Actor):
                         context=context,
                     )
                 self._channel_proxy_keys[ch_name] = key
-        self._director_registry = set()
+        self._director_registry: set[str] = set()
         self._last_data = None
         self._stop_grab_flag = False
         self._grab_thread: Optional[threading.Thread] = None
+        self._published_names: Optional[set[str]] = set(published_names) if published_names is not None else None
+        self._grabbed_names: Optional[set[str]] = None
 
     # ── Hardware lifecycle ─────────────────────────────────────────────────────
 
@@ -166,6 +169,9 @@ class PymodaqActor(Actor):
         self.register_rpc_method(self.unsubscribe_director)
         self.register_rpc_method(self.query_data_continuous)
         self.register_rpc_method(self.stop_continuous)
+        self.register_rpc_method(self.set_published_names)
+        self.register_rpc_method(self.get_published_names)
+        self.register_rpc_method(self.get_grabbed_names)
 
         # # Heartbeat — used by directors to check connectivity
         # self.register_rpc_method(self.pong)
@@ -222,29 +228,27 @@ class PymodaqActor(Actor):
                 return self._publish(self._last_data)
         return None
 
-    def change_to(self, name, value: Any) -> Optional[str]:
+    def change_to(self, name, value=None) -> Optional[str]:
         """Write one or more variables on the device.
 
-        Accepts either a single name/value pair or parallel lists of names and
-        values for a multi-variable update in one RPC call.
+        Accepts either a single name/value pair or a dict of name→value pairs
+        for a multi-variable update in one RPC call.
 
         Parameters
         ----------
-        name:
-            Variable name (str) or list of variable names (list[str]).
-            Matches the key(s) in :class:`Capabilities`.
-        value:
-            New value, or a list of new values aligned with *name* when *name*
-            is a list.  Type and unit depend on the variable definition.
+        name : str | dict
+            Variable name (str) for a single update, or a dict mapping
+            variable names to new values for a multi-variable update.
+        value :
+            New value. Required when *name* is a str; ignored when *name* is a dict.
         """
-        if isinstance(name, list):
-            for n, v in zip(name, value):
-                self.device.write(n, v)
+        if isinstance(name, dict):
+            for k, v in name.items():
+                self.device.write(k, v)
         else:
             self.device.write(name, value)
         # Immediately publish the updated state so directors receive a ZMQ
         # update without waiting for the next get_actuator_value polling cycle.
-        # Returns the same CID as the ZMQ publish so the caller can correlate.
         try:
             return self.query_data(names=None, fresh=True)
         except Exception:
@@ -312,6 +316,44 @@ class PymodaqActor(Actor):
         self._director_registry.discard(name)
         logger.debug("Director '%s' unsubscribed from actor '%s'.", name, self.name)
 
+    def set_published_names(self, names: Optional[list]) -> None:
+        """Configure which observable/variable names are published in continuous mode.
+
+        Parameters
+        ----------
+        names:
+            List of names to publish.  ``None`` removes the filter (publish everything).
+            An empty list disables all continuous publication.
+        """
+        self._published_names = set(names) if names is not None else None
+        logger.debug("'%s' published_names set to: %s", self.name, self._published_names)
+
+    def get_published_names(self) -> Optional[list]:
+        """Return the current continuous-publish filter.
+
+        Returns
+        -------
+        list[str] or None
+            Sorted list of names that will be published in continuous mode,
+            or ``None`` if no filter is set (all names are published).
+        """
+        if self._published_names is None:
+            return None
+        return sorted(self._published_names)
+
+    def get_grabbed_names(self) -> Optional[list]:
+        """Return the names currently being grabbed in continuous mode.
+
+        Returns
+        -------
+        list[str] or None
+            Sorted list of names actively grabbed, or ``None`` when not in
+            continuous mode or when grabbing all names (no filter).
+        """
+        if self._grabbed_names is None:
+            return None
+        return sorted(self._grabbed_names)
+
     # def pong(self) -> str:
     #     """Heartbeat reply — called by directors to verify connectivity."""
     #     return "pong"
@@ -321,11 +363,16 @@ class PymodaqActor(Actor):
         """Called by the periodic timer: read device and publish on data channel.
 
         Override of :meth:`pyleco.actors.Actor.read_publish`.
+        Respects :attr:`_published_names`: if set to an empty set, skips publication.
         """
         if self._stop_grab_flag:
             return
+        # If _published_names is explicitly set to empty, nothing to publish.
+        if self._published_names is not None and not self._published_names:
+            return
+        names = list(self._published_names) if self._published_names is not None else None
         try:
-            dte = device.read()
+            dte = device.read(names)
         except Exception:
             logger.exception("read_publish: device.read() raised an exception")
             return
@@ -417,13 +464,38 @@ class PymodaqActor(Actor):
         except Exception:
             logger.exception("_broadcast_settings: failed to get communicator")
 
+    def _broadcast_grab_status(self) -> None:
+        """Push current continuous-grab status to all registered directors."""
+        if not self._director_registry:
+            return
+        is_continuous = self._grab_thread is not None and self._grab_thread.is_alive()
+        grabbed = self.get_grabbed_names()
+        try:
+            communicator = self.get_communicator()
+            for director_name in list(self._director_registry):
+                try:
+                    communicator.ask_rpc(
+                        receiver=director_name,
+                        method='on_grab_status',
+                        grabbed_names=grabbed,
+                        is_continuous=is_continuous,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to broadcast grab status to director '%s'.",
+                        director_name,
+                    )
+        except Exception:
+            logger.exception("_broadcast_grab_status: failed to get communicator")
+
     # ── Continuous acquisition ─────────────────────────────────────────────────
 
     def query_data_continuous(self, rate_hz: float = 0) -> None:
         """Start a continuous acquisition loop that publishes on the data channel.
 
-        Analogous to :meth:`query_data` but runs in a background thread and
-        keeps publishing until :meth:`stop_continuous` is called.
+        Idempotent: if the loop is already running a second call has no effect
+        beyond broadcasting the current grab status to all registered directors
+        (so their GUIs can mirror the state).
 
         Parameters
         ----------
@@ -433,13 +505,24 @@ class PymodaqActor(Actor):
 
         Notes
         -----
-        Calls :meth:`stop_continuous` first so that a second call safely
-        restarts the loop.  ``device.read()`` is called from a background
-        thread; avoid issuing concurrent ``query_data`` RPC calls while
-        continuous acquisition is running.
+        ``device.read()`` is called from a background thread; avoid issuing
+        concurrent ``query_data`` RPC calls while continuous acquisition is running.
+        The names published are determined by :attr:`_published_names` at the moment
+        this method is called and do not change for the lifetime of the loop.
         """
-        self.stop_continuous()              # join any previous loop first
+        if self._grab_thread is not None and self._grab_thread.is_alive():
+            # Already running — broadcast current status so the caller's GUI mirrors it.
+            logger.debug(
+                "query_data_continuous: loop already running on '%s'; broadcasting status.",
+                self.name,
+            )
+            self._broadcast_grab_status()
+            return
         self._stop_grab_flag = False
+        # Snapshot the publish filter at grab-start time.
+        self._grabbed_names = (
+            set(self._published_names) if self._published_names is not None else None
+        )
         self._grab_thread = threading.Thread(
             target=self._grab_loop,
             args=(rate_hz,),
@@ -447,25 +530,31 @@ class PymodaqActor(Actor):
             name=f"continuous-{self.name}",
         )
         self._grab_thread.start()
+        self._broadcast_grab_status()
 
     def stop_continuous(self) -> None:
-        """Stop the continuous acquisition loop started by :meth:`query_data_continuous`.
+        """Stop the continuous acquisition loop and notify registered directors.
 
-        Sets the stop flag and waits up to 2 s for the loop thread to exit.
+        Sets the stop flag, waits up to 2 s for the loop thread to exit,
+        clears the grabbed-names snapshot, and broadcasts the updated status.
         Safe to call even when no continuous acquisition is running.
         """
         self._stop_grab_flag = True
         if self._grab_thread is not None and self._grab_thread.is_alive():
             self._grab_thread.join(timeout=2.0)
         self._grab_thread = None
+        self._grabbed_names = None
+        self._broadcast_grab_status()
 
     def _grab_loop(self, rate_hz: float) -> None:
         """Background thread body for continuous acquisition."""
         interval = 1.0 / rate_hz if rate_hz > 0 else 0.0
+        # Snapshot once — the filter does not change mid-loop.
+        names = list(self._grabbed_names) if self._grabbed_names is not None else None
         while not self._stop_grab_flag:
             t0 = time.monotonic()
             try:
-                dte = self.device.read()
+                dte = self.device.read(names)
             except Exception:
                 logger.exception("_grab_loop: device.read() failed; stopping")
                 break

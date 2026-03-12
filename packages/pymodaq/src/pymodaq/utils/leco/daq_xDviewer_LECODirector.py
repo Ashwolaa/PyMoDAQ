@@ -67,6 +67,7 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         LECODirector.__init__(self, host=self.settings["host"], port=self.settings["port"])
 
         self.register_binary_rpc_methods((self.set_data,))
+        self.register_rpc_methods((self.on_grab_status,))
 
         self.client_type = "GRABBER"
         self.x_axis = None
@@ -202,11 +203,12 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         if dte is not None:
             obs_name = self.settings['observable_name'] or None
             if obs_name:
-                # Filter the DTE to only the observable this director is responsible for.
+                # Only process frames that contain our observable — drop everything else.
                 matching = [d for d in dte.data if d.name == obs_name]
-                if matching:
-                    from pymodaq_data import DataToExport as _DTE
-                    dte = _DTE(name=dte.name, data=matching)
+                if not matching:
+                    return
+                from pymodaq_data import DataToExport as _DTE
+                dte = _DTE(name=dte.name, data=matching)
             self.dte_signal.emit(dte)
             if self._live_sequential:
                 # Sequential mode: request next frame only after this one was received.
@@ -286,6 +288,27 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         self.settings.child('observable_name').setLimits(obs_names)
         if current not in obs_names:
             self.settings.child('observable_name').setValue(obs_names[0])
+
+    def on_grab_status(self, grabbed_names, is_continuous: bool) -> None:
+        """Invoked by the actor when its continuous-grab status changes.
+
+        Allows this director's GUI to mirror the grab state of the actor
+        even when the grab was initiated by a different director.
+
+        Parameters
+        ----------
+        grabbed_names:
+            List of names currently being grabbed, or ``None`` for all.
+        is_continuous:
+            ``True`` while the actor's background grab loop is running.
+        """
+        if not is_continuous:
+            # If actor stopped, also halt sequential loop on this director.
+            self._live_sequential = False
+        self.emit_status(ThreadCommand('GRAB_STATUS', {
+            'grabbed_names': grabbed_names,
+            'is_continuous': is_continuous,
+        }))
 
     def close(self) -> None:
         self.timer.stop()

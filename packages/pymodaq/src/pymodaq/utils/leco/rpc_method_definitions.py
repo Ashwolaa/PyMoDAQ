@@ -31,6 +31,7 @@ class ViewerMethods(StrEnum):
 class GenericDirectorMethods(StrEnum):
     SET_DIRECTOR_SETTINGS = "set_director_settings"
     SET_DIRECTOR_INFO = "set_director_info"
+    ON_GRAB_STATUS = "on_grab_status"
 
 
 class MoveDirectorMethods(StrEnum):
@@ -51,3 +52,6 @@ class PymodaqActorMethods(StrEnum):
     UNSUBSCRIBE_DIRECTOR = "unsubscribe_director"
     QUERY_DATA_CONTINUOUS = "query_data_continuous"
     STOP_CONTINUOUS       = "stop_continuous"
+    GET_GRABBED_NAMES    = "get_grabbed_names"
+    SET_PUBLISHED_NAMES  = "set_published_names"
+    GET_PUBLISHED_NAMES  = "get_published_names"
