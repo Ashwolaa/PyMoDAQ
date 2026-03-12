@@ -118,10 +118,13 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                     self.controller.subscribe_settings()
                 except Exception:
                     logger.warning("Timeout during subscribe_settings.")
-                # The actor publishes with its full name (namespace.component) as ZMQ topic.
-                # Subscribing to just the component name would miss the namespace prefix.
+                # Subscribe to the per-channel sub-topic: "{namespace.actor}/{obs_name}".
+                # The actor publishes each DWA to its own sub-topic so ZMQ drops
+                # frames for other channels before they reach Python.
                 _namespace = self.communicator.namespace
-                self._actor_sub_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                self._actor_full_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                obs_name = self.settings['observable_name'] or 'data'
+                self._actor_sub_name = f"{self._actor_full_name}/{obs_name}"
                 try:
                     self.listener.subscribe(self._actor_sub_name)
                 except Exception:
@@ -196,30 +199,25 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
     def _on_actor_data(self, topic: str, dte) -> None:
         """Handle data published by the PymodaqActor on the ZMQ data channel.
 
-        Receives deserialized ``DataToExport`` directly via ``data_signal``
-        (separate from ``cmd_signal`` so control commands are never blocked).
+        The director is subscribed to ``"{actor}/{observable_name}"`` so only
+        frames for this channel arrive here — no name filtering needed.
         Called when ``use_legacy_actor=False``.
         """
-        if dte is not None:
+        if dte is None:
+            return
+        self.dte_signal.emit(dte)
+        if self._live_sequential:
+            # Sequential mode: request next frame only after this one was received.
+            # Provides automatic backpressure — no frame is requested before the
+            # previous DataToExport has been delivered to the viewer.
             obs_name = self.settings['observable_name'] or None
-            if obs_name:
-                # Only process frames that contain our observable — drop everything else.
-                matching = [d for d in dte.data if d.name == obs_name]
-                if not matching:
-                    return
-                from pymodaq_data import DataToExport as _DTE
-                dte = _DTE(name=dte.name, data=matching)
-            self.dte_signal.emit(dte)
-            if self._live_sequential:
-                # Sequential mode: request next frame only after this one was received.
-                # Provides automatic backpressure — no frame is requested before the
-                # previous DataToExport has been delivered to the viewer.
-                try:
-                    obs_names = [obs_name] if obs_name else None
-                    self.controller.query_data(names=obs_names, fresh=True)
-                except Exception:
-                    logger.warning("_on_actor_data: failed to request next frame; stopping sequential grab")
-                    self._live_sequential = False
+            try:
+                self.controller.query_data(
+                    names=[obs_name] if obs_name else None, fresh=True
+                )
+            except Exception:
+                logger.warning("_on_actor_data: failed to request next frame; stopping sequential grab")
+                self._live_sequential = False
 
     def set_data(self, data: Union[dict,list, str, float, None],
                  additional_payload: Optional[list[bytes]] = None) -> None:
@@ -265,7 +263,17 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
 
     def commit_settings(self, param) -> None:
         super().commit_settings(param)
-        if param.name() == 'query_caps':
+        if param.name() == 'observable_name' and getattr(self, '_actor_full_name', None):
+            new_obs = param.value() or 'data'
+            new_topic = f"{self._actor_full_name}/{new_obs}"
+            if new_topic != self._actor_sub_name:
+                try:
+                    self.listener.unsubscribe(self._actor_sub_name)
+                    self.listener.subscribe(new_topic)
+                    self._actor_sub_name = new_topic
+                except Exception:
+                    logger.warning("Could not update ZMQ subscription for observable change.")
+        elif param.name() == 'query_caps':
             self._query_and_apply_capabilities()
 
     def _query_and_apply_capabilities(self) -> None:

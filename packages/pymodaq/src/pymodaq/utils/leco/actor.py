@@ -45,6 +45,8 @@ from pyleco.core import PROXY_RECEIVING_PORT
 from pyleco.core.serialization import generate_conversation_id
 from pyleco.utils.data_publisher import DataPublisher
 
+from pymodaq_data import DataToExport
+
 from pymodaq.control_modules.capabilities import Capabilities, infer_capabilities
 
 logger = logging.getLogger(__name__)
@@ -245,12 +247,14 @@ class PymodaqActor(Actor):
         if isinstance(name, dict):
             for k, v in name.items():
                 self.device.write(k, v)
+            written_names = list(name.keys())
         else:
             self.device.write(name, value)
-        # Immediately publish the updated state so directors receive a ZMQ
-        # update without waiting for the next get_actuator_value polling cycle.
+            written_names = [name]
+        # Publish only the written channel(s) so unrelated directors are not
+        # disturbed (e.g. a stage move must not push a spectrum frame to the viewer).
         try:
-            return self.query_data(names=None, fresh=True)
+            return self.query_data(names=written_names, fresh=True)
         except Exception:
             logger.exception("change_to: auto-publish failed")
             return None
@@ -383,12 +387,16 @@ class PymodaqActor(Actor):
     # ── Internal helpers ───────────────────────────────────────────────────────
 
     def _publish(self, dte) -> Optional[str]:
-        """Serialize *dte* and publish it on the LECO data channel.
+        """Serialize *dte* and publish each channel on its own sub-topic.
 
-        When per-channel proxy overrides are configured the :class:`DataToExport`
-        is split by channel name: each ``DataWithAxes`` is routed to the publisher
-        whose proxy was selected for that channel in the actor GUI.  Channels
-        with no override go to the default publisher.
+        Each :class:`DataWithAxes` in *dte* is wrapped in a single-DWA
+        :class:`DataToExport` and published to ``"{actor_name}/{dwa.name}"``.
+        Directors subscribe to their specific channel topic so the ZMQ broker
+        drops irrelevant frames before they reach Python.
+
+        When per-channel proxy overrides are configured, each ``DataWithAxes``
+        is routed to the publisher whose proxy was selected for that channel in
+        the actor GUI; channels with no override go to the default publisher.
 
         Returns
         -------
@@ -403,35 +411,20 @@ class PymodaqActor(Actor):
             factory = SerializableFactory()
             cid = generate_conversation_id()
 
-            if not self._channel_proxy_keys:
-                # Fast path: single publisher for the whole DTE.
-                payload: bytes = factory.get_apply_serializer(dte)
-                self.publisher.send_data(data=payload, conversation_id=cid)
-                return cid.hex()
-
-            # Per-channel routing: split DTE by proxy endpoint.
-            from pymodaq.utils.data import DataToExport
-            default_dwas = []
-            routed: dict[tuple[str, int], list] = {}
+            # Publish each DWA to its own sub-topic: "{actor_name}/{dwa.name}".
+            # Directors subscribe to the per-channel topic so ZMQ drops irrelevant
+            # frames before they reach Python — no name filtering needed at the director.
+            # One conversation_id is shared across all DWAs in this call so callers can
+            # correlate the RPC return value with the matching ZMQ frames.
             for dwa in dte.data:
+                sub_dte = DataToExport(name=dwa.name, data=[dwa])
+                payload: bytes = factory.get_apply_serializer(sub_dte)
+                topic = f"{self.name}/{dwa.name}"
+                # Route to per-channel proxy publisher if configured, else default.
                 key = self._channel_proxy_keys.get(dwa.name)
-                if key is not None:
-                    routed.setdefault(key, []).append(dwa)
-                else:
-                    default_dwas.append(dwa)
-
-            if default_dwas:
-                sub_dte = DataToExport(name=dte.name, data=default_dwas)
-                self.publisher.send_data(
-                    data=factory.get_apply_serializer(sub_dte), conversation_id=cid
-                )
-            for key, dwas in routed.items():
-                pub = self._extra_publishers.get(key)
-                if pub is None:
-                    continue
-                sub_dte = DataToExport(name=dte.name, data=dwas)
-                pub.send_data(
-                    data=factory.get_apply_serializer(sub_dte), conversation_id=cid
+                pub = self._extra_publishers.get(key) if key is not None else None
+                (pub or self.publisher).send_data(
+                    data=payload, topic=topic, conversation_id=cid
                 )
             return cid.hex()
         except Exception:

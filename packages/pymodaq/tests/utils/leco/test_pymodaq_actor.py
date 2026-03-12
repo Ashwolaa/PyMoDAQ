@@ -149,7 +149,15 @@ class _MockDeviceWithCapabilities:
 
     def read(self, names=None):
         from pymodaq_data.data import DataToExport, DataRaw
-        return DataToExport(name='e', data=[DataRaw('spectrum', data=[np.zeros(2048)])])
+        all_data = {
+            'spectrum':   DataRaw('spectrum',   data=[np.zeros(2048)]),
+            'wavelength': DataRaw('wavelength', data=[np.array([500.0])]),
+        }
+        if names is not None:
+            data = [all_data[n] for n in names if n in all_data]
+        else:
+            data = list(all_data.values())
+        return DataToExport(name='e', data=data)
 
     def write(self, name, value):
         pass
@@ -706,3 +714,90 @@ class TestReadPublish:
             raise RuntimeError("hardware exploded")
         viewer_actor.device.read = bad_read
         viewer_actor.read_publish(viewer_actor.device, viewer_actor.publisher)  # must not raise
+
+
+# ── Helpers for sub-topic inspection ──────────────────────────────────────────
+
+def _sent_topics(actor) -> list[str]:
+    """Return the ZMQ topic (first frame, decoded) for every publish call made."""
+    topics = []
+    for frame_list in actor.publisher.socket._s:
+        if frame_list:
+            first = frame_list[0]
+            topics.append(first.decode() if isinstance(first, bytes) else str(first))
+    return topics
+
+
+def _sent_payloads(actor):
+    """Return deserialized DataToExport objects from all publish calls."""
+    from serializall import SerializableFactory
+    factory = SerializableFactory()
+    payloads = []
+    for frame_list in actor.publisher.socket._s:
+        if len(frame_list) >= 3:
+            payloads.append(factory.get_apply_deserializer(frame_list[2]))
+    return payloads
+
+
+class TestSubTopicPublish:
+    """B1 — actor publishes each DWA to its own sub-topic."""
+
+    def test_single_dwa_published_to_subtopic(self, viewer_actor):
+        """`query_data` on a single-DWA device sends to '{name}/spectrum'."""
+        viewer_actor.query_data(fresh=True)
+        topics = _sent_topics(viewer_actor)
+        assert any(t == f"{viewer_actor.name}/spectrum" for t in topics)
+
+    def test_each_dwa_gets_own_subtopic(self, caps_actor):
+        """A device with two DWAs (spectrum + wavelength) sends two frames on distinct topics."""
+        # caps_actor device has read() returning spectrum + wavelength
+        before = len(caps_actor.publisher.socket._s)
+        caps_actor.query_data(fresh=True)
+        new_frames = caps_actor.publisher.socket._s[before:]
+        topics = [f[0].decode() if isinstance(f[0], bytes) else f[0] for f in new_frames]
+        assert f"{caps_actor.name}/spectrum" in topics
+        assert f"{caps_actor.name}/wavelength" in topics
+
+    def test_published_payload_is_single_dwa_dte(self, viewer_actor):
+        """Each frame payload deserializes to a DataToExport with exactly one DWA."""
+        viewer_actor.query_data(fresh=True)
+        payloads = _sent_payloads(viewer_actor)
+        assert payloads, "Expected at least one published frame"
+        for dte in payloads:
+            assert len(dte.data) == 1
+
+    def test_subtopic_dwa_name_matches_topic(self, viewer_actor):
+        """The DWA name inside the payload matches the sub-topic channel name."""
+        viewer_actor.query_data(fresh=True)
+        for frame_list in viewer_actor.publisher.socket._s:
+            topic = frame_list[0].decode() if isinstance(frame_list[0], bytes) else frame_list[0]
+            channel = topic.split('/')[-1]
+            from serializall import SerializableFactory
+            dte = SerializableFactory().get_apply_deserializer(frame_list[2])
+            assert dte.data[0].name == channel
+
+    def test_change_to_only_publishes_written_channel(self, caps_actor):
+        """change_to('wavelength', 500) must publish only topic/wavelength, not topic/spectrum."""
+        before = len(caps_actor.publisher.socket._s)
+        caps_actor.change_to('wavelength', 500.0)
+        new_frames = caps_actor.publisher.socket._s[before:]
+        topics = [f[0].decode() if isinstance(f[0], bytes) else f[0] for f in new_frames]
+        assert all('wavelength' in t for t in topics), (
+            f"Expected only wavelength topic; got {topics}"
+        )
+        assert not any('spectrum' in t for t in topics)
+
+    def test_change_to_dict_publishes_only_written_channels(self, caps_actor):
+        """Dict form of change_to publishes exactly the keys in the dict."""
+        before = len(caps_actor.publisher.socket._s)
+        caps_actor.change_to({'wavelength': 500.0})
+        new_frames = caps_actor.publisher.socket._s[before:]
+        topics = [f[0].decode() if isinstance(f[0], bytes) else f[0] for f in new_frames]
+        assert all('wavelength' in t for t in topics)
+        assert not any('spectrum' in t for t in topics)
+
+    def test_no_flat_topic_published(self, viewer_actor):
+        """The flat '{actor_name}' topic (without sub-channel) is never published."""
+        viewer_actor.query_data(fresh=True)
+        topics = _sent_topics(viewer_actor)
+        assert not any(t == viewer_actor.name for t in topics)

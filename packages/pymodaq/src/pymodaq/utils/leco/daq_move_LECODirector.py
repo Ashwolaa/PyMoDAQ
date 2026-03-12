@@ -136,10 +136,13 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                     self.controller.subscribe_settings()
                 except Exception:
                     logger.warning("Timeout during subscribe_settings.")
-                # The actor publishes with its full name (namespace.component) as ZMQ topic.
-                # Subscribing to just the component name would miss the namespace prefix.
+                # Subscribe to the per-channel sub-topic: "{namespace.actor}/{var_name}".
+                # The actor publishes each DWA to its own sub-topic so ZMQ drops
+                # frames for other channels before they reach Python.
                 _namespace = self.communicator.namespace
-                self._actor_sub_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                self._actor_full_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                var_name = self.settings['variable_name'] or 'position'
+                self._actor_sub_name = f"{self._actor_full_name}/{var_name}"
                 try:
                     self.listener.subscribe(self._actor_sub_name)
                 except Exception:
@@ -221,19 +224,14 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
     def _on_actor_data(self, topic: str, dte) -> None:
         """Handle data published by the PymodaqActor on the ZMQ data channel.
 
-        Receives deserialized ``DataToExport`` directly via ``data_signal``
-        (separate from ``cmd_signal`` so control commands are never blocked).
-        Extracts the position and forwards it to the GUI via ``emit_status``.
+        The director is subscribed to ``"{actor}/{variable_name}"`` so only
+        frames for this channel arrive here — no name filtering needed.
         Called when ``use_legacy_actor=False``.
         """
         if dte is None:
             return
         try:
-            var_name = self.settings['variable_name'] or 'position'
-            # Only process frames that contain our variable — drop everything else.
-            dwa = next((d for d in dte.data if d.name == var_name), None)
-            if dwa is None:
-                return
+            dwa = dte.data[0]   # sub-topic DTE always carries exactly one DWA
             pos_val = float(dwa.data[0].ravel()[0])
             pos = DataActuator(data=[np.atleast_1d(np.array([pos_val]))])
             pos = self.get_position_with_scaling(pos)
@@ -290,6 +288,18 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         self.axis_unit = self.settings['settings_client', 'units']
 
     # ── Capability refresh ─────────────────────────────────────────────────────
+
+    def value_changed(self, param) -> None:
+        if param.name() == 'variable_name' and getattr(self, '_actor_full_name', None):
+            new_var = param.value() or 'position'
+            new_topic = f"{self._actor_full_name}/{new_var}"
+            if new_topic != self._actor_sub_name:
+                try:
+                    self.listener.unsubscribe(self._actor_sub_name)
+                    self.listener.subscribe(new_topic)
+                    self._actor_sub_name = new_topic
+                except Exception:
+                    logger.warning("Could not update ZMQ subscription for variable change.")
 
     def commit_leco_settings(self, param) -> None:
         super().commit_leco_settings(param)
