@@ -86,6 +86,10 @@ _load_module_from_path(
     'pymodaq.utils.leco.hardware_registry',
     _SRC / 'pymodaq' / 'utils' / 'leco' / 'hardware_registry.py',
 )
+_load_module_from_path(
+    'pymodaq.utils.leco.leco_manager',
+    _SRC / 'pymodaq' / 'utils' / 'leco' / 'leco_manager.py',
+)
 
 # ── Step 3: stubs for actor_gui.py dependencies ───────────────────────────────
 # Stub qtpy so actor_gui.py can be imported even when no Qt backend is installed.
@@ -387,33 +391,48 @@ class _QMetaObject:
         getattr(obj, method_name)()
 
 
+def _make_qt_stub(name):
+    """Return a minimal class stub for a Qt widget/layout/dialog."""
+    return type(name, (), {
+        '__init__': lambda self, *a, **k: None,
+        '__getattr__': lambda self, n: MagicMock(),
+        'Accepted': 1,
+        'Ok': 0x00000400,
+        'Cancel': 0x00400000,
+    })
+
+
 class _QtWidgets:
-    QWidget = type('QWidget', (), {
-        '__init__': lambda self, *a, **k: None,
-    })
-    QVBoxLayout = type('QVBoxLayout', (), {
-        '__init__': lambda self, *a, **k: None,
-        'addWidget': lambda self, *a, **k: None,
-        'addSpacing': lambda self, *a, **k: None,
-        'addStretch': lambda self, *a, **k: None,
-        'setContentsMargins': lambda self, *a, **k: None,
-    })
-    QHBoxLayout = _QVBoxLayout = type('QHBoxLayout', (), {
-        '__init__': lambda self, *a, **k: None,
-        'addWidget': lambda self, *a, **k: None,
-        'addSpacing': lambda self, *a, **k: None,
-        'addStretch': lambda self, *a, **k: None,
-        'setContentsMargins': lambda self, *a, **k: None,
-    })
-    QLabel = type('QLabel', (), {
-        '__init__': lambda self, *a, **k: None,
-    })
+    QWidget = _make_qt_stub('QWidget')
+    QVBoxLayout = _make_qt_stub('QVBoxLayout')
+    QHBoxLayout = _make_qt_stub('QHBoxLayout')
+    QLabel = _make_qt_stub('QLabel')
+    QDialog = _make_qt_stub('QDialog')
+    QDialogButtonBox = _make_qt_stub('QDialogButtonBox')
+    QFormLayout = _make_qt_stub('QFormLayout')
+    QGroupBox = _make_qt_stub('QGroupBox')
+    QHeaderView = _make_qt_stub('QHeaderView')
+    QLineEdit = _make_qt_stub('QLineEdit')
+    QMessageBox = _make_qt_stub('QMessageBox')
+    QPushButton = _make_qt_stub('QPushButton')
+    QSpinBox = _make_qt_stub('QSpinBox')
+    QTreeWidget = _make_qt_stub('QTreeWidget')
+    QTreeWidgetItem = _make_qt_stub('QTreeWidgetItem')
+    QApplication = _make_qt_stub('QApplication')
 
 
 if 'qtpy' not in sys.modules:
     _qtpy_mod = types.ModuleType('qtpy')
     _qtpy_mod.QtWidgets = _QtWidgets()
     sys.modules['qtpy'] = _qtpy_mod
+
+if 'qtpy.QtGui' not in sys.modules:
+    _qtgui_mod = types.ModuleType('qtpy.QtGui')
+    _qtgui_mod.QColor = type('QColor', (), {
+        '__init__': lambda self, *a, **k: None,
+        '__eq__': lambda self, other: self is other,
+    })
+    sys.modules['qtpy.QtGui'] = _qtgui_mod
 
 if 'qtpy.QtCore' not in sys.modules:
     _qtcore_mod = types.ModuleType('qtpy.QtCore')
@@ -424,13 +443,18 @@ if 'qtpy.QtCore' not in sys.modules:
     _qtcore_mod.Slot = _Slot
     _qtcore_mod.Qt = _Qt
     _qtcore_mod.QCoreApplication = MagicMock()
+    _qtcore_mod.QTimer = MagicMock()
     sys.modules['qtpy.QtCore'] = _qtcore_mod
 
 if 'pyleco.core' not in sys.modules:
     _stub_module_with('pyleco.core', COORDINATOR_PORT=6666, PROXY_RECEIVING_PORT=11100)
 
-# ── Step 4: load actor_gui.py ─────────────────────────────────────────────────
+# ── Step 4: load actor_gui.py and manager_gui.py ──────────────────────────────
 _load_module_from_path(
     'pymodaq.utils.leco.actor_gui',
     _SRC / 'pymodaq' / 'utils' / 'leco' / 'actor_gui.py',
+)
+_load_module_from_path(
+    'pymodaq.utils.leco.manager_gui',
+    _SRC / 'pymodaq' / 'utils' / 'leco' / 'manager_gui.py',
 )

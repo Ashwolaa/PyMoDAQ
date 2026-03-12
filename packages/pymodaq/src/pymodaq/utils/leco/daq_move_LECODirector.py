@@ -136,11 +136,19 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                     self.controller.subscribe_settings()
                 except Exception:
                     logger.warning("Timeout during subscribe_settings.")
-                # Subscribe to the per-channel sub-topic: "{namespace.actor}/{var_name}".
-                # The actor publishes each DWA to its own sub-topic so ZMQ drops
-                # frames for other channels before they reach Python.
-                _namespace = self.communicator.namespace
-                self._actor_full_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                # Subscribe to the per-channel sub-topic: "{actor_pub_topic}/{var_name}".
+                # Ask the actor directly for its publisher.full_name to avoid a
+                # race condition where the director's own sign-in (and thus namespace)
+                # may not have completed yet when ini_stage is called.
+                try:
+                    self._actor_full_name = self.controller.get_actor_pub_topic()
+                except Exception:
+                    _namespace = self.communicator.namespace
+                    self._actor_full_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                    logger.warning(
+                        "Could not fetch actor pub topic via RPC; "
+                        "falling back to '%s'.", self._actor_full_name
+                    )
                 var_name = self.settings['variable_name'] or 'position'
                 self._actor_sub_name = f"{self._actor_full_name}/{var_name}"
                 try:

@@ -135,6 +135,15 @@ class PymodaqDirector(GenericDirector):
         """Return the names currently being grabbed by the actor in continuous mode."""
         return self.ask_rpc(PymodaqActorMethods.GET_GRABBED_NAMES)
 
+    def get_actor_pub_topic(self) -> str:
+        """Return the ZMQ publish topic base used by the actor.
+
+        Use this during init to obtain the exact ZMQ subscription prefix
+        instead of guessing from the coordinator namespace, which avoids a
+        race condition where the director's own sign-in has not yet completed.
+        """
+        return self.ask_rpc(PymodaqActorMethods.GET_ACTOR_PUB_TOPIC)
+
     def set_published_names(self, names: Optional[list]) -> None:
         """Configure which names the actor publishes in continuous mode."""
         self.ask_rpc(PymodaqActorMethods.SET_PUBLISHED_NAMES, names=names)

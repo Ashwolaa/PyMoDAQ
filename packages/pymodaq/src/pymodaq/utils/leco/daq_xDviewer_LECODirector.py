@@ -77,6 +77,8 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         self.ind_data = 0
         self.data_mock = None
         self._live_sequential: bool = False  # True only during sequential live grab
+        self._accepting_data: bool = False   # gate: True only while a grab is active
+        self._live_grab: bool = False        # True when grab_data(live=True) was called
         self.start_timer()
         # Connect ZMQ data-channel messages (new actor path) to local handler.
         # data_signal is dedicated to ZMQ frames so high-rate data never blocks
@@ -118,11 +120,19 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                     self.controller.subscribe_settings()
                 except Exception:
                     logger.warning("Timeout during subscribe_settings.")
-                # Subscribe to the per-channel sub-topic: "{namespace.actor}/{obs_name}".
-                # The actor publishes each DWA to its own sub-topic so ZMQ drops
-                # frames for other channels before they reach Python.
-                _namespace = self.communicator.namespace
-                self._actor_full_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                # Subscribe to the per-channel sub-topic: "{actor_pub_topic}/{obs_name}".
+                # Ask the actor directly for its publisher.full_name to avoid a
+                # race condition where the director's own sign-in (and thus namespace)
+                # may not have completed yet when ini_detector is called.
+                try:
+                    self._actor_full_name = self.controller.get_actor_pub_topic()
+                except Exception:
+                    _namespace = self.communicator.namespace
+                    self._actor_full_name = f"{_namespace}.{actor_name}" if _namespace else actor_name
+                    logger.warning(
+                        "Could not fetch actor pub topic via RPC; "
+                        "falling back to '%s'.", self._actor_full_name
+                    )
                 obs_name = self.settings['observable_name'] or 'data'
                 self._actor_sub_name = f"{self._actor_full_name}/{obs_name}"
                 try:
@@ -130,10 +140,13 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                 except Exception:
                     logger.warning("Could not subscribe to actor ZMQ data channel.")
                 # Request initial frame so the display is populated on startup.
+                # Open the gate for one snap so the first frame is not dropped.
+                self._accepting_data = True
                 try:
                     obs_name = self.settings['observable_name'] or None
                     self.controller.query_data(names=[obs_name] if obs_name else None, fresh=True)
                 except Exception:
+                    self._accepting_data = False
                     logger.warning("Could not request initial data from actor.")
         else:
             self.controller = controller
@@ -160,15 +173,18 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
 
         self.ind_grabbed = 0  # to keep track of the current image in the average
         self.Naverage = Naverage
+        live = kwargs.get('live', False)
+        self._accepting_data = True
+        self._live_grab = bool(live)
         if self.settings['use_legacy_actor']:
-            if kwargs.get('live', False):
+            if live:
                 self.controller.send_data_grab()
             else:
                 self.controller.send_data_snap()
         else:
             obs_name = self.settings['observable_name'] or None
             obs_names = [obs_name] if obs_name else None
-            if kwargs.get('live', False):
+            if live:
                 if self.settings['live_mode'] == 'continuous':
                     # Actor background thread streams frames at the configured rate.
                     # Director receives passively via ZMQ subscription.
@@ -186,7 +202,9 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
 
     def stop(self):
         """Stop grabbing."""
-        self._live_sequential = False          # halt sequential loop regardless of mode
+        self._accepting_data = False
+        self._live_sequential = False
+        self._live_grab = False
         if self.settings['use_legacy_actor']:
             self.controller.stop_grab()
         else:
@@ -201,9 +219,12 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
 
         The director is subscribed to ``"{actor}/{observable_name}"`` so only
         frames for this channel arrive here — no name filtering needed.
+        The ``_accepting_data`` gate prevents processing spurious frames from
+        the actor's periodic timer when no grab is active (idle state) and
+        after a snap has been consumed.
         Called when ``use_legacy_actor=False``.
         """
-        if dte is None:
+        if not self._accepting_data or dte is None:
             return
         self.dte_signal.emit(dte)
         if self._live_sequential:
@@ -218,6 +239,9 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
             except Exception:
                 logger.warning("_on_actor_data: failed to request next frame; stopping sequential grab")
                 self._live_sequential = False
+        elif not self._live_grab:
+            # Snap mode: one frame consumed — go idle until next grab_data() call.
+            self._accepting_data = False
 
     def set_data(self, data: Union[dict,list, str, float, None],
                  additional_payload: Optional[list[bytes]] = None) -> None:
@@ -301,7 +325,9 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         """Invoked by the actor when its continuous-grab status changes.
 
         Allows this director's GUI to mirror the grab state of the actor
-        even when the grab was initiated by a different director.
+        even when the grab was initiated by a different director.  Opens or
+        closes the ``_accepting_data`` gate so frames flow while a remote grab
+        is active and stop when it ends.
 
         Parameters
         ----------
@@ -310,9 +336,13 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         is_continuous:
             ``True`` while the actor's background grab loop is running.
         """
-        if not is_continuous:
-            # If actor stopped, also halt sequential loop on this director.
+        if is_continuous:
+            self._accepting_data = True
+            self._live_grab = True
+        else:
+            self._accepting_data = False
             self._live_sequential = False
+            self._live_grab = False
         self.emit_status(ThreadCommand('GRAB_STATUS', {
             'grabbed_names': grabbed_names,
             'is_continuous': is_continuous,

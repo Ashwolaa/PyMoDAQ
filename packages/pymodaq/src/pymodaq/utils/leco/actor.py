@@ -166,6 +166,7 @@ class PymodaqActor(Actor):
         # Introspection
         self.register_rpc_method(self.get_capabilities)
         self.register_rpc_method(self.get_pymodaq_settings)
+        self.register_rpc_method(self.get_actor_pub_topic)
         self.register_rpc_method(self.set_info)
         self.register_rpc_method(self.subscribe_director)
         self.register_rpc_method(self.unsubscribe_director)
@@ -174,6 +175,10 @@ class PymodaqActor(Actor):
         self.register_rpc_method(self.set_published_names)
         self.register_rpc_method(self.get_published_names)
         self.register_rpc_method(self.get_grabbed_names)
+
+        # Manager introspection
+        self.register_rpc_method(self.get_role)
+        self.register_rpc_method(self.shutdown)
 
         # # Heartbeat — used by directors to check connectivity
         # self.register_rpc_method(self.pong)
@@ -251,10 +256,11 @@ class PymodaqActor(Actor):
         else:
             self.device.write(name, value)
             written_names = [name]
-        # Publish only the written channel(s) so unrelated directors are not
-        # disturbed (e.g. a stage move must not push a spectrum frame to the viewer).
+        # Re-read all channels so every subscribed director gets a fresh value.
+        # Sub-topic routing ensures each director only receives the channel it
+        # subscribed to — no need to narrow the read to written_names.
         try:
-            return self.query_data(names=written_names, fresh=True)
+            return self.query_data(names=None, fresh=True)
         except Exception:
             logger.exception("change_to: auto-publish failed")
             return None
@@ -283,6 +289,68 @@ class PymodaqActor(Actor):
                 return result.decode()
             return result
         return None
+
+    def get_actor_pub_topic(self) -> str:
+        """Return the ZMQ publish topic base used by this actor.
+
+        Directors call this during ``ini_stage`` / ``ini_detector`` to
+        obtain the exact topic prefix to subscribe to, instead of guessing
+        the namespace-qualified name from the coordinator name.
+
+        Returns
+        -------
+        str
+            ``publisher.full_name`` — e.g. ``'localhost.stage'`` after sign-in.
+        """
+        return self.publisher.full_name
+
+    def get_role(self) -> dict:
+        """Return role and bind address for network manager discovery.
+
+        Returns
+        -------
+        dict
+            ``{"role": "actor", "host": <bind-address>}`` where ``host`` is the
+            publisher's ``full_name`` (e.g. ``"localhost.stage"``).  A plain
+            dict is returned so the response remains forward-compatible.
+        """
+        return {"role": "actor", "host": self.publisher.full_name}
+
+    def shutdown(self) -> None:
+        """Stop continuous acquisition, disconnect all directors, close device.
+
+        Called by the LECO Network Manager to cleanly remove a stale or unwanted
+        actor.  After this call the actor's listen loop will exit on the next tick
+        (the stop-event is set) and the component will unregister from the
+        coordinator.
+        """
+        # Stop any running continuous grab.
+        self._stop_grab_flag = True
+        if self._grab_thread is not None and self._grab_thread.is_alive():
+            self._grab_thread.join(timeout=2.0)
+        self._grab_thread = None
+        self._grabbed_names = None
+
+        # Notify registered directors that the actor is going away.
+        for director_name in list(self._director_registry):
+            try:
+                communicator = self.get_communicator()
+                communicator.ask_rpc(
+                    receiver=director_name,
+                    method='disconnect',
+                )
+            except Exception:
+                logger.debug("shutdown: could not notify director '%s'", director_name)
+        self._director_registry.clear()
+
+        # Signal the listen loop to exit.
+        try:
+            stop_event = getattr(self, '_stop_event', None)
+            if stop_event is not None:
+                stop_event.set()
+        except Exception:
+            pass
+        logger.info("Actor '%s' shutdown complete.", self.name)
 
     def set_info(self, path: str, value: Any) -> None:
         """Update a setting on the device and broadcast to registered directors.
@@ -416,15 +484,21 @@ class PymodaqActor(Actor):
             # frames before they reach Python — no name filtering needed at the director.
             # One conversation_id is shared across all DWAs in this call so callers can
             # correlate the RPC return value with the matching ZMQ frames.
+            # Use publisher.full_name (not self.name) as the base topic — pyleco
+            # calls publisher.set_full_name('namespace.name') after coordinator
+            # sign-in, so this stays in sync with what directors subscribe to.
+            base_topic = self.publisher.full_name
             for dwa in dte.data:
                 sub_dte = DataToExport(name=dwa.name, data=[dwa])
                 payload: bytes = factory.get_apply_serializer(sub_dte)
-                topic = f"{self.name}/{dwa.name}"
+                topic = f"{base_topic}/{dwa.name}"
                 # Route to per-channel proxy publisher if configured, else default.
+                # Extra publishers use the same base_topic — they differ only in
+                # which proxy endpoint (host:port) they connect to.
                 key = self._channel_proxy_keys.get(dwa.name)
                 pub = self._extra_publishers.get(key) if key is not None else None
                 (pub or self.publisher).send_data(
-                    data=payload, topic=topic, conversation_id=cid
+                    data=payload, topic=topic, conversation_id=cid,
                 )
             return cid.hex()
         except Exception:

@@ -381,9 +381,14 @@ def _self_test() -> None:
     assert actor.device._position == 42.0, 'write failed'
 
     handle_request_message(actor, 'query_data', names=None, fresh=True)
-    payload = actor.publisher.socket._s[-1][2]
-    dte = SerializableFactory().get_apply_deserializer(payload)
-    assert dte.name == 'stage'
+    # _publish now sends one frame per DWA on sub-topic "{full_name}/{dwa_name}".
+    # Find the frame for the 'position' channel.
+    pos_frame = next(
+        f for f in actor.publisher.socket._s
+        if (f[0].decode() if isinstance(f[0], bytes) else f[0]).endswith('/position')
+    )
+    dte = SerializableFactory().get_apply_deserializer(pos_frame[2])
+    assert dte.data[0].name == 'position', f'unexpected DWA name: {dte.data[0].name}'
     val = float(dte.data[0].data[0].ravel()[0])
     assert val == 42.0, f'expected 42.0 got {val}'
     print('  MockStageDevice: change_to + query_data  ✓')
@@ -398,10 +403,14 @@ def _self_test() -> None:
     actor2.connect()
 
     handle_request_message(actor2, 'query_data', names=None, fresh=True)
-    payload2 = actor2.publisher.socket._s[-1][2]
-    dte2 = SerializableFactory().get_apply_deserializer(payload2)
-    assert dte2.name == 'camera'
-    assert dte2.data[0].data[0].shape == (64, 64)
+    # Find the frame for the 'frame' channel.
+    frame_frame = next(
+        f for f in actor2.publisher.socket._s
+        if (f[0].decode() if isinstance(f[0], bytes) else f[0]).endswith('/frame')
+    )
+    dte2 = SerializableFactory().get_apply_deserializer(frame_frame[2])
+    assert dte2.data[0].name == 'frame'
+    assert dte2.data[0].data[0].shape == MockCameraDevice.shape
     print('  MockCameraDevice: query_data + shape check  ✓')
 
     handle_request_message(actor2, 'get_capabilities')

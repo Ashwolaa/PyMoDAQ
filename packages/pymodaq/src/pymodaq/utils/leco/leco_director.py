@@ -1,6 +1,7 @@
 
 import logging
 import random
+import socket
 
 from pyleco.core import COORDINATOR_PORT
 from pymodaq_utils.enums import StrEnum
@@ -88,7 +89,10 @@ class LECODirector:
         #registering rpc methods common to all Directors
         self.register_rpc_methods((
             self.set_director_settings,
+            self.get_role,
         ))
+        # Register disconnect under the canonical name expected by the actor's shutdown().
+        self.communicator.register_rpc_method(method=self.disconnect_rpc, name='disconnect')
         self.register_binary_rpc_methods((
             self.set_director_info,
         ))
@@ -186,3 +190,23 @@ class LECODirector:
         GenericDirectorMethods.SET_DIRECTOR_INFO  # defined here
         params = ioxml.XML_string_to_parameter(settings)
         self.settings.child('settings_client').addChildren(params)
+
+    def get_role(self) -> dict:
+        """Return role and host for LECO Network Manager discovery.
+
+        Returns
+        -------
+        dict
+            ``{"role": "director", "host": <hostname>}``.
+        """
+        return {"role": "director", "host": socket.gethostname()}
+
+    def disconnect_rpc(self) -> None:
+        """RPC handler called by the actor (or manager) to request clean disconnection.
+
+        Registered under the name ``'disconnect'`` so the actor's ``shutdown()``
+        can notify directors before exiting.
+        Delegates to :meth:`close` which unsubscribes and stops the listener.
+        """
+        logger.info("Director '%s' received disconnect request.", self.listener.name)
+        self.close()

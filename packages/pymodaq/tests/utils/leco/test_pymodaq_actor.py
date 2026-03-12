@@ -289,6 +289,8 @@ class TestRpcMethodsRegistered:
         'subscribe_director', 'unsubscribe_director',
         'query_data_continuous', 'stop_continuous',
         'set_published_names', 'get_published_names', 'get_grabbed_names',
+        # Phase 0 — manager introspection
+        'get_role', 'shutdown',
         # Legacy aliases
         'grab', 'snap', 'get_actuator_value',
         'move_abs', 'move_rel', 'move_home',
@@ -776,28 +778,111 @@ class TestSubTopicPublish:
             dte = SerializableFactory().get_apply_deserializer(frame_list[2])
             assert dte.data[0].name == channel
 
-    def test_change_to_only_publishes_written_channel(self, caps_actor):
-        """change_to('wavelength', 500) must publish only topic/wavelength, not topic/spectrum."""
+    def test_change_to_publishes_all_channels(self, caps_actor):
+        """change_to re-reads all channels so every subscribed director gets a fresh value.
+
+        Sub-topic routing ensures each director only receives the channel it subscribed to,
+        so publishing all channels is safe — directors see only their channel.
+        """
         before = len(caps_actor.publisher.socket._s)
         caps_actor.change_to('wavelength', 500.0)
         new_frames = caps_actor.publisher.socket._s[before:]
         topics = [f[0].decode() if isinstance(f[0], bytes) else f[0] for f in new_frames]
-        assert all('wavelength' in t for t in topics), (
-            f"Expected only wavelength topic; got {topics}"
-        )
-        assert not any('spectrum' in t for t in topics)
+        # Both channels published (read all, route by sub-topic)
+        assert any('wavelength' in t for t in topics), f"wavelength not published; got {topics}"
+        assert any('spectrum' in t for t in topics), f"spectrum not published; got {topics}"
 
-    def test_change_to_dict_publishes_only_written_channels(self, caps_actor):
-        """Dict form of change_to publishes exactly the keys in the dict."""
+    def test_change_to_dict_publishes_all_channels(self, caps_actor):
+        """Dict form of change_to also publishes all channels (same as str form)."""
         before = len(caps_actor.publisher.socket._s)
         caps_actor.change_to({'wavelength': 500.0})
         new_frames = caps_actor.publisher.socket._s[before:]
         topics = [f[0].decode() if isinstance(f[0], bytes) else f[0] for f in new_frames]
-        assert all('wavelength' in t for t in topics)
-        assert not any('spectrum' in t for t in topics)
+        assert any('wavelength' in t for t in topics)
+        assert any('spectrum' in t for t in topics)
 
     def test_no_flat_topic_published(self, viewer_actor):
         """The flat '{actor_name}' topic (without sub-channel) is never published."""
         viewer_actor.query_data(fresh=True)
         topics = _sent_topics(viewer_actor)
         assert not any(t == viewer_actor.name for t in topics)
+
+
+# ── Phase 0: get_role / shutdown ───────────────────────────────────────────────
+
+class TestGetRole:
+    """Phase 0 — get_role() RPC returns the expected role dict."""
+
+    def test_get_role_returns_dict(self, viewer_actor):
+        result = viewer_actor.get_role()
+        assert isinstance(result, dict)
+
+    def test_get_role_role_field_is_actor(self, viewer_actor):
+        result = viewer_actor.get_role()
+        assert result['role'] == 'actor'
+
+    def test_get_role_host_field_present(self, viewer_actor):
+        result = viewer_actor.get_role()
+        assert 'host' in result
+
+    def test_get_role_host_matches_publisher_full_name(self, viewer_actor):
+        result = viewer_actor.get_role()
+        assert result['host'] == viewer_actor.publisher.full_name
+
+    def test_get_role_registered_as_rpc_method(self):
+        actor = PymodaqActor(
+            name='probe_role',
+            device_class=_MockViewerDevice,
+            context=FakeContext(),
+        )
+        actor.connect()
+        import json
+        discover = actor.rpc_handler.rpc.process_request(
+            '{"jsonrpc":"2.0","id":1,"method":"rpc.discover"}'
+        )
+        method_names = [m['name'] for m in json.loads(discover)['result']['methods']]
+        assert 'get_role' in method_names
+
+
+class TestShutdown:
+    """Phase 0 — shutdown() stops grab, clears directors, sets stop event."""
+
+    def test_shutdown_stops_continuous_grab(self, viewer_actor):
+        viewer_actor.query_data_continuous(rate_hz=10)
+        assert viewer_actor._grab_thread is not None
+        viewer_actor.shutdown()
+        assert viewer_actor._grab_thread is None
+
+    def test_shutdown_sets_stop_grab_flag(self, viewer_actor):
+        viewer_actor.shutdown()
+        assert viewer_actor._stop_grab_flag is True
+
+    def test_shutdown_clears_director_registry(self, viewer_actor):
+        viewer_actor._director_registry = {'localhost.dir1', 'localhost.dir2'}
+        viewer_actor.shutdown()
+        assert len(viewer_actor._director_registry) == 0
+
+    def test_shutdown_sets_stop_event(self, viewer_actor):
+        import threading
+        stop = threading.Event()
+        viewer_actor._stop_event = stop
+        viewer_actor.shutdown()
+        assert stop.is_set()
+
+    def test_shutdown_no_error_when_no_grab_running(self, viewer_actor):
+        """Calling shutdown without a running grab should not raise."""
+        viewer_actor.shutdown()  # must not raise
+
+    def test_shutdown_registered_as_rpc_method(self):
+        actor = PymodaqActor(
+            name='probe_shutdown',
+            device_class=_MockViewerDevice,
+            context=FakeContext(),
+        )
+        actor.connect()
+        import json
+        discover = actor.rpc_handler.rpc.process_request(
+            '{"jsonrpc":"2.0","id":1,"method":"rpc.discover"}'
+        )
+        method_names = [m['name'] for m in json.loads(discover)['result']['methods']]
+        assert 'shutdown' in method_names

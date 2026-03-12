@@ -55,3 +55,11 @@ class PymodaqActorMethods(StrEnum):
     GET_GRABBED_NAMES    = "get_grabbed_names"
     SET_PUBLISHED_NAMES  = "set_published_names"
     GET_PUBLISHED_NAMES  = "get_published_names"
+    GET_ACTOR_PUB_TOPIC  = "get_actor_pub_topic"
+    GET_ROLE             = "get_role"
+    SHUTDOWN             = "shutdown"
+
+
+class DirectorRPCMethods(StrEnum):
+    GET_ROLE   = "get_role"
+    DISCONNECT = "disconnect"
