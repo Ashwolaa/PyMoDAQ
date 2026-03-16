@@ -12,7 +12,6 @@ from pathlib import Path
 import tempfile
 from typing import List, Tuple, TYPE_CHECKING
 
-
 import numpy as np
 from qtpy import QtWidgets, QtCore
 from qtpy.QtWidgets import QDialogButtonBox
@@ -25,7 +24,7 @@ from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_utils import utils
 
-from pymodaq_data import data as data_mod, DataDistribution
+from pymodaq_data import data as data_mod, DataDistribution, DataDim
 from pymodaq_data.h5modules import data_saving
 
 from pymodaq_gui.parameter import ioxml, Parameter
@@ -193,13 +192,12 @@ class DAQScan(CustomExt):
 
     def plot_from(self):
         self.modules_manager.get_det_data_list()
-        data0D_names = self.modules_manager.get_probed_data_channels('Data0D')
-        data1D_names = self.modules_manager.get_probed_data_channels('Data1D')
+        data0D_names = self.modules_manager.get_probed_data_full_names(DataDim.Data0D)
+        data1D_names = self.modules_manager.get_probed_data_full_names(DataDim.Data1D)
         self.settings.child('plot_options', 'plot_0d').setValue(
             dict(all_items=data0D_names, selected=data0D_names))
         self.settings.child('plot_options', 'plot_1d').setValue(
             dict(all_items=data1D_names, selected=data1D_names))
-
 
 
     def setup_docks(self):
@@ -892,7 +890,7 @@ class DAQScan(CustomExt):
                     pass
 
             if not self.batch_started:
-                if not self.dashboard.overshoot and self.settings['scan_options', 'go_to_ini_positions']:
+                if self.settings['scan_options', 'go_to_ini_positions']:
                     self.set_ini_positions()
                 self.ui.set_action_enabled('ini_positions', True)
                 self.ui.set_action_enabled('start', True)
@@ -1058,7 +1056,6 @@ class DAQScan(CustomExt):
             set_scan
         """
         self.ui.display_status('Starting acquisition')
-        self.dashboard.overshoot = False
         #deactivate double_clicked
         if self.ui.is_action_checked('move_at'):
             self.ui.get_action('move_at').trigger()
@@ -1162,6 +1159,11 @@ class DAQScan(CustomExt):
             self.modules_manager.connect_actuators()
             self.modules_manager.move_actuators(self.scanner.positions_at(0), polling=True)
             self.modules_manager.connect_actuators(False)
+
+    def stop(self):
+        """ Programmatic method to stop any action in the extension
+        """
+        self.stop_scan()
 
     def stop_scan(self):
         """
@@ -1359,6 +1361,7 @@ class DAQScanAcquisition(QObject):
                                     dict(indexes=indexes, distribution=self.scanner.distribution)))
 
             self.det_done_flag = True
+
 
             full_names: list = self.scan_settings['plot_options', 'plot_0d']['selected'][:]
             full_names.extend(self.scan_settings['plot_options', 'plot_1d']['selected'][:])

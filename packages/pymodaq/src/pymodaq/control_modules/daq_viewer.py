@@ -104,7 +104,7 @@ class DAQ_Viewer(ParameterControlModule):
 
     params = daq_viewer_params + [
         {'title': 'Saver Settings:', 'name': 'saver_settings', 'type': 'group',
-         'visible': False, 'children': H5Saver.params}]
+         'visible': True, 'children': H5Saver.params, 'expanded': False}]
 
     listener_class = ViewerActorListener
     ui: Optional[DAQ_Viewer_UI]
@@ -156,13 +156,6 @@ class DAQ_Viewer(ParameterControlModule):
 
         self.settings.child('main_settings', 'DAQ_type').setValue(self._detector.module_name)
         self.settings.child('main_settings', 'detector_type').setValue(self._detector.daq_type)
-        for hidden_param in ('custom_name',
-                            'current_scan_name',
-                            'current_scan_path',
-                            'current_h5_file',
-                            'new_file',
-                            'base_name'):
-            self.settings.child('saver_settings', hidden_param).setOpts(visible=False)
 
         self._grabing: bool = False
         self._do_bkg: bool = False
@@ -513,6 +506,10 @@ class DAQ_Viewer(ParameterControlModule):
         self._take_bkg = True
         self.grab_data(snap_state=True)
 
+    def stop_module(self):
+        """ Programmatic entry to stop the Control module either moving, polling or grabbing"""
+        self.stop_grab()
+
     def stop_grab(self):
         """ Stop the current continuous grabbing and unchecked the stop button of the UI
 
@@ -520,9 +517,10 @@ class DAQ_Viewer(ParameterControlModule):
         --------
         :meth:`stop`
         """
-        if self.ui is not None:
-            self.manage_ui_actions('grab', 'setChecked', False)
-        self.stop()
+        if self.ui is not None and self.ui.is_action_checked('grab'):
+            self.ui.get_action('grab').trigger()
+        else:
+            self.stop()
 
     def stop(self):
         """ Stop the current continuous grabbing """
@@ -722,15 +720,9 @@ class DAQ_Viewer(ParameterControlModule):
             if len(data) != 0:
                 viewer_title = data.name
                 for dat in data:
-                    if len(self.viewers) > 1:
-                        dat.origin = (f'{self.title} - {viewer_title} - {dat.origin}'
-                                      if dat.origin is not None
-                                      else f'{self.title} - {viewer_title}')
-                    else:
-                        dat.origin = (f'{self.title} - {dat.origin}'
-                                      if dat.origin is not None
-                                      else f'{self.title}')
-                    dat.add_extra_attribute(parent_channel=viewer_title)
+                    dat.name = '/'.join([viewer_title, dat.origin, dat.name])
+                    dat.origin = self.title
+
                 self._data_to_save_export.append(data)
 
             if self._received_data == len(self.viewers):
@@ -918,10 +910,6 @@ class DAQ_Viewer(ParameterControlModule):
                 else:
                     for viewer in self.viewers:
                         viewer.x_axis, viewer.y_axis = self.get_scaling_options()
-
-        elif param.name() == 'continuous_saving_opt':
-            self.settings.child('saver_settings').setOpts(visible=param.value())
-
 
         elif param.name() == 'wait_time':
             self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.UPDATE_WAIT_TIME,
