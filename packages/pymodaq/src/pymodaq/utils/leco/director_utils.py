@@ -76,33 +76,60 @@ class ActuatorDirector(GenericDirector):
 
 
 class PymodaqDirector(GenericDirector):
-    """Base director for PymodaqActor — speaks the new query_data/change_to API.
+    """Base director for PymodaqActor — speaks the instruction-queue API.
 
-    Both move and detector directors inherit from this class.  The distinction
-    between them (Variable vs Observable) may blur over time as the
-    Variable/Observable model matures.
+    Both move and detector directors inherit from this class.
     """
 
-    def query_data(self, names=None, fresh: bool = True) -> Optional[str]:
+    def query_data(
+        self,
+        names=None,
+        count: float = 1,
+        fresh: bool = True,
+        period: float = 0.0,
+    ) -> Optional[str]:
         """Ask the actor to read one or more observables and publish on data channel.
 
         Parameters
         ----------
         names : str | list[str] | None
             Observable name(s) to read.  None = read all.
+        count : float
+            ``1`` for a one-shot snap; ``math.inf`` for continuous acquisition.
         fresh : bool
-            True  → trigger new hardware acquisition (publish to ZMQ data channel).
+            True  → enqueue a ReadRequest (hardware reads, publishes on ZMQ).
             False → re-publish last cached value without touching hardware.
+        period : float
+            Minimum seconds between reads (``0`` = as fast as hardware allows).
 
         Returns
         -------
         str or None
-            Hex conversation ID of the ZMQ publish triggered by this call.
-            Compare against the ``'cid'`` field in the ``'data_received'``
-            ThreadCommand to identify the matching frame on the data channel.
-            ``None`` if the actor had no data to publish.
+            Hex conversation ID of the ZMQ publish (for frame correlation).
+            ``None`` if the actor had no data to publish (fresh=False, empty cache).
         """
-        return self.ask_rpc(PymodaqActorMethods.QUERY_DATA, names=names, fresh=fresh)
+        return self.ask_rpc(
+            PymodaqActorMethods.QUERY_DATA,
+            names=names, count=count, fresh=fresh, period=period,
+        )
+
+    def stop(self, names=None) -> None:
+        """Tell the actor to stop acquiring the named observables.
+
+        Parameters
+        ----------
+        names:
+            List of observable names to stop.  ``None`` (default) stops all.
+        """
+        self.ask_rpc(PymodaqActorMethods.STOP, names=names)
+
+    def get_acquisition_status(self) -> dict:
+        """Return the actor's current acquisition state."""
+        return self.ask_rpc(PymodaqActorMethods.GET_ACQUISITION_STATUS)
+
+    def get_read_list(self) -> dict:
+        """Return the actor's current read list (alias for get_acquisition_status)."""
+        return self.ask_rpc(PymodaqActorMethods.GET_READ_LIST)
 
     def get_capabilities(self):
         """Retrieve the actor's Capabilities (observables + variables)."""
@@ -125,31 +152,25 @@ class PymodaqDirector(GenericDirector):
         )
 
     def get_pymodaq_settings(self) -> Optional[str]:
-        """Fetch the actor's parameter tree XML.
-
-        Returns ``None`` if the actor has no settings.
-        """
+        """Fetch the actor's parameter tree XML."""
         return self.ask_rpc("get_pymodaq_settings")
 
-    def get_grabbed_names(self) -> Optional[list]:
-        """Return the names currently being grabbed by the actor in continuous mode."""
-        return self.ask_rpc(PymodaqActorMethods.GET_GRABBED_NAMES)
-
     def get_actor_pub_topic(self) -> str:
-        """Return the ZMQ publish topic base used by the actor.
-
-        Use this during init to obtain the exact ZMQ subscription prefix
-        instead of guessing from the coordinator namespace, which avoids a
-        race condition where the director's own sign-in has not yet completed.
-        """
+        """Return the ZMQ publish topic base used by the actor."""
         return self.ask_rpc(PymodaqActorMethods.GET_ACTOR_PUB_TOPIC)
 
+    # ── Deprecated aliases ─────────────────────────────────────────────────────
+
+    def get_grabbed_names(self) -> Optional[list]:
+        """Deprecated: use ``get_read_list()``."""
+        return self.ask_rpc(PymodaqActorMethods.GET_GRABBED_NAMES)
+
     def set_published_names(self, names: Optional[list]) -> None:
-        """Configure which names the actor publishes in continuous mode."""
+        """Deprecated — no-op on the actor side."""
         self.ask_rpc(PymodaqActorMethods.SET_PUBLISHED_NAMES, names=names)
 
     def get_published_names(self) -> Optional[list]:
-        """Return the actor's current continuous-publish filter."""
+        """Deprecated: use ``get_read_list()``."""
         return self.ask_rpc(PymodaqActorMethods.GET_PUBLISHED_NAMES)
 
 
@@ -184,22 +205,17 @@ class PymodaqMoveDirector(PymodaqDirector):
 class PymodaqDetectorDirector(PymodaqDirector):
     """Director for detector-type actors (actors that expose Observables).
 
-    For a single frame use ``query_data()``.
-    For continuous acquisition use ``start_grab()`` / ``stop_grab()``:
-    the actor's background loop publishes frames on the ZMQ data channel
-    and the director receives them passively via its ZMQ subscription.
+    For a single frame use ``query_data(count=1)``.
+    For continuous acquisition use ``query_data(count=math.inf, period=1/rate_hz)``
+    and ``stop(names)`` to end it.
     """
 
     def query_data_continuous(self, rate_hz: float = 0) -> None:
-        """Tell the actor to start a continuous acquisition loop.
-
-        Parameters
-        ----------
-        rate_hz:
-            Target frame rate.  ``0`` (default) = as fast as the device allows.
-        """
-        self.ask_rpc(PymodaqActorMethods.QUERY_DATA_CONTINUOUS, rate_hz=rate_hz)
+        """Deprecated: use ``query_data(count=math.inf, period=1/rate_hz)``."""
+        import math
+        period = 1.0 / rate_hz if rate_hz > 0 else 0.0
+        self.query_data(names=None, count=math.inf, fresh=True, period=period)
 
     def stop_continuous(self) -> None:
-        """Tell the actor to stop its continuous acquisition loop."""
-        self.ask_rpc(PymodaqActorMethods.STOP_CONTINUOUS)
+        """Deprecated: use ``stop(names=None)``."""
+        self.stop(names=None)

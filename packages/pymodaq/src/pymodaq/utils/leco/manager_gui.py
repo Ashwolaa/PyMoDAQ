@@ -19,9 +19,10 @@ Main thread (Qt)
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
-from qtpy import QtWidgets
+from qtpy import QtWidgets, QtCore, QtGui
 from qtpy.QtCore import QObject, Signal, Slot
 from qtpy.QtGui import QColor
 
@@ -54,6 +55,7 @@ class LECOMonitorAdapter(QObject):
     actor_details_changed = Signal(object)       # ComponentRecord
     proxy_status_changed = Signal(object)        # ProxyRecord
     coordinator_status_changed = Signal(object)  # CoordinatorRecord
+    nodes_changed = Signal(dict)                 # dict[str, str]
 
     def __init__(self, monitor: LECONetworkMonitor, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -62,6 +64,7 @@ class LECOMonitorAdapter(QObject):
         monitor.on_actor_details_changed = self.actor_details_changed.emit
         monitor.on_proxy_status_changed = self.proxy_status_changed.emit
         monitor.on_coordinator_status_changed = self.coordinator_status_changed.emit
+        monitor.on_nodes_changed = self.nodes_changed.emit
 
 
 # ── AddProxyDialog ─────────────────────────────────────────────────────────────
@@ -146,6 +149,65 @@ class ConnectDialog(QtWidgets.QDialog):
         return self._port.value()
 
 
+# ── LogPanel ───────────────────────────────────────────────────────────────────
+
+class LogPanel(QtWidgets.QWidget):
+    """Tails a text log file and displays new lines in a QPlainTextEdit."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._log_path: Optional[Path] = None
+        self._pos: int = 0
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._poll)
+
+        self._combo = QtWidgets.QComboBox()
+        self._text = QtWidgets.QPlainTextEdit()
+        self._text.setReadOnly(True)
+        self._text.setMaximumBlockCount(2000)
+        font = QtGui.QFont('Monospace')
+        font.setStyleHint(QtGui.QFont.StyleHint.Monospace)
+        self._text.setFont(font)
+
+        clear_btn = QtWidgets.QPushButton('Clear')
+        clear_btn.clicked.connect(self._text.clear)
+
+        top = QtWidgets.QHBoxLayout()
+        top.addWidget(QtWidgets.QLabel('Source:'))
+        top.addWidget(self._combo, stretch=1)
+        top.addWidget(clear_btn)
+        layout = QtWidgets.QVBoxLayout()
+        layout.addLayout(top)
+        layout.addWidget(self._text)
+        self.setLayout(layout)
+
+    def start_tailing(self, log_path: Path, label: str = 'coordinator'):
+        """Start tailing *log_path*, adding it to the source combo if not present."""
+        self._log_path = log_path
+        self._pos = 0
+        if self._combo.findText(label) == -1:
+            self._combo.addItem(label, userData=log_path)
+        self._timer.start()
+
+    def stop_tailing(self):
+        """Stop the tail timer."""
+        self._timer.stop()
+
+    def _poll(self):
+        if self._log_path is None or not self._log_path.exists():
+            return
+        try:
+            with open(self._log_path) as f:
+                f.seek(self._pos)
+                new = f.read()
+                self._pos = f.tell()
+            if new:
+                self._text.appendPlainText(new.rstrip())
+        except OSError:
+            pass
+
+
 # ── NetworkPanel ───────────────────────────────────────────────────────────────
 
 class NetworkPanel(QtWidgets.QWidget):
@@ -219,9 +281,17 @@ class NetworkPanel(QtWidgets.QWidget):
         self._proxy_layout.addWidget(self._add_proxy_btn)
         proxy_box.setLayout(self._proxy_layout)
 
+        # ── Linked Nodes ───────────────────────────────────────────────────────
+        nodes_box = QtWidgets.QGroupBox('Linked Nodes')
+        nodes_vbox = QtWidgets.QVBoxLayout()
+        self._nodes_list = QtWidgets.QListWidget()
+        nodes_vbox.addWidget(self._nodes_list)
+        nodes_box.setLayout(nodes_vbox)
+
         layout.addWidget(led_box)
         layout.addWidget(coord_box)
         layout.addWidget(proxy_box)
+        layout.addWidget(nodes_box)
         layout.addStretch()
         self.setLayout(layout)
 
@@ -244,6 +314,13 @@ class NetworkPanel(QtWidgets.QWidget):
         self._lbl_directors.setText(f'Directors: {n_directors}')
         self._led_actors.set_as(n_actors > 0)
         self._led_directors.set_as(n_directors > 0)
+
+    @Slot(dict)
+    def update_nodes(self, nodes: dict):
+        """Refresh the Linked Nodes list."""
+        self._nodes_list.clear()
+        for ns, addr in nodes.items():
+            self._nodes_list.addItem(f'{ns}  @  {addr}')
 
     def _on_start_coordinator(self):
         dlg = QtWidgets.QDialog(self)
@@ -531,8 +608,13 @@ class LECOManagerGUI(CustomApp):
         dock_comp = Dock('Components', size=(600, 500))
         dock_comp.addWidget(self._components_table)
 
+        self._log_panel = LogPanel()
+        dock_log = Dock('Logs', size=(400, 500))
+        dock_log.addWidget(self._log_panel)
+
         self.dockarea.addDock(dock_net, 'left')
         self.dockarea.addDock(dock_comp, 'right', dock_net)
+        self.dockarea.addDock(dock_log, 'right', dock_comp)
 
     def setup_actions(self):
         self.add_action('connect', 'Connect', icon_name='network_on',
@@ -557,7 +639,9 @@ class LECOManagerGUI(CustomApp):
         self._adapter.components_changed.connect(self._network_panel.update_component_counts)
         self._adapter.actor_details_changed.connect(self._components_table.update_actor_details)
         self._adapter.coordinator_status_changed.connect(self._network_panel.update_coordinator)
+        self._adapter.coordinator_status_changed.connect(self._on_coordinator_log_update)
         self._adapter.proxy_status_changed.connect(self._network_panel.update_proxy)
+        self._adapter.nodes_changed.connect(self._network_panel.update_nodes)
 
         # NetworkPanel → monitor actions
         self._network_panel.start_coordinator_requested.connect(self._on_start_coordinator)
@@ -567,6 +651,14 @@ class LECOManagerGUI(CustomApp):
 
         # ComponentsTable → monitor actions
         self._components_table.shutdown_requested.connect(self._on_shutdown_component)
+
+    @Slot(object)
+    def _on_coordinator_log_update(self, record: CoordinatorRecord):
+        """Start or stop tailing the coordinator log based on alive state."""
+        if record.log_path and record.alive:
+            self._log_panel.start_tailing(record.log_path)
+        elif not record.alive:
+            self._log_panel.stop_tailing()
 
     def _widget_parent(self) -> Optional[QtWidgets.QWidget]:
         """Return a valid QWidget parent for dialogs (mainwindow or None)."""

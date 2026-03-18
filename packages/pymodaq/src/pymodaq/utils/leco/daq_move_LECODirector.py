@@ -75,7 +75,7 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         LECODirector.__init__(self, host=self.settings["host"], port=self.settings["port"])
         self.register_rpc_methods((
             self.set_units,  # to set units accordingly to the one of the actor
-            self.on_grab_status,
+            self.on_acquisition_status,
         ))
 
         self.register_binary_rpc_methods((
@@ -125,21 +125,25 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                 try:
                     caps = self.controller.get_capabilities()
                     var_names = [v.name for v in caps.variables] or ['position']
+                    # Set epsilon from capabilities for accurate move-done detection.
+                    var_name_sel = self.settings['variable_name'] or var_names[0]
+                    var_caps = next(
+                        (v for v in caps.variables if v.name == var_name_sel), None
+                    )
+                    if var_caps is None and var_names:
+                        var_caps = caps.variables[0] if caps.variables else None
+                    if var_caps is not None and hasattr(var_caps, 'epsilon') and var_caps.epsilon > 0:
+                        self._epsilon = var_caps.epsilon
                 except Exception:
                     var_names = ['position']
                     logger.warning("Could not fetch capabilities; defaulting variable name to 'position'.")
                 # Populate the variable_name list with what this actor actually exposes.
-                # If the user pre-selected a valid name (e.g. from the actor GUI), keep it;
-                # otherwise fall back to the first available name.
                 self._apply_variable_names(var_names)
                 try:
                     self.controller.subscribe_settings()
                 except Exception:
                     logger.warning("Timeout during subscribe_settings.")
                 # Subscribe to the per-channel sub-topic: "{actor_pub_topic}/{var_name}".
-                # Ask the actor directly for its publisher.full_name to avoid a
-                # race condition where the director's own sign-in (and thus namespace)
-                # may not have completed yet when ini_stage is called.
                 try:
                     self._actor_full_name = self.controller.get_actor_pub_topic()
                 except Exception:
@@ -155,11 +159,13 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
                     self.listener.subscribe(self._actor_sub_name)
                 except Exception:
                     logger.warning("Could not subscribe to actor ZMQ data channel.")
-                # Request initial position so the display is populated on startup.
+                # Start continuous position subscription (low rate) for always-fresh readback.
                 try:
-                    self.controller.query_data(fresh=True)
+                    self.controller.query_data(
+                        names=[var_name], count=float('inf'), fresh=True, period=0.05
+                    )
                 except Exception:
-                    logger.warning("Could not request initial position from actor.")
+                    logger.warning("Could not start continuous position subscription.")
         else:
             self.controller = controller
 
@@ -217,9 +223,10 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
             if self.settings['use_legacy_actor']:
                 self.controller.get_actuator_value()
             else:
-                # Trigger a fresh read; the actor publishes the result on the ZMQ data channel.
-                # _on_actor_data() receives it asynchronously and updates _current_value.
-                self.controller.query_data(fresh=True)
+                # _current_value is kept current by the continuous ZMQ stream started
+                # in ini_stage.  A fresh=False query publishes the cached value — fast,
+                # no hardware access needed.
+                self.controller.query_data(names=None, count=1, fresh=False)
         except Exception:
             logger.warning("get_actuator_value: could not reach actor, returning cached value.")
         return self._current_value
@@ -335,28 +342,33 @@ class DAQ_Move_LECODirector(LECODirector, DAQ_Move_base):
         if current not in var_names:
             self.settings.child('variable_name').setValue(var_names[0])
 
-    def on_grab_status(self, grabbed_names, is_continuous: bool) -> None:
-        """Invoked by the actor when its continuous-grab status changes.
+    def on_acquisition_status(self, read_list: dict, is_grabbing: bool) -> None:
+        """Invoked by the actor when its acquisition status changes.
 
         Allows this director's GUI to mirror the grab state of the actor
         even when the grab was initiated by a different director.
 
         Parameters
         ----------
-        grabbed_names:
-            List of names currently being grabbed, or ``None`` for all.
-        is_continuous:
-            ``True`` while the actor's background grab loop is running.
+        read_list:
+            Current read_list dict from the actor.
+        is_grabbing:
+            ``True`` while the actor has at least one active read request.
         """
-        self.emit_status(ThreadCommand('GRAB_STATUS', {
-            'grabbed_names': grabbed_names,
-            'is_continuous': is_continuous,
+        self.emit_status(ThreadCommand('ACQUISITION_STATUS', {
+            'read_list': read_list,
+            'is_grabbing': is_grabbing,
         }))
 
     def close(self) -> None:
         """Clear the content of the settings_clients setting."""
         self.timer.stop()
         if not self.settings['use_legacy_actor'] and self.controller is not None:
+            var_name = self.settings['variable_name'] or None
+            try:
+                self.controller.stop(names=[var_name] if var_name else None)
+            except Exception:
+                pass
             try:
                 self.controller.unsubscribe_settings()
             except Exception:

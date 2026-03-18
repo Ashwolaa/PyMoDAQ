@@ -45,19 +45,23 @@ class ViewerDirectorMethods(StrEnum):
 
 
 class PymodaqActorMethods(StrEnum):
-    QUERY_DATA           = "query_data"
-    CHANGE_TO            = "change_to"
-    GET_CAPABILITIES     = "get_capabilities"
-    SUBSCRIBE_DIRECTOR   = "subscribe_director"
-    UNSUBSCRIBE_DIRECTOR = "unsubscribe_director"
+    QUERY_DATA            = "query_data"
+    CHANGE_TO             = "change_to"
+    STOP                  = "stop"
+    GET_ACQUISITION_STATUS = "get_acquisition_status"
+    GET_READ_LIST         = "get_read_list"
+    GET_CAPABILITIES      = "get_capabilities"
+    SUBSCRIBE_DIRECTOR    = "subscribe_director"
+    UNSUBSCRIBE_DIRECTOR  = "unsubscribe_director"
+    GET_ACTOR_PUB_TOPIC   = "get_actor_pub_topic"
+    GET_ROLE              = "get_role"
+    SHUTDOWN              = "shutdown"
+    # Deprecated aliases (kept for one release cycle):
     QUERY_DATA_CONTINUOUS = "query_data_continuous"
     STOP_CONTINUOUS       = "stop_continuous"
-    GET_GRABBED_NAMES    = "get_grabbed_names"
-    SET_PUBLISHED_NAMES  = "set_published_names"
-    GET_PUBLISHED_NAMES  = "get_published_names"
-    GET_ACTOR_PUB_TOPIC  = "get_actor_pub_topic"
-    GET_ROLE             = "get_role"
-    SHUTDOWN             = "shutdown"
+    GET_GRABBED_NAMES     = "get_grabbed_names"
+    SET_PUBLISHED_NAMES   = "set_published_names"
+    GET_PUBLISHED_NAMES   = "get_published_names"
 
 
 class DirectorRPCMethods(StrEnum):

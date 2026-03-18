@@ -1,13 +1,19 @@
 """PymodaqActor — headless hardware process for PyMoDAQ.
 
-Wraps :class:`pyleco.actors.Actor` and exposes a unified hardware interface over LECO:
+Wraps :class:`pyleco.actors.Actor` and exposes a unified hardware interface over LECO via
+an **instruction-queue hardware loop**:
 
-    ``query_data(names, fresh)``   — read observables / variables
-    ``change_to(name, value)``     — write a variable
+- A single *hardware thread* owns the device exclusively.
+- All other threads (the pyleco listen loop, RPC handlers) communicate via
+  :class:`queue.Queue` + :class:`threading.Event`.
+- No lock on ``device.read()`` / ``device.write()`` is needed — structural guarantee.
 
-Legacy RPC method names (``grab``, ``snap``, ``move_abs``, …) are registered as aliases
-so that existing :class:`DAQ_Move_LECODirector` / :class:`DAQ_xDViewer_LECODirector`
-plugins continue to work without changes during the Phase 1 → Phase 2 transition.
+Primary RPC API::
+
+    query_data(names, count, fresh, period)  — read observables
+    change_to(name, value)                   — write a variable
+    stop(names)                              — stop acquiring named observables
+    get_acquisition_status()                 — current read_list snapshot
 
 **Device interface** — the object passed as ``device_class`` must implement::
 
@@ -15,11 +21,6 @@ plugins continue to work without changes during the Phase 1 → Phase 2 transiti
     device.close()                                            — close hardware
     device.read(names: list[str] | None = None) -> DataToExport
     device.write(name: str, value: Any) -> None
-
-``connect()`` is called by :meth:`PymodaqActor.connect` immediately after
-``device_class()`` is instantiated.  ``close()`` is called by
-:meth:`PymodaqActor.disconnect` instead of pyleco's default
-``device.adapter.close()`` (which assumes a pymeasure instrument).
 
 and may optionally implement::
 
@@ -29,15 +30,17 @@ and may optionally implement::
     device.move_rel(delta: float)         (relative move)
     device.home()                         (move to home position)
 
-No Qt import in this module.  Device objects that are full ``DAQ_Move_base`` /
-``DAQ_Viewer_base`` subclasses will bring Qt in via the device class itself; for
-headless testing a pure-Python mock device is sufficient.
+No Qt import in this module.
 """
 from __future__ import annotations
 
 import logging
+import math
+import queue
 import threading
 import time
+import warnings
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from pyleco.actors.actor import Actor
@@ -52,8 +55,38 @@ from pymodaq.control_modules.capabilities import Capabilities, infer_capabilitie
 logger = logging.getLogger(__name__)
 
 
+# ── Instruction data structures (Phase 0) ─────────────────────────────────────
+
+@dataclass
+class ReadRequest:
+    """Request to read one or more observables from the hardware."""
+    names: Optional[list[str]]  # None = read all observables
+    count: float                 # 1 = snap; math.inf = continuous
+    period: float                # seconds between reads; 0 = as fast as possible
+    requester: str               # full LECO name of the director, e.g. "localhost.det_dir_1"
+    req_id: bytes                # pre-generated conversation_id; used as ZMQ cid
+
+
+@dataclass
+class WriteInstruction:
+    """Request to write one or more variables on the hardware."""
+    name: Any   # str = single; dict = multi-write; tuple('settings', path) = settings write
+    value: Any  # ignored when name is a dict
+    requester: str
+    req_id: bytes
+
+
+@dataclass
+class StopInstruction:
+    """Request to stop acquiring one or more observables."""
+    names: Optional[list[str]]  # None = stop all
+    requester: str
+
+
+# ── Actor ──────────────────────────────────────────────────────────────────────
+
 class PymodaqActor(Actor):
-    """Hardware actor for PyMoDAQ.
+    """Hardware actor for PyMoDAQ — instruction-queue architecture.
 
     Parameters
     ----------
@@ -62,14 +95,14 @@ class PymodaqActor(Actor):
     device_class:
         Class of the hardware plugin.  Instantiated by :meth:`connect`.
     periodic_reading:
-        Interval in seconds for the periodic readout timer (−1 = disabled).
+        **Deprecated** — has no effect.  Use ``query_data(count=math.inf, period=...)``
+        instead.  Will be removed in a future release.
     **kwargs:
         Forwarded to :class:`pyleco.actors.Actor` (``host``, ``port``, ``context``, …).
     """
 
     _director_registry: set[str]
-    _last_data: Optional[Any]   # DataToExport or None
-    _stop_grab_flag: bool
+    _last_data: Optional[Any]
 
     def __init__(
         self,
@@ -82,11 +115,17 @@ class PymodaqActor(Actor):
         published_names: Optional[list] = None,
         **kwargs,
     ) -> None:
+        if periodic_reading != -1:
+            warnings.warn(
+                "The 'periodic_reading' parameter is deprecated and has no effect. "
+                "Use query_data(count=math.inf, period=...) instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         context = kwargs.get('context')
         super().__init__(name=name, device_class=device_class,
                          periodic_reading=periodic_reading, **kwargs)
         # Always recreate the publisher so we can honour proxy_host/proxy_port.
-        # (super().__init__ creates a default publisher on localhost:11100.)
         self.publisher.close()
         self.publisher = DataPublisher(
             full_name=name,
@@ -95,9 +134,7 @@ class PymodaqActor(Actor):
             context=context,
         )
         # Per-channel publisher routing.
-        # Maps channel_name → (host, port) key used in _extra_publishers.
         self._channel_proxy_keys: dict[str, tuple[str, int]] = {}
-        # Maps (host, port) → DataPublisher for channels that use a different proxy.
         self._extra_publishers: dict[tuple[str, int], DataPublisher] = {}
         if channel_proxies:
             for ch_name, (ch_host, ch_port) in channel_proxies.items():
@@ -110,32 +147,51 @@ class PymodaqActor(Actor):
                         context=context,
                     )
                 self._channel_proxy_keys[ch_name] = key
+
         self._director_registry: set[str] = set()
         self._last_data = None
-        self._stop_grab_flag = False
-        self._grab_thread: Optional[threading.Thread] = None
-        self._published_names: Optional[set[str]] = set(published_names) if published_names is not None else None
-        self._grabbed_names: Optional[set[str]] = None
+
+        # Instruction-queue hardware loop state
+        self._instruction_queue: queue.Queue = queue.Queue()
+        self._new_instruction_event: threading.Event = threading.Event()
+        self._hw_stop_event: threading.Event = threading.Event()
+        self._read_list: dict = {}        # key (frozenset|None) → ReadRequest
+        self._last_read_time: dict = {}   # key → float (monotonic)
+        self._write_pending: dict = {}    # name → (value, req_id, requester)
+        self._hw_thread: Optional[threading.Thread] = None
 
     # ── Hardware lifecycle ─────────────────────────────────────────────────────
 
     def connect(self, *args, **kwargs) -> None:
-        """Instantiate the device class then call ``device.connect()`` to open hardware.
+        """Instantiate the device class, open hardware, start the hardware loop.
 
-        pyleco's base :meth:`Actor.connect` only runs ``device = device_class(*args, **kwargs)``.
-        We follow up with an explicit ``device.connect()`` so that PyMoDAQ plugins (which
-        separate construction from hardware open) behave correctly.
+        Stops the pyleco periodic timer — the hardware loop replaces it.
         """
         super().connect(*args, **kwargs)   # sets self.device = device_class(...)
-        self.device.connect()
+        try:
+            self.device.connect()
+        except AttributeError:
+            logger.debug("Device has no connect() method; skipping hardware open.")
+        # Stop pyleco's periodic timer; hardware loop is the sole read driver.
+        self.stop_timer()
+        # Start the hardware loop thread.
+        self._hw_stop_event.clear()
+        self._hw_thread = threading.Thread(
+            target=self._hardware_loop,
+            daemon=True,
+            name=f"hw-loop-{self.name}",
+        )
+        self._hw_thread.start()
 
     def disconnect(self) -> None:
-        """Call ``device.close()`` then clean up.
+        """Stop the hardware loop, close the device, clean up publishers."""
+        # Stop hardware loop first.
+        self._hw_stop_event.set()
+        self._new_instruction_event.set()
+        if self._hw_thread is not None and self._hw_thread.is_alive():
+            self._hw_thread.join(timeout=2.0)
+        self._hw_thread = None
 
-        Overrides pyleco's default which assumes a pymeasure instrument
-        (``device.adapter.close()``).  PyMoDAQ plugins use ``close()`` instead.
-        """
-        self.stop_timer()
         for pub in list(self._extra_publishers.values()):
             try:
                 pub.close()
@@ -162,6 +218,9 @@ class PymodaqActor(Actor):
         # Primary interface
         self.register_rpc_method(self.query_data)
         self.register_rpc_method(self.change_to)
+        self.register_rpc_method(self.stop)
+        self.register_rpc_method(self.get_acquisition_status)
+        self.register_rpc_method(self.get_read_list)
 
         # Introspection
         self.register_rpc_method(self.get_capabilities)
@@ -170,18 +229,17 @@ class PymodaqActor(Actor):
         self.register_rpc_method(self.set_info)
         self.register_rpc_method(self.subscribe_director)
         self.register_rpc_method(self.unsubscribe_director)
+
+        # Deprecated aliases (kept for one release cycle)
         self.register_rpc_method(self.query_data_continuous)
         self.register_rpc_method(self.stop_continuous)
+        self.register_rpc_method(self.get_grabbed_names)
         self.register_rpc_method(self.set_published_names)
         self.register_rpc_method(self.get_published_names)
-        self.register_rpc_method(self.get_grabbed_names)
 
         # Manager introspection
         self.register_rpc_method(self.get_role)
         self.register_rpc_method(self.shutdown)
-
-        # # Heartbeat — used by directors to check connectivity
-        # self.register_rpc_method(self.pong)
 
         # Legacy aliases — keep existing directors working without changes
         self.register_rpc_method(self._legacy_grab, name='grab')
@@ -191,55 +249,219 @@ class PymodaqActor(Actor):
         self.register_rpc_method(self._legacy_move_rel, name='move_rel')
         self.register_rpc_method(self._legacy_move_home, name='move_home')
 
-    # ── Primary interface ──────────────────────────────────────────────────────
+    # ── Hardware loop (Phase 1) ────────────────────────────────────────────────
+
+    def _hardware_loop(self) -> None:
+        """Single hardware thread — sole owner of ``device.read()`` / ``device.write()``."""
+        _prev_keys: frozenset = frozenset()
+
+        while not self._hw_stop_event.is_set():
+            # 1. Drain instruction queue (non-blocking).
+            self._process_pending_instructions()
+
+            # 2. Execute all pending writes first (writes before reads in same tick).
+            for name, (value, req_id, requester) in list(self._write_pending.items()):
+                try:
+                    if isinstance(name, tuple) and name[0] == 'settings':
+                        # Settings write via set_info.
+                        path = name[1]
+                        if hasattr(self.device, 'set_info'):
+                            self.device.set_info(path, value)
+                        try:
+                            self._broadcast_settings()
+                        except Exception:
+                            pass
+                    else:
+                        self.device.write(name, value)
+                        # Schedule one-shot readback if channel not already in continuous read.
+                        rb_key = frozenset([name])
+                        if rb_key not in self._read_list and None not in self._read_list:
+                            self._read_list[rb_key] = ReadRequest(
+                                names=[name], count=1, period=0.0,
+                                requester=requester, req_id=req_id,
+                            )
+                            self._last_read_time.setdefault(rb_key, 0.0)
+                except Exception:
+                    logger.exception("hardware loop: write failed for %s", name)
+            self._write_pending.clear()
+
+            # 3. Execute reads that are due.
+            now = time.monotonic()
+            for key in list(self._read_list.keys()):
+                req = self._read_list.get(key)
+                if req is None:
+                    continue
+                last_t = self._last_read_time.get(key, 0.0)
+                if now - last_t >= req.period:
+                    try:
+                        dte = self.device.read(req.names)
+                    except Exception as exc:
+                        logger.exception(
+                            "hardware loop: device.read() failed for %s", req.names
+                        )
+                        self._report_error(req.requester, req.req_id, str(exc))
+                        del self._read_list[key]
+                        self._last_read_time.pop(key, None)
+                        continue
+                    if dte is not None:
+                        self._last_data = dte
+                        self._publish(dte, cid=req.req_id)
+                    self._last_read_time[key] = now
+                    req.count -= 1
+                    if req.count <= 0:
+                        del self._read_list[key]
+                        self._last_read_time.pop(key, None)
+
+            # 4. Broadcast acquisition status if read_list changed this tick.
+            current_keys = frozenset(self._read_list.keys())
+            if current_keys != _prev_keys:
+                try:
+                    self._broadcast_acquisition_status()
+                except Exception:
+                    pass
+                _prev_keys = current_keys
+
+            # 5. Sleep until next read is due (interruptible by new instructions).
+            sleep_time = max(0.0, self._time_until_next_due())
+            self._new_instruction_event.wait(timeout=sleep_time if sleep_time > 0 else 0.05)
+            self._new_instruction_event.clear()
+
+    def _process_pending_instructions(self) -> None:
+        """Drain the instruction queue (non-blocking)."""
+        while True:
+            try:
+                instr = self._instruction_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            if isinstance(instr, ReadRequest):
+                key = frozenset(instr.names) if instr.names is not None else None
+                existing = self._read_list.get(key)
+                if existing is not None:
+                    # Merge: min period; math.inf wins over finite count.
+                    merged_period = min(existing.period, instr.period)
+                    merged_count = (
+                        math.inf
+                        if (math.isinf(existing.count) or math.isinf(instr.count))
+                        else max(existing.count, instr.count)
+                    )
+                    instr = ReadRequest(
+                        names=instr.names,
+                        count=merged_count,
+                        period=merged_period,
+                        requester=instr.requester,
+                        req_id=instr.req_id,
+                    )
+                self._read_list[key] = instr
+                if key not in self._last_read_time:
+                    self._last_read_time[key] = 0.0  # fire immediately on first read
+
+            elif isinstance(instr, WriteInstruction):
+                if isinstance(instr.name, dict):
+                    for k, v in instr.name.items():
+                        self._write_pending[k] = (v, instr.req_id, instr.requester)
+                elif isinstance(instr.name, list):
+                    # change_to(name=[...], value=[...]) — iterate in zip
+                    values = instr.value if isinstance(instr.value, list) else [instr.value]
+                    for k, v in zip(instr.name, values):
+                        self._write_pending[k] = (v, instr.req_id, instr.requester)
+                else:
+                    self._write_pending[instr.name] = (
+                        instr.value, instr.req_id, instr.requester
+                    )
+
+            elif isinstance(instr, StopInstruction):
+                if instr.names is None:
+                    self._read_list.clear()
+                    self._last_read_time.clear()
+                else:
+                    key = frozenset(instr.names)
+                    self._read_list.pop(key, None)
+                    self._last_read_time.pop(key, None)
+
+    def _time_until_next_due(self) -> float:
+        """Seconds until the next read is due.  Returns 0.05 if no reads pending."""
+        if not self._read_list:
+            return 0.05
+        now = time.monotonic()
+        min_wait = float('inf')
+        for key, req in self._read_list.items():
+            last_t = self._last_read_time.get(key, 0.0)
+            remaining = req.period - (now - last_t)
+            min_wait = min(min_wait, remaining)
+        return max(0.0, min_wait)
+
+    def _report_error(self, requester: str, req_id: bytes, message: str) -> None:
+        """Send an ``on_hardware_error`` RPC to the requester."""
+        if not requester:
+            return
+        try:
+            comm = self.get_communicator()
+            comm.ask_rpc(
+                receiver=requester,
+                method='on_hardware_error',
+                req_id=req_id.hex(),
+                message=message,
+            )
+        except Exception:
+            pass
+
+    # ── Primary interface (Phase 2) ────────────────────────────────────────────
 
     def query_data(
         self,
         names=None,
+        count: float = 1,
         fresh: bool = True,
+        period: float = 0.0,
     ) -> Optional[str]:
         """Read observables from the device and publish on the data channel.
-
-        Accepts either a single observable name or a list of names.
 
         Parameters
         ----------
         names:
             Name(s) of observables to read.  A single ``str`` is accepted and
             treated as ``[names]``.  ``None`` means read all.
+        count:
+            Number of reads: ``1`` for a one-shot snap; ``math.inf`` for
+            continuous acquisition until :meth:`stop` is called.
         fresh:
-            If ``True``, trigger a new hardware acquisition (costly but up-to-date).
-            If ``False``, re-publish the last cached :class:`DataToExport` without
-            touching hardware.
+            If ``True`` (default), enqueue a :class:`ReadRequest`; data arrives
+            later on the ZMQ data channel.
+            If ``False``, re-publish the last cached :class:`DataToExport`
+            synchronously without touching hardware.
+        period:
+            Minimum seconds between reads (``0`` = as fast as hardware allows).
 
         Returns
         -------
         str or None
-            Hex-encoded conversation ID of the ZMQ publish, so the caller can
-            correlate this RPC response with the matching frame on the data channel.
-            ``None`` if no data was available to publish.
+            Hex-encoded conversation ID of the ZMQ publish.  For ``fresh=True``,
+            this is the ID that will be used when the hardware loop publishes —
+            the director can correlate ZMQ frames using this value.
+            ``None`` if no data was available (``fresh=False`` with empty cache).
         """
         if isinstance(names, str):
             names = [names]
-        if fresh:
-            try:
-                dte = self.device.read(names)
-            except Exception:
-                logger.exception("query_data: device.read() raised an exception")
-                return None
-            if dte is not None:
-                self._last_data = dte
-                return self._publish(dte)
-        else:
+        if not fresh:
             if self._last_data is not None:
                 return self._publish(self._last_data)
-        return None
+            return None
+        # fresh=True: enqueue ReadRequest; hardware loop processes asynchronously.
+        req_id = generate_conversation_id()
+        req = ReadRequest(
+            names=names,
+            count=float(count),
+            period=float(period),
+            requester='',
+            req_id=req_id,
+        )
+        self._instruction_queue.put(req)
+        self._new_instruction_event.set()
+        return req_id.hex()
 
     def change_to(self, name, value=None) -> Optional[str]:
-        """Write one or more variables on the device.
-
-        Accepts either a single name/value pair or a dict of name→value pairs
-        for a multi-variable update in one RPC call.
+        """Write one or more variables on the device (enqueued for hardware thread).
 
         Parameters
         ----------
@@ -248,41 +470,69 @@ class PymodaqActor(Actor):
             variable names to new values for a multi-variable update.
         value :
             New value. Required when *name* is a str; ignored when *name* is a dict.
+
+        Returns
+        -------
+        str
+            Hex-encoded conversation ID; the hardware thread uses this ID for
+            the auto-readback ZMQ publish after the write completes.
         """
-        if isinstance(name, dict):
-            for k, v in name.items():
-                self.device.write(k, v)
-            written_names = list(name.keys())
-        else:
-            self.device.write(name, value)
-            written_names = [name]
-        # Re-read all channels so every subscribed director gets a fresh value.
-        # Sub-topic routing ensures each director only receives the channel it
-        # subscribed to — no need to narrow the read to written_names.
-        try:
-            return self.query_data(names=None, fresh=True)
-        except Exception:
-            logger.exception("change_to: auto-publish failed")
-            return None
+        req_id = generate_conversation_id()
+        instr = WriteInstruction(name=name, value=value, requester='', req_id=req_id)
+        self._instruction_queue.put(instr)
+        self._new_instruction_event.set()
+        return req_id.hex()
 
-    # ── Introspection ──────────────────────────────────────────────────────────
+    def stop(self, names=None) -> None:
+        """Stop acquiring the named observables (global stop — affects all directors).
 
-    def get_capabilities(self) -> dict:
-        """Return the device's :class:`Capabilities` as a JSON-compatible dict.
+        Parameters
+        ----------
+        names:
+            List of observable names to stop.  ``None`` (default) stops all.
+        """
+        instr = StopInstruction(names=names, requester='')
+        self._instruction_queue.put(instr)
+        self._new_instruction_event.set()
+
+    def get_acquisition_status(self) -> dict:
+        """Return the current acquisition state as a JSON-compatible dict.
 
         Returns
         -------
         dict
-            Result of :meth:`Capabilities.to_dict`.
+            ``{"read_list": {...}, "is_grabbing": bool}``
         """
+        read_list_serial: dict = {}
+        for key, req in self._read_list.items():
+            if key is None:
+                channel_key = '__all__'
+            else:
+                channel_key = '/'.join(sorted(key))
+            read_list_serial[channel_key] = {
+                'names': req.names,
+                'count': None if math.isinf(req.count) else req.count,
+                'period': req.period,
+                'requester': req.requester,
+            }
+        return {
+            'read_list': read_list_serial,
+            'is_grabbing': bool(self._read_list),
+        }
+
+    def get_read_list(self) -> dict:
+        """Return the current read list.  Alias for :meth:`get_acquisition_status`."""
+        return self.get_acquisition_status()
+
+    # ── Introspection ──────────────────────────────────────────────────────────
+
+    def get_capabilities(self) -> dict:
+        """Return the device's :class:`Capabilities` as a JSON-compatible dict."""
         caps = infer_capabilities(self.device)
         return caps.to_dict()
 
     def get_pymodaq_settings(self) -> Optional[str]:
-        """Return the device's parameter tree as an XML string.
-
-        Returns ``None`` if the device does not expose settings.
-        """
+        """Return the device's parameter tree as an XML string."""
         if hasattr(self.device, 'get_settings'):
             result = self.device.get_settings()
             if isinstance(result, bytes):
@@ -291,54 +541,27 @@ class PymodaqActor(Actor):
         return None
 
     def get_actor_pub_topic(self) -> str:
-        """Return the ZMQ publish topic base used by this actor.
-
-        Directors call this during ``ini_stage`` / ``ini_detector`` to
-        obtain the exact topic prefix to subscribe to, instead of guessing
-        the namespace-qualified name from the coordinator name.
-
-        Returns
-        -------
-        str
-            ``publisher.full_name`` — e.g. ``'localhost.stage'`` after sign-in.
-        """
+        """Return the ZMQ publish topic base used by this actor."""
         return self.publisher.full_name
 
     def get_role(self) -> dict:
-        """Return role and bind address for network manager discovery.
-
-        Returns
-        -------
-        dict
-            ``{"role": "actor", "host": <bind-address>}`` where ``host`` is the
-            publisher's ``full_name`` (e.g. ``"localhost.stage"``).  A plain
-            dict is returned so the response remains forward-compatible.
-        """
+        """Return role dict for network manager discovery."""
         return {"role": "actor", "host": self.publisher.full_name}
 
     def shutdown(self) -> None:
-        """Stop continuous acquisition, disconnect all directors, close device.
+        """Stop hardware loop, notify directors, signal listen loop to exit."""
+        # Stop hardware loop.
+        self._hw_stop_event.set()
+        self._new_instruction_event.set()
+        if self._hw_thread is not None and self._hw_thread.is_alive():
+            self._hw_thread.join(timeout=2.0)
+        self._hw_thread = None
 
-        Called by the LECO Network Manager to cleanly remove a stale or unwanted
-        actor.  After this call the actor's listen loop will exit on the next tick
-        (the stop-event is set) and the component will unregister from the
-        coordinator.
-        """
-        # Stop any running continuous grab.
-        self._stop_grab_flag = True
-        if self._grab_thread is not None and self._grab_thread.is_alive():
-            self._grab_thread.join(timeout=2.0)
-        self._grab_thread = None
-        self._grabbed_names = None
-
-        # Notify registered directors that the actor is going away.
+        # Notify registered directors.
         for director_name in list(self._director_registry):
             try:
                 communicator = self.get_communicator()
-                communicator.ask_rpc(
-                    receiver=director_name,
-                    method='disconnect',
-                )
+                communicator.ask_rpc(receiver=director_name, method='disconnect')
             except Exception:
                 logger.debug("shutdown: could not notify director '%s'", director_name)
         self._director_registry.clear()
@@ -353,7 +576,7 @@ class PymodaqActor(Actor):
         logger.info("Actor '%s' shutdown complete.", self.name)
 
     def set_info(self, path: str, value: Any) -> None:
-        """Update a setting on the device and broadcast to registered directors.
+        """Update a setting on the device (enqueued so it runs before next read).
 
         Parameters
         ----------
@@ -362,139 +585,86 @@ class PymodaqActor(Actor):
         value:
             New value for the parameter.
         """
-        if hasattr(self.device, 'set_info'):
-            self.device.set_info(path, value)
-        self._broadcast_settings()
+        req_id = generate_conversation_id()
+        instr = WriteInstruction(
+            name=('settings', path),
+            value=value,
+            requester='',
+            req_id=req_id,
+        )
+        self._instruction_queue.put(instr)
+        self._new_instruction_event.set()
 
     def subscribe_director(self, name: str) -> None:
-        """Register a director to receive settings broadcasts.
-
-        Parameters
-        ----------
-        name:
-            Full LECO name of the director (``namespace.component``).
-        """
+        """Register a director to receive settings and acquisition status broadcasts."""
         self._director_registry.add(name)
         logger.debug("Director '%s' subscribed to actor '%s'.", name, self.name)
 
     def unsubscribe_director(self, name: str) -> None:
-        """Remove a director from settings broadcasts.
-
-        Parameters
-        ----------
-        name:
-            Full LECO name of the director.
-        """
+        """Remove a director from broadcasts."""
         self._director_registry.discard(name)
         logger.debug("Director '%s' unsubscribed from actor '%s'.", name, self.name)
 
-    def set_published_names(self, names: Optional[list]) -> None:
-        """Configure which observable/variable names are published in continuous mode.
+    # ── Deprecated aliases (kept for one release cycle) ───────────────────────
 
-        Parameters
-        ----------
-        names:
-            List of names to publish.  ``None`` removes the filter (publish everything).
-            An empty list disables all continuous publication.
-        """
-        self._published_names = set(names) if names is not None else None
-        logger.debug("'%s' published_names set to: %s", self.name, self._published_names)
+    def query_data_continuous(self, rate_hz: float = 0) -> None:
+        """Deprecated: use ``query_data(count=math.inf, period=1/rate_hz)``."""
+        period = 1.0 / rate_hz if rate_hz > 0 else 0.0
+        self.query_data(names=None, count=math.inf, fresh=True, period=period)
 
-    def get_published_names(self) -> Optional[list]:
-        """Return the current continuous-publish filter.
-
-        Returns
-        -------
-        list[str] or None
-            Sorted list of names that will be published in continuous mode,
-            or ``None`` if no filter is set (all names are published).
-        """
-        if self._published_names is None:
-            return None
-        return sorted(self._published_names)
+    def stop_continuous(self) -> None:
+        """Deprecated: use ``stop(names=None)``."""
+        self.stop(names=None)
 
     def get_grabbed_names(self) -> Optional[list]:
-        """Return the names currently being grabbed in continuous mode.
-
-        Returns
-        -------
-        list[str] or None
-            Sorted list of names actively grabbed, or ``None`` when not in
-            continuous mode or when grabbing all names (no filter).
-        """
-        if self._grabbed_names is None:
+        """Deprecated: use ``get_read_list()``."""
+        if not self._read_list:
             return None
-        return sorted(self._grabbed_names)
+        names: list[str] = []
+        for key in self._read_list:
+            if key is None:
+                return None  # "all channels" entry
+            names.extend(key)
+        return sorted(set(names))
 
-    # def pong(self) -> str:
-    #     """Heartbeat reply — called by directors to verify connectivity."""
-    #     return "pong"
-    # ── Data channel (periodic readout) ───────────────────────────────────────
+    def set_published_names(self, names: Optional[list]) -> None:
+        """Deprecated — no-op.  Use the read_list API instead."""
+        logger.warning(
+            "set_published_names() is deprecated and has no effect. "
+            "Use query_data(count=math.inf) to control what the actor reads."
+        )
 
-    def read_publish(self, device, publisher: DataPublisher) -> None:
-        """Called by the periodic timer: read device and publish on data channel.
-
-        Override of :meth:`pyleco.actors.Actor.read_publish`.
-        Respects :attr:`_published_names`: if set to an empty set, skips publication.
-        """
-        if self._stop_grab_flag:
-            return
-        # If _published_names is explicitly set to empty, nothing to publish.
-        if self._published_names is not None and not self._published_names:
-            return
-        names = list(self._published_names) if self._published_names is not None else None
-        try:
-            dte = device.read(names)
-        except Exception:
-            logger.exception("read_publish: device.read() raised an exception")
-            return
-        if dte is not None:
-            self._last_data = dte
-            self._publish(dte)
+    def get_published_names(self) -> Optional[list]:
+        """Deprecated: use ``get_read_list()``."""
+        return self.get_grabbed_names()
 
     # ── Internal helpers ───────────────────────────────────────────────────────
 
-    def _publish(self, dte) -> Optional[str]:
+    def _publish(self, dte, cid=None) -> Optional[str]:
         """Serialize *dte* and publish each channel on its own sub-topic.
 
-        Each :class:`DataWithAxes` in *dte* is wrapped in a single-DWA
-        :class:`DataToExport` and published to ``"{actor_name}/{dwa.name}"``.
-        Directors subscribe to their specific channel topic so the ZMQ broker
-        drops irrelevant frames before they reach Python.
-
-        When per-channel proxy overrides are configured, each ``DataWithAxes``
-        is routed to the publisher whose proxy was selected for that channel in
-        the actor GUI; channels with no override go to the default publisher.
+        Parameters
+        ----------
+        dte:
+            :class:`DataToExport` to publish.
+        cid:
+            Optional conversation ID (:class:`bytes`).  Generated if ``None``.
 
         Returns
         -------
         str or None
-            Hex-encoded conversation ID embedded in the ZMQ frame header, or
-            ``None`` if serialization / publish failed.  Directors can compare
-            this value against the ``cid`` field in the ``'data_received'``
-            :class:`ThreadCommand` to match a specific frame.
+            Hex-encoded conversation ID, or ``None`` on failure.
         """
         try:
             from serializall import SerializableFactory
             factory = SerializableFactory()
-            cid = generate_conversation_id()
-
-            # Publish each DWA to its own sub-topic: "{actor_name}/{dwa.name}".
-            # Directors subscribe to the per-channel topic so ZMQ drops irrelevant
-            # frames before they reach Python — no name filtering needed at the director.
-            # One conversation_id is shared across all DWAs in this call so callers can
-            # correlate the RPC return value with the matching ZMQ frames.
-            # Use publisher.full_name (not self.name) as the base topic — pyleco
-            # calls publisher.set_full_name('namespace.name') after coordinator
-            # sign-in, so this stays in sync with what directors subscribe to.
+            if cid is None:
+                cid = generate_conversation_id()
             base_topic = self.publisher.full_name
             for dwa in dte.data:
                 sub_dte = DataToExport(name=dwa.name, data=[dwa])
                 payload: bytes = factory.get_apply_serializer(sub_dte)
                 topic = f"{base_topic}/{dwa.name}"
-                # Route to per-channel proxy publisher if configured, else default.
-                # Extra publishers use the same base_topic — they differ only in
-                # which proxy endpoint (host:port) they connect to.
                 key = self._channel_proxy_keys.get(dwa.name)
                 pub = self._extra_publishers.get(key) if key is not None else None
                 (pub or self.publisher).send_data(
@@ -523,137 +693,47 @@ class PymodaqActor(Actor):
                     )
                 except Exception:
                     logger.warning(
-                        "Failed to broadcast settings to director '%s'; "
-                        "removing from registry.",
+                        "Failed to broadcast settings to director '%s'; removing.",
                         director_name,
                     )
                     self._director_registry.discard(director_name)
         except Exception:
             logger.exception("_broadcast_settings: failed to get communicator")
 
-    def _broadcast_grab_status(self) -> None:
-        """Push current continuous-grab status to all registered directors."""
+    def _broadcast_acquisition_status(self) -> None:
+        """Push current acquisition status to all registered directors."""
         if not self._director_registry:
             return
-        is_continuous = self._grab_thread is not None and self._grab_thread.is_alive()
-        grabbed = self.get_grabbed_names()
+        status = self.get_acquisition_status()
         try:
             communicator = self.get_communicator()
             for director_name in list(self._director_registry):
                 try:
                     communicator.ask_rpc(
                         receiver=director_name,
-                        method='on_grab_status',
-                        grabbed_names=grabbed,
-                        is_continuous=is_continuous,
+                        method='on_acquisition_status',
+                        read_list=status['read_list'],
+                        is_grabbing=status['is_grabbing'],
                     )
                 except Exception:
                     logger.warning(
-                        "Failed to broadcast grab status to director '%s'.",
-                        director_name,
+                        "Failed to broadcast acquisition status to '%s'.", director_name
                     )
         except Exception:
-            logger.exception("_broadcast_grab_status: failed to get communicator")
+            logger.exception("_broadcast_acquisition_status: failed to get communicator")
 
-    # ── Continuous acquisition ─────────────────────────────────────────────────
-
-    def query_data_continuous(self, rate_hz: float = 0) -> None:
-        """Start a continuous acquisition loop that publishes on the data channel.
-
-        Idempotent: if the loop is already running a second call has no effect
-        beyond broadcasting the current grab status to all registered directors
-        (so their GUIs can mirror the state).
-
-        Parameters
-        ----------
-        rate_hz:
-            Target publish rate in frames per second.
-            ``0`` (default) means as fast as ``device.read()`` allows.
-
-        Notes
-        -----
-        ``device.read()`` is called from a background thread; avoid issuing
-        concurrent ``query_data`` RPC calls while continuous acquisition is running.
-        The names published are determined by :attr:`_published_names` at the moment
-        this method is called and do not change for the lifetime of the loop.
-        """
-        if self._grab_thread is not None and self._grab_thread.is_alive():
-            # Already running — broadcast current status so the caller's GUI mirrors it.
-            logger.debug(
-                "query_data_continuous: loop already running on '%s'; broadcasting status.",
-                self.name,
-            )
-            self._broadcast_grab_status()
-            return
-        self._stop_grab_flag = False
-        # Snapshot the publish filter at grab-start time.
-        self._grabbed_names = (
-            set(self._published_names) if self._published_names is not None else None
-        )
-        self._grab_thread = threading.Thread(
-            target=self._grab_loop,
-            args=(rate_hz,),
-            daemon=True,
-            name=f"continuous-{self.name}",
-        )
-        self._grab_thread.start()
-        self._broadcast_grab_status()
-
-    def stop_continuous(self) -> None:
-        """Stop the continuous acquisition loop and notify registered directors.
-
-        Sets the stop flag, waits up to 2 s for the loop thread to exit,
-        clears the grabbed-names snapshot, and broadcasts the updated status.
-        Safe to call even when no continuous acquisition is running.
-        """
-        self._stop_grab_flag = True
-        if self._grab_thread is not None and self._grab_thread.is_alive():
-            self._grab_thread.join(timeout=2.0)
-        self._grab_thread = None
-        self._grabbed_names = None
-        self._broadcast_grab_status()
-
-    def _grab_loop(self, rate_hz: float) -> None:
-        """Background thread body for continuous acquisition."""
-        interval = 1.0 / rate_hz if rate_hz > 0 else 0.0
-        # Snapshot once — the filter does not change mid-loop.
-        names = list(self._grabbed_names) if self._grabbed_names is not None else None
-        while not self._stop_grab_flag:
-            t0 = time.monotonic()
-            try:
-                dte = self.device.read(names)
-            except Exception:
-                logger.exception("_grab_loop: device.read() failed; stopping")
-                break
-            if dte is not None:
-                self._last_data = dte
-                self._publish(dte)
-            if interval > 0:
-                elapsed = time.monotonic() - t0
-                remaining = interval - elapsed
-                if remaining > 0:
-                    time.sleep(remaining)
-
-    # ── Legacy aliases ─────────────────────────────────────────────────────────
+    # ── Legacy RPC aliases ─────────────────────────────────────────────────────
 
     def _legacy_grab(self) -> None:
-        """Legacy alias for ``grab`` / ``snap`` / ``get_actuator_value`` RPC names.
-
-        Triggers :meth:`query_data` with ``fresh=True``.
-        """
-        self._stop_grab_flag = False
-        self.query_data(names=None, fresh=True)
+        """Legacy alias for ``grab`` / ``snap`` / ``get_actuator_value`` RPC names."""
+        self.query_data(names=None, count=1, fresh=True)
 
     def _legacy_move_abs(self, position: float) -> None:
         """Legacy alias: ``move_abs(position)`` → ``change_to('position', position)``."""
         self.change_to('position', position)
 
     def _legacy_move_rel(self, position: float) -> None:
-        """Legacy alias: ``move_rel(delta)`` — relative move.
-
-        Delegates to ``device.move_rel(delta)`` if available, otherwise raises
-        :class:`NotImplementedError`.
-        """
+        """Legacy alias: ``move_rel(delta)`` — relative move."""
         if hasattr(self.device, 'move_rel'):
             self.device.move_rel(position)
         else:
@@ -663,11 +743,7 @@ class PymodaqActor(Actor):
             )
 
     def _legacy_move_home(self) -> None:
-        """Legacy alias: ``move_home()`` — move to home position.
-
-        Delegates to ``device.home()`` or ``device.move_home()`` if available,
-        otherwise writes ``0.0`` to the ``'position'`` variable.
-        """
+        """Legacy alias: ``move_home()`` — move to home position."""
         if hasattr(self.device, 'home'):
             self.device.home()
         elif hasattr(self.device, 'move_home'):
@@ -682,46 +758,23 @@ def actor_main() -> None:  # pragma: no cover
     """CLI entry point: ``pymodaq-actor``."""
     import argparse
     import importlib
-    import threading
 
     parser = argparse.ArgumentParser(
         prog='pymodaq-actor',
         description='Launch a headless PyMoDAQ hardware actor.',
     )
     parser.add_argument(
-        '--plugin',
-        required=True,
-        metavar='MODULE.CLASS',
-        help=(
-            'Fully qualified plugin class, e.g. '
-            '"pymodaq_plugins_andor.daq_2Dviewer_andor.DAQ_2DViewer_Andor"'
-        ),
+        '--plugin', required=True, metavar='MODULE.CLASS',
+        help='Fully qualified plugin class.',
     )
-    parser.add_argument(
-        '--name',
-        required=True,
-        help='LECO actor name (used for addressing and data-channel topic).',
-    )
-    parser.add_argument(
-        '--host',
-        default='localhost',
-        help='Hostname of the LECO Coordinator (default: localhost).',
-    )
-    parser.add_argument(
-        '--port',
-        type=int,
-        default=None,
-        help='Port of the LECO Coordinator (default: pyleco default).',
-    )
-    parser.add_argument(
-        '--polling',
-        type=float,
-        default=-1.0,
-        help='Periodic readout interval in seconds (-1 = disabled, default).',
-    )
+    parser.add_argument('--name', required=True,
+                        help='LECO actor name.')
+    parser.add_argument('--host', default='localhost',
+                        help='Hostname of the LECO Coordinator (default: localhost).')
+    parser.add_argument('--port', type=int, default=None,
+                        help='Port of the LECO Coordinator.')
     args = parser.parse_args()
 
-    # Dynamically load the plugin class
     module_path, class_name = args.plugin.rsplit('.', 1)
     module = importlib.import_module(module_path)
     device_class = getattr(module, class_name)
@@ -730,12 +783,7 @@ def actor_main() -> None:  # pragma: no cover
     if args.port is not None:
         actor_kwargs['port'] = args.port
 
-    actor = PymodaqActor(
-        name=args.name,
-        device_class=device_class,
-        periodic_reading=args.polling,
-        **actor_kwargs,
-    )
+    actor = PymodaqActor(name=args.name, device_class=device_class, **actor_kwargs)
 
     stop_event = threading.Event()
     try:

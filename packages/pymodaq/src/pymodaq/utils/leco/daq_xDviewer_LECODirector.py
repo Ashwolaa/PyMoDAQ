@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from typing import Optional, Union
 
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, comon_parameters, main
@@ -37,16 +38,8 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
          'limits': ['data'], 'value': 'data',
          'tip': 'Which observable (channel) this viewer shows. '
                 'Populated automatically from actor capabilities on init or via "Query capabilities".'},
-        {'title': 'Live acquisition mode:', 'name': 'live_mode', 'type': 'list',
-         'limits': ['sequential', 'continuous'], 'value': 'sequential',
-         'tip': (
-             'sequential: director requests one frame at a time — inherently backpressure-safe, '
-             'rate limited by device.read() + network round-trip. '
-             'continuous: actor streams at max_rate_hz — lower overhead for fast sensors, '
-             'but can overwhelm the GUI for large arrays if rate_hz is too high.'
-         )},
         {'title': 'Max rate (Hz):', 'name': 'max_rate_hz', 'type': 'float', 'value': 10.0,
-         'tip': 'Maximum publish rate used in continuous live mode. 0 = unlimited (not recommended for large arrays).'},
+         'tip': 'Maximum publish rate for live acquisition. 0 = as fast as hardware allows.'},
     ]
     live_mode_available = True
 
@@ -67,7 +60,7 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         LECODirector.__init__(self, host=self.settings["host"], port=self.settings["port"])
 
         self.register_binary_rpc_methods((self.set_data,))
-        self.register_rpc_methods((self.on_grab_status,))
+        self.register_rpc_methods((self.on_acquisition_status,))
 
         self.client_type = "GRABBER"
         self.x_axis = None
@@ -76,7 +69,6 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         self.grabber_type = grabber_type
         self.ind_data = 0
         self.data_mock = None
-        self._live_sequential: bool = False  # True only during sequential live grab
         self._accepting_data: bool = False   # gate: True only while a grab is active
         self._live_grab: bool = False        # True when grab_data(live=True) was called
         self.start_timer()
@@ -139,15 +131,31 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
                     self.listener.subscribe(self._actor_sub_name)
                 except Exception:
                     logger.warning("Could not subscribe to actor ZMQ data channel.")
-                # Request initial frame so the display is populated on startup.
-                # Open the gate for one snap so the first frame is not dropped.
-                self._accepting_data = True
+                # Pre-open gate if actor is already acquiring our channel.
                 try:
-                    obs_name = self.settings['observable_name'] or None
-                    self.controller.query_data(names=[obs_name] if obs_name else None, fresh=True)
+                    acq = self.controller.get_acquisition_status()
+                    obs_name = self.settings['observable_name'] or 'data'
+                    read_list = acq.get('read_list') or {}
+                    if acq.get('is_grabbing') and (
+                        obs_name in read_list or '__all__' in read_list
+                    ):
+                        self._accepting_data = True
+                        self._live_grab = True
                 except Exception:
-                    self._accepting_data = False
-                    logger.warning("Could not request initial data from actor.")
+                    pass
+                # Request initial frame so the display is populated on startup.
+                # Open the gate for one snap if not already grabbing.
+                if not self._accepting_data:
+                    self._accepting_data = True
+                    try:
+                        obs_name = self.settings['observable_name'] or None
+                        self.controller.query_data(
+                            names=[obs_name] if obs_name else None,
+                            count=1, fresh=True,
+                        )
+                    except Exception:
+                        self._accepting_data = False
+                        logger.warning("Could not request initial data from actor.")
         else:
             self.controller = controller
 
@@ -185,61 +193,45 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
             obs_name = self.settings['observable_name'] or None
             obs_names = [obs_name] if obs_name else None
             if live:
-                if self.settings['live_mode'] == 'continuous':
-                    # Actor background thread streams frames at the configured rate.
-                    # Director receives passively via ZMQ subscription.
-                    rate_hz = self.settings['max_rate_hz']
-                    self.controller.query_data_continuous(rate_hz=rate_hz)
-                else:
-                    # Sequential: request one frame; _on_actor_data re-requests the next.
-                    # Naturally backpressure-safe — rate bounded by device.read() latency.
-                    self._live_sequential = True
-                    self.controller.query_data(names=obs_names, fresh=True)
+                # Continuous: actor reads at max_rate_hz; director receives via ZMQ.
+                rate_hz = self.settings['max_rate_hz']
+                period = 1.0 / rate_hz if rate_hz > 0 else 0.0
+                self.controller.query_data(
+                    names=obs_names,
+                    count=math.inf,
+                    fresh=True,
+                    period=period,
+                )
             else:
                 # Single snap: actor reads once and publishes one ZMQ frame.
-                self._live_sequential = False
-                self.controller.query_data(names=obs_names, fresh=True)
+                self.controller.query_data(names=obs_names, count=1, fresh=True)
 
     def stop(self):
         """Stop grabbing."""
         self._accepting_data = False
-        self._live_sequential = False
         self._live_grab = False
         if self.settings['use_legacy_actor']:
             self.controller.stop_grab()
         else:
-            if self.settings['live_mode'] == 'continuous':
-                try:
-                    self.controller.stop_continuous()
-                except Exception:
-                    logger.warning("stop: could not stop actor continuous grab")
+            obs_name = self.settings['observable_name'] or None
+            try:
+                self.controller.stop(names=[obs_name] if obs_name else None)
+            except Exception:
+                logger.warning("stop: could not stop actor acquisition")
 
     def _on_actor_data(self, topic: str, dte) -> None:
         """Handle data published by the PymodaqActor on the ZMQ data channel.
 
         The director is subscribed to ``"{actor}/{observable_name}"`` so only
         frames for this channel arrive here — no name filtering needed.
-        The ``_accepting_data`` gate prevents processing spurious frames from
-        the actor's periodic timer when no grab is active (idle state) and
-        after a snap has been consumed.
+        The ``_accepting_data`` gate prevents processing spurious frames when
+        no grab is active (idle) and closes after a snap has been consumed.
         Called when ``use_legacy_actor=False``.
         """
         if not self._accepting_data or dte is None:
             return
         self.dte_signal.emit(dte)
-        if self._live_sequential:
-            # Sequential mode: request next frame only after this one was received.
-            # Provides automatic backpressure — no frame is requested before the
-            # previous DataToExport has been delivered to the viewer.
-            obs_name = self.settings['observable_name'] or None
-            try:
-                self.controller.query_data(
-                    names=[obs_name] if obs_name else None, fresh=True
-                )
-            except Exception:
-                logger.warning("_on_actor_data: failed to request next frame; stopping sequential grab")
-                self._live_sequential = False
-        elif not self._live_grab:
+        if not self._live_grab:
             # Snap mode: one frame consumed — go idle until next grab_data() call.
             self._accepting_data = False
 
@@ -321,8 +313,8 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
         if current not in obs_names:
             self.settings.child('observable_name').setValue(obs_names[0])
 
-    def on_grab_status(self, grabbed_names, is_continuous: bool) -> None:
-        """Invoked by the actor when its continuous-grab status changes.
+    def on_acquisition_status(self, read_list: dict, is_grabbing: bool) -> None:
+        """Invoked by the actor when its acquisition status changes.
 
         Allows this director's GUI to mirror the grab state of the actor
         even when the grab was initiated by a different director.  Opens or
@@ -331,26 +323,31 @@ class DAQ_xDViewer_LECODirector(LECODirector, DAQ_Viewer_base):
 
         Parameters
         ----------
-        grabbed_names:
-            List of names currently being grabbed, or ``None`` for all.
-        is_continuous:
-            ``True`` while the actor's background grab loop is running.
+        read_list:
+            Current read_list dict from the actor.
+        is_grabbing:
+            ``True`` while the actor has at least one active read request.
         """
-        if is_continuous:
+        obs_name = self.settings['observable_name'] or 'data'
+        if is_grabbing and (obs_name in read_list or '__all__' in read_list):
             self._accepting_data = True
             self._live_grab = True
-        else:
+        elif not is_grabbing:
             self._accepting_data = False
-            self._live_sequential = False
             self._live_grab = False
-        self.emit_status(ThreadCommand('GRAB_STATUS', {
-            'grabbed_names': grabbed_names,
-            'is_continuous': is_continuous,
+        self.emit_status(ThreadCommand('ACQUISITION_STATUS', {
+            'read_list': read_list,
+            'is_grabbing': is_grabbing,
         }))
 
     def close(self) -> None:
         self.timer.stop()
         if not self.settings['use_legacy_actor'] and self.controller is not None:
+            obs_name = self.settings['observable_name'] or None
+            try:
+                self.controller.stop(names=[obs_name] if obs_name else None)
+            except Exception:
+                pass
             try:
                 self.controller.unsubscribe_settings()
             except Exception:
