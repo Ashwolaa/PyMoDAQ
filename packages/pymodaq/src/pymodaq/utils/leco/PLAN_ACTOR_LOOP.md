@@ -598,7 +598,7 @@ existing `pytestmark_qt` skip pattern from `conftest.py`.
 
 ---
 
-### Phase 0 — Data structures
+### Phase 0 — Data structures ✅ IMPLEMENTED
 **Files**: `actor.py` (add dataclasses at top), `rpc_method_definitions.py`
 No behavioral change.  Purely additive.
 
@@ -612,7 +612,7 @@ No behavioral change.  Purely additive.
 
 ---
 
-### Phase 1 — Hardware loop thread
+### Phase 1 — Hardware loop thread ✅ IMPLEMENTED
 **Files**: `actor.py`
 Replace `_grab_loop` + pyleco timer with `_hardware_loop()`.  `stop_timer()` called in
 `connect()`.  Add `_instruction_queue: queue.Queue`, `_new_instruction_event: threading.Event`.
@@ -631,7 +631,7 @@ Replace `_grab_loop` + pyleco timer with `_hardware_loop()`.  `stop_timer()` cal
 
 ---
 
-### Phase 2 — RPC handler rewiring
+### Phase 2 — RPC handler rewiring ✅ IMPLEMENTED
 **Files**: `actor.py`
 `query_data(fresh=True)` enqueues `ReadRequest` and returns `req_id`.
 `query_data(fresh=False)` publishes `_last_data` synchronously.
@@ -655,7 +655,7 @@ Replace `_grab_loop` + pyleco timer with `_hardware_loop()`.  `stop_timer()` cal
 
 ---
 
-### Phase 3 — Director utils
+### Phase 3 — Director utils ✅ IMPLEMENTED
 **Files**: `director_utils.py`, `rpc_method_definitions.py`
 Add `query_data(names, count, fresh, period)`, `stop()`, `get_acquisition_status()`,
 `get_read_list()` to `PymodaqDirector`.  Keep deprecated aliases.
@@ -671,7 +671,7 @@ Add `query_data(names, count, fresh, period)`, `stop()`, `get_acquisition_status
 
 ---
 
-### Phase 4 — Viewer director
+### Phase 4 — Viewer director ✅ IMPLEMENTED
 **Files**: `daq_xDviewer_LECODirector.py`
 Use new API in `grab_data` and `stop`.  Remove `_live_sequential`.
 Add `on_acquisition_status` RPC handler.  Pre-open gate in `ini_detector`.
@@ -692,7 +692,7 @@ Add `on_acquisition_status` RPC handler.  Pre-open gate in `ini_detector`.
 
 ---
 
-### Phase 5 — Move director
+### Phase 5 — Move director ✅ IMPLEMENTED
 **Files**: `daq_move_LECODirector.py`
 Continuous position subscription at `ini_stage`.  `get_actuator_value` uses `fresh=False`.
 `_epsilon` set from capabilities.  `on_acquisition_status` handler.  `close` stops read.
@@ -710,7 +710,7 @@ Continuous position subscription at `ini_stage`.  `get_actuator_value` uses `fre
 
 ---
 
-### Phase 6 — GUI widget
+### Phase 6 — GUI widget ✅ IMPLEMENTED
 **File**: `actor_grab_status_widget.py` (new)
 `ActorGrabStatusWidget(QWidget)`.  Embedded in both director settings panels.
 
@@ -723,7 +723,7 @@ Continuous position subscription at `ini_stage`.  `get_actuator_value` uses `fre
 
 ---
 
-### Phase 7 — Error propagation
+### Phase 7 — Error propagation ✅ IMPLEMENTED
 **Files**: `actor.py`, `daq_xDviewer_LECODirector.py`, `daq_move_LECODirector.py`
 `on_hardware_error` RPC callback.  Failing `_read_list` entry removed.
 
@@ -739,7 +739,7 @@ Continuous position subscription at `ini_stage`.  `get_actuator_value` uses `fre
 
 ---
 
-### Phase 8 — Cleanup
+### Phase 8 — Cleanup ✅ IMPLEMENTED
 **Files**: `actor.py`, `director_utils.py`
 Remove: `_grab_loop`, `_published_names`, `get_published_names`, `set_published_names`,
 `query_data_continuous` (actor-side), `stop_continuous` (actor-side), `periodic_reading`

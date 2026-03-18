@@ -6,6 +6,7 @@ Pattern: create actor with FakeContext; call handle_request_message(actor, metho
 to simulate an RPC arriving at the actor; verify actor state and/or published frames.
 """
 import json
+import time
 import numpy as np
 import pytest
 from serializall import SerializableFactory
@@ -84,20 +85,34 @@ def _published(actor: PymodaqActor) -> list:
     return actor.publisher.socket._s
 
 
+def _wait_for_loop(actor: PymodaqActor, timeout: float = 1.0) -> None:
+    """Block until the hardware loop has drained the instruction queue."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if actor._instruction_queue.empty():
+            time.sleep(0.02)  # let the loop tick complete
+            return
+        time.sleep(0.01)
+
+
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def stage_actor():
     actor = PymodaqActor('N.stage', MockStage, context=FakeContext())
     actor.connect()
-    return actor
+    yield actor
+    actor._hw_stop_event.set()
+    actor._new_instruction_event.set()
 
 
 @pytest.fixture
 def camera_actor():
     actor = PymodaqActor('N.cam', MockCamera, context=FakeContext())
     actor.connect()
-    return actor
+    yield actor
+    actor._hw_stop_event.set()
+    actor._new_instruction_event.set()
 
 
 @pytest.fixture
@@ -122,21 +137,25 @@ class TestMoveActorRPC:
 
     def test_change_to_writes_device(self, stage_actor):
         handle_request_message(stage_actor, 'change_to', name='position', value=12.5)
+        _wait_for_loop(stage_actor)
         assert stage_actor.device._position == pytest.approx(12.5)
 
     def test_change_to_auto_publishes(self, stage_actor):
-        """change_to must publish updated state immediately (no extra query_data needed)."""
+        """change_to must publish updated state (via auto-readback) after write completes."""
         handle_request_message(stage_actor, 'change_to', name='position', value=5.0)
+        _wait_for_loop(stage_actor)
         assert len(_published(stage_actor)) >= 1
         assert stage_actor.device.read_count >= 1
 
     def test_query_data_publishes(self, stage_actor):
         handle_request_message(stage_actor, 'query_data', names=None, fresh=True)
+        _wait_for_loop(stage_actor)
         assert len(_published(stage_actor)) == 1
         assert stage_actor.device.read_count == 1
 
     def test_query_data_fresh_false_no_new_read(self, stage_actor):
         handle_request_message(stage_actor, 'query_data', names=None, fresh=True)
+        _wait_for_loop(stage_actor)
         count_before = stage_actor.device.read_count
         handle_request_message(stage_actor, 'query_data', names=None, fresh=False)
         assert stage_actor.device.read_count == count_before
@@ -164,6 +183,7 @@ class TestMoveActorRPC:
 
     def test_change_to_list(self, stage_actor):
         handle_request_message(stage_actor, 'change_to', name=['position'], value=[7.0])
+        _wait_for_loop(stage_actor)
         assert stage_actor.device._position == pytest.approx(7.0)
 
     def test_query_data_returns_cid(self, stage_actor):
@@ -184,6 +204,7 @@ class TestMoveActorRPC:
         """CID returned by query_data must match the header of the published ZMQ frame."""
         handle_request_message(stage_actor, 'query_data', names=None, fresh=True)
         cid_rpc = _last_rpc_result(stage_actor)
+        _wait_for_loop(stage_actor)
         # DataMessage frame layout: [topic, header(17B), payload]
         # header = CID(16B) + message_type(1B)
         zmq_frame_header = _published(stage_actor)[-1][1]
@@ -194,6 +215,7 @@ class TestMoveActorRPC:
         """CID returned by change_to must match the header of the auto-published frame."""
         handle_request_message(stage_actor, 'change_to', name='position', value=8.0)
         cid_rpc = _last_rpc_result(stage_actor)
+        _wait_for_loop(stage_actor)
         zmq_frame_header = _published(stage_actor)[-1][1]
         cid_zmq = zmq_frame_header[:16].hex()
         assert cid_rpc == cid_zmq
@@ -203,15 +225,18 @@ class TestDetectorActorRPC:
 
     def test_query_data_reads_device(self, camera_actor):
         handle_request_message(camera_actor, 'query_data', names=None, fresh=True)
+        _wait_for_loop(camera_actor)
         assert camera_actor.device.read_count == 1
 
     def test_query_data_published_deserializes(self, camera_actor):
         from pymodaq_data.data import DataToExport
         handle_request_message(camera_actor, 'query_data', names=None, fresh=True)
+        _wait_for_loop(camera_actor)
         payload = _published(camera_actor)[0][2]
         dte = SerializableFactory().get_apply_deserializer(payload)
         assert isinstance(dte, DataToExport)
-        assert dte.name == 'cam'
+        # Actor publishes each channel as DataToExport(name=channel_name, ...)
+        assert dte.name == 'frame'
 
     def test_capabilities_has_observable(self, camera_actor):
         handle_request_message(camera_actor, 'get_capabilities')

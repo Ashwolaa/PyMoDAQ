@@ -62,19 +62,52 @@ def base_director():
 def test_query_data_no_args(base_director):
     base_director.query_data()
     assert base_director.method == "query_data"
-    assert base_director.kwargs == {"names": None, "fresh": True}
+    assert base_director.kwargs == {"names": None, "count": 1, "fresh": True, "period": 0.0}
 
 
 def test_query_data_single_name(base_director):
     base_director.query_data("frame")
     assert base_director.method == "query_data"
-    assert base_director.kwargs == {"names": "frame", "fresh": True}
+    assert base_director.kwargs == {"names": "frame", "count": 1, "fresh": True, "period": 0.0}
 
 
 def test_query_data_fresh_false(base_director):
     base_director.query_data(fresh=False)
     assert base_director.method == "query_data"
-    assert base_director.kwargs == {"names": None, "fresh": False}
+    assert base_director.kwargs == {"names": None, "count": 1, "fresh": False, "period": 0.0}
+
+
+def test_query_data_continuous(base_director):
+    import math
+    base_director.query_data(names="frame", count=math.inf, period=0.1)
+    assert base_director.method == "query_data"
+    assert base_director.kwargs == {"names": "frame", "count": math.inf, "fresh": True, "period": 0.1}
+
+
+# ── stop / get_acquisition_status tests ─────────────────────────────────────
+
+def test_stop_no_args(base_director):
+    base_director.stop()
+    assert base_director.method == "stop"
+    assert base_director.kwargs == {"names": None}
+
+
+def test_stop_named(base_director):
+    base_director.stop(names=["frame"])
+    assert base_director.method == "stop"
+    assert base_director.kwargs == {"names": ["frame"]}
+
+
+def test_get_acquisition_status(base_director):
+    base_director.return_value = {"is_grabbing": False, "read_list": {}}
+    result = base_director.get_acquisition_status()
+    assert base_director.method == "get_acquisition_status"
+
+
+def test_get_read_list(base_director):
+    base_director.return_value = {}
+    base_director.get_read_list()
+    assert base_director.method == "get_read_list"
 
 
 # ── change_to tests ─────────────────────────────────────────────────────────
