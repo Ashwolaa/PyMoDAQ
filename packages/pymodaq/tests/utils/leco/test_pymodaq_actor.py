@@ -1147,3 +1147,155 @@ class TestErrorPropagation:
         move_actor._instruction_queue.put(req)
         move_actor._new_instruction_event.set()
         _wait_for_loop(move_actor)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 2 — Move-done detection
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestGetEpsilon:
+    def test_returns_epsilon_from_capabilities(self, move_actor):
+        # _MockMoveDevice has _epsilons = 0.001 → infer_capabilities gives epsilon=0.001
+        eps = move_actor._get_epsilon('position')
+        assert eps == pytest.approx(0.001)
+
+    def test_unknown_variable_returns_zero(self, move_actor):
+        assert move_actor._get_epsilon('nonexistent') == 0.0
+
+    def test_device_with_explicit_capabilities(self):
+        actor = PymodaqActor(
+            name='caps_actor',
+            device_class=_MockDeviceWithCapabilities,
+            context=FakeContext(),
+        )
+        actor.connect()
+        try:
+            eps = actor._get_epsilon('wavelength')
+            assert eps == pytest.approx(0.01)
+        finally:
+            actor._hw_stop_event.set()
+            actor._new_instruction_event.set()
+
+    def test_caches_capabilities_on_second_call(self, move_actor):
+        move_actor._get_epsilon('position')
+        caps_first = move_actor._cached_capabilities
+        move_actor._get_epsilon('position')
+        assert move_actor._cached_capabilities is caps_first  # same object
+
+
+class TestCheckConvergence:
+    def test_converged_removes_setpoint(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+        move_actor._setpoints['position'] = 5.0
+        move_actor._cached_capabilities = None  # will lazy-load
+
+        dte = DataToExport(
+            name='t', data=[DataRaw('position', data=[np.array([5.0])])]
+        )
+        move_actor._check_convergence(dte)
+        assert 'position' not in move_actor._setpoints
+
+    def test_not_converged_keeps_setpoint(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+        move_actor._setpoints['position'] = 5.0
+
+        dte = DataToExport(
+            name='t', data=[DataRaw('position', data=[np.array([4.0])])]
+        )
+        move_actor._check_convergence(dte)
+        assert 'position' in move_actor._setpoints
+
+    def test_within_epsilon_converged(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+        # epsilon = 0.001 for _MockMoveDevice
+        move_actor._setpoints['position'] = 5.0
+
+        dte = DataToExport(
+            name='t', data=[DataRaw('position', data=[np.array([5.0005])])]
+        )
+        move_actor._check_convergence(dte)
+        assert 'position' not in move_actor._setpoints
+
+    def test_empty_setpoints_is_noop(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+        assert move_actor._setpoints == {}
+        dte = DataToExport(
+            name='t', data=[DataRaw('position', data=[np.array([5.0])])]
+        )
+        move_actor._check_convergence(dte)  # must not raise
+
+    def test_untracked_channel_ignored(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+        move_actor._setpoints['position'] = 5.0
+
+        dte = DataToExport(
+            name='t', data=[DataRaw('other_channel', data=[np.array([99.0])])]
+        )
+        move_actor._check_convergence(dte)
+        assert 'position' in move_actor._setpoints  # unchanged
+
+    def test_broadcasts_change_done_on_convergence(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+        from unittest.mock import patch
+
+        move_actor._director_registry = {'director_1'}
+        move_actor._setpoints['position'] = 5.0
+        broadcast_calls = []
+
+        with patch.object(move_actor, '_broadcast_change_done',
+                          side_effect=lambda n, p: broadcast_calls.append((n, p))):
+            dte = DataToExport(
+                name='t', data=[DataRaw('position', data=[np.array([5.0])])]
+            )
+            move_actor._check_convergence(dte)
+
+        assert broadcast_calls == [('position', pytest.approx(5.0))]
+
+    def test_no_broadcast_without_directors(self, move_actor):
+        from pymodaq_data.data import DataToExport, DataRaw
+
+        move_actor._director_registry = set()
+        move_actor._setpoints['position'] = 5.0
+        broadcast_calls = []
+        move_actor._broadcast_change_done = lambda n, p: broadcast_calls.append((n, p))
+
+        dte = DataToExport(
+            name='t', data=[DataRaw('position', data=[np.array([5.0])])]
+        )
+        move_actor._check_convergence(dte)
+        # _broadcast_change_done is called but should short-circuit with empty registry
+        # (we replaced it, so just verify setpoint was cleared)
+        assert 'position' not in move_actor._setpoints
+
+
+class TestSetpointTracking:
+    def test_change_to_stores_setpoint(self, move_actor):
+        move_actor.change_to('position', 7.0)
+        _wait_for_loop(move_actor)
+        # After write executes, setpoint is either stored or already cleared
+        # (device writes instantly so readback may already have converged)
+        # Check device received the write
+        assert any(c[0] == 'position' for c in move_actor.device.write_calls)
+
+    def test_stop_all_clears_setpoints(self, move_actor):
+        move_actor._setpoints['position'] = 5.0
+        instr = StopInstruction(names=None, requester='')
+        move_actor._instruction_queue.put(instr)
+        move_actor._new_instruction_event.set()
+        _wait_for_loop(move_actor)
+        assert move_actor._setpoints == {}
+
+    def test_stop_named_clears_that_setpoint(self, move_actor):
+        move_actor._setpoints['position'] = 5.0
+        move_actor._setpoints['speed'] = 10.0
+        instr = StopInstruction(names=['position'], requester='')
+        move_actor._instruction_queue.put(instr)
+        move_actor._new_instruction_event.set()
+        _wait_for_loop(move_actor)
+        assert 'position' not in move_actor._setpoints
+        assert 'speed' in move_actor._setpoints
+
+    def test_non_numeric_write_skips_setpoint(self, move_actor):
+        move_actor.change_to('mode', 'fast')
+        _wait_for_loop(move_actor)
+        assert 'mode' not in move_actor._setpoints
