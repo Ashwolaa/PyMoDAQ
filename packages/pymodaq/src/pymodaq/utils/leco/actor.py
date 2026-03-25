@@ -160,6 +160,10 @@ class PymodaqActor(Actor):
         self._write_pending: dict = {}    # name → (value, req_id, requester)
         self._hw_thread: Optional[threading.Thread] = None
 
+        # Move-done detection (Phase 2)
+        self._setpoints: dict[str, float] = {}   # var name → last written setpoint
+        self._cached_capabilities = None          # Capabilities, lazy-loaded on first use
+
     # ── Hardware lifecycle ─────────────────────────────────────────────────────
 
     def connect(self, *args, **kwargs) -> None:
@@ -273,6 +277,11 @@ class PymodaqActor(Actor):
                             pass
                     else:
                         self.device.write(name, value)
+                        # Track setpoint for convergence / move-done detection.
+                        try:
+                            self._setpoints[name] = float(value)
+                        except (TypeError, ValueError):
+                            pass  # non-numeric variable — skip convergence tracking
                         # Schedule one-shot readback if channel not already in continuous read.
                         rb_key = frozenset([name])
                         if rb_key not in self._read_list and None not in self._read_list:
@@ -304,6 +313,7 @@ class PymodaqActor(Actor):
                         self._last_read_time.pop(key, None)
                         continue
                     if dte is not None:
+                        self._check_convergence(dte)
                         self._last_data = dte
                         self._publish(dte, cid=req.req_id)
                     self._last_read_time[key] = now
@@ -374,10 +384,13 @@ class PymodaqActor(Actor):
                 if instr.names is None:
                     self._read_list.clear()
                     self._last_read_time.clear()
+                    self._setpoints.clear()
                 else:
                     key = frozenset(instr.names)
                     self._read_list.pop(key, None)
                     self._last_read_time.pop(key, None)
+                    for name in instr.names:
+                        self._setpoints.pop(name, None)
 
     def _time_until_next_due(self) -> float:
         """Seconds until the next read is due.  Returns 0.05 if no reads pending."""
@@ -390,6 +403,70 @@ class PymodaqActor(Actor):
             remaining = req.period - (now - last_t)
             min_wait = min(min_wait, remaining)
         return max(0.0, min_wait)
+
+    def _get_epsilon(self, name: str) -> float:
+        """Return convergence epsilon for variable *name* from cached capabilities.
+
+        Lazily calls :func:`infer_capabilities` on first use.  Returns ``0.0``
+        if the variable is not found or capabilities cannot be inferred.
+        """
+        if self._cached_capabilities is None:
+            try:
+                self._cached_capabilities = infer_capabilities(self.device)
+            except Exception:
+                return 0.0
+        for var in self._cached_capabilities.variables:
+            if var.name == name:
+                return getattr(var, 'epsilon', 0.0)
+        return 0.0
+
+    def _check_convergence(self, dte) -> None:
+        """Check whether any tracked variable has reached its setpoint.
+
+        Called after every successful ``device.read()``.  For each
+        :class:`~pymodaq_data.DataWithAxes` in *dte* whose name is in
+        ``_setpoints``, compares the first scalar element against the stored
+        setpoint.  When ``|current − setpoint| ≤ epsilon``, removes the entry
+        from ``_setpoints`` and broadcasts ``on_change_done`` to all registered
+        directors.
+        """
+        if not self._setpoints:
+            return
+        for dwa in dte.data:
+            name = dwa.name
+            if name not in self._setpoints:
+                continue
+            try:
+                current = float(dwa.data[0].ravel()[0])
+            except Exception:
+                continue
+            setpoint = self._setpoints[name]
+            epsilon = self._get_epsilon(name)
+            if abs(current - setpoint) <= epsilon:
+                self._setpoints.pop(name, None)
+                self._broadcast_change_done(name, current)
+
+    def _broadcast_change_done(self, name: str, position: float) -> None:
+        """Send ``on_change_done(name, position)`` RPC to all registered directors."""
+        if not self._director_registry:
+            return
+        try:
+            communicator = self.get_communicator()
+            for director_name in list(self._director_registry):
+                try:
+                    communicator.ask_rpc(
+                        receiver=director_name,
+                        method='on_change_done',
+                        name=name,
+                        position=position,
+                    )
+                except Exception:
+                    logger.warning(
+                        "_broadcast_change_done: could not notify director '%s'",
+                        director_name,
+                    )
+        except Exception:
+            logger.exception("_broadcast_change_done: failed to get communicator")
 
     def _report_error(self, requester: str, req_id: bytes, message: str) -> None:
         """Send an ``on_hardware_error`` RPC to the requester."""

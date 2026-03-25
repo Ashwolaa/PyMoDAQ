@@ -135,7 +135,7 @@ class MockCameraDevice(Device):
       * ``capabilities`` class attribute
     """
     shape = (2048, 2048)
-    # shape = (64, 64)
+    shape = (512, 512)
     capabilities = Capabilities(
         observables=[Observable('frame', units='counts', shape=shape, dtype='float32')],
     )
