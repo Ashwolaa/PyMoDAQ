@@ -19,7 +19,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtGui import QPalette, QColor
 
 from pymodaq_gui.utils.widget_sync import WidgetSync, SyncMode
-
+from pymodaq_gui.utils.widgets.combo import ComboBox
 
 class ComboBoxPropertiesExample(QWidget):
     """Example 1: bind_properties() for ONE widget with multiple properties"""
@@ -39,9 +39,9 @@ class ComboBoxPropertiesExample(QWidget):
         combos_group = QGroupBox("3 Synchronized ComboBoxes")
         combos_layout = QHBoxLayout()
 
-        self.combo1 = QComboBox()
-        self.combo2 = QComboBox()
-        self.combo3 = QComboBox()
+        self.combo1 = ComboBox()
+        self.combo2 = ComboBox()
+        self.combo3 = ComboBox()
 
         combos_layout.addWidget(QLabel("View 1:"))
         combos_layout.addWidget(self.combo1)
@@ -65,10 +65,11 @@ class ComboBoxPropertiesExample(QWidget):
                 combo,
                 property_map={
                     'items': {
-                        'signal': None,  # FROM_SYNC only
+                        # 'signal': None,  # FROM_SYNC only
+                        'signal': combo.items_changed,
                         'getter': lambda c=combo: [c.itemText(i) for i in range(c.count())],
                         'setter': lambda items, c=combo: (c.clear(), c.addItems(items)),
-                        'mode': SyncMode.FROM_SYNC
+                        'mode': SyncMode.BIDIRECTIONAL
                     },
                     'current': {
                         'signal': combo.currentTextChanged,
@@ -89,12 +90,20 @@ class ComboBoxPropertiesExample(QWidget):
                           {'items': ["Red", "Green", "Blue"], 'current': "Red"})
         )
         controls.addWidget(colors_btn)
+        
+
+        # fruits_btn = QPushButton("Fruits")
+        # fruits_btn.clicked.connect(
+        #     lambda: setattr(self.combo_sync, 'value',
+        #                   {'items': ["Apple", "Banana", "Orange"], 'current': "Apple"})
+        # )
 
         fruits_btn = QPushButton("Fruits")
         fruits_btn.clicked.connect(
-            lambda: setattr(self.combo_sync, 'value',
-                          {'items': ["Apple", "Banana", "Orange"], 'current': "Apple"})
-        )
+            lambda: self.combo1.set_items(["Apple", "Banana", "Orange"],item_selected="Orange")
+                        #   {'items': ["Apple", "Banana", "Orange"], 'current': "Apple"})
+        )        
+        # self.combo1.setItemText(0, "Banana")
         controls.addWidget(fruits_btn)
 
         layout.addLayout(controls)
