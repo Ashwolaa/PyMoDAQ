@@ -99,6 +99,7 @@ class DAQ_Viewer(ParameterControlModule):
     custom_sig = Signal(ThreadCommand)  # particular case where DAQ_Viewer is used for a custom module
 
     grab_done_signal = Signal(DataToExport)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     overshoot_signal = Signal(bool)
     data_saved = Signal()
@@ -419,6 +420,11 @@ class DAQ_Viewer(ParameterControlModule):
                 hardware.data_detector_temp_sig[DataToExport].connect(self.show_temp_data)
                 hardware.status_sig[ThreadCommand].connect(self.thread_status)
                 self._update_settings_signal[edict].connect(hardware.update_settings)
+                from qtpy.QtCore import Qt
+                hardware.capabilities_updated_signal.connect(
+                    self.capabilities_updated_signal,
+                    Qt.ConnectionType.QueuedConnection,
+                )
 
                 self._hardware_thread.hardware = hardware
                 if self.config('pymodaq', 'viewer', 'viewer_in_thread'):
@@ -1101,6 +1107,7 @@ class DAQ_Detector(QObject):
     status_sig = Signal(ThreadCommand)
     data_detector_sig = Signal(DataToExport)
     data_detector_temp_sig = Signal(DataToExport)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     def __init__(self, title, settings_parameter, detector: SelectedModule):
         super().__init__()
@@ -1229,6 +1236,12 @@ class DAQ_Detector(QObject):
             try:
                 self.detector.dte_signal.connect(self.data_ready)
                 self.detector.dte_signal_temp.connect(self.emit_temp_data)
+                if getattr(self.detector, '_new_style_plugin', False):
+                    from qtpy.QtCore import Qt
+                    self.detector.capabilities_updated_signal.connect(
+                        self.capabilities_updated_signal,
+                        Qt.ConnectionType.QueuedConnection,
+                    )
                 infos = self.detector.ini_detector(controller)
                 status.controller = self.detector.controller
 

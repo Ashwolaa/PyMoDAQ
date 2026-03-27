@@ -897,6 +897,10 @@ class DashBoard(CustomApp, LECOComponentMixin):
         # Add widget to appropriate container
         if is_compact:
             self.compact_actuator_manager.add_module(mov_mod_tmp)
+            mov_mod_tmp.capabilities_updated_signal.connect(
+                self.compact_actuator_manager._on_capabilities_updated,
+                QtCore.Qt.ConnectionType.QueuedConnection,
+            )
         else:
             dock.addWidget(actuator_widgets[-1])
 
@@ -953,7 +957,7 @@ class DashBoard(CustomApp, LECOComponentMixin):
             self.compact_detector_manager = DetectorCompactDock(
                 "DAQ Viewer Toolbars",
                 self.dockarea,
-                orientation=Qt.Orientation.Vertical,
+                orientation=QtCore.Qt.Orientation.Vertical,
             )
             self.compact_detector_manager.show("top")
 
@@ -972,6 +976,10 @@ class DashBoard(CustomApp, LECOComponentMixin):
         )
 
         self.compact_detector_manager.add_module(det_mod_tmp)
+        det_mod_tmp.capabilities_updated_signal.connect(
+            self.compact_detector_manager._on_capabilities_updated,
+            QtCore.Qt.ConnectionType.QueuedConnection,
+        )
         QtWidgets.QApplication.processEvents()
         det_mod_tmp.detector = SelectedModule(plug_type, plug_subtype)
         QtWidgets.QApplication.processEvents()
