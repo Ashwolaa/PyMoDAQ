@@ -1,11 +1,4 @@
-"""Tests for pymodaq.control_modules.channel_control.
-
-Structure
----------
-TestChannelControlDataclass  — pure-Python, no Qt
-TestBuildToolbar             — requires Qt (qtbot fixture)
-TestAdapters                 — requires Qt (mock DAQ_Move / DAQ_Viewer)
-"""
+"""Tests for pymodaq.control_modules.channel_control."""
 from __future__ import annotations
 
 import pytest
@@ -95,20 +88,8 @@ class TestChannelControlDataclass:
         assert cc.capability.shape == (480, 640)
 
 
-# ── Qt availability guard ─────────────────────────────────────────────────────
-
-try:
-    from qtpy.QtWidgets import QApplication as _QApp  # noqa: F401
-    _HAS_QT = True
-except Exception:
-    _HAS_QT = False
-
-_skip_no_qt = pytest.mark.skipif(not _HAS_QT, reason='No Qt backend available')
-
-
 # ── Qt-dependent toolbar tests ────────────────────────────────────────────────
 
-@_skip_no_qt
 class TestBuildToolbar:
     """build_toolbar returns the correct widget structure for each capability."""
 
@@ -452,3 +433,81 @@ class TestAdapters:
         viewer = self._make_mock_viewer()
         cc = ChannelControl.from_daq_viewer(viewer)
         assert cc.toolbar is viewer.ui.toolbar
+
+
+# ── set_locked Qt tests ───────────────────────────────────────────────────────
+
+class TestSetLocked:
+    """ChannelControl.set_locked enables/disables interactive toolbar widgets."""
+
+    def test_lock_continuous_disables_go_and_spin(self, qtbot):
+        from qtpy.QtWidgets import QDoubleSpinBox, QPushButton
+        cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
+        tb = build_toolbar(cv)
+        qtbot.addWidget(tb)
+        cc = ChannelControl(capability=cv, query=lambda: None, toolbar=tb)
+
+        cc.set_locked(True)
+
+        spins = tb.findChildren(QDoubleSpinBox)
+        go_btns = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'go_btn']
+        assert not spins[0].isEnabled()
+        assert not go_btns[0].isEnabled()
+
+    def test_unlock_continuous_re_enables(self, qtbot):
+        from qtpy.QtWidgets import QDoubleSpinBox, QPushButton
+        cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
+        tb = build_toolbar(cv)
+        qtbot.addWidget(tb)
+        cc = ChannelControl(capability=cv, query=lambda: None, toolbar=tb)
+
+        cc.set_locked(True)
+        cc.set_locked(False)
+
+        spins = tb.findChildren(QDoubleSpinBox)
+        go_btns = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'go_btn']
+        assert spins[0].isEnabled()
+        assert go_btns[0].isEnabled()
+
+    def test_lock_discrete_disables_combo_and_set(self, qtbot):
+        from qtpy.QtWidgets import QComboBox, QPushButton
+        dv = DiscreteVariable(name='filter', choices=['ND1', 'ND2'])
+        tb = build_toolbar(dv)
+        qtbot.addWidget(tb)
+        cc = ChannelControl(capability=dv, query=lambda: None, toolbar=tb)
+
+        cc.set_locked(True)
+
+        combos = tb.findChildren(QComboBox)
+        set_btns = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'set_btn']
+        assert not combos[0].isEnabled()
+        assert not set_btns[0].isEnabled()
+
+    def test_lock_observable_disables_snap_grab_stop(self, qtbot):
+        from qtpy.QtWidgets import QPushButton
+        obs = Observable(name='data')
+        tb = build_toolbar(obs)
+        qtbot.addWidget(tb)
+        cc = ChannelControl(capability=obs, query=lambda: None, toolbar=tb)
+
+        cc.set_locked(True)
+
+        snap = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'snap_btn']
+        grab = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'grab_btn']
+        stop = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'stop_btn']
+        assert not snap[0].isEnabled()
+        assert not grab[0].isEnabled()
+        assert not stop[0].isEnabled()
+
+    def test_remove_btn_not_locked(self, qtbot):
+        """The × remove button is never disabled by the lock."""
+        from qtpy.QtWidgets import QPushButton
+        obs = Observable(name='data')
+        tb = build_toolbar(obs)
+        qtbot.addWidget(tb)
+        cc = ChannelControl(capability=obs, query=lambda: None, toolbar=tb)
+
+        cc.set_locked(True)
+
+        removes = [w for w in tb.findChildren(QPushButton) if w.objectName() == 'remove_btn']
+        assert removes[0].isEnabled()

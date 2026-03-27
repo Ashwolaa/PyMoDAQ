@@ -1,7 +1,4 @@
-"""Tests for pymodaq.control_modules.capabilities.
-
-Pure Python — no Qt, no LECO, no hardware.
-"""
+"""Tests for pymodaq.control_modules.capabilities."""
 import json
 
 import pytest

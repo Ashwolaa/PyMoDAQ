@@ -47,6 +47,15 @@ if TYPE_CHECKING:
 __all__ = ['ChannelControl', 'build_toolbar']
 
 
+# Interactive widget objectNames created by build_toolbar that should be
+# disabled when the dock-level lock is active.
+_LOCKABLE_OBJECT_NAMES: frozenset[str] = frozenset({
+    'go_btn', 'set_btn', 'toggle_btn',
+    'snap_btn', 'grab_btn', 'stop_btn',
+    'value_spin', 'choices_combo',
+})
+
+
 # ── ChannelControl ────────────────────────────────────────────────────────────
 
 @dataclass
@@ -80,6 +89,27 @@ class ChannelControl:
     query: Callable[[], 'DataToExport']
     change: Callable[[Any], None] | None = None
     toolbar: Any = None             # QToolBar; Any avoids a hard Qt import here
+
+    # ── Lock ──────────────────────────────────────────────────────────────────
+
+    def set_locked(self, locked: bool) -> None:
+        """Enable/disable all interactive widgets in the toolbar.
+
+        Called by the dock-level lock mechanism.  Finds every widget whose
+        ``objectName`` is in :data:`_LOCKABLE_OBJECT_NAMES` and sets its
+        enabled state accordingly.
+
+        Parameters
+        ----------
+        locked :
+            True to disable all interactive controls; False to re-enable them.
+        """
+        if self.toolbar is None:
+            return
+        from qtpy.QtWidgets import QWidget
+        for widget in self.toolbar.findChildren(QWidget):
+            if widget.objectName() in _LOCKABLE_OBJECT_NAMES:
+                widget.setEnabled(not locked)
 
     # ── Capability updates ────────────────────────────────────────────────────
 

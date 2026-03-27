@@ -667,3 +667,262 @@ class TestDetectorCompactDock:
         mgr.add_module(module)
         mgr.get_action('grab').trigger()
         actions['grab'].trigger.assert_called()
+
+
+# ── Phase 1: ChannelControl integration ──────────────────────────────────────
+
+from pymodaq.control_modules.capabilities import (
+    ContinuousVariable, DiscreteVariable, Observable, Variable,
+)
+from pymodaq.control_modules.channel_control import ChannelControl, build_toolbar
+
+
+def _make_channel_control(cap, *, query=None, change=None):
+    """Build a ChannelControl with a real toolbar for dock integration tests."""
+    tb = build_toolbar(cap)
+    return ChannelControl(capability=cap, query=query, change=change, toolbar=tb)
+
+
+class TestModuleCompactDockChannelControl:
+    """add_channel / remove_channel / channel_controls on ModuleCompactDock."""
+
+    def test_add_channel_appears_in_channel_controls(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        assert cc in mgr.channel_controls
+
+    def test_add_channel_registered_in_channel_rows(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        assert 'pos' in mgr._channel_rows
+        assert mgr._channel_rows['pos'] is cc
+
+    def test_add_channel_not_in_modules(self, qtbot):
+        """ChannelControl rows must not pollute the legacy modules list."""
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        assert cc not in mgr.modules
+
+    def test_remove_channel_removes_from_channel_rows(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        mgr.remove_channel('pos')
+        assert 'pos' not in mgr._channel_rows
+
+    def test_remove_channel_removes_from_channel_controls(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        mgr.remove_channel('pos')
+        assert cc not in mgr.channel_controls
+
+    def test_remove_channel_unknown_name_does_not_raise(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        mgr.remove_channel('nonexistent')  # must not raise
+
+    def test_mixed_dock_modules_and_channel_controls_coexist(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        module, _ = _make_mock_module()
+        qtbot.addWidget(module.ui.toolbar)
+        mgr.add_module(module)
+
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+
+        assert module in mgr.modules
+        assert cc not in mgr.modules
+        assert cc in mgr.channel_controls
+        assert module not in mgr.channel_controls
+
+    def test_add_channel_locked_dock_locks_immediately(self, qtbot):
+        """A channel added to an already-locked dock is locked immediately."""
+        from qtpy.QtWidgets import QPushButton
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        mgr.toggle_lock(True)
+
+        cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+
+        go_btns = [w for w in cc.toolbar.findChildren(QPushButton)
+                   if w.objectName() == 'go_btn']
+        assert not go_btns[0].isEnabled()
+
+
+class TestApplyLockChannelControl:
+    """_apply_lock propagates to ChannelControl rows via set_locked."""
+
+    def test_lock_disables_channel_control(self, qtbot):
+        from qtpy.QtWidgets import QPushButton
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+
+        mgr.toggle_lock(True)
+
+        go_btns = [w for w in cc.toolbar.findChildren(QPushButton)
+                   if w.objectName() == 'go_btn']
+        assert not go_btns[0].isEnabled()
+
+    def test_unlock_re_enables_channel_control(self, qtbot):
+        from qtpy.QtWidgets import QPushButton
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+
+        mgr.toggle_lock(True)
+        mgr.toggle_lock(False)
+
+        go_btns = [w for w in cc.toolbar.findChildren(QPushButton)
+                   if w.objectName() == 'go_btn']
+        assert go_btns[0].isEnabled()
+
+    def test_lock_legacy_module_unaffected_by_cc_lock(self, qtbot):
+        """Lock still applies correctly to legacy module rows in a mixed dock."""
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        module, actions = _make_mock_module(action_names=['snap'])
+        qtbot.addWidget(module.ui.toolbar)
+        mgr.add_module(module)
+
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+
+        mgr.toggle_lock(True)
+        module.ui.set_action_enabled.assert_called_with('snap', False)
+
+
+class TestOnCapabilitiesUpdated:
+    """_on_capabilities_updated diffs old vs new capabilities correctly."""
+
+    def test_new_channel_added_to_channel_rows(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        from pymodaq.control_modules.capabilities import Capabilities
+        new_caps = Capabilities(
+            observables=[Observable(name='spectrum')],
+            variables=[],
+        )
+        mgr._on_capabilities_updated(new_caps)
+        qtbot.addWidget(mgr._channel_rows['spectrum'].toolbar)
+        assert 'spectrum' in mgr._channel_rows
+
+    def test_new_variable_channel_added(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        from pymodaq.control_modules.capabilities import Capabilities
+        new_caps = Capabilities(
+            observables=[],
+            variables=[ContinuousVariable(name='pos')],
+        )
+        mgr._on_capabilities_updated(new_caps)
+        qtbot.addWidget(mgr._channel_rows['pos'].toolbar)
+        assert 'pos' in mgr._channel_rows
+
+    def test_dropped_channel_removed(self, qtbot):
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        from pymodaq.control_modules.capabilities import Capabilities
+        # Add initial channel
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+
+        # New caps without 'pos'
+        mgr._on_capabilities_updated(Capabilities(observables=[], variables=[]))
+        assert 'pos' not in mgr._channel_rows
+
+    def test_in_place_update_preserves_row(self, qtbot):
+        from qtpy.QtWidgets import QDoubleSpinBox
+        mgr = make_manager(qtbot, cls=ModuleCompactDock)
+        from pymodaq.control_modules.capabilities import Capabilities
+
+        # Add initial channel
+        cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        original_cc = mgr._channel_rows['pos']
+
+        # Update same channel with new bounds
+        new_caps = Capabilities(
+            observables=[],
+            variables=[ContinuousVariable(name='pos', lo=-100.0, hi=100.0)],
+        )
+        mgr._on_capabilities_updated(new_caps)
+
+        # Same ChannelControl object — no row replacement
+        assert mgr._channel_rows['pos'] is original_cc
+        # Spinbox bounds updated
+        spins = cc.toolbar.findChildren(QDoubleSpinBox)
+        assert spins[0].minimum() == pytest.approx(-100.0)
+        assert spins[0].maximum() == pytest.approx(100.0)
+
+
+class TestActuatorCompactDockAddChannel:
+    """ActuatorCompactDock.add_channel validates Variable capability kind."""
+
+    def test_accepts_continuous_variable(self, qtbot):
+        mgr = make_manager(qtbot, cls=ActuatorCompactDock)
+        cv = ContinuousVariable(name='pos')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)  # must not raise
+        assert 'pos' in mgr._channel_rows
+
+    def test_accepts_discrete_variable(self, qtbot):
+        mgr = make_manager(qtbot, cls=ActuatorCompactDock)
+        dv = DiscreteVariable(name='mode', choices=['a', 'b'])
+        cc = _make_channel_control(dv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        assert 'mode' in mgr._channel_rows
+
+    def test_rejects_plain_observable(self, qtbot):
+        mgr = make_manager(qtbot, cls=ActuatorCompactDock)
+        obs = Observable(name='sensor')
+        cc = _make_channel_control(obs)
+        qtbot.addWidget(cc.toolbar)
+        with pytest.raises(TypeError, match='ActuatorCompactDock'):
+            mgr.add_channel(cc)
+
+
+class TestDetectorCompactDockAddChannel:
+    """DetectorCompactDock.add_channel accepts any Observable (incl. Variable)."""
+
+    def test_accepts_plain_observable(self, qtbot):
+        mgr = make_manager(qtbot, cls=DetectorCompactDock)
+        obs = Observable(name='spectrum')
+        cc = _make_channel_control(obs)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        assert 'spectrum' in mgr._channel_rows
+
+    def test_accepts_variable_as_observable(self, qtbot):
+        """Variable is a subclass of Observable; detector dock accepts it."""
+        mgr = make_manager(qtbot, cls=DetectorCompactDock)
+        cv = ContinuousVariable(name='readback')
+        cc = _make_channel_control(cv)
+        qtbot.addWidget(cc.toolbar)
+        mgr.add_channel(cc)
+        assert 'readback' in mgr._channel_rows
