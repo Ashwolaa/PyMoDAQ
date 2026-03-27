@@ -32,13 +32,13 @@ from pymodaq.utils.messenger import deprecation_msg
 from pymodaq.utils.data import DataActuator
 from pymodaq.control_modules.thread_commands import ThreadStatus, ThreadStatusMove
 from pymodaq.control_modules.daq_move_ui.factory import ActuatorUIFactory
-from pymodaq.control_modules.utils import (create_controller_param, create_remote_connection_params,
-                                            ControllerStatus, PluginBase)
+from pymodaq.control_modules.utils import create_controller_param, create_remote_connection_params
 from pymodaq_gui.parameter.ioxml import VALID_FOR_CONFIGURATION
+from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
 
 
 if TYPE_CHECKING:
-    from pymodaq.control_modules.daq_move import ActuatorWorker
+    from pymodaq.control_modules.daq_move import DAQ_Move_Hardware
 
 logger = set_logger(get_module_name(__file__))
 
@@ -242,7 +242,7 @@ registerParameterType('group', GroupParameterPatch, override=True)
 
 
 
-class DAQ_Move_base(PluginBase):
+class DAQ_Move_base(DAQ_Plugin_base):
     """ The base class to be inherited by all actuator modules
 
     This base class implements all necessary parameters and methods for the plugin to communicate with its parent (the
@@ -286,7 +286,7 @@ class DAQ_Move_base(PluginBase):
     _epsilons: Union[float, List[float], Dict[str, float]] = None
     _epsilon = 1.0  # deprecated
 
-    params = []
+    _default_title = 'myactuator'
 
     data_actuator_type = DataActuatorType.float
     data_shape = (1,)  # expected shape of the underlying actuator's value (in general a float so shape = (1, ))
@@ -295,10 +295,10 @@ class DAQ_Move_base(PluginBase):
                  params_state: Optional[dict] = None,
                  **kwargs):
         super().__init__(parent, params_state)
-        self._title = self._title if parent is not None else "myactuator"
         self.move_is_done = False
         self.stage = None
-        self.status['stage'] = None
+        self.status.update(edict(stage=None))  # move adds 'stage' to the status dict
+
         self._ispolling = True
 
         self._axis_units: Union[Dict[str, str], List[str]] = None
@@ -489,47 +489,18 @@ class DAQ_Move_base(PluginBase):
         else:
             return self.axis_name
 
-    def ini_attributes(self):
-        """To be subclassed, in order to init specific attributes needed by the real implementation."""
-        pass
-
     def ini_stage_init(
         self,
         old_controller: Optional[HardwareController] = None,
         new_controller: Optional[HardwareController] = None,
         slave_controller: Optional[HardwareController] = None,
     ) -> Optional[HardwareController]:
-        """Manage the Master/Slave controller issue
+        """Manage the Master/Slave controller assignment.
 
-        First initialize the status dictionary
-        Then check whether this stage is controlled by a multiaxe controller (to be defined for each plugin)
-            if it is a multiaxes controller then:
-            * if it is Master: init the controller here
-            * if it is Slave: use an already initialized controller (defined in the experiment of the dashboard)
-
-        Parameters
-        ----------
-        old_controller: object
-            The particular object that allow the communication with the hardware, in general a python wrapper around the
-            hardware library. In case of Slave this one comes from a previously initialized plugin
-        new_controller: object
-            The particular object that allow the communication with the hardware, in general a python wrapper around the
-            hardware library. In case of Master it is the new instance of your plugin controller
+        Thin wrapper around :meth:`~DAQ_Plugin_base._init_controller`.
+        See that method for full documentation.
         """
-        if old_controller is None and slave_controller is not None:
-            old_controller = slave_controller
-
-        self.status.update(edict(info="", controller=None, initialized=False))
-        if not self.is_master:
-            if old_controller is None:
-                raise Exception('no controller has been defined externally while this axe '
-                                'is a slave one')
-            else:
-                controller = old_controller
-        else:  # Master stage
-            controller = new_controller
-        self.controller = controller
-        return controller
+        return self._init_controller(old_controller, new_controller, slave_controller)
 
     @property
     def current_value(self):
@@ -588,14 +559,6 @@ class DAQ_Move_base(PluginBase):
         self.target_value = value
 
     @property
-    def is_master(self) -> bool:
-        """ Get the controller master/slave status
-
-        new in version 4.3.0
-        """
-        return self.settings['controller', 'controller_status'] == ControllerStatus.MASTER
-
-    @property
     def ispolling(self):
         """ Get/Set the polling status"""
         return self._ispolling
@@ -639,6 +602,30 @@ class DAQ_Move_base(PluginBase):
     def close(self) -> None:
         raise NotImplementedError
 
+    # ── New-style capabilities adapter ────────────────────────────────────────
+
+    def query_data(self, names=None, fresh: bool = True) -> 'DataToExport':
+        """Adapter: wrap :meth:`get_actuator_value` as a ``DataToExport``.
+
+        Allows legacy actuator plugins to participate in the new-style
+        compact-dock API without any plugin-side changes.
+        """
+        from pymodaq.utils.data import DataToExport, DataActuator as _DA
+
+        pos = self.get_actuator_value()
+        # get_actuator_value may return a DataActuator or a plain number
+        if not isinstance(pos, _DA):
+            pos = _DA(self._title, data=pos)
+        return DataToExport(name=self._title, data=[pos])
+
+    def change_to(self, name: str, value) -> None:
+        """Adapter: forward to :meth:`move_abs`.
+
+        Allows legacy actuator plugins to participate in the new-style
+        compact-dock API without any plugin-side changes.
+        """
+        self.move_abs(value)
+
     def move_abs(self, value: Union[float, DataActuator]):
         if hasattr(self, 'move_Abs'):
             deprecation_msg('move_Abs method in plugins is deprecated, use move_abs', 3)
@@ -661,14 +648,11 @@ class DAQ_Move_base(PluginBase):
             raise NotImplementedError
 
     def emit_value(self, pos: DataActuator):
-        """Convenience method to emit the current actuator value back to the UI"""
-
+        """Convenience method to emit the current actuator value back to the UI."""
         self.emit_status(ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos))
 
-    def commit_settings(self, param: Parameter):
-        """
-          to subclass to transfer parameters to hardware
-        """
+    def commit_common_settings(self, param):
+        """Override to apply settings common to all axes before per-plugin commit."""
 
     def move_done(self, position: Optional[
         DataActuator] = None):  # the position argument is just there to match some signature of child classes
@@ -834,16 +818,14 @@ class DAQ_Move_base(PluginBase):
             pos = pos / self.settings['scaling', 'scaling']
         return pos
 
-    @Slot(edict)
-    def update_settings(self, settings_parameter_dict):
-        """Apply settings-tree change and handle actuator-specific axis/epsilon side-effects."""
-        super().update_settings(settings_parameter_dict)
-        if settings_parameter_dict['change'] == 'value':
-            param = settings_parameter_dict['param']
-            if param.name() == 'axis':
-                self.axis_name = param.value()
-            elif param.name() == 'epsilon':
-                self.epsilon = param.value()
+    def _apply_settings(self, param: Parameter) -> None:
+        """Move-specific post-update hook: commit then handle axis/epsilon."""
+        self.commit_common_settings(param)
+        self.commit_settings(param)
+        if param.name() == 'axis':
+            self.axis_name = param.value()
+        elif param.name() == 'epsilon':
+            self.epsilon = param.value()
 
     def ini_stage_init(self, old_controller=None, new_controller=None, slave_controller=None):
         """Deprecated — use ini_controller_init instead."""

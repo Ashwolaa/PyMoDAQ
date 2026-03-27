@@ -100,6 +100,7 @@ class DAQ_Viewer(ParameterControlModule):
     custom_sig = Signal(ThreadCommand)  # particular case where DAQ_Viewer is used for a custom module
 
     grab_done_signal = Signal(DataToExport)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     overshoot_signal = Signal(bool)
     data_saved = Signal()
@@ -355,6 +356,11 @@ class DAQ_Viewer(ParameterControlModule):
     def _connect_hardware_signals(self, hardware):
         hardware.data_detector_sig[DataToExport].connect(self.show_data)
         hardware.data_detector_temp_sig[DataToExport].connect(self.show_temp_data)
+        from qtpy.QtCore import Qt
+        hardware.capabilities_updated_signal.connect(
+            self.capabilities_updated_signal,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
     def _post_hardware_init(self):
         if self.ui is not None:
@@ -1014,6 +1020,7 @@ class DetectorWorker(HardwareWorkerBase):
     """
     data_detector_sig = Signal(DataToExport)
     data_detector_temp_sig = Signal(DataToExport)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     _kind = 'detector'
 
@@ -1108,6 +1115,12 @@ class DetectorWorker(HardwareWorkerBase):
             try:
                 self.plugin.dte_signal.connect(self.data_ready)
                 self.plugin.dte_signal_temp.connect(self.emit_temp_data)
+                if getattr(self.plugin, '_new_style_plugin', False):
+                    from qtpy.QtCore import Qt
+                    self.plugin.capabilities_updated_signal.connect(
+                        self.capabilities_updated_signal,
+                        Qt.ConnectionType.QueuedConnection,
+                    )
                 infos = self.plugin.ini_detector(controller)
                 status.controller = self.plugin.controller
                 self.controller_address = self.plugin.controller

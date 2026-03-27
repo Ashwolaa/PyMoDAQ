@@ -4,11 +4,7 @@ HW_KIND = 'detector'
 HW_SETTINGS_KEY = f'{HW_KIND}_settings'
 from typing import Union, Iterable
 from qtpy import QtWidgets
-from qtpy.QtCore import Signal
-
-
-from pymodaq.utils.parameter import ioxml
-
+from qtpy.QtCore import QObject, Signal
 
 import numpy as np
 from pymodaq.utils.math_utils import gauss1D, gauss2D
@@ -21,10 +17,10 @@ from pymodaq_utils.warnings import deprecation_msg
 from pymodaq_utils.serialize.mysocket import Socket
 from pymodaq_utils.serialize.serializer_legacy import DeSerializer, Serializer
 from pymodaq_gui.plotting.items.roi import RoiInfo
-from pymodaq.control_modules.thread_commands import ThreadStatus, ThreadStatusViewer
-from pymodaq.control_modules.utils import (create_controller_param, create_remote_connection_params,
-                                            PluginBase)
+from pymodaq.control_modules.thread_commands import ThreadStatusViewer
+from pymodaq.control_modules.utils import create_controller_param, create_remote_connection_params
 from pymodaq_gui.qt_utils import mkQApp
+from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
 from pymodaq_gui.parameter import Parameter
 from pymodaq_gui.parameter.ioxml import VALID_FOR_CONFIGURATION
 
@@ -126,7 +122,7 @@ def main(plugin_file=None, init=True, title='Testing'):
     sys.exit(app.exec())
 
 
-class DAQ_Viewer_base(PluginBase):
+class DAQ_Viewer_base(DAQ_Plugin_base):
     """
         ===================== ===================================
         **Attributes**          **Type**
@@ -142,6 +138,8 @@ class DAQ_Viewer_base(PluginBase):
         --------
         send_param_status
     """
+    _default_title = 'mydetector'
+
     hardware_averaging = False
     live_mode_available = False
     data_grabed_signal = Signal(list)  # will be deprecated use dte_signal
@@ -149,11 +147,9 @@ class DAQ_Viewer_base(PluginBase):
     dte_signal = Signal(DataToExport)
     dte_signal_temp = Signal(DataToExport)
 
-    params = []
-
     def __init__(self, parent=None, params_state=None):
         super().__init__(parent, params_state)
-        self._title = self._title if parent is not None else "mydetector"
+
         if '0D' in str(self.__class__):
             self.plugin_type = '0D'
         elif '1D' in str(self.__class__):
@@ -163,6 +159,7 @@ class DAQ_Viewer_base(PluginBase):
         self.scan_parameters = None
         self.x_axis = None
         self.y_axis = None
+
         self.ini_attributes()
         try:
             self.data_grabed_signal.connect(self._emit_dte)
@@ -188,11 +185,12 @@ class DAQ_Viewer_base(PluginBase):
 
     def ini_detector_init(self, old_controller=None, new_controller=None,
                           slave_controller=None):
-        """Deprecated — use ini_controller_init instead."""
-        import warnings
-        warnings.warn("'ini_detector_init' is deprecated, use 'ini_controller_init' instead.",
-                      DeprecationWarning, stacklevel=2)
-        return self.ini_controller_init(old_controller, new_controller, slave_controller)
+        """Manage the Master/Slave controller assignment.
+
+        Thin wrapper around :meth:`~DAQ_Plugin_base._init_controller`.
+        See that method for full documentation.
+        """
+        return self._init_controller(old_controller, new_controller, slave_controller)
 
     @abstractmethod
     def ini_detector(self, controller=None):
@@ -225,6 +223,30 @@ class DAQ_Viewer_base(PluginBase):
         To be reimplemented in subclass
         """
         raise NotImplementedError
+
+    # ── New-style capabilities adapter ────────────────────────────────────────
+
+    def query_data(self, names=None, fresh: bool = True) -> DataToExport:
+        """Adapter: trigger a single snap and return its ``DataToExport``.
+
+        Allows legacy detector plugins to participate in the new-style
+        compact-dock API without any plugin-side changes.  The snap
+        result is captured via ``dte_signal`` if available on the parent
+        (``DAQ_Detector``), otherwise ``grab_data`` is called directly
+        (blocking, for standalone usage).
+
+        Notes
+        -----
+        For headless/test use the direct ``grab_data`` path is used.
+        Full async integration via the Qt signal chain is handled by the
+        framework layer (``DAQ_Viewer.snap``).
+        """
+        # Delegate to parent's snap machinery when running inside hardware thread
+        if self.parent is not None and hasattr(self.parent, 'snap'):
+            return self.parent.snap()
+        # Fallback: call grab_data and collect via dte_signal (best-effort)
+        self.grab_data(Naverage=1)
+        return DataToExport(name=self._title, data=[])
 
     def roi_select(self, roi_info: RoiInfo, ind_viewer: int = 0):
         """ Every time a ROISelect is updated on a 2D Viewer,

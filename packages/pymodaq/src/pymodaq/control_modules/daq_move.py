@@ -92,6 +92,7 @@ class DAQ_Move(ParameterControlModule):
     move_done_signal = Signal(DataActuator)
     current_value_signal = Signal(DataActuator)
     bounds_signal = Signal(bool)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     params = daq_move_params +  [
         {'title': 'Saver Settings:', 'name': 'saver_settings', 'type': 'group',
@@ -808,6 +809,7 @@ class ActuatorWorker(HardwareWorkerBase):
     """
 
     _kind = 'actuator'
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     def __init__(self, actuator_type, position: DataActuator, title="actuator"):
         super().__init__(title, actuator_type)
@@ -893,6 +895,12 @@ class ActuatorWorker(HardwareWorkerBase):
             status.controller = self.plugin.controller
             self.controller_address = self.plugin.controller
             self.plugin.move_done_signal.connect(self.move_done)
+            if getattr(self.plugin, '_new_style_plugin', False):
+                from qtpy.QtCore import Qt
+                self.plugin.capabilities_updated_signal.connect(
+                    self.capabilities_updated_signal,
+                    Qt.ConnectionType.QueuedConnection,
+                )
             if status.initialized:
                 self.status_sig.emit(
                     ThreadCommand(
