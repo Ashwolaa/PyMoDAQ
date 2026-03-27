@@ -26,6 +26,8 @@ except Exception:
 if TYPE_CHECKING:
     from pymodaq.control_modules.daq_move import DAQ_Move
     from pymodaq.control_modules.daq_viewer import DAQ_Viewer
+    from pymodaq.control_modules.channel_control import ChannelControl
+    from pymodaq.control_modules.capabilities import Capabilities
 
 
 # ── Control-panel placement ────────────────────────────────────────────────────
@@ -100,7 +102,9 @@ LOCKABLE_ACTIONS = frozenset({
 @dataclass
 class _RowData:
     toolbar: QtWidgets.QWidget
-    module: object = None   # DAQ_Move | DAQ_Viewer | None
+    module: object = None           # DAQ_Move | DAQ_Viewer — legacy rows only
+    channel_control: object = None  # ChannelControl — new-style rows only
+    # Exactly one of module / channel_control is non-None per row.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -427,7 +431,17 @@ class ModuleCompactDock(CompactDockManager):
     def __init__(self, title: str, dockarea: DockArea,
                  orientation: Qt.Orientation = Qt.Orientation.Vertical):
         super().__init__(title, dockarea, orientation)
+        # name → ChannelControl for new-style rows (keyed by capability.name)
+        self._channel_rows: dict[str, 'ChannelControl'] = {}
         self.lock_changed.connect(self._apply_lock)
+
+    # ── Properties ────────────────────────────────────────────────────────────
+
+    @property
+    def channel_controls(self) -> list:
+        """Live view of all ChannelControl instances in row order."""
+        return [r.channel_control for r in self._rows.values()
+                if r.channel_control is not None]
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -441,6 +455,46 @@ class ModuleCompactDock(CompactDockManager):
         is_empty = super().remove_widget(module.ui.toolbar)
         self._update_alignment()
         return is_empty
+
+    def add_channel(self, channel_control: 'ChannelControl') -> None:
+        """Add a ChannelControl as a new row.
+
+        Subclasses override to restrict the accepted capability kind
+        (e.g. :class:`ActuatorCompactDock` accepts only Variable-typed controls).
+
+        Parameters
+        ----------
+        channel_control :
+            A fully constructed :class:`~pymodaq.control_modules.channel_control.ChannelControl`
+            whose ``.toolbar`` has been built by
+            :func:`~pymodaq.control_modules.channel_control.build_toolbar`.
+        """
+        toolbar = channel_control.toolbar
+        super().add_widget(toolbar, create_toolbar=False)
+        # Override the _RowData created by add_widget to use channel_control field.
+        self._rows[toolbar] = _RowData(toolbar=toolbar,
+                                       channel_control=channel_control)
+        self._channel_rows[channel_control.capability.name] = channel_control
+        if self.is_locked:
+            channel_control.set_locked(True)
+
+    def remove_channel(self, name: str) -> bool:
+        """Remove the ChannelControl row for *name*.
+
+        Parameters
+        ----------
+        name :
+            ``capability.name`` of the channel to remove.
+
+        Returns
+        -------
+        bool
+            True when the dock is now completely empty.
+        """
+        cc = self._channel_rows.pop(name, None)
+        if cc is None:
+            return len(self._rows) == 0
+        return super().remove_widget(cc.toolbar)
 
     # ── Alignment hook ────────────────────────────────────────────────────────
 
@@ -495,7 +549,8 @@ class ModuleCompactDock(CompactDockManager):
     # ── Lock wiring ───────────────────────────────────────────────────────────
 
     def _apply_lock(self, locked: bool):
-        """Enable/disable lockable actions on every module."""
+        """Enable/disable lockable actions on every row (legacy and new-style)."""
+        # Legacy module rows — use ActionManager interface.
         for module in self.modules:
             for name in LOCKABLE_ACTIONS:
                 if not module.ui.has_action(name):
@@ -508,6 +563,47 @@ class ModuleCompactDock(CompactDockManager):
                 widget = getattr(module.ui.get_action(name), 'widget', None)
                 if widget is not None:
                     widget.setEnabled(not locked)
+        # New-style ChannelControl rows — delegate to set_locked.
+        for cc in self.channel_controls:
+            cc.set_locked(locked)
+
+    # ── Capabilities diff ─────────────────────────────────────────────────────
+
+    def _on_capabilities_updated(self, new_caps: 'Capabilities') -> None:
+        """Diff old vs new capabilities and add/update/remove rows accordingly.
+
+        This slot is **defined** here but **not connected** to any signal.
+        The connection to ``plugin.capabilities_updated_signal`` is made in
+        Phase 2 when ``DAQ_Plugin_base`` and its signal exist.  The connection
+        **must** use ``Qt.ConnectionType.QueuedConnection`` because the signal
+        can fire from a hardware thread.
+
+        For new capability names the ChannelControl is created with
+        ``query=None`` and ``change=None`` as stubs; Phase 3 wires the real
+        callables via ``DAQ_HardwareWorker``.
+        """
+        from pymodaq.control_modules.channel_control import ChannelControl, build_toolbar
+
+        all_new = new_caps.observables + new_caps.variables
+        new_by_name = {cap.name: cap for cap in all_new}
+        old_names = set(self._channel_rows)
+        new_names = set(new_by_name)
+
+        # In-place refinements — same name, possibly updated metadata.
+        for name in old_names & new_names:
+            self._channel_rows[name].update_capability(new_by_name[name])
+
+        # New channels — build stub ChannelControl; callables wired in Phase 3.
+        for name in new_names - old_names:
+            cap = new_by_name[name]
+            toolbar = build_toolbar(cap)
+            cc = ChannelControl(capability=cap, query=None, change=None,
+                                toolbar=toolbar)
+            self.add_channel(cc)
+
+        # Removed channels.
+        for name in old_names - new_names:
+            self.remove_channel(name)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -516,6 +612,17 @@ class ModuleCompactDock(CompactDockManager):
 
 class ActuatorCompactDock(ModuleCompactDock):
     """Compact dock specialised for DAQ_Move (actuator) modules."""
+
+    def add_channel(self, channel_control: 'ChannelControl') -> None:
+        """Accept only Variable-typed ChannelControls."""
+        from pymodaq.control_modules.capabilities import Variable
+        if not isinstance(channel_control.capability, Variable):
+            raise TypeError(
+                f"ActuatorCompactDock accepts Variable capabilities only; "
+                f"got {type(channel_control.capability).__name__!r} "
+                f"(name={channel_control.capability.name!r})"
+            )
+        super().add_channel(channel_control)
 
     def _get_module_align_widgets(self, module) -> dict:
         widgets = {}
@@ -545,6 +652,18 @@ class ActuatorCompactDock(ModuleCompactDock):
 
 class DetectorCompactDock(ModuleCompactDock):
     """Compact dock specialised for DAQ_Viewer (detector) modules."""
+
+    def add_channel(self, channel_control: 'ChannelControl') -> None:
+        """Accept only Observable-typed ChannelControls (including Variable subclasses
+        when the detector plugin also exposes writable quantities)."""
+        from pymodaq.control_modules.capabilities import Observable
+        if not isinstance(channel_control.capability, Observable):
+            raise TypeError(
+                f"DetectorCompactDock accepts Observable capabilities only; "
+                f"got {type(channel_control.capability).__name__!r} "
+                f"(name={channel_control.capability.name!r})"
+            )
+        super().add_channel(channel_control)
 
     def _get_module_align_widgets(self, module) -> dict:
         widgets = {}
