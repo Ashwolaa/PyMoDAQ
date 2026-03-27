@@ -18,7 +18,7 @@ import time
 from easydict import EasyDict as edict
 import numpy as np
 from qtpy import QtWidgets
-from qtpy.QtCore import Qt, QObject, Slot, QThread, Signal
+from qtpy.QtCore import Qt, QObject, Slot, QThread, Signal, QTimer
 
 from pymodaq_data.data import DataToExport, Axis, DataDistribution
 from pymodaq.utils.data import DataFromPlugins
@@ -1039,6 +1039,8 @@ class DetectorWorker(HardwareWorkerBase):
         self.hardware_averaging = False
         self.show_averaging = False
         self.wait_time = settings_parameter['main_settings', 'wait_time']
+        self._grab_kwargs: dict = {}
+        self._grab_live: bool = True
         self.daq_type = detector.daq_type
 
     # --- deprecated aliases ---------------------------------------------------
@@ -1077,10 +1079,8 @@ class DetectorWorker(HardwareWorkerBase):
             self.grab_state = True
             self.grab_data(**command.attribute)
 
-        elif command.command == ControlToHardwareViewer.SINGLE:
-            self.single_grab = True
-            self.grab_state = True
-            self.single(**command.attribute)
+            elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
+                self.plugin.update_scanner(command.attribute[0])
 
         elif command.command == ControlToHardwareViewer.STOP_GRAB:
             self.grab_state = False
@@ -1190,7 +1190,7 @@ class DetectorWorker(HardwareWorkerBase):
         else:
             self.average_done = True  # expected to make sure the single_grab stop by itself
             self.data_detector_sig.emit(data)
-        self.waiting_for_data = False
+        self._schedule_next()
 
     def single(self, Naverage=1, *args, **kwargs):
         """ Convenience function to grab a single set of data
@@ -1220,45 +1220,48 @@ class DetectorWorker(HardwareWorkerBase):
         try:
             self.ind_average = 0
             self.Naverage = Naverage
-            if Naverage > 1:
-                self.average_done = False
-            self.waiting_for_data = False
-
-            # for live mode:two possibilities: either snap one data and regrab softwarewise
-            # (while True) or if self.plugin.live_mode_available is True all data is continuously
-            # emitted from the plugin
+            self.average_done = False
+            self._grab_live = live
             if self.plugin.live_mode_available:
                 kwargs['wait_time'] = self.wait_time
             else:
-                kwargs['wait_time'] = 0
+                kwargs.pop('wait_time', None)
+            self._grab_kwargs = kwargs
             self.status_sig.emit(ThreadCommand('grab'))
-            while True:
-                try:
-                    if not self.waiting_for_data:
-                        self.waiting_for_data = True
-                        self.plugin.grab_data(Naverage, live=live, **kwargs)
-                    QtWidgets.QApplication.processEvents()
-                    if self.single_grab:
-                        if self.hardware_averaging:
-                            break
-                        else:
-                            if self.average_done:
-                                break
-                    else:
-                        QThread.msleep(self.wait_time)  # if in grab mode apply a waiting time
-                        # after acquisition
-                    if not self.grab_state:
-                        break   # if not in grab mode  breaks the while loop
-                    if self.plugin.live_mode_available and (not self.hardware_averaging and
-                                                            self.average_done):
-                        break  # if live can be done in the plugin breaks the while loop except
-                        # if average is asked but not done hardware wise
-                except Exception as e:
-                    self.logger.exception(str(e))
-            self.status_sig.emit(ThreadCommand('grab_stopped'))
-
+            self._trigger_next_grab()
         except Exception as e:
             self.logger.exception(str(e))
+
+    def _trigger_next_grab(self):
+        """Trigger one acquisition. The event loop is free between calls."""
+        if not self.grab_state:
+            self.status_sig.emit(ThreadCommand('grab_stopped'))
+            return
+        self.plugin.grab_data(self.Naverage, live=self._grab_live, **self._grab_kwargs)
+        # Blocking plugins: grab_data blocks, dte_signal fires synchronously (direct
+        # connection, same thread), data_ready() runs and schedules next trigger, then
+        # grab_data returns. Non-blocking (live) plugins: returns immediately.
+
+    def _schedule_next(self):
+        """Decide whether and when to trigger the next acquisition."""
+        if self.single_grab:
+            if self.hardware_averaging or self.average_done:
+                # Done (hw avg: one call handles Naverage; sw avg: all frames received)
+                self.grab_state = False
+                if self.plugin.live_mode_available:
+                    self.plugin.stop()
+                self.status_sig.emit(ThreadCommand('grab_stopped'))
+            else:
+                # Software averaging still in progress — re-trigger with no delay.
+                # Use singleShot(0) to avoid call-stack recursion (data_ready fires
+                # synchronously inside _trigger_next_grab for blocking plugins)
+                QTimer.singleShot(0, self._trigger_next_grab)
+        elif self.plugin.live_mode_available:
+            pass  # plugin drives its own loop; we just receive emitted data
+        else:
+            # Continuous non-live: re-trigger after wait_time ms
+            if self.grab_state:
+                QTimer.singleShot(self.wait_time, self._trigger_next_grab)
 
     def close(self):
         """Call the close method of the instrument plugin class."""

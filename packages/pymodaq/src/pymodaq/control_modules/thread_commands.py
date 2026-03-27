@@ -30,12 +30,14 @@ class ThreadStatus(StrEnum):
     CLOSE_SPLASH = 'close_splash'
     INI_HARDWARE = 'ini_hardware'   # unified replacement for INI_STAGE / INI_DETECTOR
     STOP = 'stop'                   # unified replacement for ThreadStatusMove.STOP / ThreadStatusViewer.STOP
+    QUERY_DATA = 'query_data'       # replaces GET_ACTUATOR_VALUE upward
 
 
 class ControlToHardware(StrEnum):
     """Commands common to both ActuatorWorker and DetectorWorker workers."""
     INI_HARDWARE = 'ini_hardware'
     CLOSE        = 'close'
+    QUERY_DATA   = 'query_data'
 
 
 class ThreadStatusMove(StrEnum):
@@ -73,6 +75,13 @@ class ThreadStatusViewer(StrEnum):
     STOP = 'stop'                   # deprecated: use ThreadStatus.STOP
     UPDATE_CHANNELS = 'update_channels'
 
+
+
+class ControlToHardware(StrEnum):
+    """Commands common to both DAQ_Move_Hardware and DAQ_Detector workers."""
+    INI_HARDWARE = 'ini_hardware'
+    CLOSE        = 'close'
+    QUERY_DATA   = 'query_data'
 
 
 class ControlToHardwareMove(StrEnum):

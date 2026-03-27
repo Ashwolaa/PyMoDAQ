@@ -30,8 +30,7 @@ from pymodaq.control_modules.thread_commands import (ThreadStatus, ControlToHard
                                                      ControleModuleType, ControllerStatus)  # noqa: F401
 
 if TYPE_CHECKING:
-    from .daq_move_ui.ui_base import DAQ_Move_UI_Base
-    from .daq_viewer_ui.ui_base import DAQ_Viewer_UI
+    from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
 
 
 config = Config()
@@ -848,7 +847,7 @@ class HardwareWorkerBase(QObject):
         super().__init__()
         self._title = title
         self._plugin_name = plugin_name
-        self.plugin = None              # set by subclass after ini_hardware
+        self.plugin: 'DAQ_Plugin_base' = None  # set by subclass after ini_hardware
         self.controller_address = None
 
     @property
@@ -873,7 +872,7 @@ class HardwareWorkerBase(QObject):
             if self.plugin is not None:
                 self.plugin.update_settings(settings_parameter_dict)
 
-    def _connect_capabilities_signal(self, plugin) -> None:
+    def _connect_capabilities_signal(self, plugin:DAQ_Plugin_base) -> None:
         """Wire the plugin capabilities_updated_signal with QueuedConnection."""
         if getattr(plugin, '_new_style_plugin', False):
             from qtpy.QtCore import Qt
@@ -893,6 +892,14 @@ class HardwareWorkerBase(QObject):
             else:
                 cmd(command.attribute)
 
+    def _do_read(self, names=None, fresh: bool = True):
+        """Read from the plugin via the uniform query_data interface."""
+        return self.plugin.query_data(names=names, fresh=fresh)
+
+    def _do_write(self, name: str, value) -> None:
+        """Write to the plugin via the uniform change_to interface."""
+        self.plugin.change_to(name, value)
+
     def queue_command(self, command) -> bool:
         """Handle commands shared by all hardware workers.
 
@@ -907,6 +914,9 @@ class HardwareWorkerBase(QObject):
             self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status]))
             if self.thread() is not None:
                 self.thread().quit()
+        elif command.command == ControlToHardware.QUERY_DATA:
+            dte = self._do_read()
+            self.status_sig.emit(ThreadCommand(ThreadStatus.QUERY_DATA, dte))
         else:
             return False
         return True

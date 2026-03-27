@@ -714,10 +714,16 @@ class DAQ_Move(ParameterControlModule):
             self.init_signal.emit(self._initialized_state)
 
         elif (
-            status.command == ThreadStatusMove.GET_ACTUATOR_VALUE
+            status.command == ThreadStatus.QUERY_DATA
+            or status.command == ThreadStatusMove.GET_ACTUATOR_VALUE
             or status.command == "check_position"
         ):
-            data_act = self._check_data_type(status.attribute)
+            attr = status.attribute
+            # QUERY_DATA emits a DataToExport; GET_ACTUATOR_VALUE emits DataActuator directly
+            if status.command == ThreadStatus.QUERY_DATA:
+                from pymodaq_data.data import DataToExport as _DTE
+                attr = attr.data[0] if (isinstance(attr, _DTE) and attr.data) else attr
+            data_act = self._check_data_type(attr)
             if self.ui is not None:
                 self.ui.display_value(data_act)
                 if self.ui.has_action("show_graph") and not self.ui.is_action_checked(
@@ -921,6 +927,7 @@ class ActuatorWorker(HardwareWorkerBase):
 
     def move_abs(self, position: DataActuator, polling: bool = True) -> None:
         assert self.plugin is not None
+        self._move_completed = False
         position = check_units(position, self.plugin.axis_unit)
         self.plugin.move_is_done = False
         self.plugin.ispolling = polling
@@ -936,6 +943,7 @@ class ActuatorWorker(HardwareWorkerBase):
 
     def move_rel(self, rel_position: DataActuator, polling: bool = True) -> None:
         assert self.plugin is not None
+        self._move_completed = False
         rel_position = check_units(rel_position, self.plugin.axis_unit)
         self.plugin.move_is_done = False
         self.plugin.ispolling = polling
@@ -946,7 +954,6 @@ class ActuatorWorker(HardwareWorkerBase):
         else:
             rel_position.units = self.plugin.axis_unit
             self.plugin.move_rel(rel_position)
-
         self.plugin.poll_moving()
 
     @Slot(float)
@@ -961,6 +968,22 @@ class ActuatorWorker(HardwareWorkerBase):
         self.plugin.move_is_done = False
         self._move_completed = False
         self.plugin.move_home()
+
+    @Slot(str, object)
+    def _on_change_done(self, name: str, dte) -> None:
+        """Relay change_done_signal → move_done for pure new-style plugins.
+
+        Called when a plugin's change_to() uses _poll_until_done() for
+        convergence.  For old-style plugins this slot is never invoked.
+        """
+        if self._move_completed:
+            return
+        if dte is not None and dte.data:
+            pos = dte.data[0]
+        else:
+            pos = self.get_actuator_value()
+        if pos is not None:
+            self.move_done(pos)
 
     @Slot(DataActuator)
     def move_done(self, pos: DataActuator):
@@ -1001,10 +1024,8 @@ class ActuatorWorker(HardwareWorkerBase):
                 self.move_home()
 
             elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
-                pos = self.get_actuator_value()
-                self.status_sig.emit(
-                    ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
-                )
+                # legacy path — route through base QUERY_DATA
+                super().queue_command(ThreadCommand(ControlToHardware.QUERY_DATA))
 
             elif command.command == ControlToHardwareMove.STOP_MOTION:
                 self.stop_motion()
