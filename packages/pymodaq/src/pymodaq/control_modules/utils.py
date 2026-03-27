@@ -834,6 +834,7 @@ class HardwareWorkerBase(QObject):
     """
 
     status_sig = Signal(ThreadCommand)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     # Subclasses set _kind to 'actuator' or 'detector'.
     # _plugin_settings_key is derived automatically as "<kind>_settings".
@@ -872,6 +873,15 @@ class HardwareWorkerBase(QObject):
             if self.plugin is not None:
                 self.plugin.update_settings(settings_parameter_dict)
 
+    def _connect_capabilities_signal(self, plugin) -> None:
+        """Wire the plugin capabilities_updated_signal with QueuedConnection."""
+        if getattr(plugin, '_new_style_plugin', False):
+            from qtpy.QtCore import Qt
+            plugin.capabilities_updated_signal.connect(
+                self.capabilities_updated_signal,
+                Qt.ConnectionType.QueuedConnection,
+            )
+
     def _dispatch_custom_command(self, command) -> None:
         """Forward an unrecognised ThreadCommand to the plugin instance."""
         if self.plugin is not None and hasattr(self.plugin, command.command):
@@ -900,3 +910,8 @@ class HardwareWorkerBase(QObject):
         else:
             return False
         return True
+
+
+# Backward-compat alias: capabilities branch uses DAQ_Hardware_Base; the
+# factorization branch settled on HardwareWorkerBase.  Keep both names.
+DAQ_Hardware_Base = HardwareWorkerBase

@@ -1020,9 +1020,9 @@ class DetectorWorker(HardwareWorkerBase):
     """
     data_detector_sig = Signal(DataToExport)
     data_detector_temp_sig = Signal(DataToExport)
-    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     _kind = 'detector'
+    _plugin_settings_key = 'detector_settings'
 
     def __init__(self, title, settings_parameter, detector: SelectedModule):
         super().__init__(title, detector.module_name)
@@ -1132,6 +1132,11 @@ class DetectorWorker(HardwareWorkerBase):
 
             if isinstance(infos, edict):
                 status.update(infos)
+                deprecation_msg(
+                    "Returns from ini_detector should now be a string and a boolean,"
+                    " see pymodaq_plugins_template",
+                    stacklevel=3,
+                )
             else:
                 status.info = infos[0]
                 status.initialized = infos[1]

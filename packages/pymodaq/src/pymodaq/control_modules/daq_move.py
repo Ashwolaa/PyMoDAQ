@@ -809,6 +809,7 @@ class ActuatorWorker(HardwareWorkerBase):
     """
 
     _kind = 'actuator'
+    _plugin_settings_key = 'move_settings'  # matches params group name in move_utility_classes.py
     capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
 
     def __init__(self, actuator_type, position: DataActuator, title="actuator"):
