@@ -196,7 +196,7 @@ _KIND_MAP = {
 def _variable_from_dict(d: dict) -> Variable:
     """Deserialize a Variable subclass using the ``'kind'`` discriminator."""
     kind = d.get('kind', 'variable')
-    cls = _KIND_MAP.get(kind, Variable)
+    cls:Variable = _KIND_MAP.get(kind, Variable)
     return cls.from_dict(d)
 
 
@@ -207,7 +207,7 @@ class Capabilities:
     """Hardware capabilities declared or inferred for a plugin.
 
     Serializes to/from a JSON-compatible dict so it can be returned by the
-    ``get_capabilities()`` RPC without binary frames.
+    ``get_capabilities()`.
 
     Parameters
     ----------
@@ -250,8 +250,7 @@ def infer_capabilities(plugin) -> Capabilities:
     :class:`Capabilities` instance, it is returned directly (opt-in path).
 
     Otherwise capabilities are inferred from the plugin's class attributes using
-    duck typing — no Qt or LECO imports — so it is safe to call from headless
-    actor processes and pure-Python tests:
+    duck typing
 
     * **Actuator heuristic** — plugin has ``_controller_units`` or ``_axis_names`` →
       one :class:`ContinuousVariable` named after each axis (or ``'position'`` for

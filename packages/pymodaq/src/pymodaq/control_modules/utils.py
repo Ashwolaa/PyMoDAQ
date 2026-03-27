@@ -503,3 +503,66 @@ class ParameterControlModule(ParameterManager,LECOComponentMixin, ControlModule)
         return None
 
 
+class DAQ_Hardware_Base(QObject):
+    """Abstract base for DAQ_Move_Hardware and DAQ_Detector worker objects.
+
+    Extracts common signals, properties, and helper methods shared by both
+    worker classes so their subclasses only carry instrument-specific logic.
+    """
+
+    status_sig = Signal(ThreadCommand)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
+
+    _kind: str = 'hardware'               # subclass sets 'actuator' or 'detector'
+    _plugin_settings_key: str = ''        # subclass sets 'move_settings' or 'detector_settings'
+
+    def __init__(self, title: str, plugin_name: str) -> None:
+        super().__init__()
+        self._title = title
+        self._plugin_name = plugin_name
+        self.plugin = None                 # unified name for the plugin instance
+        self.controller_address = None     # fixes spelling of hardware_adress / controller_adress
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    @property
+    def plugin_name(self) -> str:
+        """Name of the instrument plugin class."""
+        return self._plugin_name
+
+    def ini_hardware(self, params_state=None, controller=None):
+        """Initialize the hardware plugin. Subclasses must implement."""
+        raise NotImplementedError
+
+    def update_settings(self, settings_parameter_dict) -> None:
+        """Route settings to main_settings (self) or the plugin settings subtree."""
+        path = settings_parameter_dict['path']
+        param = settings_parameter_dict['param']
+        if path[0] == 'main_settings':
+            if hasattr(self, path[-1]):
+                setattr(self, path[-1], param.value())
+        elif path[0] == self._plugin_settings_key:
+            if self.plugin is not None:
+                self.plugin.update_settings(settings_parameter_dict)
+
+    def _connect_capabilities_signal(self, plugin) -> None:
+        """Wire the plugin capabilities_updated_signal with QueuedConnection."""
+        if getattr(plugin, '_new_style_plugin', False):
+            plugin.capabilities_updated_signal.connect(
+                self.capabilities_updated_signal,
+                Qt.ConnectionType.QueuedConnection,
+            )
+
+    def _dispatch_custom_command(self, command) -> None:
+        """Forward an unrecognized ThreadCommand to the plugin instance."""
+        if self.plugin is not None and hasattr(self.plugin, command.command):
+            cmd = getattr(self.plugin, command.command)
+            if isinstance(command.attribute, list):
+                cmd(*command.attribute)
+            elif isinstance(command.attribute, dict):
+                cmd(**command.attribute)
+            else:
+                cmd(command.attribute)
+
