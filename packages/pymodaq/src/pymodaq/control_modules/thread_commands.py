@@ -18,6 +18,8 @@ class ThreadStatus(StrEnum):
     RAISE_TIMEOUT = 'raise_timeout'
     SHOW_SPLASH = 'show_splash'
     CLOSE_SPLASH = 'close_splash'
+    INI_HARDWARE = 'ini_hardware'   # replaces INI_STAGE / INI_DETECTOR upward
+    QUERY_DATA = 'query_data'       # replaces GET_ACTUATOR_VALUE upward
 
 
 class ThreadStatusMove(StrEnum):
@@ -55,6 +57,13 @@ class ThreadStatusViewer(StrEnum):
     STOP = 'stop'
     UPDATE_CHANNELS = 'update_channels'
 
+
+
+class ControlToHardware(StrEnum):
+    """Commands common to both DAQ_Move_Hardware and DAQ_Detector workers."""
+    INI_HARDWARE = 'ini_hardware'
+    CLOSE        = 'close'
+    QUERY_DATA   = 'query_data'
 
 
 class ControlToHardwareMove(StrEnum):

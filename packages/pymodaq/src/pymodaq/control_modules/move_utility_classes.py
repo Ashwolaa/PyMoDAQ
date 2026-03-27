@@ -615,7 +615,7 @@ class DAQ_Move_base(DAQ_Plugin_base):
         pos = self.get_actuator_value()
         # get_actuator_value may return a DataActuator or a plain number
         if not isinstance(pos, _DA):
-            pos = _DA(self._title, data=pos)
+            pos = _DA(self._title, data=pos, units=self.axis_unit)
         return DataToExport(name=self._title, data=[pos])
 
     def change_to(self, name: str, value) -> None:

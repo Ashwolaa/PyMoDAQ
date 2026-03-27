@@ -23,8 +23,8 @@ from pymodaq_gui.h5modules.saving import H5Saver
 
 from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands, LECOComponentMixin
 from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
-from pymodaq.control_modules.thread_commands import ThreadStatus
-
+from pymodaq.control_modules.thread_commands import ThreadStatus, ControlToHardware
+from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
 
 
 config = Config()
@@ -520,7 +520,7 @@ class DAQ_Hardware_Base(QObject):
         super().__init__()
         self._title = title
         self._plugin_name = plugin_name
-        self.plugin = None                 # unified name for the plugin instance
+        self.plugin:DAQ_Plugin_base = None                 # unified name for the plugin instance
         self.controller_address = None     # fixes spelling of hardware_adress / controller_adress
 
     @property
@@ -547,7 +547,7 @@ class DAQ_Hardware_Base(QObject):
             if self.plugin is not None:
                 self.plugin.update_settings(settings_parameter_dict)
 
-    def _connect_capabilities_signal(self, plugin) -> None:
+    def _connect_capabilities_signal(self, plugin:DAQ_Plugin_base) -> None:
         """Wire the plugin capabilities_updated_signal with QueuedConnection."""
         if getattr(plugin, '_new_style_plugin', False):
             plugin.capabilities_updated_signal.connect(
@@ -565,4 +565,49 @@ class DAQ_Hardware_Base(QObject):
                 cmd(**command.attribute)
             else:
                 cmd(command.attribute)
+
+    def _do_read(self, names=None, fresh: bool = True):
+        """Read from the plugin via the uniform query_data interface.
+
+        Works for both old-style plugins (via the DAQ_Move_base / DAQ_Viewer_base
+        adapters) and pure new-style plugins that implement query_data natively.
+
+        Returns
+        -------
+        DataToExport
+        """
+        return self.plugin.query_data(names=names, fresh=fresh)
+
+    def _do_write(self, name: str, value) -> None:
+        """Write to the plugin via the uniform change_to interface.
+
+        Works for both old-style plugins (adapter forwards to move_abs) and
+        pure new-style plugins that implement change_to natively.
+        """
+        self.plugin.change_to(name, value)
+
+    def queue_command(self, command) -> bool:
+        """Handle commands common to both hardware workers.
+
+        Parameters
+        ----------
+        command: ThreadCommand
+
+        Returns
+        -------
+        bool
+            True if the command was handled, False so the subclass can continue.
+        """
+        if command.command == ControlToHardware.INI_HARDWARE:
+            status = self.ini_hardware(*command.attribute)
+            self.status_sig.emit(ThreadCommand(ThreadStatus.INI_HARDWARE, status))
+        elif command.command == ControlToHardware.CLOSE:
+            status = self.close()
+            self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status]))
+        elif command.command == ControlToHardware.QUERY_DATA:
+            dte = self._do_read()
+            self.status_sig.emit(ThreadCommand(ThreadStatus.QUERY_DATA, dte))
+        else:
+            return False
+        return True
 
