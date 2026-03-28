@@ -399,6 +399,8 @@ class DAQ_Viewer(ParameterControlModule):
         if not do_init:
             try:
                 self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.CLOSE))
+                if hasattr(self, '_hardware_thread') and self._hardware_thread is not None:
+                    self._hardware_thread.wait(3000)  # wait up to 3 s for clean exit
                 QtWidgets.QApplication.processEvents()
                 if self.ui is not None:
                     self.ui.detector_init = False
@@ -427,6 +429,7 @@ class DAQ_Viewer(ParameterControlModule):
 
                 self._hardware_thread.hardware = hardware
                 if self.config('pymodaq', 'viewer', 'viewer_in_thread'):
+                    self._hardware_thread.finished.connect(hardware.deleteLater)
                     self._hardware_thread.start()
                 self.command_hardware.emit(ThreadCommand(ControlToHardware.INI_HARDWARE,
                                                          attribute=[

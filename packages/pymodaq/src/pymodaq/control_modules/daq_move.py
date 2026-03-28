@@ -427,6 +427,8 @@ class DAQ_Move(ParameterControlModule):
         if not do_init:
             try:
                 self.command_hardware.emit(ThreadCommand(ControlToHardwareMove.CLOSE))
+                if hasattr(self, '_hardware_thread') and self._hardware_thread is not None:
+                    self._hardware_thread.wait(3000)  # wait up to 3 s for clean exit
                 QtWidgets.QApplication.processEvents()
 
                 if self.ui is not None:
@@ -452,6 +454,7 @@ class DAQ_Move(ParameterControlModule):
                 )
 
                 self._hardware_thread.hardware = hardware
+                self._hardware_thread.finished.connect(hardware.deleteLater)
                 self._hardware_thread.start()
                 self.command_hardware.emit(
                     ThreadCommand(

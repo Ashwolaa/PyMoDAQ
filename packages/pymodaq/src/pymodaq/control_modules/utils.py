@@ -582,6 +582,14 @@ class DAQ_Hardware_Base(QObject):
         elif command.command == ControlToHardware.CLOSE:
             status = self.close()
             self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status]))
+            # Quit the thread's event loop.  CLOSE always executes inside the
+            # worker thread (queued connection), so thread().quit() is safe.
+            # Combined with the deleteLater() connected at setup time, this
+            # ensures self is destroyed in the worker thread — preventing the
+            # "Timers cannot be stopped from another thread" Qt warnings that
+            # occur when the GC collects self from the main thread.
+            if self.thread() is not None:
+                self.thread().quit()
         else:
             return False
         return True
