@@ -621,7 +621,7 @@ class DAQ_Move(ParameterControlModule):
             if self.ui is not None:
                 self.ui.set_abs_spinbox_properties(**status.attribute)
 
-        elif status.command == ThreadStatusMove.STOP:
+        elif status.command in (ThreadStatus.STOP, ThreadStatusMove.STOP):
             self.stop_motion()
 
         elif status.command == ThreadStatusMove.UNITS:
@@ -1054,10 +1054,10 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
         try:
             logger.debug(f"Threadcommand {command.command} sent to {self.title}")
             if command.command == ControlToHardwareMove.INI_STAGE:
-                # Legacy path: old-style callers still send INI_STAGE
+                # Legacy alias: emit ThreadStatus.INI_HARDWARE (canonical)
                 status: edict = self.ini_hardware(*command.attribute)
                 self.status_sig.emit(
-                    ThreadCommand(command=ThreadStatusMove.INI_STAGE, attribute=status)
+                    ThreadCommand(command=ThreadStatus.INI_HARDWARE, attribute=status)
                 )
 
             elif command.command == ControlToHardwareMove.MOVE_ABS:

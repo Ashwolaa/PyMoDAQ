@@ -1031,7 +1031,7 @@ class DAQ_Viewer(ParameterControlModule):
         """
         super().thread_status(status, 'detector')
 
-        if status.command == ThreadStatusViewer.INI_DETECTOR:
+        if status.command in (ThreadStatus.INI_HARDWARE, ThreadStatusViewer.INI_DETECTOR):
             self.update_status("detector initialized: " + str(status.attribute['initialized']))
             if self.ui is not None:
                 self.ui.detector_init = status.attribute['initialized']
@@ -1065,7 +1065,7 @@ class DAQ_Viewer(ParameterControlModule):
             """status.attribute should be a list of numpy arrays of shape (1,)"""
             self._lcd.setvalues(status.attribute)
 
-        elif status.command == ThreadStatusViewer.STOP:
+        elif status.command in (ThreadStatus.STOP, ThreadStatusViewer.STOP):
             self.stop_grab()
 
     @Slot(ThreadCommand)
@@ -1142,16 +1142,13 @@ class DAQ_Detector(DAQ_Hardware_Base):
             * update_wait_time
             * any string that the hardware is able to understand
         """
-        # INI_HARDWARE and its legacy alias INI_DETECTOR both complete initialization
-        # and must emit ThreadStatusViewer.INI_DETECTOR so DAQ_Viewer.thread_status
-        # can finish the handshake.  Handle both before falling through to super().
-        if command.command in (ControlToHardware.INI_HARDWARE,
-                               ControlToHardwareViewer.INI_DETECTOR):
-            status = self.ini_hardware(*command.attribute)
-            self.status_sig.emit(ThreadCommand(ThreadStatusViewer.INI_DETECTOR, status))
+        if super().queue_command(command):
             return
 
-        if super().queue_command(command):
+        # Legacy alias: INI_DETECTOR → INI_HARDWARE (already handled by super)
+        if command.command == ControlToHardwareViewer.INI_DETECTOR:
+            status = self.ini_hardware(*command.attribute)
+            self.status_sig.emit(ThreadCommand(ThreadStatus.INI_HARDWARE, status))
             return
 
         elif command.command == ControlToHardwareViewer.GRAB:
