@@ -1,6 +1,16 @@
 from pymodaq_utils.enums import StrEnum
 
 
+class ControleModuleType(StrEnum):
+    DAQ_MOVE = 'DAQ_Move'
+    DAQ_VIEWER = 'DAQ_Viewer'
+
+
+class ControllerStatus(StrEnum):
+    MASTER = 'Master'
+    SLAVE = 'Slave'
+
+
 class ThreadStatus(StrEnum):
     """ Allowed Generic commands sent from a plugin using the method: emit_status
 
@@ -18,6 +28,15 @@ class ThreadStatus(StrEnum):
     RAISE_TIMEOUT = 'raise_timeout'
     SHOW_SPLASH = 'show_splash'
     CLOSE_SPLASH = 'close_splash'
+    INI_HARDWARE = 'ini_hardware'   # unified replacement for INI_STAGE / INI_DETECTOR
+    QUERY_DATA = 'query_data'       # unified replacement for GET_ACTUATOR_VALUE upward
+
+
+class ControlToHardware(StrEnum):
+    """Commands common to both DAQ_Move_Hardware and DAQ_Detector workers."""
+    INI_HARDWARE = 'ini_hardware'
+    CLOSE        = 'close'
+    QUERY_DATA   = 'query_data'
 
 
 class ThreadStatusMove(StrEnum):

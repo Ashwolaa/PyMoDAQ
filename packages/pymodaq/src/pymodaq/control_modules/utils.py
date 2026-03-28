@@ -23,22 +23,16 @@ from pymodaq_gui.h5modules.saving import H5Saver
 
 from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands, LECOComponentMixin
 from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
-from pymodaq.control_modules.thread_commands import ThreadStatus
+from pymodaq.control_modules.thread_commands import (
+    ThreadStatus, ControlToHardware, ControleModuleType, ControllerStatus,
+)
 
-
+# Re-export for backward compatibility — callers that imported these from utils
+# still work; new code should import from thread_commands directly.
+__all__ = ['ControleModuleType', 'ControllerStatus']
 
 config = Config()
 logger = set_logger(get_module_name(__file__))
-
-
-class ControleModuleType(StrEnum):
-    DAQ_MOVE = 'DAQ_Move'
-    DAQ_VIEWER = 'DAQ_Viewer'
-
-
-class ControllerStatus(StrEnum):
-    MASTER = 'Master'
-    SLAVE = 'Slave'
 
 
 
@@ -503,3 +497,87 @@ class ParameterControlModule(ParameterManager,LECOComponentMixin, ControlModule)
         return None
 
 
+class DAQ_Hardware_Base(QObject):
+    """Abstract base shared by DAQ_Move_Hardware and DAQ_Detector.
+
+    Provides common signals, a unified plugin reference, shared update_settings
+    dispatch, and a queue_command handler for the three commands that both
+    worker classes share (ini_hardware, close, query_data).
+
+    Subclasses must implement:
+        ini_hardware(params_state, controller) -> edict
+        close() -> str
+    and set class attributes:
+        _kind: str               e.g. 'actuator' or 'detector'
+        _plugin_settings_key: str  e.g. 'move_settings' or 'detector_settings'
+    """
+
+    status_sig = Signal(ThreadCommand)
+    capabilities_updated_signal = Signal(object)  # Capabilities — relayed from plugin
+
+    _kind: str = 'hardware'
+    _plugin_settings_key: str = ''
+
+    def __init__(self, title: str, plugin_name: str) -> None:
+        super().__init__()
+        self._title = title
+        self._plugin_name = plugin_name
+        self.plugin = None              # set by subclass after ini_hardware
+        self.controller_address = None
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    @property
+    def plugin_name(self) -> str:
+        return self._plugin_name
+
+    def ini_hardware(self, params_state=None, controller=None):
+        raise NotImplementedError
+
+    def update_settings(self, settings_parameter_dict) -> None:
+        """Route a settings change to either main_settings or the plugin subtree."""
+        path = settings_parameter_dict['path']
+        param = settings_parameter_dict['param']
+        if path[0] == 'main_settings':
+            if hasattr(self, path[-1]):
+                setattr(self, path[-1], param.value())
+        elif path[0] == self._plugin_settings_key:
+            if self.plugin is not None:
+                self.plugin.update_settings(settings_parameter_dict)
+
+    def _connect_capabilities_signal(self, plugin) -> None:
+        """Wire plugin.capabilities_updated_signal → self.capabilities_updated_signal."""
+        if hasattr(plugin, 'capabilities_updated_signal'):
+            plugin.capabilities_updated_signal.connect(
+                self.capabilities_updated_signal,
+                Qt.ConnectionType.QueuedConnection,
+            )
+
+    def _dispatch_custom_command(self, command) -> None:
+        """Forward an unrecognised ThreadCommand to the plugin instance."""
+        if self.plugin is not None and hasattr(self.plugin, command.command):
+            cmd = getattr(self.plugin, command.command)
+            if isinstance(command.attribute, list):
+                cmd(*command.attribute)
+            elif isinstance(command.attribute, dict):
+                cmd(**command.attribute)
+            else:
+                cmd(command.attribute)
+
+    def queue_command(self, command) -> bool:
+        """Handle commands shared by all hardware workers.
+
+        Returns True if the command was consumed, False so the subclass
+        can handle its own commands.
+        """
+        if command.command == ControlToHardware.INI_HARDWARE:
+            status = self.ini_hardware(*command.attribute)
+            self.status_sig.emit(ThreadCommand(ThreadStatus.INI_HARDWARE, status))
+        elif command.command == ControlToHardware.CLOSE:
+            status = self.close()
+            self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status]))
+        else:
+            return False
+        return True
