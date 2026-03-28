@@ -54,6 +54,7 @@ from pymodaq_gui.plotting.data_viewers.viewer import ViewerBase
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
 from pymodaq_utils.enums import enum_checker
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base
+from pymodaq.control_modules.hardware_worker import _is_new_style, DAQ_HardwareWorker
 
 from pymodaq.utils.leco.pymodaq_listener import ViewerActorListener, LECOClientCommands, LECOViewerCommands
 
@@ -1068,33 +1069,55 @@ class DetectorWorker(HardwareWorkerBase):
         """
         if super().queue_command(command):
             return
+        try:
+            if command.command == ControlToHardwareViewer.GRAB:
+                if _is_new_style(self.plugin):
+                    self.grab_state = True
+                    self.single_grab = False
+                    for cap in self.plugin.capabilities.observables:
+                        self._hw_worker.grab(cap.name)
+                    for cap in self.plugin.capabilities.variables:
+                        self._hw_worker.grab(cap.name)
+                else:
+                    self.single_grab = False
+                    self.grab_state = True
+                    self.grab_data(**command.attribute)
 
-        # Legacy alias: INI_DETECTOR → ini_hardware (base class already handles INI_HARDWARE)
-        if command.command == ControlToHardwareViewer.INI_DETECTOR:
-            status = self.ini_hardware(*command.attribute)
-            self.status_sig.emit(ThreadCommand(ThreadStatusViewer.INI_DETECTOR, status))
+            elif command.command == ControlToHardwareViewer.SINGLE:
+                if _is_new_style(self.plugin):
+                    self.grab_state = True
+                    self.single_grab = True
+                    for cap in self.plugin.capabilities.observables:
+                        self._hw_worker.snap(cap.name)
+                    for cap in self.plugin.capabilities.variables:
+                        self._hw_worker.snap(cap.name)
+                else:
+                    self.single_grab = True
+                    self.grab_state = True
+                    self.single(**command.attribute)
 
-        elif command.command == ControlToHardwareViewer.GRAB:
-            self.single_grab = False
-            self.grab_state = True
-            self.grab_data(**command.attribute)
+            elif command.command == ControlToHardwareViewer.STOP_GRAB:
+                if _is_new_style(self.plugin):
+                    self.grab_state = False
+                    for name in list(self._hw_worker.grabbed_names):
+                        self._hw_worker.stop(name)
+                    self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
+                else:
+                    self.grab_state = False
+                    self.plugin.stop()
+                    QtWidgets.QApplication.processEvents()
+                    self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
 
             elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
                 self.plugin.update_scanner(command.attribute[0])
 
-        elif command.command == ControlToHardwareViewer.STOP_GRAB:
-            self.grab_state = False
-            self.plugin.stop()
-            self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
+            elif command.command == ControlToHardwareViewer.UPDATE_WAIT_TIME:
+                self.wait_time = command.attribute[0]
 
-        elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
-            self.plugin.update_scanner(command.attribute[0])
-
-        elif command.command == ControlToHardwareViewer.UPDATE_WAIT_TIME:
-            self.wait_time = command.attribute[0]
-
-        else:  # custom commands for particular plugins
-            self._dispatch_custom_command(command)
+            else:  # custom commands for particular plugins
+                self._dispatch_custom_command(command)
+        except Exception as e:
+            self.logger.exception(str(e))
 
     def ini_hardware(self, params_state=None, controller=None):
         """ Initialize an instrument plugin class and tries to apply experiment settings
@@ -1124,6 +1147,9 @@ class DetectorWorker(HardwareWorkerBase):
                 infos = self.plugin.ini_detector(controller)
                 status.controller = self.plugin.controller
                 self.controller_address = self.plugin.controller
+                if _is_new_style(self.plugin):
+                    self._hw_worker = DAQ_HardwareWorker(self.plugin)
+                    self._hw_worker.data_ready_signal.connect(self._on_hw_data_ready)
 
             except Exception as e:
                 logger.exception("Hardware couldn't be initialized", exc_info=e)
@@ -1263,8 +1289,15 @@ class DetectorWorker(HardwareWorkerBase):
             if self.grab_state:
                 QTimer.singleShot(self.wait_time, self._trigger_next_grab)
 
+    def _on_hw_data_ready(self, name: str, dte: DataToExport) -> None:
+        """Relay data_ready_signal from DAQ_HardwareWorker to data_detector_sig."""
+        if dte is not None:
+            self.data_detector_sig.emit(dte)
+
     def close(self):
         """Call the close method of the instrument plugin class."""
+        if hasattr(self, '_hw_worker'):
+            self._hw_worker.close()
         if self.plugin is not None and self.plugin.controller is not None:
             status = self.plugin.close()
             return status

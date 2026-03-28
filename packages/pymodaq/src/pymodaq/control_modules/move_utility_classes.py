@@ -4,7 +4,7 @@ HW_KIND = 'actuator'
 HW_SETTINGS_KEY = f'{HW_KIND}_settings'
 from abc import abstractmethod
 from time import perf_counter
-from typing import Union, List, Dict, TYPE_CHECKING, Optional, TypeVar
+from typing import ClassVar, Union, List, Dict, TYPE_CHECKING, Optional, TypeVar
 
 
 from easydict import EasyDict as edict
@@ -276,6 +276,11 @@ class DAQ_Move_base(DAQ_Plugin_base):
     target_value: DataActuator
         stores the target position the controller should reach within epsilon
     """
+
+    # Old-style adapter: uses move_abs / get_actuator_value; routed through
+    # DAQ_Move_Hardware, not DAQ_HardwareWorker.  Plugins that implement the
+    # new query_data / change_to interface directly should set this to True.
+    _new_style_plugin: ClassVar[bool] = False
 
     move_done_signal = Signal(DataActuator)
     is_multiaxes = False

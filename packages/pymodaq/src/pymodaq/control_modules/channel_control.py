@@ -73,8 +73,10 @@ class ChannelControl:
         The Observable or Variable this channel represents.  Determines the
         toolbar style and whether *change* is meaningful.
     query :
-        Zero-argument callable that reads the current value.  Must return a
-        :class:`~pymodaq_data.data.DataToExport`.
+        Callable ``(fresh: bool) -> DataToExport`` that reads the current
+        value.  Pass ``fresh=True`` to read from hardware (snap / grab tick);
+        pass ``fresh=False`` to return the last cached value without a
+        hardware round-trip (readback display, status label).
     change :
         Single-argument callable that writes a new value.  ``None`` for pure
         Observables (read-only channels).
@@ -86,7 +88,7 @@ class ChannelControl:
     """
 
     capability: Observable          # Variable is a subclass of Observable
-    query: Callable[[], 'DataToExport']
+    query: Callable[[bool], 'DataToExport']
     change: Callable[[Any], None] | None = None
     toolbar: Any = None             # QToolBar; Any avoids a hard Qt import here
 
@@ -215,7 +217,7 @@ class ChannelControl:
 
         return cls(
             capability=variable,
-            query=lambda: daq_move.get_actuator_value(),
+            query=lambda fresh: daq_move.get_actuator_value(),
             change=lambda v: daq_move.move_abs(v),
             toolbar=daq_move.ui.toolbar,
         )
@@ -237,7 +239,7 @@ class ChannelControl:
 
         return cls(
             capability=observable,
-            query=lambda: daq_viewer.snap(),
+            query=lambda fresh: daq_viewer.snap(),
             change=None,
             toolbar=daq_viewer.ui.toolbar,
         )

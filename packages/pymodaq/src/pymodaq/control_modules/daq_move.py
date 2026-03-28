@@ -47,6 +47,7 @@ from pymodaq.control_modules.move_utility_classes import (ThreadCommand, MoveCom
 
 
 from pymodaq.control_modules.move_utility_classes import params as daq_move_params
+from pymodaq.control_modules.hardware_worker import _is_new_style, DAQ_HardwareWorker
 from pymodaq.utils.leco.pymodaq_listener import (MoveActorListener, LECOMoveCommands, LECOCommands,)
 from pymodaq import Q_, Unit
 
@@ -850,6 +851,8 @@ class ActuatorWorker(HardwareWorkerBase):
 
     def close(self):
         """Uninitialize the stage closing the hardware."""
+        if hasattr(self, '_hw_worker'):
+            self._hw_worker.close()
         if self.plugin is not None and self.plugin.controller is not None:
             self.plugin.close()
         return "Stage uninitialized"
@@ -902,12 +905,12 @@ class ActuatorWorker(HardwareWorkerBase):
             status.controller = self.plugin.controller
             self.controller_address = self.plugin.controller
             self.plugin.move_done_signal.connect(self.move_done)
-            if getattr(self.plugin, '_new_style_plugin', False):
-                from qtpy.QtCore import Qt
-                self.plugin.capabilities_updated_signal.connect(
-                    self.capabilities_updated_signal,
-                    Qt.ConnectionType.QueuedConnection,
-                )
+            self.plugin.change_done_signal.connect(self._on_change_done)
+            self._connect_capabilities_signal(self.plugin)
+            if _is_new_style(self.plugin):
+                self._hw_worker = DAQ_HardwareWorker(self.plugin)
+                self._hw_worker.data_ready_signal.connect(self._on_hw_data_ready)
+                self._hw_worker.change_done_signal.connect(self._on_change_done)
             if status.initialized:
                 self.status_sig.emit(
                     ThreadCommand(
@@ -985,6 +988,14 @@ class ActuatorWorker(HardwareWorkerBase):
         if pos is not None:
             self.move_done(pos)
 
+    def _on_hw_data_ready(self, name: str, dte) -> None:
+        """Relay data_ready_signal from DAQ_HardwareWorker as a position update."""
+        if dte is not None and dte.data:
+            pos = dte.data[0]
+            self.status_sig.emit(
+                ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
+            )
+
     @Slot(DataActuator)
     def move_done(self, pos: DataActuator):
         """Send the move_done signal back to the main class"""
@@ -1007,15 +1018,18 @@ class ActuatorWorker(HardwareWorkerBase):
             return
         try:
             logger.debug(f"Threadcommand {command.command} sent to {self.title}")
-            if command.command == ControlToHardwareMove.INI_STAGE:
-                # Legacy alias → emit the canonical INI_HARDWARE status
-                status: edict = self.ini_hardware(*command.attribute)
-                self.status_sig.emit(
-                    ThreadCommand(command=ThreadStatus.INI_HARDWARE, attribute=status)
-                )
-
-            elif command.command == ControlToHardwareMove.MOVE_ABS:
-                self.move_abs(*command.attribute)
+            if command.command == ControlToHardwareMove.MOVE_ABS:
+                if _is_new_style(self.plugin):
+                    position = command.attribute[0]
+                    name = self.plugin.axis_name
+                    if self.plugin.data_actuator_type.name == 'float':
+                        value = position.units_as(self.plugin.axis_unit).value()
+                    else:
+                        value = position
+                    self._move_completed = False
+                    self._hw_worker.change_to(name, value)
+                else:
+                    self.move_abs(*command.attribute)
 
             elif command.command == ControlToHardwareMove.MOVE_REL:
                 self.move_rel(*command.attribute)
@@ -1024,8 +1038,11 @@ class ActuatorWorker(HardwareWorkerBase):
                 self.move_home()
 
             elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
-                # legacy path — route through base QUERY_DATA
-                super().queue_command(ThreadCommand(ControlToHardware.QUERY_DATA))
+                if _is_new_style(self.plugin):
+                    self._hw_worker.snap(self.plugin.axis_name)
+                else:
+                    # legacy path — route through base QUERY_DATA
+                    super().queue_command(ThreadCommand(ControlToHardware.QUERY_DATA))
 
             elif command.command == ControlToHardwareMove.STOP_MOTION:
                 self.stop_motion()

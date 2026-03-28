@@ -18,7 +18,7 @@ from pymodaq.control_modules.channel_control import ChannelControl, build_toolba
 class TestChannelControlDataclass:
     """ChannelControl can be constructed and inspected without Qt."""
 
-    def _dummy_query(self):
+    def _dummy_query(self, fresh=True):
         return None
 
     def test_observable_channel_no_change(self):
@@ -54,8 +54,8 @@ class TestChannelControlDataclass:
     def test_query_callable_is_called(self):
         called = []
         obs = Observable(name='temp')
-        cc = ChannelControl(capability=obs, query=lambda: called.append(1) or 42)
-        result = cc.query()
+        cc = ChannelControl(capability=obs, query=lambda fresh: called.append(1) or 42)
+        result = cc.query(True)
         assert result == 42
         assert called == [1]
 
@@ -299,7 +299,7 @@ class TestBuildToolbar:
         cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
         tb = build_toolbar(cv)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=cv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=cv, query=lambda fresh: None, toolbar=tb)
         cc.update_capability(ContinuousVariable(name='pos', lo=-100.0, hi=100.0))
         spins = tb.findChildren(QDoubleSpinBox)
         assert spins[0].minimum() == pytest.approx(-100.0)
@@ -310,7 +310,7 @@ class TestBuildToolbar:
         cv = ContinuousVariable(name='pos', units='mm')
         tb = build_toolbar(cv)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=cv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=cv, query=lambda fresh: None, toolbar=tb)
         cc.update_capability(ContinuousVariable(name='pos', units='nm'))
         spins = tb.findChildren(QDoubleSpinBox)
         assert 'nm' in spins[0].suffix()
@@ -320,7 +320,7 @@ class TestBuildToolbar:
         dv = DiscreteVariable(name='filter', choices=['ND1', 'ND2'])
         tb = build_toolbar(dv)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=dv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=dv, query=lambda fresh: None, toolbar=tb)
         cc.update_capability(DiscreteVariable(name='filter', choices=['ND1', 'ND2', 'ND4']))
         combos = tb.findChildren(QComboBox)
         assert combos[0].count() == 3
@@ -332,7 +332,7 @@ class TestBuildToolbar:
         qtbot.addWidget(tb)
         combos = tb.findChildren(QComboBox)
         combos[0].setCurrentIndex(1)   # select 'ND2'
-        cc = ChannelControl(capability=dv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=dv, query=lambda fresh: None, toolbar=tb)
         # Update with same choices in different order — ND2 still present
         cc.update_capability(DiscreteVariable(name='filter',
                                               choices=['ND1', 'ND2', 'ND4', 'ND8']))
@@ -389,7 +389,7 @@ class TestAdapters:
     def test_from_daq_move_query_delegates(self):
         move = self._make_mock_move()
         cc = ChannelControl.from_daq_move(move)
-        result = cc.query()
+        result = cc.query(True)
         move.get_actuator_value.assert_called_once()
         assert result == 'dte_sentinel'
 
@@ -425,7 +425,7 @@ class TestAdapters:
     def test_from_daq_viewer_query_delegates(self):
         viewer = self._make_mock_viewer()
         cc = ChannelControl.from_daq_viewer(viewer)
-        result = cc.query()
+        result = cc.query(True)
         viewer.snap.assert_called_once()
         assert result == 'dte_sentinel'
 
@@ -445,7 +445,7 @@ class TestSetLocked:
         cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
         tb = build_toolbar(cv)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=cv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=cv, query=lambda fresh: None, toolbar=tb)
 
         cc.set_locked(True)
 
@@ -459,7 +459,7 @@ class TestSetLocked:
         cv = ContinuousVariable(name='pos', lo=-10.0, hi=10.0)
         tb = build_toolbar(cv)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=cv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=cv, query=lambda fresh: None, toolbar=tb)
 
         cc.set_locked(True)
         cc.set_locked(False)
@@ -474,7 +474,7 @@ class TestSetLocked:
         dv = DiscreteVariable(name='filter', choices=['ND1', 'ND2'])
         tb = build_toolbar(dv)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=dv, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=dv, query=lambda fresh: None, toolbar=tb)
 
         cc.set_locked(True)
 
@@ -488,7 +488,7 @@ class TestSetLocked:
         obs = Observable(name='data')
         tb = build_toolbar(obs)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=obs, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=obs, query=lambda fresh: None, toolbar=tb)
 
         cc.set_locked(True)
 
@@ -505,7 +505,7 @@ class TestSetLocked:
         obs = Observable(name='data')
         tb = build_toolbar(obs)
         qtbot.addWidget(tb)
-        cc = ChannelControl(capability=obs, query=lambda: None, toolbar=tb)
+        cc = ChannelControl(capability=obs, query=lambda fresh: None, toolbar=tb)
 
         cc.set_locked(True)
 

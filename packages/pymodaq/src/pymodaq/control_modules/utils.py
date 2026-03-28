@@ -4,12 +4,9 @@ Created the 03/10/2022
 
 @author: Sebastien Weber
 """
-
 from random import randint
 from typing import Optional, Type, Union, TYPE_CHECKING
 from easydict import EasyDict as edict
-from qtpy import QtWidgets
-
 from qtpy import QtWidgets
 from qtpy.QtCore import Signal, QObject, Qt, Slot, QThread
 
@@ -872,10 +869,14 @@ class HardwareWorkerBase(QObject):
             if self.plugin is not None:
                 self.plugin.update_settings(settings_parameter_dict)
 
-    def _connect_capabilities_signal(self, plugin:DAQ_Plugin_base) -> None:
-        """Wire the plugin capabilities_updated_signal with QueuedConnection."""
-        if getattr(plugin, '_new_style_plugin', False):
-            from qtpy.QtCore import Qt
+    def _connect_capabilities_signal(self, plugin: 'DAQ_Plugin_base') -> None:
+        """Wire the plugin capabilities_updated_signal with QueuedConnection.
+
+        Connects unconditionally for all plugins that carry
+        ``capabilities_updated_signal`` (i.e. all ``DAQ_Plugin_base``
+        subclasses), regardless of ``_new_style_plugin``.
+        """
+        if hasattr(plugin, 'capabilities_updated_signal'):
             plugin.capabilities_updated_signal.connect(
                 self.capabilities_updated_signal,
                 Qt.ConnectionType.QueuedConnection,
