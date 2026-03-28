@@ -23,13 +23,17 @@ from pymodaq_gui.h5modules.saving import H5Saver
 
 from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands, LECOComponentMixin
 from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
-from pymodaq.control_modules.thread_commands import (
-    ThreadStatus, ControlToHardware, ControleModuleType, ControllerStatus,
-)
+from pymodaq.control_modules.thread_commands import ThreadStatus, ControlToHardware
 
-# Re-export for backward compatibility — callers that imported these from utils
-# still work; new code should import from thread_commands directly.
-__all__ = ['ControleModuleType', 'ControllerStatus']
+
+class ControleModuleType(StrEnum):
+    DAQ_MOVE = 'DAQ_Move'
+    DAQ_VIEWER = 'DAQ_Viewer'
+
+
+class ControllerStatus(StrEnum):
+    MASTER = 'Master'
+    SLAVE = 'Slave'
 
 config = Config()
 logger = set_logger(get_module_name(__file__))
