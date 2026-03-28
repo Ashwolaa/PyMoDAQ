@@ -566,6 +566,26 @@ class DAQ_Hardware_Base(QObject):
             else:
                 cmd(command.attribute)
 
+    def _do_read(self, names=None, fresh: bool = True):
+        """Read from the plugin via the uniform query_data interface.
+
+        Works for both old-style plugins (via the DAQ_Move_base / DAQ_Viewer_base
+        adapters) and pure new-style plugins that implement query_data natively.
+
+        Returns
+        -------
+        DataToExport
+        """
+        return self.plugin.query_data(names=names, fresh=fresh)
+
+    def _do_write(self, name: str, value) -> None:
+        """Write to the plugin via the uniform change_to interface.
+
+        Works for both old-style plugins (adapter forwards to move_abs) and
+        pure new-style plugins that implement change_to natively.
+        """
+        self.plugin.change_to(name, value)
+
     def queue_command(self, command) -> bool:
         """Handle commands shared by all hardware workers.
 
@@ -578,6 +598,9 @@ class DAQ_Hardware_Base(QObject):
         elif command.command == ControlToHardware.CLOSE:
             status = self.close()
             self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status]))
+        elif command.command == ControlToHardware.QUERY_DATA:
+            dte = self._do_read()
+            self.status_sig.emit(ThreadCommand(ThreadStatus.QUERY_DATA, dte))
         else:
             return False
         return True

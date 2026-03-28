@@ -18,7 +18,7 @@ import time
 from easydict import EasyDict as edict
 import numpy as np
 from qtpy import QtWidgets
-from qtpy.QtCore import Qt, QObject, Slot, QThread, Signal
+from qtpy.QtCore import Qt, QObject, Slot, QThread, Signal, QTimer
 
 from pymodaq_data.data import DataToExport, Axis, DataDistribution
 from pymodaq.utils.data import DataFromPlugins
@@ -55,6 +55,7 @@ from pymodaq_gui.plotting.data_viewers.viewer import ViewerBase
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
 from pymodaq_utils.enums import enum_checker
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base
+from pymodaq.control_modules.hardware_worker import _is_new_style, DAQ_HardwareWorker
 
 from pymodaq.utils.leco.pymodaq_listener import ViewerActorListener, LECOClientCommands, LECOViewerCommands
 
@@ -398,7 +399,7 @@ class DAQ_Viewer(ParameterControlModule):
         """
         if not do_init:
             try:
-                self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.CLOSE))
+                self.command_hardware.emit(ThreadCommand(ControlToHardware.CLOSE))
                 QtWidgets.QApplication.processEvents()
                 if self.ui is not None:
                     self.ui.detector_init = False
@@ -1031,7 +1032,7 @@ class DAQ_Viewer(ParameterControlModule):
         """
         super().thread_status(status, 'detector')
 
-        if status.command == ThreadStatusViewer.INI_DETECTOR:
+        if status.command == ThreadStatus.INI_HARDWARE or status.command == ThreadStatusViewer.INI_DETECTOR:
             self.update_status("detector initialized: " + str(status.attribute['initialized']))
             if self.ui is not None:
                 self.ui.detector_init = status.attribute['initialized']
@@ -1124,56 +1125,85 @@ class DAQ_Detector(DAQ_Hardware_Base):
         self.hardware_averaging = False
         self.show_averaging = False
         self.wait_time = settings_parameter['main_settings', 'wait_time']
+        self._grab_kwargs: dict = {}
+        self._grab_live: bool = True
         self.daq_type = detector.daq_type
 
-    def queue_command(self, command: ThreadCommand):
-        """Transfer command from the main module to the hardware module
+    # --- deprecated aliases ---------------------------------------------------
 
-        Parameters
-        ----------
-        command: ThreadCommand
-            The specific (or generic) command (str) to pass to the hardware,  either:
-            * ini_hardware / ini_detector (legacy)
-            * close
-            * grab
-            * single
-            * stop_grab
-            * update_scanner
-            * update_wait_time
-            * any string that the hardware is able to understand
+    @property
+    def detector(self):
+        deprecation_msg("detector is deprecated, use plugin")
+        return self.plugin
+
+    @property
+    def controller_adress(self):
+        deprecation_msg("controller_adress is deprecated, use controller_address")
+        return self.controller_address
+
+    @property
+    def detector_name(self):
+        deprecation_msg("detector_name is deprecated, use plugin_name")
+        return self.plugin_name
+
+    @Slot(ThreadCommand)
+    def queue_command(self, command: ThreadCommand):
+        """Transfer command from the main module to the hardware module.
+
+        Common commands (ini_hardware, close) are handled by the base class.
+        Detector-specific commands are handled here.
         """
         if super().queue_command(command):
             return
+        try:
+            if command.command == ControlToHardwareViewer.GRAB:
+                if _is_new_style(self.plugin):
+                    self.grab_state = True
+                    self.single_grab = False
+                    for cap in self.plugin.capabilities.observables:
+                        self._hw_worker.grab(cap.name)
+                    for cap in self.plugin.capabilities.variables:
+                        self._hw_worker.grab(cap.name)
+                else:
+                    self.single_grab = False
+                    self.grab_state = True
+                    self.grab_data(**command.attribute)
 
-        # Legacy alias: INI_DETECTOR → INI_HARDWARE (already handled above via super)
-        if command.command == ControlToHardwareViewer.INI_DETECTOR:
-            status = self.ini_hardware(*command.attribute)
-            self.status_sig.emit(ThreadCommand(ThreadStatusViewer.INI_DETECTOR, status))
+            elif command.command == ControlToHardwareViewer.SINGLE:
+                if _is_new_style(self.plugin):
+                    self.grab_state = True
+                    self.single_grab = True
+                    for cap in self.plugin.capabilities.observables:
+                        self._hw_worker.snap(cap.name)
+                    for cap in self.plugin.capabilities.variables:
+                        self._hw_worker.snap(cap.name)
+                else:
+                    self.single_grab = True
+                    self.grab_state = True
+                    self.single(**command.attribute)
 
-        elif command.command == ControlToHardwareViewer.GRAB:
-            self.single_grab = False
-            self.grab_state = True
-            self.grab_data(**command.attribute)
+            elif command.command == ControlToHardwareViewer.STOP_GRAB:
+                if _is_new_style(self.plugin):
+                    self.grab_state = False
+                    for name in list(self._hw_worker.grabbed_names):
+                        self._hw_worker.stop(name)
+                    self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
+                else:
+                    self.grab_state = False
+                    self.plugin.stop()
+                    QtWidgets.QApplication.processEvents()
+                    self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
 
-        elif command.command == ControlToHardwareViewer.SINGLE:
-            self.single_grab = True
-            self.grab_state = True
-            self.single(**command.attribute)
+            elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
+                self.plugin.update_scanner(command.attribute[0])
 
-        elif command.command == ControlToHardwareViewer.STOP_GRAB:
-            self.grab_state = False
-            self.plugin.stop()
-            QtWidgets.QApplication.processEvents()
-            self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
+            elif command.command == ControlToHardwareViewer.UPDATE_WAIT_TIME:
+                self.wait_time = command.attribute[0]
 
-        elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
-            self.plugin.update_scanner(command.attribute[0])
-
-        elif command.command == ControlToHardwareViewer.UPDATE_WAIT_TIME:
-            self.wait_time = command.attribute[0]
-
-        else:  # custom commands for particular plugins
-            self._dispatch_custom_command(command)
+            else:  # custom commands for particular plugins
+                self._dispatch_custom_command(command)
+        except Exception as e:
+            self.logger.exception(str(e))
 
     def ini_hardware(self, params_state=None, controller=None):
         """ Initialize an instrument plugin class and tries to apply preset settings
@@ -1187,15 +1217,20 @@ class DAQ_Detector(DAQ_Hardware_Base):
         controller: wrapper
         """
         try:
+            # status="Not initialized"
             status = edict(initialized=False, info="", x_axis=None, y_axis=None)
-            det_params, class_ = get_viewer_plugins(self.daq_type.name, self._plugin_name)
+            det_params, class_ = get_viewer_plugins(self.daq_type.name, self.plugin_name)
             self.plugin: DAQ_Viewer_base = class_(self, params_state)
 
             try:
                 self.plugin.dte_signal.connect(self.data_ready)
                 self.plugin.dte_signal_temp.connect(self.emit_temp_data)
+                self._connect_capabilities_signal(self.plugin)
                 infos = self.plugin.ini_detector(controller)
                 status.controller = self.plugin.controller
+                if _is_new_style(self.plugin):
+                    self._hw_worker = DAQ_HardwareWorker(self.plugin)
+                    self._hw_worker.data_ready_signal.connect(self._on_hw_data_ready)
 
             except Exception as e:
                 logger.exception("Hardware couldn't be initialized", exc_info=e)
@@ -1204,6 +1239,11 @@ class DAQ_Detector(DAQ_Hardware_Base):
 
             if isinstance(infos, edict):
                 status.update(infos)
+                deprecation_msg(
+                    "Returns from ini_detector should now be a string and a boolean,"
+                    " see pymodaq_plugins_template",
+                    stacklevel=3,
+                )
             else:
                 status.info = infos[0]
                 status.initialized = infos[1]
@@ -1211,14 +1251,13 @@ class DAQ_Detector(DAQ_Hardware_Base):
             self.hardware_averaging = class_.hardware_averaging  # to check if averaging can be done directly by
             # the hardware or done here software wise
 
-            self._connect_capabilities_signal(self.plugin)
             return status
         except Exception as e:
             self.logger.exception(str(e))
             return status
 
     def ini_detector(self, params_state=None, controller=None):
-        """Deprecated — use ini_hardware."""
+        """Deprecated wrapper for ini_hardware."""
         deprecation_msg("ini_detector is deprecated, use ini_hardware")
         return self.ini_hardware(params_state, controller)
 
@@ -1259,7 +1298,7 @@ class DAQ_Detector(DAQ_Hardware_Base):
         else:
             self.average_done = True  # expected to make sure the single_grab stop by itself
             self.data_detector_sig.emit(data)
-        self.waiting_for_data = False
+        self._schedule_next()
 
 
     def single(self, Naverage=1, *args, **kwargs):
@@ -1290,49 +1329,59 @@ class DAQ_Detector(DAQ_Hardware_Base):
         try:
             self.ind_average = 0
             self.Naverage = Naverage
-            if Naverage > 1:
-                self.average_done = False
-            self.waiting_for_data = False
-
-            # for live mode:two possibilities: either snap one data and regrab softwarewise
-            # (while True) or if self.plugin.live_mode_available is True all data is continuously
-            # emitted from the plugin
+            self.average_done = False
+            self._grab_live = live
             if self.plugin.live_mode_available:
                 kwargs['wait_time'] = self.wait_time
             else:
-                kwargs['wait_time'] = 0
+                kwargs.pop('wait_time', None)
+            self._grab_kwargs = kwargs
             self.status_sig.emit(ThreadCommand('grab'))
-            while True:
-                try:
-                    if not self.waiting_for_data:
-                        self.waiting_for_data = True
-                        self.plugin.grab_data(Naverage, live=live, **kwargs)
-                    QtWidgets.QApplication.processEvents()
-                    if self.single_grab:
-                        if self.hardware_averaging:
-                            break
-                        else:
-                            if self.average_done:
-                                break
-                    else:
-                        QThread.msleep(self.wait_time)  # if in grab mode apply a waiting time
-                        # after acquisition
-                    if not self.grab_state:
-                        break   # if not in grab mode  breaks the while loop
-                    if self.plugin.live_mode_available and (not self.hardware_averaging and
-                                                            self.average_done):
-                        break  # if live can be done in the plugin breaks the while loop except
-                        # if average is asked but not done hardware wise
-                except Exception as e:
-                    self.logger.exception(str(e))
-            self.status_sig.emit(ThreadCommand('grab_stopped'))
-
+            self._trigger_next_grab()
         except Exception as e:
             self.logger.exception(str(e))
+
+    def _trigger_next_grab(self):
+        """Trigger one acquisition. The event loop is free between calls."""
+        if not self.grab_state:
+            self.status_sig.emit(ThreadCommand('grab_stopped'))
+            return
+        self.plugin.grab_data(self.Naverage, live=self._grab_live, **self._grab_kwargs)
+        # Blocking plugins: grab_data blocks, dte_signal fires synchronously (direct
+        # connection, same thread), data_ready() runs and schedules next trigger, then
+        # grab_data returns. Non-blocking (live) plugins: returns immediately.
+
+    def _schedule_next(self):
+        """Decide whether and when to trigger the next acquisition."""
+        if self.single_grab:
+            if self.hardware_averaging or self.average_done:
+                # Done (hw avg: one call handles Naverage; sw avg: all frames received)
+                self.grab_state = False
+                if self.plugin.live_mode_available:
+                    self.plugin.stop()
+                self.status_sig.emit(ThreadCommand('grab_stopped'))
+            else:
+                # Software averaging still in progress — re-trigger with no delay.
+                # Use singleShot(0) to avoid call-stack recursion (data_ready fires
+                # synchronously inside _trigger_next_grab for blocking plugins)
+                QTimer.singleShot(0, self._trigger_next_grab)
+        elif self.plugin.live_mode_available:
+            pass  # plugin drives its own loop; we just receive emitted data
+        else:
+            # Continuous non-live: re-trigger after wait_time ms
+            if self.grab_state:
+                QTimer.singleShot(self.wait_time, self._trigger_next_grab)
+
+    def _on_hw_data_ready(self, name: str, dte: DataToExport) -> None:
+        """Relay data_ready_signal from DAQ_HardwareWorker to data_detector_sig."""
+        if dte is not None:
+            self.data_detector_sig.emit(dte)
 
     def close(self):
         """ Call the close method of the instrument plugin class
         """
+        if hasattr(self, '_hw_worker'):
+            self._hw_worker.close()
         if self.plugin is not None and self.plugin.controller is not None:
             status = self.plugin.close()
             return status
