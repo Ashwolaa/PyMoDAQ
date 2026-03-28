@@ -392,7 +392,7 @@ class DAQ_Viewer(ParameterControlModule):
         Parameters
         ----------
         do_init: bool
-            If True, create a DAQ_Detector instance and move it into a separated thread, connected its signals/slots
+            If True, create a DAQ_Viewer_Hardware instance and move it into a separated thread, connected its signals/slots
             to the DAQ_Viewer object (self)
             If False, force the instrument to close and kill the Thread (still not done properly in some cases)
         """
@@ -410,7 +410,7 @@ class DAQ_Viewer(ParameterControlModule):
         else:            
             try:
 
-                hardware = DAQ_Detector(self._title, self.settings, self.detector)
+                hardware = DAQ_Viewer_Hardware(self._title, self.settings, self.detector)
                 self._hardware_thread = QThread()
                 if self.config('pymodaq', 'viewer', 'viewer_in_thread'):
                     hardware.moveToThread(self._hardware_thread)
@@ -1091,7 +1091,7 @@ class DAQ_Viewer(ParameterControlModule):
             super().process_leco_commands(status=status)
 
 
-class DAQ_Detector(DAQ_Hardware_Base):
+class DAQ_Viewer_Hardware(DAQ_Hardware_Base):
     """ Worker class to control the instrument plugin
 
     Attributes

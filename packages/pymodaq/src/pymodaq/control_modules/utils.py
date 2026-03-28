@@ -502,7 +502,7 @@ class ParameterControlModule(ParameterManager,LECOComponentMixin, ControlModule)
 
 
 class DAQ_Hardware_Base(QObject):
-    """Abstract base shared by DAQ_Move_Hardware and DAQ_Detector.
+    """Abstract base shared by DAQ_Move_Hardware and DAQ_Viewer_Hardware.
 
     Provides common signals, a unified plugin reference, shared update_settings
     dispatch, and a queue_command handler for the three commands that both
