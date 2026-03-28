@@ -41,8 +41,7 @@ from pymodaq_utils.utils import ThreadCommand
 from pymodaq_gui.parameter import Parameter
 import pymodaq_gui.parameter.utils as putils
 
-from pymodaq.control_modules.thread_commands import ThreadStatus
-from pymodaq.control_modules.utils import ControllerStatus
+from pymodaq.control_modules.thread_commands import ThreadStatus, ControllerStatus
 
 if TYPE_CHECKING:
     from pymodaq.control_modules.capabilities import Capabilities

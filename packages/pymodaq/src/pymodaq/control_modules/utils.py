@@ -5,7 +5,7 @@ Created the 03/10/2022
 @author: Sebastien Weber
 """
 from random import randint
-from typing import Optional, Type, Union
+from typing import Optional, Type, Union, TYPE_CHECKING
 from easydict import EasyDict as edict
 
 from qtpy.QtCore import Signal, QObject, Qt, Slot, QThread
@@ -23,22 +23,15 @@ from pymodaq_gui.h5modules.saving import H5Saver
 
 from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands, LECOComponentMixin
 from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
-from pymodaq.control_modules.thread_commands import ThreadStatus, ControlToHardware
-from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
+from pymodaq.control_modules.thread_commands import (
+    ThreadStatus, ControlToHardware, ControleModuleType, ControllerStatus,
+)
+if TYPE_CHECKING:
+    from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
 
 
 config = Config()
 logger = set_logger(get_module_name(__file__))
-
-
-class ControleModuleType(StrEnum):
-    DAQ_MOVE = 'DAQ_Move'
-    DAQ_VIEWER = 'DAQ_Viewer'
-
-
-class ControllerStatus(StrEnum):
-    MASTER = 'Master'
-    SLAVE = 'Slave'
 
 
 
@@ -520,7 +513,7 @@ class DAQ_Hardware_Base(QObject):
         super().__init__()
         self._title = title
         self._plugin_name = plugin_name
-        self.plugin:DAQ_Plugin_base = None                 # unified name for the plugin instance
+        self.plugin: 'DAQ_Plugin_base' = None              # unified name for the plugin instance
         self.controller_address = None     # fixes spelling of hardware_adress / controller_adress
 
     @property
@@ -547,9 +540,14 @@ class DAQ_Hardware_Base(QObject):
             if self.plugin is not None:
                 self.plugin.update_settings(settings_parameter_dict)
 
-    def _connect_capabilities_signal(self, plugin:DAQ_Plugin_base) -> None:
-        """Wire the plugin capabilities_updated_signal with QueuedConnection."""
-        if getattr(plugin, '_new_style_plugin', False):
+    def _connect_capabilities_signal(self, plugin: 'DAQ_Plugin_base') -> None:
+        """Wire the plugin capabilities_updated_signal with QueuedConnection.
+
+        Connects unconditionally for all plugins that carry
+        ``capabilities_updated_signal`` (i.e. all ``DAQ_Plugin_base``
+        subclasses), regardless of ``_new_style_plugin``.
+        """
+        if hasattr(plugin, 'capabilities_updated_signal'):
             plugin.capabilities_updated_signal.connect(
                 self.capabilities_updated_signal,
                 Qt.ConnectionType.QueuedConnection,

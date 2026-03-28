@@ -47,6 +47,7 @@ from pymodaq.control_modules.move_utility_classes import (ThreadCommand, MoveCom
 
 
 from pymodaq.control_modules.move_utility_classes import params as daq_move_params
+from pymodaq.control_modules.hardware_worker import _is_new_style, DAQ_HardwareWorker
 from pymodaq.utils.leco.pymodaq_listener import (MoveActorListener, LECOMoveCommands, LECOCommands,)
 from pymodaq.control_modules.utils import ControllerStatus
 from pymodaq import Q_, Unit
@@ -934,6 +935,8 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
         Uninitialize the stage closing the hardware.
 
         """
+        if hasattr(self, '_hw_worker'):
+            self._hw_worker.close()
         if self.plugin is not None and self.plugin.controller is not None:
             self.plugin.close()
 
@@ -1003,6 +1006,10 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
             self.plugin.move_done_signal.connect(self.move_done)
             self.plugin.change_done_signal.connect(self._on_change_done)
             self._connect_capabilities_signal(self.plugin)
+            if _is_new_style(self.plugin):
+                self._hw_worker = DAQ_HardwareWorker(self.plugin)
+                self._hw_worker.data_ready_signal.connect(self._on_hw_data_ready)
+                self._hw_worker.change_done_signal.connect(self._on_change_done)
             if status.initialized:
                 self.status_sig.emit(
                     ThreadCommand(
@@ -1084,6 +1091,14 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
         if pos is not None:
             self.move_done(pos)
 
+    def _on_hw_data_ready(self, name: str, dte) -> None:
+        """Relay data_ready_signal from DAQ_HardwareWorker as a position update."""
+        if dte is not None and dte.data:
+            pos = dte.data[0]
+            self.status_sig.emit(
+                ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
+            )
+
     @Slot(DataActuator)
     def move_done(self, pos: DataActuator):
         """Send the move_done signal back to the main class"""
@@ -1107,7 +1122,17 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
         try:
             logger.debug(f"Threadcommand {command.command} sent to {self.title}")
             if command.command == ControlToHardwareMove.MOVE_ABS:
-                self.move_abs(*command.attribute)
+                if _is_new_style(self.plugin):
+                    position = command.attribute[0]
+                    name = self.plugin.axis_name
+                    if self.plugin.data_actuator_type.name == 'float':
+                        value = position.units_as(self.plugin.axis_unit).value()
+                    else:
+                        value = position
+                    self._move_completed = False
+                    self._hw_worker.change_to(name, value)
+                else:
+                    self.move_abs(*command.attribute)
 
             elif command.command == ControlToHardwareMove.MOVE_REL:
                 self.move_rel(*command.attribute)
@@ -1116,8 +1141,11 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
                 self.move_home()
 
             elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
-                # legacy path — route through base QUERY_DATA
-                super().queue_command(ThreadCommand(ControlToHardware.QUERY_DATA))
+                if _is_new_style(self.plugin):
+                    self._hw_worker.snap(self.plugin.axis_name)
+                else:
+                    # legacy path — route through base QUERY_DATA
+                    super().queue_command(ThreadCommand(ControlToHardware.QUERY_DATA))
 
             elif command.command == ControlToHardwareMove.STOP_MOTION:
                 self.stop_motion()

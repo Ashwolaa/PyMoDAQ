@@ -1,6 +1,16 @@
 from pymodaq_utils.enums import StrEnum
 
 
+class ControleModuleType(StrEnum):
+    DAQ_MOVE = 'DAQ_Move'
+    DAQ_VIEWER = 'DAQ_Viewer'
+
+
+class ControllerStatus(StrEnum):
+    MASTER = 'Master'
+    SLAVE = 'Slave'
+
+
 class ThreadStatus(StrEnum):
     """ Allowed Generic commands sent from a plugin using the method: emit_status
 

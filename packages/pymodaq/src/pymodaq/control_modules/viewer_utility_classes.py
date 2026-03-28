@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Union, Iterable
+from typing import ClassVar, Union, Iterable
 from qtpy import QtWidgets
 from qtpy.QtCore import QObject, Signal
 
@@ -136,6 +136,11 @@ class DAQ_Viewer_base(DAQ_Plugin_base):
         send_param_status
     """
     _default_title = 'mydetector'
+
+    # Old-style adapter: uses grab_data; routed through DAQ_Detector, not
+    # DAQ_HardwareWorker.  Plugins that implement query_data directly should
+    # set this to True.
+    _new_style_plugin: ClassVar[bool] = False
 
     hardware_averaging = False
     live_mode_available = False
