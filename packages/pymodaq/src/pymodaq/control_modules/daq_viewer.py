@@ -1167,7 +1167,6 @@ class DAQ_Viewer_Hardware(DAQ_Hardware_Base):
         elif command.command == ControlToHardwareViewer.STOP_GRAB:
             self.grab_state = False
             self.plugin.stop()
-            QtWidgets.QApplication.processEvents()
             self.status_sig.emit(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Stopping grab'))
 
         elif command.command == ControlToHardwareViewer.UPDATE_SCANNER:  # may be deprecated
