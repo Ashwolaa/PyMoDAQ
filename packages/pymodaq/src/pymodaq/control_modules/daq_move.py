@@ -985,29 +985,27 @@ class DAQ_Move_Hardware(DAQ_Hardware_Base):
         deprecation_msg("ini_stage is deprecated, use ini_hardware")
         return self.ini_hardware(params_state, controller)
 
-    def move_abs(self, position: DataActuator, polling: bool = True) -> None:
+    def move(self, position: DataActuator, polling: bool = True, move_type: str='abs') -> None:
         assert self.plugin is not None
-        position = check_units(position, self.plugin.axis_unit)
         self.plugin.move_is_done = False
         self.plugin.ispolling = polling
+        position = check_units(position, self.plugin.axis_unit)
         if self.plugin.data_actuator_type == self.plugin.data_actuator_type.float:
-            self.plugin.move_abs(position.units_as(self.plugin.axis_unit).value())
+            position = position.units_as(self.plugin.axis_unit).value()
         else:
             position.units = self.plugin.axis_unit
+        if move_type == 'abs':
             self.plugin.move_abs(position)
+        elif move_type == 'rel':
+            self.plugin.move_rel(position)
         self.plugin.poll_moving()
 
+    def move_abs(self, position: DataActuator, polling: bool = True) -> None:
+        self.move(position, polling, move_type='abs')
+
+
     def move_rel(self, rel_position: DataActuator, polling: bool = True) -> None:
-        assert self.plugin is not None
-        rel_position = check_units(rel_position, self.plugin.axis_unit)
-        self.plugin.move_is_done = False
-        self.plugin.ispolling = polling
-        if self.plugin.data_actuator_type.name == 'float':
-            self.plugin.move_rel(rel_position.units_as(self.plugin.axis_unit).value())
-        else:
-            rel_position.units = self.plugin.axis_unit
-            self.plugin.move_rel(rel_position)
-        self.plugin.poll_moving()
+        self.move(rel_position, polling, move_type='rel')
 
     @Slot(float)
     def Move_Stoped(self, pos):

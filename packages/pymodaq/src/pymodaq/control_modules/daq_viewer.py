@@ -1142,13 +1142,17 @@ class DAQ_Detector(DAQ_Hardware_Base):
             * update_wait_time
             * any string that the hardware is able to understand
         """
-        if super().queue_command(command):
-            return
-
-        # Legacy alias: INI_DETECTOR → INI_HARDWARE (already handled above via super)
-        if command.command == ControlToHardwareViewer.INI_DETECTOR:
+        # INI_HARDWARE and its legacy alias INI_DETECTOR both complete initialization
+        # and must emit ThreadStatusViewer.INI_DETECTOR so DAQ_Viewer.thread_status
+        # can finish the handshake.  Handle both before falling through to super().
+        if command.command in (ControlToHardware.INI_HARDWARE,
+                               ControlToHardwareViewer.INI_DETECTOR):
             status = self.ini_hardware(*command.attribute)
             self.status_sig.emit(ThreadCommand(ThreadStatusViewer.INI_DETECTOR, status))
+            return
+
+        if super().queue_command(command):
+            return
 
         elif command.command == ControlToHardwareViewer.GRAB:
             self.single_grab = False
