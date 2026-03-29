@@ -14,7 +14,6 @@ from qtpy.QtCore import Signal, QObject, Qt, Slot, QThread
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_utils.logger import get_base_logger, set_logger, get_module_name
-from pymodaq_utils.enums import StrEnum
 
 from pymodaq_gui.parameter import Parameter, ioxml
 from pymodaq_gui.parameter import utils as putils
@@ -25,17 +24,8 @@ from pymodaq_gui.h5modules.saving import H5Saver
 
 from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands, LECOComponentMixin
 from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
-from pymodaq.control_modules.thread_commands import ThreadStatus, ControlToHardware
-
-
-class ControleModuleType(StrEnum):
-    DAQ_MOVE = 'DAQ_Move'
-    DAQ_VIEWER = 'DAQ_Viewer'
-
-
-class ControllerStatus(StrEnum):
-    MASTER = 'Master'
-    SLAVE = 'Slave'
+from pymodaq.control_modules.thread_commands import (ThreadStatus, ControlToHardware,
+                                                     ControleModuleType, ControllerStatus)  # noqa: F401
 
 config = Config()
 logger = set_logger(get_module_name(__file__))
