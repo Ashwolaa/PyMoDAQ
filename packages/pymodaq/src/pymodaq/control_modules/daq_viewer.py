@@ -48,7 +48,7 @@ from pymodaq.utils.gui_utils import get_splash_sc
 from pymodaq.control_modules.daq_viewer_ui.ui_base import DAQ_Viewer_UI
 from pymodaq.control_modules.instruments import (DET_TYPES, DAQTypesEnum,
                                            DetectorError, get_viewer_plugins)
-from pymodaq.control_modules.utils import ControllerStatus, DAQ_Hardware_Base
+from pymodaq.control_modules.utils import DAQ_Hardware_Base
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusViewer, ControlToHardware,
                                                      ControlToHardwareViewer, UiToMainViewer)
 from pymodaq_gui.plotting.data_viewers.viewer import ViewerBase
@@ -96,6 +96,9 @@ class DAQ_Viewer(ParameterControlModule):
     create if one want to receive infos from the ROI
     """
     settings_name = 'daq_viewer_settings'
+    _hw_settings_name = 'detector_settings'
+    _ui_init_attr = 'detector_init'
+    _ini_hw_cmd = ControlToHardware.INI_HARDWARE
     custom_sig = Signal(ThreadCommand)  # particular case where DAQ_Viewer is used for a custom module
 
     grab_done_signal = Signal(DataToExport)
@@ -258,19 +261,6 @@ class DAQ_Viewer(ParameterControlModule):
         deprecation_msg('viewers_docks is a deprecated property use viewer_docks instead')
         return self.viewer_docks
 
-    @property
-    def master(self) -> bool:
-        """ Get/Set programmatically the Master/Slave status of a detector"""
-        if self.initialized_state:
-            return self.settings['detector_settings', 'controller_status'] == ControllerStatus.MASTER
-        else:
-            return True
-
-    @master.setter
-    def master(self, is_master: bool):
-        if self.initialized_state:
-            self.settings.child('detector_settings', 'controller_status').setValue(
-                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE)
 
     @property
     def daq_type(self) -> DAQTypesEnum:
@@ -361,86 +351,37 @@ class DAQ_Viewer(ParameterControlModule):
 
         self._viewers = viewers
 
-    def quit_fun(self):
-        """ Quit the application, closing the hardware and other modules """
-
-        # insert anything that needs to be closed before leaving
-
-        if self._initialized_state:  # means  initialized
-            self.init_hardware(False)
-        self.quit_signal.emit()
-
+    def _quit_cleanup(self):
         if self._lcd is not None:
             try:
                 self._lcd.parent.close()
             except Exception as e:
                 self.logger.exception(str(e))
 
-        try:
-            if self.ui is not None:
-                self.ui.close()
-
-        except Exception as e:
-            self.logger.exception(str(e))
-
     #  #####################################
     #  Methods for running the acquisition
 
-    def init_hardware(self, do_init=True):
-        """ Init the selected detector
+    def _create_hardware(self):
+        return DAQ_Viewer_Hardware(self._title, self.settings, self.detector)
 
-        Parameters
-        ----------
-        do_init: bool
-            If True, create a DAQ_Viewer_Hardware instance and move it into a separated thread, connected its signals/slots
-            to the DAQ_Viewer object (self)
-            If False, force the instrument to close and kill the Thread (still not done properly in some cases)
-        """
-        if not do_init:
-            try:
-                self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.CLOSE))
-                if hasattr(self, '_hardware_thread') and self._hardware_thread is not None:
-                    self._hardware_thread.wait(3000)  # wait up to 3 s for clean exit
-                QtWidgets.QApplication.processEvents()
-                if self.ui is not None:
-                    self.ui.detector_init = False
+    def _setup_hardware_thread(self, hardware):
+        if self.config('pymodaq', 'viewer', 'viewer_in_thread'):
+            hardware.moveToThread(self._hardware_thread)
+            self._hardware_thread.finished.connect(hardware.deleteLater)
+            self._hardware_thread.start()
 
-            except Exception as e:
-                self.logger.exception(str(e))
-            finally:
-                self.connect_leco(False)
-        else:            
-            try:
+    def _connect_hardware_signals(self, hardware):
+        hardware.data_detector_sig[DataToExport].connect(self.show_data)
+        hardware.data_detector_temp_sig[DataToExport].connect(self.show_temp_data)
+        hardware.capabilities_updated_signal.connect(
+            self.capabilities_updated_signal,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
-                hardware = DAQ_Viewer_Hardware(self._title, self.settings, self.detector)
-                self._hardware_thread = QThread()
-                if self.config('pymodaq', 'viewer', 'viewer_in_thread'):
-                    hardware.moveToThread(self._hardware_thread)
-
-                self.command_hardware[ThreadCommand].connect(hardware.queue_command)
-                hardware.data_detector_sig[DataToExport].connect(self.show_data)
-                hardware.data_detector_temp_sig[DataToExport].connect(self.show_temp_data)
-                hardware.status_sig[ThreadCommand].connect(self.thread_status)
-                self._update_settings_signal[edict].connect(hardware.update_settings)
-                hardware.capabilities_updated_signal.connect(
-                    self.capabilities_updated_signal,
-                    Qt.ConnectionType.QueuedConnection,
-                )
-
-                self._hardware_thread.hardware = hardware
-                if self.config('pymodaq', 'viewer', 'viewer_in_thread'):
-                    self._hardware_thread.finished.connect(hardware.deleteLater)
-                    self._hardware_thread.start()
-                self.command_hardware.emit(ThreadCommand(ControlToHardware.INI_HARDWARE,
-                                                         attribute=[
-                                                             self.settings.child('detector_settings').saveState(),
-                                                             self.controller]))
-                if self.ui is not None:
-                    for dock in self.ui.viewer_docks:
-                        dock.setEnabled(True)
-                self.connect_leco(True)
-            except Exception as e:
-                self.logger.exception(str(e))
+    def _post_hardware_init(self):
+        if self.ui is not None:
+            for dock in self.ui.viewer_docks:
+                dock.setEnabled(True)
 
     def snap(self, send_to_leco=False):
         """ Launch a single grab """
@@ -539,12 +480,6 @@ class DAQ_Viewer(ParameterControlModule):
         self.update_status(f'{self._title}: Stop Grab')
         self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.STOP_GRAB, ))
         self._grabing = False
-
-    @Slot()
-    def _raise_timeout(self):
-        """  Print the "timeout occurred" error message in the status bar via the update_status method.
-        """
-        self.update_status("Timeout occurred", log_type="log")
 
     def save_current(self):
         """Save current data into a h5file"""
@@ -952,17 +887,6 @@ class DAQ_Viewer(ParameterControlModule):
             self._update_settings_signal.emit(edict(path=putils.get_param_path(param)[1:], param=data[0],
                                                     change='childAdded'))
 
-    def param_deleted(self, param):
-        """ Remove a child from the settings attribute
-
-        Parameters
-        ----------
-        param: Parameter
-            a given parameter whose value has been changed by user
-        """
-        if param.name() not in putils.iter_children(self.settings.child('main_settings'), []):
-            self._update_settings_signal.emit(edict(path=['detector_settings'], param=param, change='parent'))
-
     def _set_setting_tree(self):
         """Apply the specific settings of the selected detector (plugin)
 
@@ -1032,7 +956,7 @@ class DAQ_Viewer(ParameterControlModule):
                 * lcd: display on the LCD panel, the content of the attribute
                 * stop: stop the grab
         """
-        super().thread_status(status, 'detector')
+        super().thread_status(status)
 
         if status.command in (ThreadStatus.INI_HARDWARE, ThreadStatusViewer.INI_DETECTOR):
             self.update_status("detector initialized: " + str(status.attribute['initialized']))

@@ -48,7 +48,6 @@ from pymodaq.control_modules.move_utility_classes import (ThreadCommand, MoveCom
 
 from pymodaq.control_modules.move_utility_classes import params as daq_move_params
 from pymodaq.utils.leco.pymodaq_listener import (MoveActorListener, LECOMoveCommands, LECOCommands,)
-from pymodaq.control_modules.utils import ControllerStatus
 from pymodaq import Q_, Unit
 
 
@@ -89,6 +88,9 @@ class DAQ_Move(ParameterControlModule):
     """
 
     settings_name = "daq_move_settings"
+    _hw_settings_name = "move_settings"
+    _ui_init_attr = 'actuator_init'
+    _ini_hw_cmd = ControlToHardware.INI_HARDWARE
 
     move_done_signal = Signal(DataActuator)
     current_value_signal = Signal(DataActuator)
@@ -217,20 +219,6 @@ class DAQ_Move(ParameterControlModule):
         elif cmd.command == UiToMainMove.REL_VALUE:
             self._relative_value = cmd.attribute
 
-    @property
-    def master(self) -> bool:
-        """Get/Set programmatically the Master/Slave status of an actuator"""
-        if self.initialized_state:
-            return self.settings["move_settings", "controller", "controller_status"] == ControllerStatus.MASTER
-        else:
-            return True
-
-    @master.setter
-    def master(self, is_master: bool):
-        if self.initialized_state:
-            self.settings.child("move_settings", "controller", "controller_status").setValue(
-                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE
-            )
 
 
     def append_data(
@@ -408,71 +396,18 @@ class DAQ_Move(ParameterControlModule):
     def move_rel_m(self):
         self.move_rel(-self._relative_value)
 
-    def quit_fun(self):
-        """Programmatic quitting of the current instance of DAQ_Move
+    def _pre_close_hardware(self):
+        """Stop the refresh timer before closing so no more commands reach the hardware thread."""
+        self._refresh_timer.stop()
 
-        Des-init the actuator then close the UI parent widget
-        """
-        # insert anything that needs to be closed before leaving
+    def _create_hardware(self):
+        return DAQ_Move_Hardware(self._actuator_type, self._current_value, self._title)
 
-        if self._initialized_state:
-            self.init_hardware(False)
-        self.quit_signal.emit()
-        if self.ui is not None:
-            self.ui.close()
-        # self.parent.close()
-
-    def init_hardware(self, do_init=True):
-        """Init or desinit the selected instrument plugin class"""
-        if not do_init:
-            try:
-                self.command_hardware.emit(ThreadCommand(ControlToHardwareMove.CLOSE))
-                if hasattr(self, '_hardware_thread') and self._hardware_thread is not None:
-                    self._hardware_thread.wait(3000)  # wait up to 3 s for clean exit
-                QtWidgets.QApplication.processEvents()
-
-                if self.ui is not None:
-                    self.ui.actuator_init = False
-            except Exception as e:
-                self.logger.exception(str(e))
-            finally:
-                self.connect_leco(False)
-        else:
-            try:
-                hardware = DAQ_Move_Hardware(
-                    self._actuator_type, self._current_value, self._title
-                )
-                self._hardware_thread = QThread()
-                hardware.moveToThread(self._hardware_thread)
-
-                self.command_hardware[ThreadCommand].connect(hardware.queue_command)
-                hardware.status_sig[ThreadCommand].connect(self.thread_status)
-                self._update_settings_signal[edict].connect(hardware.update_settings)
-                hardware.capabilities_updated_signal.connect(
-                    self.capabilities_updated_signal,
-                    Qt.ConnectionType.QueuedConnection,
-                )
-
-                self._hardware_thread.hardware = hardware
-                self._hardware_thread.finished.connect(hardware.deleteLater)
-                self._hardware_thread.start()
-                self.command_hardware.emit(
-                    ThreadCommand(
-                        ControlToHardware.INI_HARDWARE,
-                        attribute=[
-                            self.settings.child("move_settings").saveState(),
-                            self.controller,
-                        ],
-                    )
-                )
-                self.connect_leco(True)
-            except Exception as e:
-                self.logger.exception(str(e))
-
-    @property
-    def initialized_state(self):
-        """bool: status of the actuator's initialization (init or not)"""
-        return self._initialized_state
+    def _connect_hardware_signals(self, hardware):
+        hardware.capabilities_updated_signal.connect(
+            self.capabilities_updated_signal,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
     @property
     def move_done_bool(self):
@@ -517,15 +452,6 @@ class DAQ_Move(ParameterControlModule):
         else:
             self.settings.child('saver_settings', 'N_saved').hide()
 
-    def param_deleted(self, param):
-        """Apply deletion of settings"""
-        if param.name() not in putils.iter_children(
-            self.settings.child("main_settings"), []
-        ):
-            self._update_settings_signal.emit(
-                edict(path=["move_settings"], param=param, change="parent")
-            )
-
     def child_added(self, param, data):
         """Apply addition of settings"""
         path = self.settings.childPath(param)
@@ -533,11 +459,6 @@ class DAQ_Move(ParameterControlModule):
             self._update_settings_signal.emit(
                 edict(path=path, param=data[0].saveState(), change="childAdded")
             )
-
-    def raise_timeout(self):
-        """Update status with "Timeout occurred" statement and change the timeout flag."""
-        self.update_status("Timeout occurred")
-        self.wait_position_flag = False
 
     @Slot(ThreadCommand)
     def thread_status(
@@ -564,7 +485,7 @@ class DAQ_Move(ParameterControlModule):
             * stop: stop the motion
         """
 
-        super().thread_status(status, "move")
+        super().thread_status(status)
 
         if status.command == ThreadStatus.INI_HARDWARE or status.command == ThreadStatusMove.INI_STAGE:
             self.update_status(
@@ -844,9 +765,6 @@ class DAQ_Move(ParameterControlModule):
 
         except Exception as e:
             self.logger.exception(str(e))
-
-    def connect_leco(self, connect: bool) -> None:
-        super().connect_leco(connect)
 
 
     def process_leco_commands(self, status: ThreadCommand) -> None:
