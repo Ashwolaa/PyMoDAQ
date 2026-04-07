@@ -1,5 +1,12 @@
 from pyqtgraph.parametertree.parameterTypes.basetypes import (
-    SimpleParameter, GroupParameter, GroupParameterItem)  # to be imported from elsewhere
+    SimpleParameter, GroupParameter, GroupParameterItem,  # to be imported from elsewhere
+    WidgetParameterItem)
+from pymodaq_gui.utils.styling import create_icon
+
+# ---------------------------------------------------------------------------
+# Parameter type registrations
+# ---------------------------------------------------------------------------
+
 from .action_led import ActionLedParameter
 from .bool import BoolPushParameter
 from .pixmap import PixmapParameter, PixmapCheckParameter

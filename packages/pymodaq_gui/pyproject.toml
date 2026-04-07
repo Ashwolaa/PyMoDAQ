@@ -34,7 +34,8 @@ classifiers = [
 dependencies = [
     "pymodaq_utils>=0.0.8",
     "pymodaq_data>=5.0.13",
-    "pyqtgraph>=0.12",
+    # "pyqtgraph>=0.12",
+    "pyqtgraph @ git+https://github.com/Ashwolaa/pyqtgraph.git@dev",
     "qtpy",
     "easydict",
     "qt_themes",
@@ -83,3 +84,6 @@ include = [
 omit = [
     "*/examples/*",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
