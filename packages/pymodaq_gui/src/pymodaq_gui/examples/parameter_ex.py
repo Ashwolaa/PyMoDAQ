@@ -48,15 +48,14 @@ class ParameterEx(ParameterManager):
         {'title': 'Groups:', 'name': 'groups', 'type': 'group', 'children': [
             {'title': 'A visible group:', 'name': 'agroup', 'type': 'group', 'children': []},
             {'title': 'An hidden group:', 'name': 'bgroup', 'type': 'group', 'children': [], 'visible': False},  # this visible option is not available in usual pyqtgraph group     
-            {'title': 'An expandable group:', 'name': 'cgroup', 'type': 'groupedit', 'addText': 'Add', 'addMenu': 
+            {'title': 'An expandable group:', 'name': 'cgroup', 'type': 'groupedit', 'addText': 'Add', 'addMenu':
               create_nested_menu(3,3,'Menu','Sub',use_index_tracking=True)},
             {'title': 'A bool with children:', 'name': 'booleans_group', 'type': 'bool', 'value':False, 'tip': 'Any Parameter can have its own children', 'children': [
             {'title': 'A bool in a bool', 'name': 'a_bool_in_a_bool', 'type': 'bool', 'value': True},
             {'title': 'A push with children', 'name': 'aboolpush', 'type': 'bool_push', 'value': True, 'label': 'action','children':[
                  {'title': 'A string in a group', 'name': 'atte_in_a_group', 'type': 'str', 'value': 'this is a string you can edit'},
-            ]},]},            
+            ]},]},
         ]},
-
         {'title': 'Numbers:', 'name': 'numbers', 'type': 'group', 'children': [
             {'title': 'Standard float', 'name': 'afloat', 'type': 'float', 'value': 20., 'min': 1.,
              'tip': 'displays this text as a tooltip'},
@@ -127,11 +126,11 @@ class ParameterEx(ParameterManager):
              'tip': 'If show_pb is True, user can add items to the list', 'show_pb': True,},
             {'title': 'Removable items', 'name': 'itemsbisbis', 'type': 'itemselect',
              'value': dict(all_items=['item1', 'item2', 'item3'], selected=['item2']),
-             'tip': 'If show_mb is True, user can remove selected items from the list', 'show_mb': True,},            
+             'tip': 'If show_mb is True, user can remove selected items from the list', 'show_mb': True,},
             {'title': 'Checkable items', 'name': 'itemscheckable', 'type': 'itemselect',
              'value': dict(all_items=['item1', 'item2', 'item3'], selected=['item2']),
              'tip': 'If checkbox is True, user can select item by checking/unchecking items. Remove items is still used with standard selections',
-             'show_pb': True, 'checkbox': True, 'show_mb': True,},                        
+             'show_pb': True, 'checkbox': True, 'show_mb': True,},
             {'title': 'Dragable items', 'name': 'itemsdragablecheckable', 'type': 'itemselect',
              'value': dict(all_items=['item1', 'item2', 'item3'], selected=['item2']),
              'tip': 'If dragdrop is True, user can drag or drop items inside the list', 'checkbox': True, 'dragdrop': True}, 
@@ -157,8 +156,8 @@ class ParameterEx(ParameterManager):
         # TableModelTabular and the TableModelSequential custom models in the pymodaq.utils.scanner module
     ]
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, tree=None):
+        super().__init__(tree=tree)
 
     def value_changed(self, param):
         """
@@ -206,5 +205,124 @@ def main():
     sys.exit(app.exec())
 
 
+def main_expose():
+    """Demonstrate the capability expose mode.
+
+    Open the ctrl button (gear icon) on any *numeric* parameter (float, int,
+    slide) to see the "Set as DAQ Move" / "Set as DAQ Viewer" submenu.
+    Non-numeric parameters are excluded by the default capability filter.
+
+    After selecting a role the parameter gains a joystick (move) or videocam
+    (viewer) icon in column 0.  Opening the ctrl button on an already-bound
+    parameter shows a checkmark next to the active role; selecting it again
+    clears the binding.
+    """
+    from pymodaq_gui.qt_utils import mkQApp
+    from pymodaq_gui.parameter import ParameterTree
+
+    app = mkQApp('Parameter expose-mode demo')
+
+    # ── build the ParameterEx UI, injecting our ParameterTree ────────────
+    expose_tree = ParameterTree()
+    ptree = ParameterEx(tree=expose_tree)
+    tree = ptree.tree   # same object as expose_tree
+
+
+    # ── per-parameter binding state ──────────────────────────────────────
+    _current_roles: dict = {}   # param name → role key
+
+    def _on_expose_requested(param, role: str) -> None:
+        """Toggle binding: selecting the active role clears it."""
+        name = param.name()
+        if _current_roles.get(name) == role:
+            _current_roles.pop(name)
+            tree.set_param_role(param, None)
+            print(f'[expose] cleared binding for "{name}"')
+        else:
+            _current_roles[name] = role
+            tree.set_param_role(param, role)
+            print(f'[expose] "{name}" → {role}')
+
+    tree.expose_requested.connect(_on_expose_requested)
+
+    # ── pre-bind a couple of params so icons are visible on startup ──────
+    _on_expose_requested(ptree.settings.child('numbers', 'afloat'), 'move')
+    _on_expose_requested(ptree.settings.child('numbers', 'anotherfloat'), 'viewer')
+
+    ptree.settings_tree.show()
+    sys.exit(app.exec())
+
+
+def main_icons():
+    """Demonstrate dynamic column-0 icons and custom context actions.
+
+    * The ``afloat`` parameter starts with a ``gear2`` icon set via its
+      ``context`` opt (handled by the gear button menu).
+    * Selecting "Mark as done" emits ``param.sigContextMenu`` and sets a
+      ``check`` icon via ``param.setOpts(icon=...)``.
+    * ``anotherfloat`` has no initial icon; its icon is set programmatically
+      via ``tree.set_param_icon`` after the tree is built.
+    * Selecting "Clear icon" on either param clears its icon.
+    """
+    from pymodaq_gui.qt_utils import mkQApp
+    from pymodaq_gui.parameter import ParameterTree
+
+    app = mkQApp('Parameter icon demo')
+
+    # A minimal parameter set focusing on icon features
+    params = [
+        {'title': 'Numbers:', 'name': 'numbers', 'type': 'group', 'children': [
+            {'title': 'Float with context actions', 'name': 'afloat',
+             'type': 'float', 'value': 1.0, 'min': 0.,
+             'icon': 'gear2',   # initial display icon via opt
+             'context': {'mark': 'Mark as done', 'clear': 'Clear icon'},
+             'tip': 'Gear button shows "Mark as done" / "Clear icon"'},
+            {'title': 'Float set via set_param_icon', 'name': 'anotherfloat',
+             'type': 'float', 'value': 2.0, 'min': 0.,
+             'context': {'clear': 'Clear icon'},
+             'tip': 'Icon is set programmatically after tree construction'},
+        ]},
+    ]
+
+    from pymodaq_gui.managers.parameter_manager import ParameterManager
+
+    class IconDemo(ParameterManager):
+        params = params
+
+        def value_changed(self, param):
+            pass
+
+    ptree = IconDemo(tree=ParameterTree())
+    tree = ptree.tree
+
+    # Set icon programmatically (no 'icon' opt on this param)
+    tree.set_param_icon(ptree.settings.child('numbers', 'anotherfloat'), 'led')
+
+    def _on_context(param, action):
+        if action == 'mark':
+            param.setOpts(icon='check')   # dynamic update via opt
+            print(f'[icon demo] {param.name()} marked — icon changed to check')
+        elif action == 'clear':
+            param.setOpts(icon=None)      # clear
+            print(f'[icon demo] {param.name()} icon cleared')
+
+    ptree.settings.sigContextMenu.connect(_on_context)
+
+    ptree.settings_tree.show()
+    sys.exit(app.exec())
+
+
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--expose', action='store_true',
+                        help='Run the expose-mode demo instead of the standard one')
+    parser.add_argument('--icons', action='store_true',
+                        help='Run the dynamic-icon / context-actions demo')
+    args = parser.parse_args()
+    if args.expose:
+        main_expose()
+    elif args.icons:
+        main_icons()
+    else:
+        main()
