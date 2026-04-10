@@ -16,17 +16,9 @@ It also adds the new capabilities API:
 * ``query_data`` / ``change_to`` new-style hardware interface stubs
 * ``_poll_until_done`` blocking convergence helper
 
-Signal relay chain
-------------------
-::
-
-    plugin.capabilities_updated_signal
-        → DAQ_Move_Hardware.capabilities_updated_signal   (QueuedConnection)
-        → DAQ_Move.capabilities_updated_signal            (QueuedConnection)
-        → ModuleCompactDock._on_capabilities_updated      (QueuedConnection)
-
-The ``QueuedConnection`` is **mandatory** because the signal can fire
-from the hardware thread.
+The hardware-thread routing for new-style plugins is handled by
+:class:`~pymodaq.control_modules.hardware_worker.DAQ_HardwareWorker`
+(see that module for the full usage pattern and signal relay chain).
 """
 from __future__ import annotations
 
@@ -90,9 +82,10 @@ class DAQ_Plugin_base(QObject):
     def __init__(self, parent=None, params_state=None) -> None:
         """Initialise the settings tree and shared plugin state.
 
-        Subclasses call ``QObject.__init__(self)`` *before* calling
-        ``super().__init__(parent, params_state)`` (or inline the body), since
-        ``QObject.__init__`` must be the first call on the MRO.
+        Note: ``parent`` here is PyMoDAQ's hardware-worker object
+        (``DAQ_Move_Hardware`` / ``DAQ_Detector``), **not** a Qt parent
+        widget.  It is stored as ``self.parent`` and is not forwarded to
+        ``QObject.__init__``.
 
         Parameters
         ----------
@@ -103,6 +96,7 @@ class DAQ_Plugin_base(QObject):
             Saved parameter state to restore, either as a ``dict`` or a
             :class:`~pymodaq_gui.parameter.Parameter` instance.
         """
+        super().__init__()  # → QObject.__init__(self); called exactly once here
         self.parent_parameters_path: list = []
         self.settings = Parameter.create(
             name='Settings', type='group', children=self.params
@@ -119,6 +113,7 @@ class DAQ_Plugin_base(QObject):
         self._title: str = parent.title if parent is not None else self._default_title
         self.controller = None
         self.status = edict(info="", controller=None, initialized=False)
+        self._capabilities: Optional['Capabilities'] = None
 
     # ------------------------------------------------------------------
     # Parameter-tree infrastructure (shared between move and viewer)
@@ -285,29 +280,18 @@ class DAQ_Plugin_base(QObject):
     def capabilities(self) -> 'Capabilities':
         """Return the plugin's current :class:`~pymodaq.control_modules.capabilities.Capabilities`.
 
-        The default implementation lazily infers capabilities from the
-        class via :func:`~pymodaq.control_modules.capabilities.infer_capabilities`
-        and caches the result.  Subclasses may override to return a
-        static class-level ``Capabilities`` object directly.
+        On first access the capabilities are inferred from the class via
+        :func:`~pymodaq.control_modules.capabilities.infer_capabilities`
+        and the result is cached in the instance dict.  Subsequent reads
+        return the cached value without re-running inference.
+
+        The setter stores a new value and emits
+        :attr:`capabilities_updated_signal`.
         """
-        caps = self.__dict__.get('_capabilities')
-        if caps is not None:
-            return caps
-        # Guard against re-entrant calls: infer_capabilities does
-        # getattr(plugin, 'capabilities', None) which would re-enter this
-        # property.  The flag causes the recursive call to return None, which
-        # infer_capabilities treats as "not a Capabilities" and falls through
-        # to its heuristic logic.
-        if self.__dict__.get('_caps_computing'):
-            return None
-        self.__dict__['_caps_computing'] = True
-        try:
+        if self._capabilities is None:
             from pymodaq.control_modules.capabilities import infer_capabilities
-            result = infer_capabilities(self)
-            self.__dict__['_capabilities'] = result
-            return result
-        finally:
-            self.__dict__['_caps_computing'] = False
+            self._capabilities = infer_capabilities(self)
+        return self._capabilities
 
     @capabilities.setter
     def capabilities(self, new_caps: 'Capabilities') -> None:

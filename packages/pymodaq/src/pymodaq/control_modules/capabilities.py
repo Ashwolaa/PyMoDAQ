@@ -18,6 +18,19 @@ The variable hierarchy:
 
 A :class:`DAQ_Viewer` expects at least one observable or variable.
 A :class:`DAQ_Move` expects at least one variable.
+
+Opt-in static declaration
+-------------------------
+A plugin that knows its capabilities at class definition time can declare them
+directly instead of relying on the heuristic inference::
+
+    class MyPlugin(DAQ_Move_base):
+        _declared_capabilities = Capabilities(
+            variables=[ContinuousVariable(name='position', units='mm', lo=-50, hi=50)]
+        )
+
+:func:`infer_capabilities` checks for ``_declared_capabilities`` first.
+and is used to build ``capabilities`` *property* .
 """
 from __future__ import annotations
 
@@ -246,15 +259,16 @@ class Capabilities:
 def infer_capabilities(plugin) -> Capabilities:
     """Return the :class:`Capabilities` of a hardware plugin.
 
-    If the plugin declares a ``capabilities`` class attribute that is already a
-    :class:`Capabilities` instance, it is returned directly (opt-in path).
+    If the plugin declares a ``_declared_capabilities`` class attribute that
+    is already a :class:`Capabilities` instance, it is returned directly
+    (opt-in path).
 
-    Otherwise capabilities are inferred from the plugin's class attributes using
-    duck typing
+    Otherwise capabilities are inferred from the plugin's class attributes
+    using duck typing:
 
-    * **Actuator heuristic** — plugin has ``_controller_units`` or ``_axis_names`` →
-      one :class:`ContinuousVariable` named after each axis (or ``'position'`` for
-      single-axis).
+    * **Actuator heuristic** — plugin has ``_controller_units`` or
+      ``_axis_names`` → one :class:`ContinuousVariable` named after each
+      axis (or ``'position'`` for single-axis).
     * **Detector fallback** — one :class:`Observable` named ``'data'``.
 
     Parameters
@@ -266,7 +280,7 @@ def infer_capabilities(plugin) -> Capabilities:
     -------
     Capabilities
     """
-    caps = getattr(plugin, 'capabilities', None)
+    caps = getattr(plugin, '_declared_capabilities', None)
     if isinstance(caps, Capabilities):
         return caps
 
