@@ -258,7 +258,7 @@ class TestInferCapabilities:
             observables=[Observable(name='spectrum', shape=(2048,))],
         )
         class MyPlugin:
-            capabilities = declared
+            _declared_capabilities = declared
 
         result = infer_capabilities(MyPlugin())
         assert result is declared
@@ -266,7 +266,7 @@ class TestInferCapabilities:
     def test_explicit_capabilities_on_class_itself(self):
         declared = Capabilities(variables=[Variable(name='position', units='mm')])
         class MyPlugin:
-            capabilities = declared
+            _declared_capabilities = declared
 
         assert infer_capabilities(MyPlugin) is declared
 

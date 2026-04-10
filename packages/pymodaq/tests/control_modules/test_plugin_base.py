@@ -13,9 +13,10 @@ from pymodaq.control_modules.plugin_base import DAQ_Plugin_base
 class _ConcretePlugin(DAQ_Plugin_base):
     """Minimal concrete plugin that supplies a title."""
 
+    _default_title = 'test_plugin'
+
     def __init__(self):
-        QObject.__init__(self)
-        self._title = 'test_plugin'
+        super().__init__()  # parent=None → _title = _default_title = 'test_plugin'
 
 
 # ---------------------------------------------------------------------------
