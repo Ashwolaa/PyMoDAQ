@@ -296,7 +296,6 @@ class DAQ_Move_base(DAQ_Plugin_base):
     def __init__(self, parent: Optional['DAQ_Move_Hardware'] = None,
                  params_state: Optional[dict] = None,
                  **kwargs):
-        QObject.__init__(self)  # to make sure this is the parent class
         super().__init__(parent, params_state)
         self.move_is_done = False
         self.stage = None

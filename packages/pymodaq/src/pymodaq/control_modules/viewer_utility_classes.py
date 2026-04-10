@@ -150,7 +150,6 @@ class DAQ_Viewer_base(DAQ_Plugin_base):
     dte_signal_temp = Signal(DataToExport)
 
     def __init__(self, parent=None, params_state=None):
-        QObject.__init__(self)  # to make sure this is the parent class
         super().__init__(parent, params_state)
 
         if '0D' in str(self.__class__):
