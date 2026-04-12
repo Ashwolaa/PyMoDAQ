@@ -28,7 +28,9 @@ def init_qt(qtbot):
 def ini_daq_move_without_ui(init_qt):
     qtbot = init_qt
     prog = DAQ_Move()
-    return prog, qtbot
+    yield prog, qtbot
+    prog.quit_fun()
+    QtWidgets.QApplication.processEvents()
 
 
 @fixture
@@ -42,6 +44,8 @@ def ini_daq_move_ui(init_qt):
     prog = DAQ_Move(widget)
     widget.show()
     yield prog, qtbot, widget
+    prog.quit_fun()
+    QtWidgets.QApplication.processEvents()
     widget.close()
 
 
