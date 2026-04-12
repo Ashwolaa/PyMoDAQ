@@ -3,12 +3,25 @@
 All tests are headless — no Qt event loop, no real ControllerThread.
 A ``FakeRegistry`` subclass injects a ``FakeThread`` so the registry
 logic can be tested independently of threading.
+
+Key concept
+-----------
+``ControllerKey`` is keyed on ``hardware_class`` (the shared SDK driver),
+not on the plugin wrapper class.  Two plugin classes that declare the same
+``hardware_class`` resolve to the same key and therefore share one thread:
+
+    class DAQ_Move_MyStage(DAQ_Move_base):
+        hardware_class = MyStageDriver   # ← declares shared driver
+
+    class DAQ_0DViewer_MyStage(DAQ_Viewer_base):
+        hardware_class = MyStageDriver   # ← same driver → same key → same thread
+
+Plugins that do not declare ``hardware_class`` fall back to ``type(plugin)``,
+so existing single-role plugins need no changes.
 """
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -47,9 +60,29 @@ class FakeRegistry(ControllerRegistry):
         return FakeThread()
 
 
-def make_plugin_class(name='DAQ_Move_Mock', params=None):
-    """Return a minimal plugin-class stub."""
-    return type(name, (), {'params': params or []})
+def make_hardware_class(name='MyDriver'):
+    """Return a minimal SDK driver class stub (the shared hardware_class)."""
+    return type(name, (), {})
+
+
+def make_plugin_class(name='DAQ_Move_Mock', hardware_class=None, params=None):
+    """Return a minimal plugin-class stub.
+
+    If *hardware_class* is provided it is set as a class attribute, simulating
+    a plugin that declares which physical driver it shares with other plugins.
+    If omitted, no ``hardware_class`` attribute is present — the registry falls
+    back to using the plugin class itself as the key.
+    """
+    attrs = {'params': params or []}
+    if hardware_class is not None:
+        attrs['hardware_class'] = hardware_class
+    return type(name, (), attrs)
+
+
+def key_for(plugin_cls, controller_id=0) -> ControllerKey:
+    """Replicate the call-site key derivation used in production code."""
+    hw_cls = getattr(plugin_cls, 'hardware_class', plugin_cls)
+    return ControllerKey(hardware_class=hw_cls, controller_id=controller_id)
 
 
 # ---------------------------------------------------------------------------
@@ -58,45 +91,106 @@ def make_plugin_class(name='DAQ_Move_Mock', params=None):
 
 class TestControllerKey:
 
-    def test_equality(self):
-        cls = make_plugin_class('DAQ_Move_Mock')
-        k1 = ControllerKey(cls, 42)
-        k2 = ControllerKey(cls, 42)
+    def test_equality_same_hardware_class_same_id(self):
+        hw = make_hardware_class()
+        k1 = ControllerKey(hardware_class=hw, controller_id=42)
+        k2 = ControllerKey(hardware_class=hw, controller_id=42)
         assert k1 == k2
 
-    def test_inequality_class(self):
-        cls_a = make_plugin_class('DAQ_Move_A')
-        cls_b = make_plugin_class('DAQ_Move_B')
-        assert ControllerKey(cls_a, 1) != ControllerKey(cls_b, 1)
+    def test_inequality_different_hardware_class(self):
+        hw_a = make_hardware_class('DriverA')
+        hw_b = make_hardware_class('DriverB')
+        assert ControllerKey(hardware_class=hw_a, controller_id=1) != \
+               ControllerKey(hardware_class=hw_b, controller_id=1)
 
-    def test_inequality_id(self):
-        cls = make_plugin_class('DAQ_Move_A')
-        assert ControllerKey(cls, 1) != ControllerKey(cls, 2)
+    def test_inequality_different_controller_id(self):
+        hw = make_hardware_class()
+        assert ControllerKey(hardware_class=hw, controller_id=1) != \
+               ControllerKey(hardware_class=hw, controller_id=2)
 
-    def test_two_classes_same_name_different_keys(self):
-        """Class identity beats name: two distinct classes with the same __name__ are different keys."""
-        cls_a = make_plugin_class('DAQ_Move_Mock')
-        cls_b = make_plugin_class('DAQ_Move_Mock')
-        assert ControllerKey(cls_a, 0) != ControllerKey(cls_b, 0)
+    def test_two_classes_same_name_are_different_hardware_classes(self):
+        """Class identity beats name: two distinct classes with the same
+        __name__ produce different keys (no aliasing by name)."""
+        hw_a = make_hardware_class('MyDriver')
+        hw_b = make_hardware_class('MyDriver')
+        assert ControllerKey(hardware_class=hw_a, controller_id=0) != \
+               ControllerKey(hardware_class=hw_b, controller_id=0)
 
     def test_hashable_usable_as_dict_key(self):
-        cls = make_plugin_class('DAQ_Move_Mock')
-        d = {}
-        k = ControllerKey(cls, 0)
-        d[k] = 'value'
+        hw = make_hardware_class()
+        k = ControllerKey(hardware_class=hw, controller_id=0)
+        d = {k: 'value'}
         assert d[k] == 'value'
 
     def test_hashable_equal_keys_same_hash(self):
-        cls = make_plugin_class('DAQ_Move_Mock')
-        k1 = ControllerKey(cls, 7)
-        k2 = ControllerKey(cls, 7)
+        hw = make_hardware_class()
+        k1 = ControllerKey(hardware_class=hw, controller_id=7)
+        k2 = ControllerKey(hardware_class=hw, controller_id=7)
         assert hash(k1) == hash(k2)
 
     def test_frozen_immutable(self):
-        cls = make_plugin_class('DAQ_Move_Mock')
-        k = ControllerKey(cls, 1)
+        hw = make_hardware_class()
+        k = ControllerKey(hardware_class=hw, controller_id=1)
         with pytest.raises((AttributeError, TypeError)):
-            k.plugin_class = object  # type: ignore[misc]
+            k.hardware_class = object  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# hardware_class sharing: two plugin classes → one thread
+# ---------------------------------------------------------------------------
+
+class TestHardwareClassSharing:
+    """Verify that the registry correctly collapses plugin classes that share
+    the same physical driver (hardware_class) into a single ControllerThread."""
+
+    def setup_method(self):
+        self.registry = FakeRegistry()
+        self.driver = make_hardware_class('MyStageDriver')
+
+    def test_two_plugin_classes_same_hardware_class_same_key(self):
+        move_cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
+        view_cls = make_plugin_class('DAQ_0DViewer_MyStage', hardware_class=self.driver)
+        assert key_for(move_cls) == key_for(view_cls)
+
+    def test_two_plugin_classes_same_hardware_class_share_thread(self):
+        move_cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
+        view_cls = make_plugin_class('DAQ_0DViewer_MyStage', hardware_class=self.driver)
+        key = key_for(move_cls)
+        thread_move, _ = self.registry.acquire(key, move_cls)
+        thread_view, _ = self.registry.acquire(key, view_cls)
+        assert thread_move is thread_view
+
+    def test_two_plugin_classes_same_hardware_class_ref_count_two(self):
+        move_cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
+        view_cls = make_plugin_class('DAQ_0DViewer_MyStage', hardware_class=self.driver)
+        key = key_for(move_cls)
+        self.registry.acquire(key, move_cls)
+        self.registry.acquire(key, view_cls)
+        assert self.registry.ref_count(key) == 2
+
+    def test_plugin_without_hardware_class_uses_plugin_class_as_key(self):
+        """Fallback: plugin not declaring hardware_class keys on itself."""
+        cls_a = make_plugin_class('DAQ_Move_Solo')   # no hardware_class
+        cls_b = make_plugin_class('DAQ_Move_Solo')   # different object, same name
+        # Each plugin class is its own key — no sharing
+        assert key_for(cls_a) != key_for(cls_b)
+
+    def test_different_hardware_classes_give_different_threads(self):
+        driver_b = make_hardware_class('OtherDriver')
+        cls_a = make_plugin_class('DAQ_Move_A', hardware_class=self.driver)
+        cls_b = make_plugin_class('DAQ_Move_B', hardware_class=driver_b)
+        thread_a, _ = self.registry.acquire(key_for(cls_a), cls_a)
+        thread_b, _ = self.registry.acquire(key_for(cls_b), cls_b)
+        assert thread_a is not thread_b
+
+    def test_same_hardware_class_different_controller_id_gives_different_threads(self):
+        """controller_id distinguishes two physical units of the same model."""
+        cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
+        key0 = ControllerKey(hardware_class=self.driver, controller_id=0)
+        key1 = ControllerKey(hardware_class=self.driver, controller_id=1)
+        thread0, _ = self.registry.acquire(key0, cls)
+        thread1, _ = self.registry.acquire(key1, cls)
+        assert thread0 is not thread1
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +202,7 @@ class TestAcquire:
     def setup_method(self):
         self.registry = FakeRegistry()
         self.plugin_cls = make_plugin_class()
-        self.key = ControllerKey(self.plugin_cls, 0)
+        self.key = key_for(self.plugin_cls)
 
     def test_first_acquire_returns_thread_and_settings(self):
         thread, settings = self.registry.acquire(self.key, self.plugin_cls)
@@ -130,8 +224,8 @@ class TestAcquire:
         self.registry.acquire(self.key, self.plugin_cls)
         assert self.registry.ref_count(self.key) == 2
 
-    def test_different_keys_give_different_threads(self):
-        key2 = ControllerKey(self.plugin_cls, 1)
+    def test_different_controller_id_gives_different_threads(self):
+        key2 = ControllerKey(hardware_class=self.plugin_cls, controller_id=1)
         thread1, _ = self.registry.acquire(self.key, self.plugin_cls)
         thread2, _ = self.registry.acquire(key2, self.plugin_cls)
         assert thread1 is not thread2
@@ -174,16 +268,6 @@ class TestAcquire:
     def test_subscribers_empty_for_unknown_key(self):
         assert self.registry.subscribers(self.key) == {}
 
-    def test_different_classes_same_name_different_entries(self):
-        """Two distinct classes with identical __name__ must not share an entry."""
-        cls_a = make_plugin_class('DAQ_Move_Mock')
-        cls_b = make_plugin_class('DAQ_Move_Mock')
-        key_a = ControllerKey(cls_a, 0)
-        key_b = ControllerKey(cls_b, 0)
-        thread_a, _ = self.registry.acquire(key_a, cls_a)
-        thread_b, _ = self.registry.acquire(key_b, cls_b)
-        assert thread_a is not thread_b
-
 
 # ---------------------------------------------------------------------------
 # ControllerRegistry.release tests
@@ -194,7 +278,7 @@ class TestRelease:
     def setup_method(self):
         self.registry = FakeRegistry()
         self.plugin_cls = make_plugin_class()
-        self.key = ControllerKey(self.plugin_cls, 0)
+        self.key = key_for(self.plugin_cls)
 
     def test_release_decrements_ref_count(self):
         self.registry.acquire(self.key, self.plugin_cls)
@@ -213,7 +297,8 @@ class TestRelease:
         assert thread.close_hardware_called
 
     def test_release_unknown_key_is_noop(self):
-        unknown = ControllerKey('DAQ_Move_Unknown', 99)
+        unknown_hw = make_hardware_class('UnknownDriver')
+        unknown = ControllerKey(hardware_class=unknown_hw, controller_id=99)
         self.registry.release(unknown)  # must not raise
 
     def test_ref_count_zero_for_unknown_key(self):
@@ -237,7 +322,7 @@ class TestRelease:
 
     def test_double_release_is_safe(self):
         """Releasing twice after acquiring once should not raise."""
-        thread, _ = self.registry.acquire(self.key, self.plugin_cls)
+        self.registry.acquire(self.key, self.plugin_cls)
         self.registry.release(self.key)
         self.registry.release(self.key)  # second release: key unknown, noop
 
@@ -259,8 +344,8 @@ class TestCloseAll:
         self.plugin_cls = make_plugin_class()
 
     def test_close_all_tears_down_all_threads(self):
-        key1 = ControllerKey(self.plugin_cls, 0)
-        key2 = ControllerKey(self.plugin_cls, 1)
+        key1 = ControllerKey(hardware_class=self.plugin_cls, controller_id=0)
+        key2 = ControllerKey(hardware_class=self.plugin_cls, controller_id=1)
         thread1, _ = self.registry.acquire(key1, self.plugin_cls)
         thread2, _ = self.registry.acquire(key2, self.plugin_cls)
         self.registry.close_all()
@@ -268,7 +353,7 @@ class TestCloseAll:
         assert thread2.close_hardware_called
 
     def test_close_all_clears_entries(self):
-        key = ControllerKey(self.plugin_cls, 0)
+        key = ControllerKey(hardware_class=self.plugin_cls, controller_id=0)
         self.registry.acquire(key, self.plugin_cls)
         self.registry.close_all()
         assert not self.registry.is_known(key)
@@ -284,11 +369,9 @@ class TestCloseAll:
 class TestSingleton:
 
     def setup_method(self):
-        # Reset the global singleton before each test.
         ControllerRegistry._reset_global()
 
     def teardown_method(self):
-        # Clean up after each test.
         if ControllerRegistry._global is not None:
             ControllerRegistry._global.close_all()
         ControllerRegistry._reset_global()
@@ -318,7 +401,7 @@ class TestThreadSafety:
     def test_concurrent_acquire_same_key(self):
         registry = FakeRegistry()
         plugin_cls = make_plugin_class()
-        key = ControllerKey(plugin_cls, 0)
+        key = key_for(plugin_cls)
         results = []
         errors = []
 
@@ -345,9 +428,8 @@ class TestThreadSafety:
     def test_concurrent_release(self):
         registry = FakeRegistry()
         plugin_cls = make_plugin_class()
-        key = ControllerKey(plugin_cls, 0)
+        key = key_for(plugin_cls)
 
-        # Acquire 10 times first.
         for _ in range(10):
             registry.acquire(key, plugin_cls)
 

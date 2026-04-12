@@ -10,8 +10,9 @@ Usage
 -----
 Typical call site in ``DAQ_Move.init_hardware``::
 
+    hw_cls = getattr(type(self.plugin), 'hardware_class', type(self.plugin))
     key = ControllerKey(
-        plugin_class=type(self.plugin),
+        hardware_class=hw_cls,
         controller_id=self.settings['controller', 'controller_ID'],
     )
     thread, settings = ControllerRegistry.get().acquire(
@@ -60,7 +61,7 @@ class ControllerKey:
         share the same integer without collision.
     """
 
-    plugin_class: type
+    hardware_class: type
     controller_id: int
 
 
