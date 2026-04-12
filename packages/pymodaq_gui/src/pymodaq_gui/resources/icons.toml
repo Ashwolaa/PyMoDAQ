@@ -53,8 +53,6 @@ names = [
     'ink_eraser',
     'ink_eraser_off',
     'input',
-    'joystick',
-    'language',
     'lightbulb',
     'lock',
     'lock_open_right',

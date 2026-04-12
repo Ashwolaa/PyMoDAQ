@@ -1061,6 +1061,7 @@ class DetectorWorker(HardwareWorkerBase):
         deprecation_msg("controller_adress is deprecated, use controller_address")
         return self.controller_address
 
+    @Slot(ThreadCommand)
     def queue_command(self, command: ThreadCommand):
         """Transfer command from the main module to the hardware module.
 
