@@ -475,10 +475,10 @@ class LECOComponentMixin:
                 # # Reusing existing client — cmd_signal may still be connected from a
                 # # previous connect_leco(False) that didn't disconnect it; remove first
                 # # to avoid duplicate connections.
-                # try:
-                #     self._leco_client.cmd_signal.disconnect(self.process_leco_commands)
-                # except (TypeError, RuntimeError):
-                #     pass  # already disconnected is fine
+                try:
+                    self._leco_client.cmd_signal.disconnect(self.process_leco_commands)
+                except (TypeError, RuntimeError):
+                    pass  # already disconnected is fine
             except AttributeError:
                 self._leco_client = self._listener_class(name=name, host=host, port=port)
             self._leco_client.cmd_signal.connect(self.process_leco_commands)
