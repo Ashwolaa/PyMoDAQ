@@ -59,31 +59,44 @@ def make_plugin_class(name='DAQ_Move_Mock', params=None):
 class TestControllerKey:
 
     def test_equality(self):
-        k1 = ControllerKey('DAQ_Move_Mock', 42)
-        k2 = ControllerKey('DAQ_Move_Mock', 42)
+        cls = make_plugin_class('DAQ_Move_Mock')
+        k1 = ControllerKey(cls, 42)
+        k2 = ControllerKey(cls, 42)
         assert k1 == k2
 
     def test_inequality_class(self):
-        assert ControllerKey('DAQ_Move_A', 1) != ControllerKey('DAQ_Move_B', 1)
+        cls_a = make_plugin_class('DAQ_Move_A')
+        cls_b = make_plugin_class('DAQ_Move_B')
+        assert ControllerKey(cls_a, 1) != ControllerKey(cls_b, 1)
 
     def test_inequality_id(self):
-        assert ControllerKey('DAQ_Move_A', 1) != ControllerKey('DAQ_Move_A', 2)
+        cls = make_plugin_class('DAQ_Move_A')
+        assert ControllerKey(cls, 1) != ControllerKey(cls, 2)
+
+    def test_two_classes_same_name_different_keys(self):
+        """Class identity beats name: two distinct classes with the same __name__ are different keys."""
+        cls_a = make_plugin_class('DAQ_Move_Mock')
+        cls_b = make_plugin_class('DAQ_Move_Mock')
+        assert ControllerKey(cls_a, 0) != ControllerKey(cls_b, 0)
 
     def test_hashable_usable_as_dict_key(self):
+        cls = make_plugin_class('DAQ_Move_Mock')
         d = {}
-        k = ControllerKey('DAQ_Move_Mock', 0)
+        k = ControllerKey(cls, 0)
         d[k] = 'value'
         assert d[k] == 'value'
 
     def test_hashable_equal_keys_same_hash(self):
-        k1 = ControllerKey('DAQ_Move_Mock', 7)
-        k2 = ControllerKey('DAQ_Move_Mock', 7)
+        cls = make_plugin_class('DAQ_Move_Mock')
+        k1 = ControllerKey(cls, 7)
+        k2 = ControllerKey(cls, 7)
         assert hash(k1) == hash(k2)
 
     def test_frozen_immutable(self):
-        k = ControllerKey('DAQ_Move_Mock', 1)
+        cls = make_plugin_class('DAQ_Move_Mock')
+        k = ControllerKey(cls, 1)
         with pytest.raises((AttributeError, TypeError)):
-            k.plugin_class = 'other'  # type: ignore[misc]
+            k.plugin_class = object  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +108,7 @@ class TestAcquire:
     def setup_method(self):
         self.registry = FakeRegistry()
         self.plugin_cls = make_plugin_class()
-        self.key = ControllerKey(self.plugin_cls.__name__, 0)
+        self.key = ControllerKey(self.plugin_cls, 0)
 
     def test_first_acquire_returns_thread_and_settings(self):
         thread, settings = self.registry.acquire(self.key, self.plugin_cls)
@@ -118,7 +131,7 @@ class TestAcquire:
         assert self.registry.ref_count(self.key) == 2
 
     def test_different_keys_give_different_threads(self):
-        key2 = ControllerKey(self.plugin_cls.__name__, 1)
+        key2 = ControllerKey(self.plugin_cls, 1)
         thread1, _ = self.registry.acquire(self.key, self.plugin_cls)
         thread2, _ = self.registry.acquire(key2, self.plugin_cls)
         assert thread1 is not thread2
@@ -141,6 +154,36 @@ class TestAcquire:
     def test_is_known_false_before_acquire(self):
         assert not self.registry.is_known(self.key)
 
+    def test_subscriber_recorded_on_first_acquire(self):
+        sub = object()
+        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub)
+        assert id(sub) in self.registry.subscribers(self.key)
+
+    def test_subscriber_recorded_on_guest_acquire(self):
+        sub1, sub2 = object(), object()
+        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub1)
+        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub2)
+        subs = self.registry.subscribers(self.key)
+        assert id(sub1) in subs
+        assert id(sub2) in subs
+
+    def test_no_subscriber_acquire_still_works(self):
+        self.registry.acquire(self.key, self.plugin_cls)
+        assert self.registry.subscribers(self.key) == {}
+
+    def test_subscribers_empty_for_unknown_key(self):
+        assert self.registry.subscribers(self.key) == {}
+
+    def test_different_classes_same_name_different_entries(self):
+        """Two distinct classes with identical __name__ must not share an entry."""
+        cls_a = make_plugin_class('DAQ_Move_Mock')
+        cls_b = make_plugin_class('DAQ_Move_Mock')
+        key_a = ControllerKey(cls_a, 0)
+        key_b = ControllerKey(cls_b, 0)
+        thread_a, _ = self.registry.acquire(key_a, cls_a)
+        thread_b, _ = self.registry.acquire(key_b, cls_b)
+        assert thread_a is not thread_b
+
 
 # ---------------------------------------------------------------------------
 # ControllerRegistry.release tests
@@ -151,7 +194,7 @@ class TestRelease:
     def setup_method(self):
         self.registry = FakeRegistry()
         self.plugin_cls = make_plugin_class()
-        self.key = ControllerKey(self.plugin_cls.__name__, 0)
+        self.key = ControllerKey(self.plugin_cls, 0)
 
     def test_release_decrements_ref_count(self):
         self.registry.acquire(self.key, self.plugin_cls)
@@ -175,6 +218,22 @@ class TestRelease:
 
     def test_ref_count_zero_for_unknown_key(self):
         assert self.registry.ref_count(self.key) == 0
+
+    def test_release_removes_subscriber(self):
+        sub = object()
+        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub)
+        self.registry.release(self.key, subscriber=sub)
+        # entry gone (ref_count → 0), so subscribers() returns {}
+        assert self.registry.subscribers(self.key) == {}
+
+    def test_release_removes_only_named_subscriber(self):
+        sub1, sub2 = object(), object()
+        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub1)
+        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub2)
+        self.registry.release(self.key, subscriber=sub1)
+        subs = self.registry.subscribers(self.key)
+        assert id(sub1) not in subs
+        assert id(sub2) in subs
 
     def test_double_release_is_safe(self):
         """Releasing twice after acquiring once should not raise."""
@@ -200,8 +259,8 @@ class TestCloseAll:
         self.plugin_cls = make_plugin_class()
 
     def test_close_all_tears_down_all_threads(self):
-        key1 = ControllerKey(self.plugin_cls.__name__, 0)
-        key2 = ControllerKey(self.plugin_cls.__name__, 1)
+        key1 = ControllerKey(self.plugin_cls, 0)
+        key2 = ControllerKey(self.plugin_cls, 1)
         thread1, _ = self.registry.acquire(key1, self.plugin_cls)
         thread2, _ = self.registry.acquire(key2, self.plugin_cls)
         self.registry.close_all()
@@ -209,7 +268,7 @@ class TestCloseAll:
         assert thread2.close_hardware_called
 
     def test_close_all_clears_entries(self):
-        key = ControllerKey(self.plugin_cls.__name__, 0)
+        key = ControllerKey(self.plugin_cls, 0)
         self.registry.acquire(key, self.plugin_cls)
         self.registry.close_all()
         assert not self.registry.is_known(key)
@@ -259,7 +318,7 @@ class TestThreadSafety:
     def test_concurrent_acquire_same_key(self):
         registry = FakeRegistry()
         plugin_cls = make_plugin_class()
-        key = ControllerKey(plugin_cls.__name__, 0)
+        key = ControllerKey(plugin_cls, 0)
         results = []
         errors = []
 
@@ -286,7 +345,7 @@ class TestThreadSafety:
     def test_concurrent_release(self):
         registry = FakeRegistry()
         plugin_cls = make_plugin_class()
-        key = ControllerKey(plugin_cls.__name__, 0)
+        key = ControllerKey(plugin_cls, 0)
 
         # Acquire 10 times first.
         for _ in range(10):

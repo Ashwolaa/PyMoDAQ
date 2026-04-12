@@ -11,7 +11,7 @@ Usage
 Typical call site in ``DAQ_Move.init_hardware``::
 
     key = ControllerKey(
-        plugin_class=type(self.plugin).__name__,
+        plugin_class=type(self.plugin),
         controller_id=self.settings['controller', 'controller_ID'],
     )
     thread, settings = ControllerRegistry.get().acquire(
@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 if TYPE_CHECKING:
     from pymodaq_gui.parameter import Parameter
@@ -51,14 +51,16 @@ class ControllerKey:
     Parameters
     ----------
     plugin_class :
-        ``type(plugin).__name__`` — e.g. ``'DAQ_Move_PI_GCS2'``.
+        The plugin class object itself — e.g. ``DAQ_Move_PI_GCS2``.
+        Using the class object (not its name string) avoids collisions
+        between plugins from different packages that happen to share a name.
     controller_id :
         User-assigned grouping integer (0–9999) from the parameter tree.
         Scoped within ``plugin_class``; two different plugin classes may
         share the same integer without collision.
     """
 
-    plugin_class: str
+    plugin_class: type
     controller_id: int
 
 
@@ -69,6 +71,7 @@ class _Entry:
     thread: Any          # ControllerThread in production; Any for test injection
     settings: 'Parameter'
     ref_count: int = 1
+    subscribers: dict = field(default_factory=dict)  # {id(obj): repr(obj)} — debug only
 
 
 class ControllerRegistry:
@@ -120,6 +123,7 @@ class ControllerRegistry:
         key: ControllerKey,
         plugin_class: type,
         params_state: dict | None = None,
+        subscriber: object | None = None,
     ) -> tuple[Any, 'Parameter']:
         """Return ``(thread, settings)`` for *key*.
 
@@ -144,6 +148,10 @@ class ControllerRegistry:
             Saved parameter state (``dict`` from ``Parameter.saveState()``
             or ``None``).  Only used on the first ``acquire``; ignored
             by guests.
+        subscriber :
+            Optional reference to the calling object (e.g. a ``DAQ_Move``
+            instance).  Stored in ``entry.subscribers`` for introspection
+            and debugging only — not used for lifecycle logic.
 
         Returns
         -------
@@ -156,23 +164,36 @@ class ControllerRegistry:
             if key in self._entries:
                 entry = self._entries[key]
                 entry.ref_count += 1
+                if subscriber is not None:
+                    entry.subscribers[id(subscriber)] = repr(subscriber)
                 return entry.thread, entry.settings
 
             settings = self._make_settings(plugin_class, params_state)
             thread = self._make_thread(plugin_class, settings)
-            self._entries[key] = _Entry(thread=thread, settings=settings)
+            subs = {id(subscriber): repr(subscriber)} if subscriber is not None else {}
+            self._entries[key] = _Entry(thread=thread, settings=settings, subscribers=subs)
             return thread, settings
 
-    def release(self, key: ControllerKey) -> None:
+    def release(self, key: ControllerKey, subscriber: object | None = None) -> None:
         """Decrement ref-count for *key*; tear down when it reaches zero.
 
         Safe to call even if *key* is unknown (no-op).
+
+        Parameters
+        ----------
+        key :
+            Unique controller identifier.
+        subscriber :
+            The same object passed to :meth:`acquire`.  Removed from the
+            debug subscribers dict if present.
         """
         with self._lock:
             entry = self._entries.get(key)
             if entry is None:
                 return
             entry.ref_count -= 1
+            if subscriber is not None:
+                entry.subscribers.pop(id(subscriber), None)
             if entry.ref_count <= 0:
                 self._teardown(entry)
                 del self._entries[key]
@@ -187,6 +208,16 @@ class ControllerRegistry:
         """Return ``True`` if *key* has at least one active subscriber."""
         with self._lock:
             return key in self._entries
+
+    def subscribers(self, key: ControllerKey) -> dict:
+        """Return a snapshot of the debug subscribers dict for *key*.
+
+        Keys are ``id(subscriber)``, values are ``repr(subscriber)``.
+        Returns an empty dict if *key* is unknown.  For introspection only.
+        """
+        with self._lock:
+            entry = self._entries.get(key)
+            return dict(entry.subscribers) if entry is not None else {}
 
     def close_all(self) -> None:
         """Tear down all active threads regardless of ref-count.

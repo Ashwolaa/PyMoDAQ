@@ -61,7 +61,7 @@ Key problems:
 │                                                                  │
 │  owns: plugin instance                                           │
 │  owns: SDK / controller object                                   │
-│  owns: ChannelScheduler (per-channel grab timers)               │
+│  owns: per-channel QTimer instances (continuous grab)            │
 │  holds: read-only ref to shared Parameter (for ini_hardware)    │
 │                                                                  │
 │  Signals → GUI thread (queued):                                  │
@@ -110,10 +110,6 @@ ActuatorPlugin = DAQ_Move_base
 # viewer_utility_classes.py
 DetectorPlugin = DAQ_Viewer_base
 ```
-
-Internal renames (with backward-compat aliases):
-- `HardwareWorkerBase` → `PluginThreadWorker`
-- `DAQ_HardwareWorker` → `ChannelScheduler`
 
 **Risk**: zero.
 
@@ -165,10 +161,12 @@ class ControllerRegistry:
 
 ---
 
-### Phase 2 — ControllerThread + ChannelScheduler
+### Phase 2 — ControllerThread
 
-The singleton object that lives in the hardware thread, owns the plugin, and
-serialises all hardware access.
+The object that lives in the hardware thread, owns the plugin, and serialises
+all hardware access. Qt's queued connection mechanism already serialises
+concurrent `request_read` / `request_write` calls — no separate scheduler
+object is needed at this stage.
 
 ```python
 # new file: control_modules/controller_thread.py
@@ -187,7 +185,7 @@ class ControllerThread(QObject):
         self._plugin_class = plugin_class
         self._settings_ref = settings   # GUI-thread Parameter — read-only here
         self._plugin = None
-        self._scheduler = ChannelScheduler(parent=self)  # child → follows moveToThread
+        self._grab_timers: dict[str, QTimer] = {}  # continuous grab timers
 
     # ── Slots (all execute in hardware thread via queued connection) ──────────
 
@@ -207,34 +205,42 @@ class ControllerThread(QObject):
     def request_write(self, channel: str, value) -> None:
         """Write value to channel; emits change_done when complete."""
 
-    @Slot(str, bool)
-    def start_grab(self, channel: str, continuous: bool) -> None:
-        """Start ChannelScheduler timer for channel."""
+    @Slot(str, float)
+    def start_grab(self, channel: str, period_ms: float) -> None:
+        """Create (or restart) a QTimer for periodic reads on channel."""
 
     @Slot(str)
     def stop_grab(self, channel: str) -> None:
-        """Stop ChannelScheduler timer for channel."""
+        """Stop and remove the grab timer for channel."""
 
     @Slot(list, object, str)
     def update_settings(self, path, data, change) -> None:
         """Relay GUI Parameter edit → plugin.commit_settings()."""
 ```
 
-`ChannelScheduler` (relocated from `DAQ_HardwareWorker`) is a child `QObject`
-of `ControllerThread`. Because it is a Qt parent-child, it follows `moveToThread`
-automatically. Its `QTimer` instances are created inside `@Slot` methods so they
-are always affiliated with the hardware thread's event loop.
+`QTimer` instances are created inside `@Slot` methods so they are always
+affiliated with the hardware thread's event loop. No explicit `moveToThread`
+needed for child objects.
+
+**Serialisation**: Qt queues `request_read` and `request_write` calls in the
+hardware thread's event loop. Each slot runs to completion before the next
+starts — no mutex or scheduler needed.
 
 **Async acquisition contract** (see CR-3):
 - Old-style detectors: `request_read` calls `grab_data()`; plugin's `dte_signal`
   is wired to emit `data_ready`. No blocking.
-- Old-style actuators: `request_write` calls `move_abs`; `ChannelScheduler`
-  polls until epsilon reached, then emits `change_done`. No blocking.
+- Old-style actuators: `request_write` calls `move_abs` then polls (simple loop
+  with `QCoreApplication.processEvents` guard) until epsilon reached, emits
+  `change_done`. No blocking from the caller's perspective.
 - New-style plugins: `query_data` / `change_to` called directly; results emitted
   immediately.
 
-**Deliverable**: `ControllerThread` + `ChannelScheduler` + integration tests
-with mock plugin (headless, no GUI).
+**Future**: if batching (one hardware read fans out to multiple subscribers) or
+priority queueing becomes necessary, a `ChannelScheduler` child `QObject` can be
+introduced at that point without changing the public slot/signal interface.
+
+**Deliverable**: `ControllerThread` + integration tests with mock plugin
+(headless, no GUI).
 
 ---
 
@@ -386,7 +392,7 @@ showing the same value). Not used cross-module or cross-thread.
 
 ---
 
-### CR-3 — Fully async: ControllerThread never blocks
+### CR-3 — Fully async: ControllerThread never blocks callers
 
 `ControllerThread` has no synchronous data return. All acquisition is
 request→signal:
@@ -395,8 +401,10 @@ request→signal:
   `data_ready` immediately.
 - **Old-style detector** (`grab_data` fire-and-forget): slot calls `grab_data()`;
   plugin's `dte_signal` is wired to emit `data_ready`. No blocking.
-- **Old-style actuator** (`move_abs` + polling): slot calls `move_abs`;
-  `ChannelScheduler` polls until epsilon reached, emits `change_done`. No blocking.
+- **Old-style actuator** (`move_abs` + polling): slot calls `move_abs` then
+  polls inline (simple loop) until epsilon reached, emits `change_done`. Because
+  this runs in the hardware thread's event loop, callers are never blocked — they
+  have already returned to their own event loop.
 
 All subscribers receive `data_ready` / `change_done` and filter by channel name.
 This pattern is already how Qt event-driven code works — the existing
@@ -436,11 +444,15 @@ instance per test, torn down via `registry.close_all()` in teardown.
 
 ---
 
-### CR-7 — ChannelScheduler thread affinity
+### CR-7 — QTimer thread affinity
 
-`ChannelScheduler` is a child `QObject` of `ControllerThread`. It follows
-`moveToThread` automatically. All `QTimer` creation happens inside `@Slot`
-methods (hardware thread event loop). No explicit `moveToThread` call needed.
+`QTimer` instances for continuous grab are created inside `@Slot` methods
+(i.e. inside the hardware thread's event loop), so they are automatically
+affiliated with that thread. No explicit `moveToThread` call is needed.
+
+If a `ChannelScheduler` child `QObject` is introduced in the future, the same
+rule applies: create it inside a hardware-thread slot and it inherits the
+correct thread affinity.
 
 ---
 
@@ -468,7 +480,7 @@ Network clients (LECO Directors)
 
 - **Disconnect** (exception in `query_data` / `change_to`, or watchdog):
   `ControllerThread` emits `hardware_status(False, reason)`. All DAQ GUIs
-  transition to disabled state; `ChannelScheduler` timers pause.
+  transition to disabled state; grab timers are stopped.
 - **Reconnect**: only the owner DAQ (first `acquire()` caller) can trigger
   re-init. `ControllerThread` re-runs `ini_hardware`, emits
   `hardware_status(True, info)`. Guest DAQs resume automatically with no extra
