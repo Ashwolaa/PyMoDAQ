@@ -461,8 +461,8 @@ class LECOComponentMixin:
         sent from the Qt thread.
 
         When *connect* is ``False``, a :attr:`~LECOCommands.QUIT` command is
-        emitted to stop the listener gracefully, and the signal/slot connection
-        to :meth:`~ActorListener.queue_command` is removed.
+        emitted to stop the listener gracefully, and both signal/slot connections
+        (to :meth:`~ActorListener.queue_command` and from ``cmd_signal``) are removed.
 
         :param connect: ``True`` to establish the connection, ``False`` to
             tear it down.
@@ -472,15 +472,28 @@ class LECOComponentMixin:
             host, port = self.get_leco_host_port()
             try:
                 self._leco_client.name = name
+                # # Reusing existing client — cmd_signal may still be connected from a
+                # # previous connect_leco(False) that didn't disconnect it; remove first
+                # # to avoid duplicate connections.
+                # try:
+                #     self._leco_client.cmd_signal.disconnect(self.process_leco_commands)
+                # except (TypeError, RuntimeError):
+                #     pass  # already disconnected is fine
             except AttributeError:
                 self._leco_client = self._listener_class(name=name, host=host, port=port)
-                self._leco_client.cmd_signal.connect(self.process_leco_commands)
+            self._leco_client.cmd_signal.connect(self.process_leco_commands)
             self._leco_commands_signal.connect(self._leco_client.queue_command)
             self._leco_client.start_listen()
         else:
+            if self._leco_client is None:
+                return
             self._leco_commands_signal.emit(ThreadCommand(LECOCommands.QUIT, ))
             try:
                 self._leco_commands_signal.disconnect(self._leco_client.queue_command)
+            except TypeError:
+                pass  # already disconnected
+            try:
+                self._leco_client.cmd_signal.disconnect(self.process_leco_commands)
             except TypeError:
                 pass  # already disconnected
 
