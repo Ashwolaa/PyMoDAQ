@@ -1,16 +1,18 @@
 """Tests for ControllerThread (Phase CT-2).
 
-All tests use new-style mock plugins only (query_data / change_to interface).
+Design: one physical hardware device → one ControllerThread → one plugin instance.
+DAQ_Move and DAQ_Viewer are pure GUI subscribers; they never touch the SDK.
+
+All tests use new-style mock plugins only (open / close / query_data / change_to).
 Old-style adapter wiring (DAQ_Move_base / DAQ_Viewer_base) is covered in Phase 4.
 
-Qt is required (ControllerThread is a QObject), but no GUI is shown.
-Slots are called directly in the test thread — no QThread / event loop needed
-for the core logic tests.  Timer firing is verified with qtbot.
+Qt is required (ControllerThread is a QObject) but no GUI is shown.
+Slots are called directly in the test thread for the core logic tests.
+Timer firing is verified with qtbot.
 """
 from __future__ import annotations
 
 import pytest
-from qtpy.QtCore import QCoreApplication
 
 from pymodaq.control_modules.controller_thread import ControllerThread
 
@@ -26,7 +28,7 @@ class MockPlugin:
     """New-style plugin stub: records every call, raises on demand."""
 
     def __init__(self):
-        self.open_called_with = None   # (settings, controller)
+        self.open_called_with = None   # settings passed to open()
         self.close_called = False
         self.query_calls: list = []    # list of names lists
         self.change_calls: list = []   # list of (name, value)
@@ -35,18 +37,14 @@ class MockPlugin:
         self._open_raises: Exception | None = None
         self._query_raises: Exception | None = None
         self._change_raises: Exception | None = None
-        self._controller_obj = object()   # fake SDK object returned by open()
         self._capabilities = None
 
-    # ── plugin interface ─────────────────────────────────────────────────────
-
-    def open(self, settings, controller=None):
-        self.open_called_with = (settings, controller)
+    def open(self, settings) -> None:
+        self.open_called_with = settings
         if self._open_raises:
             raise self._open_raises
-        return self._controller_obj
 
-    def close(self):
+    def close(self) -> None:
         self.close_called = True
 
     def query_data(self, names=None, fresh=True):
@@ -55,12 +53,12 @@ class MockPlugin:
             raise self._query_raises
         return FAKE_DTE
 
-    def change_to(self, name, value):
+    def change_to(self, name, value) -> None:
         self.change_calls.append((name, value))
         if self._change_raises:
             raise self._change_raises
 
-    def commit_settings(self, path, data, change):
+    def commit_settings(self, path, data, change) -> None:
         self.commit_calls.append((path, data, change))
 
     @property
@@ -86,12 +84,11 @@ def make_plugin_class(plugin_instance: MockPlugin) -> type:
 
 
 def make_thread(plugin_instance: MockPlugin | None = None) -> tuple[ControllerThread, MockPlugin]:
-    """Return a ControllerThread + its MockPlugin, not yet initialised."""
+    """Return a (ControllerThread, MockPlugin) pair, not yet initialised."""
     if plugin_instance is None:
         plugin_instance = MockPlugin()
     plugin_cls = make_plugin_class(plugin_instance)
-    settings = FakeSettings()
-    thread_obj = ControllerThread(plugin_class=plugin_cls, settings=settings)
+    thread_obj = ControllerThread(plugin_class=plugin_cls, settings=FakeSettings())
     return thread_obj, plugin_instance
 
 
@@ -117,7 +114,7 @@ class Collector:
 
 
 # ---------------------------------------------------------------------------
-# ini_hardware tests
+# ini_hardware
 # ---------------------------------------------------------------------------
 
 class TestIniHardware:
@@ -130,18 +127,12 @@ class TestIniHardware:
     def test_ini_passes_settings_to_open(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
-        settings_passed, _ = plugin.open_called_with
-        assert isinstance(settings_passed, FakeSettings)
-
-    def test_ini_stores_controller_from_open(self, qapp):
-        thread_obj, plugin = make_thread()
-        thread_obj.ini_hardware()
-        assert thread_obj._controller is plugin._controller_obj
+        assert isinstance(plugin.open_called_with, FakeSettings)
 
     def test_ini_stores_plugin_instance(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
-        assert plugin in thread_obj._plugins.values()
+        assert thread_obj._plugin is plugin
 
     def test_ini_emits_hardware_status_true(self, qapp):
         thread_obj, plugin = make_thread()
@@ -164,7 +155,6 @@ class TestIniHardware:
 
     def test_ini_does_not_emit_capabilities_when_none(self, qapp):
         thread_obj, plugin = make_thread()
-        plugin._capabilities = None
         collector = Collector()
         thread_obj.capabilities_signal.connect(collector)
         thread_obj.ini_hardware()
@@ -176,34 +166,19 @@ class TestIniHardware:
         collector = Collector()
         thread_obj.hardware_status.connect(collector)
         thread_obj.ini_hardware()
-        assert collector.count == 1
         connected, info = collector.last()
         assert connected is False
         assert 'device not found' in info
 
-    def test_second_ini_passes_existing_controller(self, qapp):
-        """Second plugin class gets the already-open controller passed in."""
-        plugin_a = MockPlugin()
-        plugin_b = MockPlugin()
-        cls_a = make_plugin_class(plugin_a)
-        cls_b = make_plugin_class(plugin_b)
-        settings = FakeSettings()
-
-        # First plugin opens hardware
-        thread_obj = ControllerThread(plugin_class=cls_a, settings=settings)
+    def test_ini_failure_leaves_plugin_none(self, qapp):
+        thread_obj, plugin = make_thread()
+        plugin._open_raises = RuntimeError('oops')
         thread_obj.ini_hardware()
-        sdk_obj = plugin_a._controller_obj
-
-        # Second plugin class arrives — simulate by swapping _plugin_class
-        thread_obj._plugin_class = cls_b
-        thread_obj.ini_hardware()
-
-        _, controller_received = plugin_b.open_called_with
-        assert controller_received is sdk_obj
+        assert thread_obj._plugin is None
 
 
 # ---------------------------------------------------------------------------
-# close_hardware tests
+# close_hardware
 # ---------------------------------------------------------------------------
 
 class TestCloseHardware:
@@ -214,17 +189,11 @@ class TestCloseHardware:
         thread_obj.close_hardware()
         assert plugin.close_called
 
-    def test_close_clears_plugins(self, qapp):
+    def test_close_sets_plugin_to_none(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
         thread_obj.close_hardware()
-        assert thread_obj._plugins == {}
-
-    def test_close_clears_controller(self, qapp):
-        thread_obj, plugin = make_thread()
-        thread_obj.ini_hardware()
-        thread_obj.close_hardware()
-        assert thread_obj._controller is None
+        assert thread_obj._plugin is None
 
     def test_close_emits_hardware_status_false(self, qapp):
         thread_obj, plugin = make_thread()
@@ -249,7 +218,7 @@ class TestCloseHardware:
 
 
 # ---------------------------------------------------------------------------
-# request_read tests
+# request_read
 # ---------------------------------------------------------------------------
 
 class TestRequestRead:
@@ -275,7 +244,7 @@ class TestRequestRead:
         thread_obj, plugin = make_thread()
         collector = Collector()
         thread_obj.data_ready.connect(collector)
-        thread_obj.request_read('axis_x')  # no plugin yet
+        thread_obj.request_read('axis_x')
         assert collector.count == 0
         assert plugin.query_calls == []
 
@@ -292,7 +261,7 @@ class TestRequestRead:
 
 
 # ---------------------------------------------------------------------------
-# request_write tests
+# request_write
 # ---------------------------------------------------------------------------
 
 class TestRequestWrite:
@@ -335,7 +304,7 @@ class TestRequestWrite:
 
 
 # ---------------------------------------------------------------------------
-# start_grab / stop_grab tests
+# start_grab / stop_grab
 # ---------------------------------------------------------------------------
 
 class TestGrabTimers:
@@ -382,7 +351,7 @@ class TestGrabTimers:
 
 
 # ---------------------------------------------------------------------------
-# update_settings tests
+# update_settings
 # ---------------------------------------------------------------------------
 
 class TestUpdateSettings:
@@ -401,8 +370,7 @@ class TestUpdateSettings:
     def test_update_settings_plugin_without_commit_settings(self, qapp):
         """Plugins that don't implement commit_settings are skipped silently."""
         class _PluginNoCommit:
-            """Minimal plugin with no commit_settings method."""
-            def open(self, settings, controller=None): return None
+            def open(self, settings): pass
             def close(self): pass
             def query_data(self, names=None, fresh=True): return FAKE_DTE
             def change_to(self, name, value): pass
@@ -418,52 +386,20 @@ class TestUpdateSettings:
 
 
 # ---------------------------------------------------------------------------
-# Multi-plugin channel dispatch tests
+# Channel routing (single plugin)
 # ---------------------------------------------------------------------------
 
-class TestChannelDispatch:
+class TestChannelRouting:
+    """One plugin instance handles all channels — no dispatch logic needed."""
 
-    def test_single_plugin_handles_any_channel(self, qapp):
+    def test_any_channel_name_is_passed_through(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
-        thread_obj.request_read('any_channel')
-        assert plugin.query_calls == [['any_channel']]
+        for ch in ('axis_x', 'axis_y', 'temperature', 'arbitrary'):
+            thread_obj.request_read(ch)
+        assert plugin.query_calls == [['axis_x'], ['axis_y'], ['temperature'], ['arbitrary']]
 
-    def test_multi_plugin_dispatches_by_capabilities(self, qapp):
-        """With two plugins, request_read dispatches to the one whose
-        Capabilities include the requested channel."""
-
-        class FakeCaps:
-            def __init__(self, var_names, obs_names):
-                self.variables = [type('V', (), {'name': n})() for n in var_names]
-                self.observables = [type('O', (), {'name': n})() for n in obs_names]
-
-        plugin_move = MockPlugin()
-        plugin_move._capabilities = FakeCaps(['axis_x'], [])
-
-        plugin_view = MockPlugin()
-        plugin_view._capabilities = FakeCaps([], ['temperature'])
-
-        settings = FakeSettings()
-        thread_obj = ControllerThread(
-            plugin_class=make_plugin_class(plugin_move),
-            settings=settings,
-        )
-        cls_move = make_plugin_class(plugin_move)
-        cls_view = make_plugin_class(plugin_view)
-        # Manually inject both plugins (simulates two ini_hardware calls)
-        thread_obj._plugins[cls_move] = plugin_move
-        thread_obj._plugins[cls_view] = plugin_view
-
-        thread_obj.request_read('axis_x')
-        assert plugin_move.query_calls == [['axis_x']]
-        assert plugin_view.query_calls == []
-
-        thread_obj.request_read('temperature')
-        assert plugin_view.query_calls == [['temperature']]
-        assert plugin_move.query_calls == [['axis_x']]  # unchanged
-
-    def test_no_plugins_request_read_is_noop(self, qapp):
+    def test_no_plugin_request_read_is_noop(self, qapp):
         thread_obj, _ = make_thread()
         collector = Collector()
         thread_obj.data_ready.connect(collector)

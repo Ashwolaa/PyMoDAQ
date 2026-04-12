@@ -4,19 +4,18 @@ One ``ControllerThread`` instance lives inside a dedicated ``QThread``.
 Qt's queued-connection mechanism serialises concurrent slot calls automatically
 — no additional locking is required.
 
+Design
+------
+One physical hardware device → one ``ControllerThread`` → one plugin instance.
+DAQ_Move and DAQ_Viewer are lightweight GUI subscribers that connect to this
+thread's signals; they never touch the SDK directly.
+
 New-style plugin interface
 --------------------------
 Plugins must implement:
 
-    def open(self, settings, controller=None) -> Any:
-        \"\"\"Open hardware.
-
-        *controller* is ``None`` on the first call.  When a second plugin
-        class sharing the same ``hardware_class`` is initialised, the already-
-        open SDK object is passed in so the plugin can reuse the connection.
-
-        Return the SDK / controller object (or ``None`` for stateless plugins).
-        \"\"\"
+    def open(self, settings) -> None:
+        \"\"\"Open hardware.  Raise on failure.\"\"\"
 
     def close(self) -> None:
         \"\"\"Close hardware gracefully.\"\"\"
@@ -34,12 +33,11 @@ Plugins must implement:
     def commit_settings(self, path: list, data, change: str) -> None:
         \"\"\"React to a GUI parameter edit (optional).\"\"\"
 
-Old-style adapters (Phase 4)
-----------------------------
-``DAQ_Move_base`` and ``DAQ_Viewer_base`` expose ``query_data`` / ``change_to``
-wrappers around the legacy ``get_actuator_value`` / ``move_abs`` / ``grab_data``
-interface.  Those adapters are wired up in Phase 4; this file is intentionally
-new-style only.
+Legacy plugins
+--------------
+``DAQ_Move_base`` and ``DAQ_Viewer_base`` plugins continue to work unchanged
+via the master/slave mechanism until they are migrated.  See
+``PLUGIN_MIGRATION_GUIDE.md`` for step-by-step instructions.
 """
 from __future__ import annotations
 
@@ -56,7 +54,8 @@ __all__ = ['ControllerThread']
 class ControllerThread(QObject):
     """QObject that lives in a dedicated QThread and owns the plugin + hardware.
 
-    In production, instantiate via :class:`~pymodaq.control_modules.controller_registry.ControllerRegistry`
+    In production, instantiate via
+    :class:`~pymodaq.control_modules.controller_registry.ControllerRegistry`
     which handles ``moveToThread`` and ``QThread`` lifecycle.
 
     Signals fire on the GUI thread via Qt's cross-thread queued delivery.
@@ -67,34 +66,25 @@ class ControllerThread(QObject):
     data_ready          = Signal(str, object)        # (channel, DataToExport)
     change_done         = Signal(str, object)        # (channel, value)
     hardware_status     = Signal(bool, str)          # (connected, info)
-    settings_changed    = Signal(list, object, str)  # (path, data, change)  emitted by plugin
+    settings_changed    = Signal(list, object, str)  # (path, data, change)
     capabilities_signal = Signal(object)             # Capabilities
 
     def __init__(self, plugin_class: type, settings: 'Parameter') -> None:
         super().__init__()
         self._plugin_class = plugin_class
         self._settings_ref = settings           # GUI-thread Parameter, read-only here
-        self._plugins: dict[type, Any] = {}    # plugin_class → plugin instance
-        self._controller: Any = None           # shared SDK object set by first ini_hardware
+        self._plugin: Any = None               # single plugin instance
         self._grab_timers: dict[str, QTimer] = {}
 
     # ── Slots ← GUI thread ───────────────────────────────────────────────────
 
     @Slot()
     def ini_hardware(self) -> None:
-        """Instantiate the plugin class, open hardware, emit capabilities + status.
-
-        If a second plugin class sharing the same ``hardware_class`` calls this
-        slot (via a second ``acquire``), the already-open ``self._controller``
-        SDK object is passed in so the plugin can reuse the connection without
-        reopening hardware.
-        """
+        """Instantiate the plugin, open hardware, emit capabilities + status."""
         try:
             plugin = self._plugin_class()
-            controller = plugin.open(self._settings_ref, controller=self._controller)
-            if self._controller is None and controller is not None:
-                self._controller = controller
-            self._plugins[self._plugin_class] = plugin
+            plugin.open(self._settings_ref)
+            self._plugin = plugin
 
             caps = getattr(plugin, 'capabilities', None)
             if caps is not None:
@@ -106,28 +96,27 @@ class ControllerThread(QObject):
 
     @Slot()
     def close_hardware(self) -> None:
-        """Stop all grab timers, close all plugin instances, reset state."""
+        """Stop all grab timers, close the plugin, reset state."""
         for timer in list(self._grab_timers.values()):
             timer.stop()
         self._grab_timers.clear()
 
-        for plugin in list(self._plugins.values()):
+        if self._plugin is not None:
             try:
-                plugin.close()
+                self._plugin.close()
             except Exception:
                 pass
-        self._plugins.clear()
-        self._controller = None
+            self._plugin = None
+
         self.hardware_status.emit(False, 'Closed')
 
     @Slot(str)
     def request_read(self, channel: str) -> None:
         """One-shot read on *channel*; emits ``data_ready(channel, dte)``."""
-        plugin = self._plugin_for_channel(channel)
-        if plugin is None:
+        if self._plugin is None:
             return
         try:
-            dte = plugin.query_data(names=[channel], fresh=True)
+            dte = self._plugin.query_data(names=[channel], fresh=True)
             self.data_ready.emit(channel, dte)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
@@ -135,11 +124,10 @@ class ControllerThread(QObject):
     @Slot(str, object)
     def request_write(self, channel: str, value: object) -> None:
         """Write *value* to *channel*; emits ``change_done(channel, value)``."""
-        plugin = self._plugin_for_channel(channel)
-        if plugin is None:
+        if self._plugin is None:
             return
         try:
-            plugin.change_to(channel, value)
+            self._plugin.change_to(channel, value)
             self.change_done.emit(channel, value)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
@@ -149,7 +137,7 @@ class ControllerThread(QObject):
         """Start (or restart) periodic reads on *channel* every *period_ms* ms.
 
         ``QTimer`` is created here, inside a slot, so it is affiliated with the
-        hardware thread's event loop (see CR-7).
+        hardware thread's event loop (see CR-7 in ``CONTROLLER_THREAD_PLAN.md``).
         """
         self.stop_grab(channel)
         timer = QTimer(self)
@@ -167,36 +155,12 @@ class ControllerThread(QObject):
 
     @Slot(list, object, str)
     def update_settings(self, path: list, data: object, change: str) -> None:
-        """Relay a GUI parameter edit to all plugin instances."""
-        for plugin in self._plugins.values():
-            commit = getattr(plugin, 'commit_settings', None)
-            if commit is not None:
-                try:
-                    commit(path, data, change)
-                except Exception:
-                    pass
-
-    # ── Internal ─────────────────────────────────────────────────────────────
-
-    def _plugin_for_channel(self, channel: str) -> Any | None:
-        """Return the plugin instance that owns *channel*, or ``None``.
-
-        With a single plugin, dispatching is trivial.  With multiple plugins
-        (legacy mixed DAQ_Move + DAQ_Viewer case), each plugin's
-        ``Capabilities`` is checked for the channel name.
-        """
-        if not self._plugins:
-            return None
-        if len(self._plugins) == 1:
-            return next(iter(self._plugins.values()))
-        for plugin in self._plugins.values():
-            caps = getattr(plugin, 'capabilities', None)
-            if caps is None:
-                continue
-            names = (
-                [v.name for v in getattr(caps, 'variables', [])]
-                + [o.name for o in getattr(caps, 'observables', [])]
-            )
-            if channel in names:
-                return plugin
-        return None
+        """Relay a GUI parameter edit to the plugin."""
+        if self._plugin is None:
+            return
+        commit = getattr(self._plugin, 'commit_settings', None)
+        if commit is not None:
+            try:
+                commit(path, data, change)
+            except Exception:
+                pass
