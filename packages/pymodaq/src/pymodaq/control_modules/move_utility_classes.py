@@ -877,5 +877,11 @@ class DAQ_Move_base(PluginBase):
 
 
 
+# ---------------------------------------------------------------------------
+# Naming alias — preferred name for new plugin authors.
+# DAQ_Move_base is kept for full backward compatibility.
+# ---------------------------------------------------------------------------
+ActuatorPlugin = DAQ_Move_base
+
 if __name__ == '__main__':
     test = DAQ_Move_base()

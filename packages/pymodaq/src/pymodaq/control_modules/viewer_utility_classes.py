@@ -258,5 +258,11 @@ class DAQ_Viewer_base(PluginBase):
         # todo check this because ScanParameters has been removed
         self.scan_parameters = scan_parameters
 
+# ---------------------------------------------------------------------------
+# Naming alias — preferred name for new plugin authors.
+# DAQ_Viewer_base is kept for full backward compatibility.
+# ---------------------------------------------------------------------------
+DetectorPlugin = DAQ_Viewer_base
+
 if __name__ == '__main__':
     test = DAQ_Viewer_base()

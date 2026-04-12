@@ -900,3 +900,9 @@ class HardwareWorkerBase(QObject):
         else:
             return False
         return True
+
+# ---------------------------------------------------------------------------
+# Naming alias — DAQ_Plugin_base is the name used in the new capabilities
+# architecture. PluginBase is kept for full backward compatibility.
+# ---------------------------------------------------------------------------
+DAQ_Plugin_base = PluginBase
