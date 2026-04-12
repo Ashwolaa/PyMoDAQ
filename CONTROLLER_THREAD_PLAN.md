@@ -126,8 +126,8 @@ hardware thread starts.
 
 @dataclass(frozen=True)
 class ControllerKey:
-    plugin_class: str   # e.g. "DAQ_Move_PI_GCS2"
-    controller_id: int  # user-assigned grouping integer (0-9999)
+    hardware_class: type  # shared driver class (see CR-1); falls back to plugin class
+    controller_id: int    # user-assigned grouping integer (0-9999)
 
 class ControllerRegistry:
     """Singleton in production; injectable in tests via constructor."""
@@ -184,7 +184,8 @@ class ControllerThread(QObject):
         super().__init__()
         self._plugin_class = plugin_class
         self._settings_ref = settings   # GUI-thread Parameter — read-only here
-        self._plugin = None
+        self._plugins: dict[type, Any] = {}  # plugin_class → plugin instance
+        self._controller = None          # shared SDK object, set by first ini_hardware
         self._grab_timers: dict[str, QTimer] = {}  # continuous grab timers
 
     # ── Slots (all execute in hardware thread via queued connection) ──────────
@@ -235,6 +236,20 @@ starts — no mutex or scheduler needed.
 - New-style plugins: `query_data` / `change_to` called directly; results emitted
   immediately.
 
+**Multiple plugin instances** (legacy mixed DAQ_Move + DAQ_Viewer case):
+When two plugin classes share the same `hardware_class`, both land in the same
+`ControllerThread`. The thread opens the SDK once (first `ini_hardware` call)
+and stores `self._controller`. The second plugin class is initialised with the
+already-open `self._controller` reference — exactly the current master/slave
+hand-off, but now correctly serialised through a single thread.
+`request_read` / `request_write` dispatch to the appropriate plugin instance
+based on the channel name declared in `Capabilities`.
+
+**Capabilities-first plugin**: a unified plugin that exposes both axes and
+observables lives as a single instance in `self._plugins`. No second plugin
+class is needed. DAQ_Move and DAQ_Viewer are purely GUI subscribers to
+different channels of that one instance (see CR-9).
+
 **Future**: if batching (one hardware read fans out to multiple subscribers) or
 priority queueing becomes necessary, a `ChannelScheduler` child `QObject` can be
 introduced at that point without changing the public slot/signal interface.
@@ -246,26 +261,41 @@ introduced at that point without changing the public slot/signal interface.
 
 ### Phase 3a — DAQ_Move / DAQ_Viewer become thin channel subscribers
 
+Two acquisition paths converge on the same subscriber interface.
+
+#### Path A — Legacy (user manually picks plugin class)
+
 Each GUI module:
-1. Derives a `ControllerKey` from its `main_settings`.
+1. Derives a `ControllerKey` from its `main_settings`
+   (`hardware_class = getattr(plugin_cls, 'hardware_class', plugin_cls)`).
 2. Calls `ControllerRegistry.acquire(key, plugin_class, params_state)`.
-   - First caller: gets a fresh thread; hardware is initialised.
-   - Subsequent callers: get the already-running thread; their `params_state`
-     is ignored. A status-bar warning appears if it conflicts with live state.
+   - First caller: creates thread, opens hardware.
+   - Subsequent callers: get the running thread; `params_state` ignored.
 3. Receives back `(controller_thread, shared_parameter)`.
-4. Connects `controller_thread.request_read` / `request_write` / `start_grab` /
-   `stop_grab` slots for its channel.
-5. Connects to `data_ready`, `change_done`, `hardware_status`,
-   `settings_changed` signals — filtering by its channel name.
-6. Connects `shared_parameter.sigTreeStateChanged` → `controller_thread.update_settings`
-   (queued) to relay user edits to the hardware thread.
-7. On close: `ControllerRegistry.release(key)`.
+4–7. Connects channels, signals, settings relay; calls `release(key)` on close.
+
+#### Path B — Capabilities-first (DAQs created from Capabilities)
+
+1. `HardwareWidget` (or dashboard preset loader) calls `registry.acquire(key, plugin_class)`
+   — this is the sole "owner" acquire that creates the thread.
+2. `ControllerThread` runs `ini_hardware`, emits `capabilities_signal(Capabilities)`.
+3. `HardwareWidget` receives capabilities and auto-creates DAQ_Move / DAQ_Viewer
+   instances for each axis / observable.
+4. Each auto-created DAQ calls `registry.acquire(key, ...)` as a guest — gets
+   the already-running thread, ref_count incremented.
+5. Each DAQ subscribes to its channel name exactly as in Path A.
+6. `HardwareWidget` holds its own ref; as long as it exists the thread stays
+   alive even if all child DAQs close.
+
+**Common subscriber interface** (both paths):
+- Connect `controller_thread.data_ready` / `change_done`, filter by channel name.
+- Re-emit `move_done_signal` / `grab_done_signal` for scan engine compatibility.
+- No owned `QThread`, no `ActuatorWorker`, no master/slave subtree.
 
 **What DAQ_Move retains**:
 - `main_settings` (module name, UI type, refresh rate) — not shared
 - Per-module toolbar actions (move abs/rel/home, stop)
 - `move_done_signal` — re-emitted from `change_done` filtered by channel name
-- Channel name (`axis_name`) from `Capabilities`
 
 **What disappears from DAQ_Move**:
 - Owning a `QThread` / `ActuatorWorker`
@@ -342,11 +372,43 @@ parameters as deprecated no-ops for one release cycle. Migrate preset XML files.
 
 ## Design decisions (Critical Review)
 
-### CR-1 — Controller key collision risk (DEFERRED)
+### CR-1 — Controller key: hardware_class, not plugin class
 
-Key is `(plugin_class_name, controller_id)` scoped per process. Collision
-probability is low in practice. Long-term: replace with a user-supplied address
-string (COM port, IP, USB serial number) once plugins are ready to expose it.
+The key must identify the **physical hardware**, not the GUI wrapper.
+Using the plugin class as the key causes a silent conflict when the same
+physical device is exposed by two separate plugin classes (e.g.
+`DAQ_Move_MyStage` for the motor axis and `DAQ_0DViewer_MyStage` for the
+on-board temperature sensor): two different keys → two ControllerThreads →
+two threads hitting the same SDK simultaneously.
+
+**Resolution**: plugins declare a `hardware_class` attribute pointing to the
+shared driver class.  The registry key becomes `(hardware_class, controller_id)`.
+
+```python
+# Both point at the same driver → same ControllerThread
+class DAQ_Move_MyStage(DAQ_Move_base):
+    hardware_class = MyStageDriver
+
+class DAQ_0DViewer_MyStage(DAQ_Viewer_base):
+    hardware_class = MyStageDriver
+```
+
+Key construction at call site:
+
+```python
+hw_cls = getattr(type(self.plugin), 'hardware_class', type(self.plugin))
+key = ControllerKey(hardware_class=hw_cls, controller_id=self.settings['controller_ID'])
+```
+
+**Fallback**: if `hardware_class` is not declared, `type(plugin)` is used —
+existing single-role plugins (the vast majority) need no changes.
+
+**Capabilities-first plugins**: a unified plugin that implements both
+`query_data` and `change_to` has no split, so `hardware_class` defaults to
+`type(plugin)` and the key is unique by construction.
+
+**Long-term**: replace `controller_id` with a user-supplied physical address
+(COM port, IP, USB serial number) once plugins are ready to expose it.
 
 ---
 
@@ -453,6 +515,42 @@ affiliated with that thread. No explicit `moveToThread` call is needed.
 If a `ChannelScheduler` child `QObject` is introduced in the future, the same
 rule applies: create it inside a hardware-thread slot and it inherits the
 correct thread affinity.
+
+---
+
+### CR-9 — Capabilities integration: ControllerThread as the source
+
+In the capabilities-first model the flow is **inverted** relative to the legacy
+path: instead of DAQ modules pulling from the registry, the `ControllerThread`
+pushes capabilities outward and the dashboard/HardwareWidget creates DAQs from
+them.
+
+```
+ControllerThread
+    │ ini_hardware()
+    ▼
+capabilities_signal(Capabilities)
+    │
+    ▼
+HardwareWidget
+    ├── creates DAQ_Move  "axis_x"   → acquire(key) as guest → subscribe channel
+    ├── creates DAQ_Move  "axis_y"   → acquire(key) as guest → subscribe channel
+    └── creates DAQ_Viewer "temp"    → acquire(key) as guest → subscribe channel
+```
+
+**No conflict**: the unified plugin has one class → one key → one thread.
+DAQ_Move and DAQ_Viewer are GUI views over different channels of the same plugin;
+they never independently open the hardware.
+
+**Mixed legacy case** (`hardware_class` declared on separate plugin classes):
+Both plugin classes resolve to the same key. The thread hosts both plugin
+instances sharing one `self._controller` SDK object. Channel dispatch routes
+`request_read` / `request_write` to whichever plugin instance owns that channel
+name according to `Capabilities`.
+
+**Key invariant**: `ControllerThread` is always the single point of hardware
+ownership. DAQ_Move and DAQ_Viewer are always pure subscribers — they never
+touch the SDK directly.
 
 ---
 
