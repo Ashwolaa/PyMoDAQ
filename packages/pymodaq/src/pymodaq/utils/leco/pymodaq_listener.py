@@ -490,12 +490,12 @@ class LECOComponentMixin:
             self._leco_commands_signal.emit(ThreadCommand(LECOCommands.QUIT, ))
             try:
                 self._leco_commands_signal.disconnect(self._leco_client.queue_command)
-            except TypeError:
-                pass  # already disconnected
+            except (TypeError, RuntimeError):
+                pass  # already disconnected (RuntimeError on PySide6)
             try:
                 self._leco_client.cmd_signal.disconnect(self.process_leco_commands)
-            except TypeError:
-                pass  # already disconnected
+            except (TypeError, RuntimeError):
+                pass  # already disconnected (RuntimeError on PySide6)
 
     def get_leco_name(self) -> str:
         """Return the LECO component name used to register on the network.
