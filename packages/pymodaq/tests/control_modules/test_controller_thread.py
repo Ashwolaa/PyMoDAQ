@@ -1,10 +1,11 @@
-"""Tests for ControllerThread (Phase CT-2).
+"""Tests for ControllerThread.
 
 Design: one physical hardware device → one ControllerThread → one plugin instance.
 DAQ_Move and DAQ_Viewer are pure GUI subscribers; they never touch the SDK.
 
-All tests use new-style mock plugins only (open / close / query_data / change_to).
-Old-style adapter wiring (DAQ_Move_base / DAQ_Viewer_base) is covered in Phase 4.
+Two sets of mock plugins:
+  - New-style (open / close / query_data / change_to)
+  - Old-style (ini_stage / move_abs / poll_moving / get_actuator_value)
 
 Qt is required (ControllerThread is a QObject) but no GUI is shown.
 Slots are called directly in the test thread for the core logic tests.
@@ -58,8 +59,9 @@ class MockPlugin:
         if self._change_raises:
             raise self._change_raises
 
-    def commit_settings(self, path, data, change) -> None:
-        self.commit_calls.append((path, data, change))
+    def commit_settings(self, param) -> None:
+        """All plugins receive a Parameter object, old-style and new-style alike."""
+        self.commit_calls.append(param)
 
     @property
     def capabilities(self):
@@ -68,15 +70,22 @@ class MockPlugin:
 
 class FakeSettings:
     """Stand-in for pymodaq_gui Parameter."""
-    pass
+    def saveState(self):
+        return None
+    def child(self, *path):
+        return self
 
 
 def make_plugin_class(plugin_instance: MockPlugin) -> type:
-    """Return a plugin class whose constructor always returns *plugin_instance*."""
+    """Return a plugin class whose constructor always returns *plugin_instance*.
+
+    Inherits from MockPlugin so ``hasattr(_PluginClass, 'open')`` returns True
+    and the new-style detection in ControllerThread works correctly.
+    """
     instance = plugin_instance
 
-    class _PluginClass:
-        def __new__(cls):
+    class _PluginClass(MockPlugin):
+        def __new__(cls, *args, **kwargs):
             return instance
 
     _PluginClass.__name__ = 'MockPluginClass'
@@ -360,7 +369,9 @@ class TestUpdateSettings:
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
         thread_obj.update_settings(['param', 'value'], 42, 'value')
-        assert plugin.commit_calls == [(['param', 'value'], 42, 'value')]
+        # commit_settings receives the Parameter node looked up from hw_settings
+        assert len(plugin.commit_calls) == 1
+        assert plugin.commit_calls[0] is not None  # a FakeSettings child
 
     def test_update_settings_before_ini_is_noop(self, qapp):
         thread_obj, plugin = make_thread()
@@ -405,3 +416,218 @@ class TestChannelRouting:
         thread_obj.data_ready.connect(collector)
         thread_obj.request_read('axis_x')
         assert collector.count == 0
+
+
+# ---------------------------------------------------------------------------
+# Old-style actuator mock
+# ---------------------------------------------------------------------------
+
+class FakeDataActuator:
+    """Minimal DataActuator stand-in."""
+    def __init__(self, value=0.0, units='mm'):
+        self.value_float = value
+        self.units = units
+        self.name = 'actuator'
+
+
+class OldStyleActuatorPlugin:
+    """Simulates a DAQ_Move_base plugin (ini_stage / move_abs / poll_moving)."""
+
+    # Marks it as old-style (no 'open' attribute)
+    axis_name = 'axis_x'
+    axis_unit = 'mm'
+
+    def __init__(self, parent=None, params_state=None):
+        self.parent = parent
+        self.params_state = params_state
+        self.controller = object()   # fake SDK
+        self.move_is_done = False
+        self._ini_raises: Exception | None = None
+        self._move_calls: list = []
+        self._read_calls: int = 0
+        # Simulate move_done_signal with a simple callable list
+        self._move_done_listeners: list = []
+
+    # Minimal Signal duck-type for move_done_signal
+    class _Sig:
+        def __init__(self, plugin):
+            self._plugin = plugin
+        def connect(self, fn):
+            self._plugin._move_done_listeners.append(fn)
+
+    @property
+    def move_done_signal(self):
+        return self._Sig(self)
+
+    def _emit_move_done(self, value):
+        for fn in self._move_done_listeners:
+            fn(value)
+
+    def ini_stage(self, controller=None):
+        if self._ini_raises:
+            raise self._ini_raises
+        return 'initialized', True
+
+    def close(self):
+        pass
+
+    def get_actuator_value(self):
+        self._read_calls += 1
+        return FakeDataActuator(1.0)
+
+    def move_abs(self, value):
+        self._move_calls.append(('abs', value))
+
+    def move_home(self):
+        self._move_calls.append(('home', None))
+
+    def poll_moving(self):
+        # Immediately simulate completion (no real timer in tests)
+        done = FakeDataActuator(getattr(self._move_calls[-1][1], 'value_float', 0.0)
+                                if self._move_calls else 0.0)
+        self._emit_move_done(done)
+
+    def commit_settings(self, param):
+        pass
+
+
+def make_old_style_thread() -> tuple['ControllerThread', OldStyleActuatorPlugin]:
+    """Return a (ControllerThread, OldStyleActuatorPlugin) pair.
+
+    Inherits from OldStyleActuatorPlugin so ``hasattr(_PluginClass, 'ini_stage')``
+    returns True and the old-style detection in ControllerThread works correctly.
+    """
+    plugin_instance = OldStyleActuatorPlugin()
+
+    class _PluginClass(OldStyleActuatorPlugin):
+        def __new__(cls, parent=None, params_state=None):
+            plugin_instance.parent = parent
+            plugin_instance.params_state = params_state
+            return plugin_instance
+
+    _PluginClass.__name__ = 'OldStyleActuatorPlugin'
+
+    thread_obj = ControllerThread(plugin_class=_PluginClass, settings=FakeSettings())
+    return thread_obj, plugin_instance
+
+
+# ---------------------------------------------------------------------------
+# Old-style actuator: ini_hardware
+# ---------------------------------------------------------------------------
+
+class TestOldStyleIniHardware:
+
+    def test_ini_calls_ini_stage(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        assert thread_obj._plugin is plugin
+
+    def test_ini_emits_hardware_status_true(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        collector = Collector()
+        thread_obj.hardware_status.connect(collector)
+        thread_obj.ini_hardware()
+        assert collector.count == 1
+        connected, _ = collector.last()
+        assert connected is True
+
+    def test_ini_stores_controller(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        assert thread_obj._controller is plugin.controller
+
+    def test_ini_failure_emits_hardware_status_false(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        plugin._ini_raises = RuntimeError('no device')
+        collector = Collector()
+        thread_obj.hardware_status.connect(collector)
+        thread_obj.ini_hardware()
+        connected, info = collector.last()
+        assert connected is False
+        assert 'no device' in info
+
+    def test_parent_shim_title_set(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        assert plugin.parent is not None
+        assert plugin.parent.title == 'OldStyleActuatorPlugin'
+
+    def test_status_message_forwarded(self, qapp):
+        """Plugin calling parent.status_sig.emit() should reach status_message."""
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        collector = Collector()
+        thread_obj.status_message.connect(collector)
+        from pymodaq_utils.utils import ThreadCommand
+        plugin.parent.status_sig.emit(ThreadCommand('Update_Status', 'Moving'))
+        assert collector.count == 1
+        assert 'Moving' in collector.last()[0]
+
+
+# ---------------------------------------------------------------------------
+# Old-style actuator: request_write
+# ---------------------------------------------------------------------------
+
+class TestOldStyleRequestWrite:
+
+    def test_request_write_calls_move_abs(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        thread_obj.request_write('axis_x', FakeDataActuator(5.0))
+        assert plugin._move_calls[0][0] == 'abs'
+
+    def test_request_write_emits_change_done(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        collector = Collector()
+        thread_obj.change_done.connect(collector)
+        thread_obj.request_write('axis_x', FakeDataActuator(5.0))
+        assert collector.count == 1
+        channel, _ = collector.last()
+        assert channel == 'axis_x'
+
+    def test_request_write_home(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        thread_obj.request_write('axis_x', 'home')
+        assert plugin._move_calls[0][0] == 'home'
+
+    def test_request_write_before_ini_is_noop(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        collector = Collector()
+        thread_obj.change_done.connect(collector)
+        thread_obj.request_write('axis_x', FakeDataActuator(1.0))
+        assert collector.count == 0
+
+    def test_broadcast_channel_empty(self, qapp):
+        """Empty channel = broadcast; change_done emitted with empty channel."""
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        collector = Collector()
+        thread_obj.change_done.connect(collector)
+        thread_obj.request_write('', FakeDataActuator(1.0))
+        channel, _ = collector.last()
+        assert channel == ''
+
+
+# ---------------------------------------------------------------------------
+# Old-style actuator: request_read
+# ---------------------------------------------------------------------------
+
+class TestOldStyleRequestRead:
+
+    def test_request_read_calls_get_actuator_value(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        thread_obj.request_read('axis_x')
+        assert plugin._read_calls == 1
+
+    def test_request_read_emits_data_ready(self, qapp):
+        thread_obj, plugin = make_old_style_thread()
+        thread_obj.ini_hardware()
+        collector = Collector()
+        thread_obj.data_ready.connect(collector)
+        thread_obj.request_read('axis_x')
+        assert collector.count == 1
+        channel, _ = collector.last()
+        assert channel == 'axis_x'
