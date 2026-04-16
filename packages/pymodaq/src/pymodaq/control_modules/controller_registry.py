@@ -1,27 +1,29 @@
 """Process-global registry mapping controller keys to ControllerThread instances.
 
 One ``ControllerThread`` is created per unique ``ControllerKey``
-(plugin class name + user-assigned controller ID).  Subsequent callers
+(hardware class + user-assigned controller ID).  Subsequent callers
 that share the same key receive the already-running thread and the shared
-``Parameter`` settings model.  The thread is torn down when the last
-subscriber releases it.
+``Parameter`` (hw_settings) model.  The thread is torn down when the last
+subscriber detaches.
 
 Usage
 -----
 Typical call site in ``DAQ_Move.init_hardware``::
 
-    hw_cls = getattr(type(self.plugin), 'hardware_class', type(self.plugin))
+    hw_cls = getattr(plugin_class, 'hardware_class', plugin_class)
     key = ControllerKey(
         hardware_class=hw_cls,
-        controller_id=self.settings['controller', 'controller_ID'],
+        controller_id=self.settings['main_settings', 'controller_ID'],
     )
-    thread, settings = ControllerRegistry.get().acquire(
-        key, type(self.plugin), params_state
+    thread, hw_settings = ControllerRegistry.get().attach(
+        key, plugin_class,
+        params_state=self.settings.child(self._hw_settings_name).saveState(),
+        subscriber=self,
     )
 
 And in ``DAQ_Move.close``::
 
-    ControllerRegistry.get().release(key)
+    ControllerRegistry.get().detach(key, subscriber=self)
 
 Test isolation
 --------------
@@ -78,7 +80,7 @@ class _Entry:
 class ControllerRegistry:
     """Map ``ControllerKey`` → ``(ControllerThread, Parameter)``.
 
-    Thread-safe: ``acquire`` and ``release`` may be called from any Qt
+    Thread-safe: ``attach`` and ``detach`` may be called from any Qt
     thread (the GUI thread is typical but not guaranteed).
 
     In production use the module-level singleton via :meth:`get`.
@@ -119,14 +121,14 @@ class ControllerRegistry:
     # Public API
     # ------------------------------------------------------------------
 
-    def acquire(
+    def attach(
         self,
         key: ControllerKey,
         plugin_class: type,
         params_state: dict | None = None,
         subscriber: object | None = None,
     ) -> tuple[Any, 'Parameter']:
-        """Return ``(thread, settings)`` for *key*.
+        """Return ``(thread, hw_settings)`` for *key*.
 
         **First caller** (key not yet known): creates the shared
         ``Parameter`` model in the calling thread (expected to be the
@@ -134,7 +136,7 @@ class ControllerRegistry:
         the entry with ``ref_count=1``.
 
         **Subsequent callers** (key already known): increment
-        ``ref_count`` and return the existing ``(thread, settings)``
+        ``ref_count`` and return the existing ``(thread, hw_settings)``
         pair.  *params_state* is ignored — the hardware is already live.
 
         Parameters
@@ -147,7 +149,7 @@ class ControllerRegistry:
             instantiate the plugin inside the hardware thread.
         params_state :
             Saved parameter state (``dict`` from ``Parameter.saveState()``
-            or ``None``).  Only used on the first ``acquire``; ignored
+            or ``None``).  Only used on the first ``attach``; ignored
             by guests.
         subscriber :
             Optional reference to the calling object (e.g. a ``DAQ_Move``
@@ -158,7 +160,7 @@ class ControllerRegistry:
         -------
         thread :
             The ``ControllerThread`` owning the hardware.
-        settings :
+        hw_settings :
             The shared ``Parameter`` model (lives in the GUI thread).
         """
         with self._lock:
@@ -175,7 +177,7 @@ class ControllerRegistry:
             self._entries[key] = _Entry(thread=thread, settings=settings, subscribers=subs)
             return thread, settings
 
-    def release(self, key: ControllerKey, subscriber: object | None = None) -> None:
+    def detach(self, key: ControllerKey, subscriber: object | None = None) -> None:
         """Decrement ref-count for *key*; tear down when it reaches zero.
 
         Safe to call even if *key* is unknown (no-op).
@@ -185,7 +187,7 @@ class ControllerRegistry:
         key :
             Unique controller identifier.
         subscriber :
-            The same object passed to :meth:`acquire`.  Removed from the
+            The same object passed to :meth:`attach`.  Removed from the
             debug subscribers dict if present.
         """
         with self._lock:
@@ -239,7 +241,7 @@ class ControllerRegistry:
     ) -> 'Parameter':
         """Create the shared ``Parameter`` model.
 
-        Called from :meth:`acquire` with the registry lock held.
+        Called from :meth:`attach` with the registry lock held.
         The returned object will live in whichever thread calls
         ``acquire`` (expected: GUI thread).
         """
@@ -261,7 +263,7 @@ class ControllerRegistry:
                 def _make_thread(self, plugin_class, settings):
                     return FakeThread()
 
-        Called from :meth:`acquire` with the registry lock held.
+        Called from :meth:`attach` with the registry lock held.
         The ``ControllerThread`` import is deferred so Phase CT-1 tests
         can run before ``controller_thread.py`` exists.
         """
@@ -277,7 +279,7 @@ class ControllerRegistry:
     def _teardown(self, entry: _Entry) -> None:
         """Stop the hardware thread associated with *entry*.
 
-        Called from :meth:`release` and :meth:`close_all` with the
+        Called from :meth:`detach` and :meth:`close_all` with the
         registry lock held.
         """
         thread_obj = entry.thread
