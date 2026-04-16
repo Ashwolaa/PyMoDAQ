@@ -156,16 +156,16 @@ class TestHardwareClassSharing:
         move_cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
         view_cls = make_plugin_class('DAQ_0DViewer_MyStage', hardware_class=self.driver)
         key = key_for(move_cls)
-        thread_move, _ = self.registry.acquire(key, move_cls)
-        thread_view, _ = self.registry.acquire(key, view_cls)
+        thread_move, _ = self.registry.attach(key, move_cls)
+        thread_view, _ = self.registry.attach(key, view_cls)
         assert thread_move is thread_view
 
     def test_two_plugin_classes_same_hardware_class_ref_count_two(self):
         move_cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
         view_cls = make_plugin_class('DAQ_0DViewer_MyStage', hardware_class=self.driver)
         key = key_for(move_cls)
-        self.registry.acquire(key, move_cls)
-        self.registry.acquire(key, view_cls)
+        self.registry.attach(key, move_cls)
+        self.registry.attach(key, view_cls)
         assert self.registry.ref_count(key) == 2
 
     def test_plugin_without_hardware_class_uses_plugin_class_as_key(self):
@@ -179,8 +179,8 @@ class TestHardwareClassSharing:
         driver_b = make_hardware_class('OtherDriver')
         cls_a = make_plugin_class('DAQ_Move_A', hardware_class=self.driver)
         cls_b = make_plugin_class('DAQ_Move_B', hardware_class=driver_b)
-        thread_a, _ = self.registry.acquire(key_for(cls_a), cls_a)
-        thread_b, _ = self.registry.acquire(key_for(cls_b), cls_b)
+        thread_a, _ = self.registry.attach(key_for(cls_a), cls_a)
+        thread_b, _ = self.registry.attach(key_for(cls_b), cls_b)
         assert thread_a is not thread_b
 
     def test_same_hardware_class_different_controller_id_gives_different_threads(self):
@@ -188,13 +188,13 @@ class TestHardwareClassSharing:
         cls = make_plugin_class('DAQ_Move_MyStage', hardware_class=self.driver)
         key0 = ControllerKey(hardware_class=self.driver, controller_id=0)
         key1 = ControllerKey(hardware_class=self.driver, controller_id=1)
-        thread0, _ = self.registry.acquire(key0, cls)
-        thread1, _ = self.registry.acquire(key1, cls)
+        thread0, _ = self.registry.attach(key0, cls)
+        thread1, _ = self.registry.attach(key1, cls)
         assert thread0 is not thread1
 
 
 # ---------------------------------------------------------------------------
-# ControllerRegistry.acquire tests
+# ControllerRegistry.attach tests
 # ---------------------------------------------------------------------------
 
 class TestAcquire:
@@ -205,44 +205,44 @@ class TestAcquire:
         self.key = key_for(self.plugin_cls)
 
     def test_first_acquire_returns_thread_and_settings(self):
-        thread, settings = self.registry.acquire(self.key, self.plugin_cls)
+        thread, settings = self.registry.attach(self.key, self.plugin_cls)
         assert isinstance(thread, FakeThread)
         assert isinstance(settings, FakeSettings)
 
     def test_second_acquire_same_key_returns_same_objects(self):
-        thread1, settings1 = self.registry.acquire(self.key, self.plugin_cls)
-        thread2, settings2 = self.registry.acquire(self.key, self.plugin_cls)
+        thread1, settings1 = self.registry.attach(self.key, self.plugin_cls)
+        thread2, settings2 = self.registry.attach(self.key, self.plugin_cls)
         assert thread1 is thread2
         assert settings1 is settings2
 
     def test_first_acquire_ref_count_one(self):
-        self.registry.acquire(self.key, self.plugin_cls)
+        self.registry.attach(self.key, self.plugin_cls)
         assert self.registry.ref_count(self.key) == 1
 
     def test_second_acquire_ref_count_two(self):
-        self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.acquire(self.key, self.plugin_cls)
+        self.registry.attach(self.key, self.plugin_cls)
+        self.registry.attach(self.key, self.plugin_cls)
         assert self.registry.ref_count(self.key) == 2
 
     def test_different_controller_id_gives_different_threads(self):
         key2 = ControllerKey(hardware_class=self.plugin_cls, controller_id=1)
-        thread1, _ = self.registry.acquire(self.key, self.plugin_cls)
-        thread2, _ = self.registry.acquire(key2, self.plugin_cls)
+        thread1, _ = self.registry.attach(self.key, self.plugin_cls)
+        thread2, _ = self.registry.attach(key2, self.plugin_cls)
         assert thread1 is not thread2
 
     def test_params_state_passed_to_settings_on_first_acquire(self):
         state = {'key': 'value'}
-        _, settings = self.registry.acquire(self.key, self.plugin_cls, params_state=state)
+        _, settings = self.registry.attach(self.key, self.plugin_cls, params_state=state)
         assert settings.params_state == state
 
     def test_params_state_ignored_for_guest(self):
-        _, settings_first = self.registry.acquire(self.key, self.plugin_cls, params_state={'a': 1})
-        _, settings_guest = self.registry.acquire(self.key, self.plugin_cls, params_state={'b': 2})
+        _, settings_first = self.registry.attach(self.key, self.plugin_cls, params_state={'a': 1})
+        _, settings_guest = self.registry.attach(self.key, self.plugin_cls, params_state={'b': 2})
         # guest gets the same settings object — first caller's state wins
         assert settings_first is settings_guest
 
     def test_is_known_true_after_acquire(self):
-        self.registry.acquire(self.key, self.plugin_cls)
+        self.registry.attach(self.key, self.plugin_cls)
         assert self.registry.is_known(self.key)
 
     def test_is_known_false_before_acquire(self):
@@ -250,19 +250,19 @@ class TestAcquire:
 
     def test_subscriber_recorded_on_first_acquire(self):
         sub = object()
-        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub)
+        self.registry.attach(self.key, self.plugin_cls, subscriber=sub)
         assert id(sub) in self.registry.subscribers(self.key)
 
     def test_subscriber_recorded_on_guest_acquire(self):
         sub1, sub2 = object(), object()
-        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub1)
-        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub2)
+        self.registry.attach(self.key, self.plugin_cls, subscriber=sub1)
+        self.registry.attach(self.key, self.plugin_cls, subscriber=sub2)
         subs = self.registry.subscribers(self.key)
         assert id(sub1) in subs
         assert id(sub2) in subs
 
     def test_no_subscriber_acquire_still_works(self):
-        self.registry.acquire(self.key, self.plugin_cls)
+        self.registry.attach(self.key, self.plugin_cls)
         assert self.registry.subscribers(self.key) == {}
 
     def test_subscribers_empty_for_unknown_key(self):
@@ -270,7 +270,7 @@ class TestAcquire:
 
 
 # ---------------------------------------------------------------------------
-# ControllerRegistry.release tests
+# ControllerRegistry.detach tests
 # ---------------------------------------------------------------------------
 
 class TestRelease:
@@ -281,55 +281,55 @@ class TestRelease:
         self.key = key_for(self.plugin_cls)
 
     def test_release_decrements_ref_count(self):
-        self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.release(self.key)
+        self.registry.attach(self.key, self.plugin_cls)
+        self.registry.attach(self.key, self.plugin_cls)
+        self.registry.detach(self.key)
         assert self.registry.ref_count(self.key) == 1
 
     def test_release_to_zero_removes_entry(self):
-        self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.release(self.key)
+        self.registry.attach(self.key, self.plugin_cls)
+        self.registry.detach(self.key)
         assert not self.registry.is_known(self.key)
 
     def test_release_to_zero_calls_close_hardware(self):
-        thread, _ = self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.release(self.key)
+        thread, _ = self.registry.attach(self.key, self.plugin_cls)
+        self.registry.detach(self.key)
         assert thread.close_hardware_called
 
     def test_release_unknown_key_is_noop(self):
         unknown_hw = make_hardware_class('UnknownDriver')
         unknown = ControllerKey(hardware_class=unknown_hw, controller_id=99)
-        self.registry.release(unknown)  # must not raise
+        self.registry.detach(unknown)  # must not raise
 
     def test_ref_count_zero_for_unknown_key(self):
         assert self.registry.ref_count(self.key) == 0
 
     def test_release_removes_subscriber(self):
         sub = object()
-        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub)
-        self.registry.release(self.key, subscriber=sub)
+        self.registry.attach(self.key, self.plugin_cls, subscriber=sub)
+        self.registry.detach(self.key, subscriber=sub)
         # entry gone (ref_count → 0), so subscribers() returns {}
         assert self.registry.subscribers(self.key) == {}
 
     def test_release_removes_only_named_subscriber(self):
         sub1, sub2 = object(), object()
-        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub1)
-        self.registry.acquire(self.key, self.plugin_cls, subscriber=sub2)
-        self.registry.release(self.key, subscriber=sub1)
+        self.registry.attach(self.key, self.plugin_cls, subscriber=sub1)
+        self.registry.attach(self.key, self.plugin_cls, subscriber=sub2)
+        self.registry.detach(self.key, subscriber=sub1)
         subs = self.registry.subscribers(self.key)
         assert id(sub1) not in subs
         assert id(sub2) in subs
 
     def test_double_release_is_safe(self):
         """Releasing twice after acquiring once should not raise."""
-        self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.release(self.key)
-        self.registry.release(self.key)  # second release: key unknown, noop
+        self.registry.attach(self.key, self.plugin_cls)
+        self.registry.detach(self.key)
+        self.registry.detach(self.key)  # second release: key unknown, noop
 
     def test_reacquire_after_full_release_creates_new_thread(self):
-        thread1, _ = self.registry.acquire(self.key, self.plugin_cls)
-        self.registry.release(self.key)
-        thread2, _ = self.registry.acquire(self.key, self.plugin_cls)
+        thread1, _ = self.registry.attach(self.key, self.plugin_cls)
+        self.registry.detach(self.key)
+        thread2, _ = self.registry.attach(self.key, self.plugin_cls)
         assert thread1 is not thread2
 
 
@@ -346,15 +346,15 @@ class TestCloseAll:
     def test_close_all_tears_down_all_threads(self):
         key1 = ControllerKey(hardware_class=self.plugin_cls, controller_id=0)
         key2 = ControllerKey(hardware_class=self.plugin_cls, controller_id=1)
-        thread1, _ = self.registry.acquire(key1, self.plugin_cls)
-        thread2, _ = self.registry.acquire(key2, self.plugin_cls)
+        thread1, _ = self.registry.attach(key1, self.plugin_cls)
+        thread2, _ = self.registry.attach(key2, self.plugin_cls)
         self.registry.close_all()
         assert thread1.close_hardware_called
         assert thread2.close_hardware_called
 
     def test_close_all_clears_entries(self):
         key = ControllerKey(hardware_class=self.plugin_cls, controller_id=0)
-        self.registry.acquire(key, self.plugin_cls)
+        self.registry.attach(key, self.plugin_cls)
         self.registry.close_all()
         assert not self.registry.is_known(key)
 
@@ -407,7 +407,7 @@ class TestThreadSafety:
 
         def worker():
             try:
-                thread, settings = registry.acquire(key, plugin_cls)
+                thread, settings = registry.attach(key, plugin_cls)
                 results.append((thread, settings))
             except Exception as exc:
                 errors.append(exc)
@@ -431,13 +431,13 @@ class TestThreadSafety:
         key = key_for(plugin_cls)
 
         for _ in range(10):
-            registry.acquire(key, plugin_cls)
+            registry.attach(key, plugin_cls)
 
         errors = []
 
         def worker():
             try:
-                registry.release(key)
+                registry.detach(key)
             except Exception as exc:
                 errors.append(exc)
 
