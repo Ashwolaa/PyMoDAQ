@@ -1,0 +1,604 @@
+"""Integration tests: multiple DAQ_Move / DAQ_Viewer subscribers on one CT.
+
+One physical instrument → one ControllerThread.  DAQ_Move and DAQ_Viewer are
+lightweight subscribers that connect to the same CT and filter by channel.
+
+Scenarios
+---------
+A. Multi-axis actuator
+   Two subscribers (X and Y channels) on one CT with a multi-axis actuator
+   plugin.  Channel filtering ensures each subscriber only reacts to its axis.
+
+B. Multi-subscriber detector
+   Two DAQ_Viewer-like subscribers on one CT sharing a detector plugin.
+
+C. Combined plugin (the "big fish")
+   A single plugin exposes both actuator axes (X, Y, Power) AND a camera
+   detector — like the BeamSteering / Camera examples in pymodaq_plugins_mockexamples.
+   One CT handles all roles:
+     - Multiple DAQ_Move subscribers, each watching one axis channel
+     - One DAQ_Viewer subscriber watching the camera channel
+   Moving axis X changes the hardware state visible to the next camera grab.
+
+These tests call ini_hardware() synchronously (no QThread).
+"""
+from __future__ import annotations
+
+import pytest
+
+from pymodaq.control_modules.controller_thread import ControllerThread
+from pymodaq.control_modules.controller_registry import ControllerKey, ControllerRegistry
+
+
+# ---------------------------------------------------------------------------
+# Shared hardware SDK mock  (Camera / BeamSteering-style)
+# ---------------------------------------------------------------------------
+
+class FakeCamera:
+    """Pure-Python hardware SDK: multi-axis stage + camera image.
+
+    Mimics the camera_wrapper.Camera pattern:
+    axes X/Y/Theta can be set and read; get_data() returns a snapshot.
+    """
+
+    axes = ['X', 'Y', 'Theta']
+
+    def __init__(self):
+        self._positions: dict[str, float] = {'X': 0.0, 'Y': 0.0, 'Theta': 0.0}
+        self._grab_count: int = 0
+
+    def set_value(self, axis: str, value: float) -> None:
+        self._positions[axis] = value
+
+    def get_value(self, axis: str) -> float:
+        return self._positions[axis]
+
+    def get_data(self) -> dict:
+        """Return a snapshot of current axis positions (stands in for a real image)."""
+        self._grab_count += 1
+        return dict(self._positions)
+
+
+# ---------------------------------------------------------------------------
+# Shared test helpers
+# ---------------------------------------------------------------------------
+
+class FakeDataActuator:
+    def __init__(self, value=0.0, units='mm'):
+        self.value_float = value
+        self.units = units
+
+    def units_as(self, unit):
+        return FakeDataActuator(self.value_float, unit)
+
+    def value(self, unit=None):
+        return self.value_float
+
+
+class FakeSettings:
+    def saveState(self): return None
+    def child(self, *path): return self
+
+
+class Collector:
+    def __init__(self): self.calls: list = []
+    def __call__(self, *args): self.calls.append(args)
+    @property
+    def count(self): return len(self.calls)
+    def last(self): return self.calls[-1] if self.calls else None
+
+
+# ---------------------------------------------------------------------------
+# Pure actuator plugin  (multi-axis, dispatches by axis_name)
+# ---------------------------------------------------------------------------
+
+class MultiAxisActuatorPlugin:
+    """Old-style actuator plugin wrapping FakeCamera axes."""
+
+    hardware_class = FakeCamera
+    axis_name: str = 'X'
+    axis_unit: str = 'mm'
+
+    class _FloatType:
+        def __eq__(self, other):
+            from pymodaq.control_modules.move_utility_classes import DataActuatorType
+            return other == DataActuatorType.float
+
+    data_actuator_type = _FloatType()
+
+    class _FakeTimer:
+        def stop(self): pass
+
+    def __init__(self, parent=None, params_state=None):
+        self.parent = parent
+        self.controller: FakeCamera = None
+        self.move_is_done = False
+        self.poll_timer = self._FakeTimer()
+        self._move_done_listeners: list = []
+
+    class _Sig:
+        def __init__(self, plugin):
+            self._plugin = plugin
+        def connect(self, fn):
+            self._plugin._move_done_listeners.append(fn)
+
+    @property
+    def move_done_signal(self): return self._Sig(self)
+
+    def _emit_move_done(self, val):
+        for fn in self._move_done_listeners: fn(val)
+
+    def ini_stage(self, controller=None):
+        if controller is None:
+            controller = FakeCamera()
+        self.controller = controller
+        return 'ok', True
+
+    def close(self): pass
+
+    def get_actuator_value(self):
+        return FakeDataActuator(self.controller.get_value(self.axis_name))
+
+    def move_abs(self, value):
+        v = value.value_float if hasattr(value, 'value_float') else float(value)
+        self.controller.set_value(self.axis_name, v)
+
+    def move_home(self):
+        self.controller.set_value(self.axis_name, 0.0)
+
+    def stop_motion(self):
+        self._emit_move_done(FakeDataActuator(self.controller.get_value(self.axis_name)))
+
+    def poll_moving(self):
+        self._emit_move_done(FakeDataActuator(self.controller.get_value(self.axis_name)))
+
+    def commit_settings(self, param): pass
+
+
+# ---------------------------------------------------------------------------
+# Pure detector plugin
+# ---------------------------------------------------------------------------
+
+class CameraDetectorPlugin:
+    """Old-style detector plugin wrapping FakeCamera.get_data()."""
+
+    hardware_class = FakeCamera
+    hardware_averaging = False
+
+    def __init__(self, parent=None, params_state=None):
+        self.parent = parent
+        self.controller: FakeCamera = None
+        self._dte_listeners: list = []
+        self._dte_temp_listeners: list = []
+
+    class _Sig:
+        def __init__(self, lst): self._lst = lst
+        def connect(self, fn): self._lst.append(fn)
+
+    @property
+    def dte_signal(self): return self._Sig(self._dte_listeners)
+
+    @property
+    def dte_signal_temp(self): return self._Sig(self._dte_temp_listeners)
+
+    def ini_detector(self, controller=None):
+        if controller is None:
+            controller = FakeCamera()
+        self.controller = controller
+        return 'ok', True
+
+    def grab_data(self, Naverage=1):
+        frame = self.controller.get_data()
+        for fn in self._dte_listeners: fn(frame)
+
+    def stop(self): pass
+    def close(self): pass
+    def commit_settings(self, param): pass
+
+
+# ---------------------------------------------------------------------------
+# Combined plugin  (the "big fish")
+# Exposes both ini_stage (actuator: X/Y/Theta) AND ini_detector (camera grab)
+# on the SAME FakeCamera SDK instance — one ControllerThread handles all.
+# ---------------------------------------------------------------------------
+
+class CombinedCameraPlugin:
+    """Combined plugin: multi-axis stage + camera detector on one SDK.
+
+    Exposes both ini_stage (actuator: X/Y/Theta) and ini_detector (camera grab)
+    on the same FakeCamera instance.  ini_stage creates the FakeCamera;
+    ini_detector receives it as *controller* so both roles share one SDK.
+    One ControllerThread initialises both roles via _ini_combined().
+    """
+
+    hardware_class = FakeCamera
+    axis_name: str = 'X'
+    axis_unit: str = 'mm'
+    hardware_averaging = False
+
+    class _FloatType:
+        def __eq__(self, other):
+            from pymodaq.control_modules.move_utility_classes import DataActuatorType
+            return other == DataActuatorType.float
+
+    data_actuator_type = _FloatType()
+
+    class _FakeTimer:
+        def stop(self): pass
+
+    def __init__(self, parent=None, params_state=None):
+        self.parent = parent
+        self.controller: FakeCamera = None
+        self.move_is_done = False
+        self.poll_timer = self._FakeTimer()
+        self._move_done_listeners: list = []
+        self._dte_listeners: list = []
+        self._dte_temp_listeners: list = []
+
+    # --- signal duck-types (separate classes to avoid name collision) ---------
+
+    class _MoveSig:
+        def __init__(self, plugin): self._plugin = plugin
+        def connect(self, fn): self._plugin._move_done_listeners.append(fn)
+
+    class _DteSig:
+        def __init__(self, lst): self._lst = lst
+        def connect(self, fn): self._lst.append(fn)
+
+    @property
+    def move_done_signal(self): return self._MoveSig(self)
+
+    @property
+    def dte_signal(self): return self._DteSig(self._dte_listeners)
+
+    @property
+    def dte_signal_temp(self): return self._DteSig(self._dte_temp_listeners)
+
+    def _emit_move_done(self, val):
+        for fn in self._move_done_listeners: fn(val)
+
+    # --- actuator interface --------------------------------------------------
+
+    def ini_stage(self, controller=None):
+        if controller is None:
+            controller = FakeCamera()
+        self.controller = controller
+        return 'ok', True
+
+    def get_actuator_value(self):
+        return FakeDataActuator(self.controller.get_value(self.axis_name))
+
+    def move_abs(self, value):
+        v = value.value_float if hasattr(value, 'value_float') else float(value)
+        self.controller.set_value(self.axis_name, v)
+
+    def move_home(self):
+        self.controller.set_value(self.axis_name, 0.0)
+
+    def stop_motion(self):
+        self._emit_move_done(FakeDataActuator(self.controller.get_value(self.axis_name)))
+
+    def poll_moving(self):
+        self._emit_move_done(FakeDataActuator(self.controller.get_value(self.axis_name)))
+
+    # --- detector interface --------------------------------------------------
+
+    def ini_detector(self, controller=None):
+        if controller is not None:
+            self.controller = controller
+        return 'ok', True
+
+    def grab_data(self, Naverage=1):
+        frame = self.controller.get_data()
+        for fn in self._dte_listeners: fn(frame)
+
+    def stop(self): pass
+
+    # --- shared ----------------------------------------------------------
+
+    def close(self): pass
+    def commit_settings(self, param): pass
+
+
+# ---------------------------------------------------------------------------
+# CT factory helpers
+# ---------------------------------------------------------------------------
+
+def _make_ct(plugin_cls):
+    """Return an uninitialised (ControllerThread, plugin_instance) pair."""
+    plugin_instance = plugin_cls()
+
+    class _Cls(plugin_cls):
+        def __new__(cls, parent=None, params_state=None):
+            plugin_instance.parent = parent
+            return plugin_instance
+
+    _Cls.__name__ = plugin_cls.__name__
+    ct = ControllerThread(_Cls, FakeSettings())
+    return ct, plugin_instance
+
+
+# ---------------------------------------------------------------------------
+# A. Multi-axis actuator: two DAQ_Move subscribers on one CT
+# ---------------------------------------------------------------------------
+
+class TestMultiAxisActuator:
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(MultiAxisActuatorPlugin)
+        self.ct.ini_hardware()
+
+    def _filter(self, channel, col):
+        """Return a change_done slot that only records events for *channel*."""
+        def slot(ch, val):
+            if not ch or ch == channel:
+                col(ch, val)
+        return slot
+
+    def test_move_x_fires_only_x_subscriber(self, qapp):
+        x_col, y_col = Collector(), Collector()
+        self.ct.change_done.connect(self._filter('X', x_col))
+        self.ct.change_done.connect(self._filter('Y', y_col))
+
+        self.ct.request_write('X', FakeDataActuator(10.0))
+
+        assert x_col.count == 1
+        assert y_col.count == 0
+
+    def test_move_y_fires_only_y_subscriber(self, qapp):
+        x_col, y_col = Collector(), Collector()
+        self.ct.change_done.connect(self._filter('X', x_col))
+        self.ct.change_done.connect(self._filter('Y', y_col))
+
+        self.ct.request_write('Y', FakeDataActuator(5.0))
+
+        assert x_col.count == 0
+        assert y_col.count == 1
+
+    def test_x_and_y_write_independent_positions(self, qapp):
+        self.ct.request_write('X', FakeDataActuator(42.0))
+        self.ct.request_write('Y', FakeDataActuator(7.0))
+
+        assert self.plugin.controller.get_value('X') == pytest.approx(42.0)
+        assert self.plugin.controller.get_value('Y') == pytest.approx(7.0)
+
+    def test_read_x_returns_x_position(self, qapp):
+        self.plugin.controller.set_value('X', 99.0)
+        col = Collector()
+        self.ct.data_ready.connect(col)
+        self.ct.request_read('X')
+        assert col.count == 1
+        ch, val, is_temp = col.last()
+        assert ch == 'X'
+        assert val.value_float == pytest.approx(99.0)
+
+    def test_all_subscribers_see_same_sdk(self, qapp):
+        self.ct.request_write('X', FakeDataActuator(1.0))
+        self.ct.request_write('Y', FakeDataActuator(2.0))
+        sdk = self.plugin.controller
+        assert sdk.get_value('X') == pytest.approx(1.0)
+        assert sdk.get_value('Y') == pytest.approx(2.0)
+        assert self.ct._controller is sdk
+
+
+# ---------------------------------------------------------------------------
+# B. Multi-subscriber detector: two DAQ_Viewer subscribers on one CT
+# ---------------------------------------------------------------------------
+
+class TestMultiSubscriberDetector:
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(CameraDetectorPlugin)
+        self.ct.ini_hardware()
+
+    def test_both_subscribers_receive_data_ready(self, qapp):
+        col_a, col_b = Collector(), Collector()
+        self.ct.data_ready.connect(col_a)
+        self.ct.data_ready.connect(col_b)
+
+        self.ct.request_snap('', 1)
+
+        assert col_a.count == 1
+        assert col_b.count == 1
+
+    def test_channel_filter_routes_correctly(self, qapp):
+        cam_col, ir_col = Collector(), Collector()
+
+        def cam_slot(ch, data, is_temp):
+            if not ch or ch == 'cam': cam_col(ch, data, is_temp)
+
+        def ir_slot(ch, data, is_temp):
+            if not ch or ch == 'ir': ir_col(ch, data, is_temp)
+
+        self.ct.data_ready.connect(cam_slot)
+        self.ct.data_ready.connect(ir_slot)
+
+        self.ct.request_snap('cam', 1)
+
+        assert cam_col.count == 1
+        assert ir_col.count == 0   # 'ir' filtered out
+
+    def test_hardware_grab_count_matches_snap_calls(self, qapp):
+        for _ in range(3):
+            self.ct.request_snap('', 1)
+        assert self.plugin.controller._grab_count == 3
+
+
+# ---------------------------------------------------------------------------
+# C. Combined plugin: multiple DAQ_Move + DAQ_Viewer on ONE CT
+# ---------------------------------------------------------------------------
+
+class TestCombinedPlugin:
+    """One ControllerThread owns a combined plugin (actuator + detector).
+
+    Subscribes:
+      - DAQ_Move_X  (channel='X')
+      - DAQ_Move_Y  (channel='Y')
+      - DAQ_Viewer  (channel='', broadcast)
+    """
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(CombinedCameraPlugin)
+        self.ct.ini_hardware()
+        # Verify both roles initialised on the same SDK
+        assert self.ct._plugin is self.plugin
+        assert self.ct._controller is self.plugin.controller
+
+    def _move_filter(self, channel, col):
+        def slot(ch, val):
+            if not ch or ch == channel: col(ch, val)
+        return slot
+
+    # -- Actuator tests -------------------------------------------------------
+
+    def test_move_x_fires_only_x_subscriber(self, qapp):
+        x_col, y_col = Collector(), Collector()
+        self.ct.change_done.connect(self._move_filter('X', x_col))
+        self.ct.change_done.connect(self._move_filter('Y', y_col))
+
+        self.ct.request_write('X', FakeDataActuator(20.0))
+
+        assert x_col.count == 1
+        assert y_col.count == 0
+
+    def test_move_y_fires_only_y_subscriber(self, qapp):
+        x_col, y_col = Collector(), Collector()
+        self.ct.change_done.connect(self._move_filter('X', x_col))
+        self.ct.change_done.connect(self._move_filter('Y', y_col))
+
+        self.ct.request_write('Y', FakeDataActuator(15.0))
+
+        assert x_col.count == 0
+        assert y_col.count == 1
+
+    def test_three_axis_positions_independent(self, qapp):
+        self.ct.request_write('X', FakeDataActuator(1.0))
+        self.ct.request_write('Y', FakeDataActuator(2.0))
+        sdk = self.plugin.controller
+        sdk.set_value('Theta', 45.0)   # set directly (no DAQ_Move for Theta here)
+
+        assert sdk.get_value('X') == pytest.approx(1.0)
+        assert sdk.get_value('Y') == pytest.approx(2.0)
+        assert sdk.get_value('Theta') == pytest.approx(45.0)
+
+    # -- Detector tests -------------------------------------------------------
+
+    def test_snap_emits_data_ready(self, qapp):
+        col = Collector()
+        self.ct.data_ready.connect(col)
+        self.ct.request_snap('', 1)
+        assert col.count == 1
+
+    def test_grab_data_not_confused_with_actuator_read(self, qapp):
+        """request_snap goes to grab_data, not get_actuator_value."""
+        col = Collector()
+        self.ct.data_ready.connect(col)
+        self.ct.request_snap('', 1)
+        _, frame, is_temp = col.last()
+        assert isinstance(frame, dict)   # FakeCamera.get_data() returns dict
+        assert is_temp is False
+
+    # -- Cross-role tests: move then grab -------------------------------------
+
+    def test_move_x_visible_in_next_grab(self, qapp):
+        """Moving X on the actuator role changes what the detector grab observes."""
+        self.ct.request_write('X', FakeDataActuator(88.0))
+        assert self.plugin.controller.get_value('X') == pytest.approx(88.0)
+
+        data_col = Collector()
+        self.ct.data_ready.connect(data_col)
+        self.ct.request_snap('', 1)
+
+        _, frame, _ = data_col.last()
+        assert frame['X'] == pytest.approx(88.0)
+
+    def test_move_y_then_grab_reflects_new_y(self, qapp):
+        self.ct.request_write('Y', FakeDataActuator(-5.0))
+
+        data_col = Collector()
+        self.ct.data_ready.connect(data_col)
+        self.ct.request_snap('', 1)
+
+        _, frame, _ = data_col.last()
+        assert frame['Y'] == pytest.approx(-5.0)
+
+    def test_actuator_and_detector_subscribers_on_independent_signals(self, qapp):
+        """change_done does not appear in data_ready and vice-versa."""
+        change_col = Collector()
+        data_col = Collector()
+        self.ct.change_done.connect(change_col)
+        self.ct.data_ready.connect(data_col)
+
+        self.ct.request_write('X', FakeDataActuator(1.0))
+        self.ct.request_snap('', 1)
+
+        assert change_col.count == 1   # actuator move
+        assert data_col.count == 1     # detector grab
+
+
+# ---------------------------------------------------------------------------
+# D. Registry: same hardware_class → same CT for all subscribers
+# ---------------------------------------------------------------------------
+
+class FakeThread:
+    def __init__(self): self.close_hardware_called = False
+    def close_hardware(self): self.close_hardware_called = True
+
+
+class FakeRegistryForIntegration(ControllerRegistry):
+    def _make_settings(self, plugin_class, params_state):
+        class _S:
+            def saveState(self): return None
+            def child(self, *p): return self
+        return _S()
+
+    def _make_thread(self, plugin_class, settings):
+        return FakeThread()
+
+
+class TestRegistrySameHardwareSharesCT:
+
+    def _hw(self, name='FakeHW'):
+        return type(name, (), {})
+
+    def _cls(self, name, hw):
+        return type(name, (), {'hardware_class': hw, 'params': []})
+
+    def test_same_plugin_class_returns_same_thread(self):
+        reg = FakeRegistryForIntegration()
+        hw = self._hw()
+        cls = self._cls('DAQ_Move_X', hw)
+        key = ControllerKey(hardware_class=hw, controller_id=0)
+
+        t1, _ = reg.attach(key, cls, subscriber='sub1')
+        t2, _ = reg.attach(key, cls, subscriber='sub2')
+
+        assert t1 is t2
+        assert reg.ref_count(key) == 2
+
+    def test_actuator_and_detector_plugin_same_hardware_share_thread(self):
+        """DAQ_Move and DAQ_Viewer with the same hardware_class share ONE CT."""
+        reg = FakeRegistryForIntegration()
+        hw = self._hw('BeamSteering')
+        move_cls = self._cls('DAQ_Move_BS', hw)
+        view_cls = self._cls('DAQ_Viewer_BS', hw)
+
+        key = ControllerKey(hardware_class=hw, controller_id=0)
+        t_move, _ = reg.attach(key, move_cls)
+        t_view, _ = reg.attach(key, view_cls)
+
+        assert t_move is t_view   # ONE thread for the instrument
+        assert reg.ref_count(key) == 2
+
+    def test_different_controller_ids_give_different_threads(self):
+        reg = FakeRegistryForIntegration()
+        hw = self._hw()
+        cls = self._cls('DAQ_Move', hw)
+
+        key0 = ControllerKey(hardware_class=hw, controller_id=0)
+        key1 = ControllerKey(hardware_class=hw, controller_id=1)
+
+        t0, _ = reg.attach(key0, cls)
+        t1, _ = reg.attach(key1, cls)
+
+        assert t0 is not t1   # two physical instruments
