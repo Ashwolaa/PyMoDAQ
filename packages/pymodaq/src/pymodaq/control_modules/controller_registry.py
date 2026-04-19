@@ -53,13 +53,15 @@ class ControllerKey:
 
     Parameters
     ----------
-    plugin_class :
-        The plugin class object itself — e.g. ``DAQ_Move_PI_GCS2``.
-        Using the class object (not its name string) avoids collisions
-        between plugins from different packages that happen to share a name.
+    hardware_class :
+        The underlying SDK / driver class (e.g. ``BeamSteering``).
+        Plugins that share the same physical hardware declare the same
+        ``hardware_class``; the registry maps this to one ``ControllerThread``.
+        Plugins without a ``hardware_class`` attribute fall back to using
+        the plugin class itself, giving it an exclusive thread.
     controller_id :
         User-assigned grouping integer (0–9999) from the parameter tree.
-        Scoped within ``plugin_class``; two different plugin classes may
+        Scoped within ``hardware_class``; two different hardware classes may
         share the same integer without collision.
     """
 
@@ -273,6 +275,7 @@ class ControllerRegistry:
         qt_thread = QtCore.QThread()
         thread_obj.moveToThread(qt_thread)
         qt_thread.started.connect(thread_obj.ini_hardware)
+        thread_obj.parent_qt_thread = qt_thread  # keep reference; prevents GC while running
         qt_thread.start()
         return thread_obj
 
@@ -290,4 +293,4 @@ class ControllerRegistry:
         qt_thread = getattr(thread_obj, 'parent_qt_thread', None)
         if qt_thread is not None and qt_thread.isRunning():
             qt_thread.quit()
-            qt_thread.wait(msecs=2000)
+            qt_thread.wait(2000)

@@ -25,6 +25,8 @@ from pymodaq.utils.data import DataFromPlugins
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq.control_modules.utils import ParameterControlModule, HardwareWorkerBase
+from pymodaq.control_modules.ct_module import ControllerThreadModule
+from pymodaq.control_modules.controller_thread import ControllerThread
 
 from pymodaq_gui.utils.file_io import select_file
 from pymodaq_gui.utils.widgets.lcd import LCD
@@ -65,7 +67,7 @@ config = Config()
 local_path = get_set_local_dir()
 
 
-class DAQ_Viewer(ParameterControlModule):
+class DAQ_Viewer(ControllerThreadModule):
     """ Main PyMoDAQ class to drive detectors
 
     Qt object and generic UI to drive actuators. The class is giving you full functionality to select (daq_detector),
@@ -105,6 +107,10 @@ class DAQ_Viewer(ParameterControlModule):
     data_saved = Signal()
     grab_status = Signal(bool)
 
+    # CT-specific signals into the hardware thread.
+    _start_grab_request = Signal(str, float)  # (channel, period_ms) → ct.start_grab
+    _snap_request       = Signal(str, int)    # (channel, Naverage)  → ct.request_snap
+
     params = daq_viewer_params + [
         {'title': 'Saver Settings:', 'name': 'saver_settings', 'type': 'group',
          'visible': True, 'children': H5Saver.get_params_for_save_type(SaveType.detector), 'expanded': False}]
@@ -123,6 +129,8 @@ class DAQ_Viewer(ParameterControlModule):
         self.logger = set_logger(f'{logger.name}.{title}')
         self.logger.info(f'Initializing DAQ_Viewer: {title}')
 
+        # CT attributes (_ct, _ct_key, _channel, _hw_settings) are initialised
+        # by ControllerThreadModule.__init__ before ParameterControlModule runs.
         super().__init__(listener_class=ViewerActorListener, **kwargs)
 
         self._detector = SelectedModule(daq_type=DAQTypesEnum[daq_type])
@@ -163,6 +171,10 @@ class DAQ_Viewer(ParameterControlModule):
         self._grabing: bool = False
         self._do_bkg: bool = False
         self._take_bkg: bool = False
+
+        self._snap_naverage: int = 1   # CT-path software averaging state
+        self._snap_ind: int = 0
+        self._snap_accum = None
 
         self._grab_done: bool = False
         self._start_grab_time: float = 0.  # used for the refreshing rate
@@ -361,6 +373,74 @@ class DAQ_Viewer(ParameterControlModule):
             for dock in self.ui.viewer_docks:
                 dock.setEnabled(True)
 
+    # -------------------------------------------------------------------------
+    # ControllerThreadModule hooks
+    # -------------------------------------------------------------------------
+
+    def _get_plugin_class(self) -> type:
+        """Return the detector plugin class for the currently selected detector."""
+        _, class_ = get_viewer_plugins(
+            self._detector.daq_type.name,
+            self._detector.module_name,
+        )
+        return class_
+
+    def _connect_ct_signals(self, ct: 'ControllerThread') -> None:
+        ct.data_ready.connect(self._on_ct_data_ready)
+        self._start_grab_request.connect(ct.start_grab)
+        self._snap_request.connect(ct.request_snap)
+
+    def _disconnect_ct_signals(self, ct: 'ControllerThread') -> None:
+        try:
+            ct.data_ready.disconnect(self._on_ct_data_ready)
+            self._start_grab_request.disconnect(ct.start_grab)
+            self._snap_request.disconnect(ct.request_snap)
+        except Exception:
+            pass
+
+    def _on_hardware_connected(self) -> None:
+        """Enable viewer docks when hardware comes up."""
+        if self.ui is not None:
+            for dock in self.ui.viewer_docks:
+                dock.setEnabled(True)
+
+    @Slot(str, object, bool)
+    def _on_ct_data_ready(self, channel: str, dte, is_temp: bool) -> None:
+        """Receive a DataToExport from ControllerThread and display it.
+
+        ``is_temp=True`` means the plugin emitted an intermediate frame
+        (``dte_signal_temp``); display without triggering grab_done_signal.
+
+        For software averaging (``_snap_naverage > 1``): accumulate across
+        N calls, show intermediates via show_temp_data, call show_data only
+        on the final result.  Each chained grab is requested here.
+        """
+        if channel and channel != self._channel:
+            return
+        if not isinstance(dte, DataToExport):
+            return
+        if is_temp:
+            self.show_temp_data(dte)
+            return
+        if self._snap_naverage > 1:
+            self._snap_ind += 1
+            if self._snap_ind == 1:
+                self._snap_accum = dte.deepcopy()
+            else:
+                self._snap_accum = dte.average(self._snap_accum, self._snap_ind)
+            if self._snap_ind < self._snap_naverage:
+                if self.settings['main_settings', 'show_averaging']:
+                    self.show_temp_data(self._snap_accum)
+                self._snap_request.emit(self._channel, 1)   # request next grab
+            else:
+                accum = self._snap_accum
+                self._snap_naverage = 1
+                self._snap_ind = 0
+                self._snap_accum = None
+                self.show_data(accum)
+        else:
+            self.show_data(dte)
+
     def _quit_cleanup(self):
         if self._lcd is not None:
             try:
@@ -424,6 +504,34 @@ class DAQ_Viewer(ParameterControlModule):
             self.ui.data_ready = False
 
         self._start_grab_time = time.perf_counter()
+
+        if self._ct is not None:
+            # ControllerThread path
+            if snap_state:
+                self.update_status(f'{self._title}: Snap')
+                Naverage = self.settings['main_settings', 'Naverage']
+                try:
+                    hw_avg = getattr(self._get_plugin_class(), 'hardware_averaging', False)
+                except Exception:
+                    hw_avg = False
+                if hw_avg:
+                    self._snap_naverage = 1   # plugin handles it; one data_ready expected
+                    self._snap_request.emit(self._channel, Naverage)
+                else:
+                    self._snap_naverage = Naverage
+                    self._snap_ind = 0
+                    self._snap_accum = None
+                    self._snap_request.emit(self._channel, 1)
+            elif not grab_state:
+                self.update_status(f'{self._title}: Stop Grab')
+                self._stop_grab_request.emit(self._channel)
+            else:
+                self.update_status(f'{self._title}: Continuous Grab')
+                period_ms = self.settings['main_settings', 'refresh_time']
+                self._start_grab_request.emit(self._channel, period_ms)
+            return
+
+        # Legacy DetectorWorker path
         if snap_state:
             self.update_status(f'{self._title}: Snap')
             self.command_hardware.emit(
@@ -467,7 +575,10 @@ class DAQ_Viewer(ParameterControlModule):
     def stop(self):
         """ Stop the current continuous grabbing """
         self.update_status(f'{self._title}: Stop Grab')
-        self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.STOP_GRAB, ))
+        if self._ct is not None:
+            self._stop_grab_request.emit(self._channel)
+        else:
+            self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.STOP_GRAB, ))
         self._grabing = False
 
     # -------------------------------------------------------------------------
@@ -838,6 +949,7 @@ class DAQ_Viewer(ParameterControlModule):
 
     def _module_value_changed(self, param: Parameter):
         """Handle detector-specific parameter changes."""
+        super()._module_value_changed(param)  # CT settings forwarding (base class)
         path = self.settings.childPath(param)
         if param.name() == 'DAQ_type':
             self.settings.child('saver_settings', 'do_save').setValue(False)
