@@ -73,6 +73,7 @@ class ControllerThreadModule(ParameterControlModule):
         self._ct_key: Optional[ControllerKey] = None
         self._channel: str = ''
         self._hw_settings: Optional[Parameter] = None
+        self._syncing_from_hw: bool = False
         super().__init__(**kwargs)
 
     # ── Helpers ──────────────────────────────────────────────────────────────
@@ -148,7 +149,6 @@ class ControllerThreadModule(ParameterControlModule):
             ct.hardware_status.connect(self._on_hardware_status)
             ct.status_message.connect(self.update_status)
             ct.settings_changed.connect(self._on_hw_settings_changed)
-            hw_settings.sigTreeStateChanged.connect(self._relay_hw_settings_change)
 
             self._read_request.connect(ct.request_read)
             self._stop_grab_request.connect(ct.stop_grab)
@@ -183,10 +183,6 @@ class ControllerThreadModule(ParameterControlModule):
                 pass
             self._ct = None
         if self._hw_settings is not None:
-            try:
-                self._hw_settings.sigTreeStateChanged.disconnect(self._relay_hw_settings_change)
-            except Exception:
-                pass
             self._hw_settings = None
         if self._ct_key is not None:
             ControllerRegistry.get().detach(self._ct_key, subscriber=self)
@@ -246,6 +242,15 @@ class ControllerThreadModule(ParameterControlModule):
                 self._hw_settings.child(*path).setValue(data)
             except Exception:
                 pass
+        # Mirror into local display so the module's own settings widget stays
+        # in sync when another subscriber (or the plugin itself) changed a value.
+        self._syncing_from_hw = True
+        try:
+            self.settings.child(self._hw_settings_name, *path).setValue(data)
+        except Exception:
+            pass
+        finally:
+            self._syncing_from_hw = False
 
     def _module_value_changed(self, param: 'Parameter'):
         """Forward hw_settings edits from this module to the hardware thread.
@@ -254,6 +259,8 @@ class ControllerThreadModule(ParameterControlModule):
         other subscribers (e.g. another axis on the same controller) stay in sync.
         Per-channel params (in _PER_CHANNEL_PARAMS) are not mirrored.
         """
+        if getattr(self, '_syncing_from_hw', False):
+            return
         if self._ct is not None:
             hw_subtree = self.settings.child(self._hw_settings_name)
             hw_path = hw_subtree.childPath(param)

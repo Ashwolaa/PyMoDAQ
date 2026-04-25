@@ -91,10 +91,14 @@ class DAQ_Move(ControllerThreadModule):
     _hw_kind = 'actuator'
     _ini_hw_cmd = ControlToHardware.INI_HARDWARE
 
-    # Per-channel params: each DAQ_Move axis owns its own axis selector, units,
-    # and epsilon.  ('controller', 'axis') uses a full path tuple so only that
-    # leaf is per-channel, not the entire 'controller' group.
-    _PER_CHANNEL_PARAMS: frozenset = frozenset({'units', 'epsilon', ('controller', 'axis')})
+    # Per-channel (per-DAQ-module) params: each axis owns its own values for
+    # these and they are never relayed to the shared ControllerThread or
+    # mirrored to hw_settings.  ('controller', 'axis') uses a full path tuple
+    # so only that leaf is per-channel, not the entire 'controller' group.
+    _PER_CHANNEL_PARAMS: frozenset = frozenset({
+        'units', 'epsilon', 'timeout', 'bounds', 'scaling',
+        ('controller', 'axis'),
+    })
 
     move_done_signal = Signal(DataActuator)
     current_value_signal = Signal(DataActuator)

@@ -640,6 +640,13 @@ class ControllerThread(QObject):
         if channel and hasattr(self._plugin, 'axis_name'):
             if self._plugin.axis_name != channel:
                 self._plugin.axis_name = channel
+                # _current_value may carry units from the previous axis; refresh it
+                # so check_target_reached can subtract current from target without a
+                # pint DimensionalityError.
+                try:
+                    self._plugin.get_actuator_value()
+                except Exception:
+                    pass
 
         if value is ControlCommand.STOP:
             # Stop polling first so the timer does not fire during/after the abort.

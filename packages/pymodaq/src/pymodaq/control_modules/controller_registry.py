@@ -44,7 +44,17 @@ if TYPE_CHECKING:
     from pymodaq_gui.parameter import Parameter
 
 
-__all__ = ['ControllerKey', 'ControllerRegistry']
+__all__ = ['ControllerKey', 'ControllerRegistry', 'COMMON_DAQ_PARAM_NAMES']
+
+# Top-level param names injected by comon_parameters / comon_parameters_fun
+# that belong to the DAQ module (per-channel) rather than to the physical
+# hardware.  Used by DAQ_Move._PER_CHANNEL_PARAMS to exclude these from the
+# shared hw_settings relay so each module keeps its own axis/units/epsilon.
+#
+# Limitation: plugin authors must not reuse these names for hardware params.
+COMMON_DAQ_PARAM_NAMES: frozenset = frozenset({
+    'units', 'epsilon', 'timeout', 'bounds', 'scaling', 'controller',
+})
 
 
 @dataclass(frozen=True)
@@ -241,19 +251,24 @@ class ControllerRegistry:
     def _make_settings(
         self, plugin_class: type, params_state: dict | None
     ) -> 'Parameter':
-        """Create the shared ``Parameter`` model.
+        """Create the shared ``Parameter`` model for the plugin.
+
+        All plugin params are included unfiltered.  The CT passes this
+        state to the plugin on init via ``params_state``; stripping children
+        here would cause ``restoreState`` to remove them from the plugin's
+        own settings tree and break hardware initialisation.
 
         Called from :meth:`attach` with the registry lock held.
         The returned object will live in whichever thread calls
         ``acquire`` (expected: GUI thread).
         """
         from pymodaq_gui.parameter import Parameter
-        settings = Parameter.create(
-            name='Settings', type='group',
-            children=getattr(plugin_class, 'params', []),
-        )
+        all_params = getattr(plugin_class, 'params', [])
+        settings = Parameter.create(name='Settings', type='group',
+                                    children=all_params)
         if params_state is not None:
-            settings.restoreState(params_state)
+            settings.restoreState(params_state, addChildren=False,
+                                  removeChildren=False)
         return settings
 
     def _make_thread(self, plugin_class: type, settings: 'Parameter') -> Any:
