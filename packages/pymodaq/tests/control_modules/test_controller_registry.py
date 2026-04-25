@@ -449,3 +449,42 @@ class TestThreadSafety:
 
         assert not errors
         assert not registry.is_known(key)
+
+
+# ---------------------------------------------------------------------------
+# _make_settings (requires Qt)
+# ---------------------------------------------------------------------------
+
+class RealSettingsRegistry(ControllerRegistry):
+    """Uses real _make_settings; injects FakeThread so no hardware starts."""
+
+    def _make_thread(self, plugin_class, settings):
+        return FakeThread()
+
+
+class TestMakeSettings:
+    """ControllerRegistry._make_settings passes all plugin params through."""
+
+    def test_all_params_included(self, qapp):
+        pc = make_plugin_class(params=[
+            {'name': 'voltage', 'type': 'float', 'value': 0.0},
+            {'name': 'speed', 'type': 'float', 'value': 1.0},
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc)
+        names = {ch.name() for ch in hw.children()}
+        assert {'voltage', 'speed'}.issubset(names)
+        reg.close_all()
+
+    def test_params_state_restores_values(self, qapp):
+        pc = make_plugin_class(params=[
+            {'name': 'voltage', 'type': 'float', 'value': 0.0},
+        ])
+        reg = RealSettingsRegistry()
+        from pymodaq_gui.parameter import Parameter
+        dummy = Parameter.create(name='hw', type='group', children=[
+            {'name': 'voltage', 'type': 'float', 'value': 3.3},
+        ])
+        _, hw = reg.attach(key_for(pc), pc, params_state=dummy.saveState())
+        assert hw['voltage'] == 3.3
+        reg.close_all()
