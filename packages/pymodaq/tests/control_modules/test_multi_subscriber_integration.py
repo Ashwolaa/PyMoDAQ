@@ -546,7 +546,7 @@ class FakeThread:
 
 
 class FakeRegistryForIntegration(ControllerRegistry):
-    def _make_settings(self, plugin_class, params_state):
+    def _make_settings(self, plugin_class, params_state, exclude_params=frozenset()):
         class _S:
             def saveState(self): return None
             def child(self, *p): return self

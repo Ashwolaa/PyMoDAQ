@@ -205,18 +205,17 @@ class ExperimentManager(ManagerBase):
 
     @staticmethod
     def _group_plugins_by_id(plugins) -> list:
-        """Group a flat list of plugin dicts by their 'ID' key, sorted by 'status' within each group."""
+        """Group a flat list of plugin dicts by their 'ID' key.
+
+        Plugins that share the same controller_ID are placed in the same
+        sub-list; ordering within each group preserves preset order.
+        ControllerRegistry handles the shared-hardware wiring automatically —
+        no Master/Slave sorting is needed.
+        """
         IDs = list(set(plug["ID"] for plug in plugins))
-        plugins_sorted = []
-        for id in IDs:
-            plug_ids = [plug for plug in plugins if plug["ID"] == id]
-            plug_ids.sort(key=lambda p: p["status"])
-            plugins_sorted.append(plug_ids)
-        return plugins_sorted
+        return [[plug for plug in plugins if plug["ID"] == id] for id in IDs]
 
     def list_control_modules_from_preset(self):
-        # ################################################################
-        # ##### sort plugins by IDs and within the same IDs by Master and Slave status
         plugins = []
         plugins += [
             {"type": ModuleType.Actuator,
@@ -229,7 +228,6 @@ class ExperimentManager(ManagerBase):
         ]
         for plug in plugins:
             plug["ID"] = plug["settings"].child("controller", "controller_ID").value()
-            plug["status"] = plug["settings"].child("controller", "controller_status").value()
 
         plugins_sorted = self._group_plugins_by_id(plugins)
 
@@ -257,14 +255,13 @@ class ExperimentManager(ManagerBase):
         # Add Control Modules to the Dashboard
         ind_module = -1
         for plug_IDs in plugins_sorted:
-            for ind_plugin, plugin in enumerate(plug_IDs):
+            for plugin in plug_IDs:
                 ind_module += 1
                 plug_name = plugin["settings"].child("name").value()
                 plug_type = plugin["settings"].child("info", "type").value()
                 plug_init = plugin["settings"].child("info", "init").value()
 
                 if plugin["type"] == ModuleType.Actuator or plugin["type"] == 'move':
-
                     self.dashboard.add_move(plug_name, None, plug_type, actuator_docks, actuator_widgets,
                                             actuators_modules,
                                             ui_identifier=plugin["settings"].child("info", "ui").value())
@@ -275,28 +272,10 @@ class ExperimentManager(ManagerBase):
                                            detector_docks_viewer, detector_modules,
                                            plug_dim, plug_type)
                     module = detector_modules[-1]
-                    
-                # Early validation for status
-                if (ind_plugin == 0 and plugin["status"] != ControllerStatus.MASTER) or \
-                (ind_plugin != 0 and plugin["status"] != ControllerStatus.SLAVE):
-                    expected_status = ControllerStatus.MASTER if ind_plugin == 0 else ControllerStatus.SLAVE
-                    raise MasterSlaveError(f"The instrument {plug_name} should be defined as {expected_status}")                    
-                
-                # Common initialization logic
+
                 if plug_init:
                     module.apply_controller_parameters(plugin["settings"].child("controller"))
-                    if ind_plugin == 0:
-                        module.master = True
-                        self.dashboard.init_module(module)
-                        master_controller = module.controller
-                    else:
-                        self.dashboard.init_module(module, controller=master_controller)
-                # Master-specific validation
-                elif plugin["status"] == ControllerStatus.MASTER and len(plug_IDs) > 1:
-                    raise MasterSlaveError(
-                        f"The instrument {plug_name} defined as Master has to be initialized "
-                        f"(init checked in the preset) in order to init its associated slave instrument"
-                    )
+                    self.dashboard.init_module(module)
 
                 self.subentries_model.set_status(ind_module, True)
 
@@ -311,30 +290,16 @@ class ExperimentManager(ManagerBase):
         return actuators_modules, detector_modules
 
     def _init_module_master_slave(self, module, ind_plugin, plug_name, plug_init,
-                                   plug_IDs, plugin_status, master_controller=None):
-        """Validate master/slave status and initialize a module (old-preset format).
+                                   plug_IDs, plugin_status=None, master_controller=None):
+        """Initialize a module loaded from an old-format preset.
 
-        Returns the (possibly updated) master_controller.
+        The ``plugin_status`` and ``master_controller`` arguments are kept for
+        call-site compatibility but are no longer used — ControllerRegistry
+        handles controller sharing automatically.
         """
-        if ind_plugin == 0:
-            if plugin_status != "Master":
-                raise MasterSlaveError(f"The instrument {plug_name} should be defined as Master")
-            if plug_init:
-                module.master = True
-                self.dashboard.init_module(module)
-                master_controller = module.controller
-            elif plugin_status == "Master" and len(plug_IDs) > 1:
-                raise MasterSlaveError(
-                    f"The instrument {plug_name} defined as Master has to be "
-                    f"initialized (init checked in the preset) in order to init "
-                    f"its associated slave instrument"
-                )
-        else:
-            if plugin_status != "Slave":
-                raise MasterSlaveError(f"The instrument {plug_name} should be defined as slave")
-            if plug_init:
-                self.dashboard.init_module(module, controller=master_controller)
-        return master_controller
+        if plug_init:
+            self.dashboard.init_module(module)
+        return None
 
     ##### BACKCOMPATIBILITY ###########
     def list_control_modules_from_old_preset(self):
@@ -397,7 +362,6 @@ class ExperimentManager(ManagerBase):
         detector_docks_viewer: list[Dock] = []
         actuator_widgets: list[QtWidgets.QWidget] = []
 
-        master_controller = None
         ind_module = -1
         for plug_IDs in plugins_sorted:
             for ind_plugin, plugin in enumerate(plug_IDs):
@@ -423,10 +387,8 @@ class ExperimentManager(ManagerBase):
                     QtWidgets.QApplication.processEvents()
                     module = detector_modules[-1]
 
-                master_controller = self._init_module_master_slave(
-                    module, ind_plugin, plug_name, plug_init,
-                    plug_IDs, plugin["status"], master_controller,
-                )
+                if plug_init:
+                    self.dashboard.init_module(module)
                 self.subentries_model.set_status(ind_module, True)
 
         QtWidgets.QApplication.processEvents()

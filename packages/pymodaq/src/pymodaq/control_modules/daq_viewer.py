@@ -99,6 +99,7 @@ class DAQ_Viewer(ControllerThreadModule):
     settings_name = 'daq_viewer_settings'
     _hw_kind = 'detector'
     _ini_hw_cmd = ControlToHardware.INI_HARDWARE
+    _PER_CHANNEL_PARAMS: frozenset = frozenset({'channel_settings'})
     custom_sig = Signal(ThreadCommand)  # particular case where DAQ_Viewer is used for a custom module
 
     grab_done_signal = Signal(DataToExport)

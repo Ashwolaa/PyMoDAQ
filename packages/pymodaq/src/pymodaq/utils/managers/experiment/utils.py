@@ -91,10 +91,26 @@ def make_actuator_controller_param(typ: str) -> dict:
                         'DAQ_Move_' + typ)
     params_hardware = getattr(class_, 'params')
 
-    controller_dict = get_param_dict_from_name(params_hardware, 'controller')
-    axis_dict = get_param_dict_from_name(controller_dict['children'], 'axis')
-    axis_names = axis_dict['limits']
-    axis_name = axis_dict['value']
+    # New-style plugins (comon_parameters_fun) put 'axis' inside 'axis_settings',
+    # not inside 'controller'.  Try axis_settings first, then fall back to
+    # the old location inside controller.
+    axis_dict = None
+    axis_settings_dict = get_param_dict_from_name(params_hardware, 'axis_settings')
+    if axis_settings_dict is not None:
+        axis_dict = get_param_dict_from_name(axis_settings_dict.get('children', []), 'axis')
+
+    if axis_dict is None:
+        controller_dict = get_param_dict_from_name(params_hardware, 'controller')
+        if controller_dict is not None:
+            axis_dict = get_param_dict_from_name(controller_dict.get('children', []), 'axis')
+
+    if axis_dict is not None:
+        axis_names = axis_dict['limits']
+        axis_name = axis_dict['value']
+    else:
+        axis_names = None
+        axis_name = None
+
     controller_dict = create_controller_param(axis_name=axis_name, axis_names=axis_names)
     controller_dict['expanded'] = False
     return controller_dict

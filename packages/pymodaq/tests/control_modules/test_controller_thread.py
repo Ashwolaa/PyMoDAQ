@@ -98,7 +98,7 @@ def make_thread(plugin_instance: MockPlugin | None = None) -> tuple[ControllerTh
     if plugin_instance is None:
         plugin_instance = MockPlugin()
     plugin_cls = make_plugin_class(plugin_instance)
-    thread_obj = ControllerThread(plugin_class=plugin_cls, settings=FakeSettings())
+    thread_obj = ControllerThread(plugin_class=plugin_cls, params_state=None)
     return thread_obj, plugin_instance
 
 
@@ -134,10 +134,12 @@ class TestIniHardware:
         thread_obj.ini_hardware()
         assert plugin.open_called_with is not None
 
-    def test_ini_passes_settings_to_open(self, qapp):
+    def test_ini_passes_plugin_settings_to_open(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
-        assert isinstance(plugin.open_called_with, FakeSettings)
+        # Plugin receives the hardware-thread-owned _plugin_settings Parameter,
+        # not the shared GUI-thread hw_settings.
+        assert plugin.open_called_with is thread_obj._plugin_settings
 
     def test_ini_stores_plugin_instance(self, qapp):
         thread_obj, plugin = make_thread()
@@ -445,10 +447,11 @@ class TestUpdateSettings:
     def test_update_settings_calls_commit_settings(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
-        thread_obj.update_settings(['param', 'value'], 42, 'value')
-        # commit_settings receives the Parameter node looked up from hw_settings
+        # path=[] means root _plugin_settings node — always present regardless of params.
+        thread_obj.update_settings([], 42, 'value')
+        # commit_settings receives the root _plugin_settings Parameter node.
         assert len(plugin.commit_calls) == 1
-        assert plugin.commit_calls[0] is not None  # a FakeSettings child
+        assert plugin.commit_calls[0] is thread_obj._plugin_settings
 
     def test_update_settings_before_ini_is_noop(self, qapp):
         thread_obj, plugin = make_thread()
@@ -467,10 +470,100 @@ class TestUpdateSettings:
         instance = _PluginNoCommit()
         thread_obj = ControllerThread(
             plugin_class=make_plugin_class(instance),
-            settings=FakeSettings(),
+            params_state=None,
         )
         thread_obj.ini_hardware()
         thread_obj.update_settings(['param'], 1, 'value')  # must not raise
+
+
+class TestTranslateModulePath:
+    """ControllerThread._translate_module_path_to_plugin maps module paths to plugin paths.
+
+    Tests inject _plugin_settings directly rather than going through ini_hardware,
+    which avoids the complexity of old-style plugin lifecycle support.
+    """
+
+    def _make_thread_with_flat_settings(self, qapp):
+        """Return a thread whose _plugin_settings has flat (old-style) layout."""
+        from pymodaq_gui.parameter import Parameter
+        thread_obj, plugin = make_thread()
+        thread_obj.ini_hardware()
+        thread_obj._plugin_settings = Parameter.create(name='Settings', type='group', children=[
+            {'name': 'controller', 'type': 'group', 'children': [
+                {'name': 'controller_ID', 'type': 'int', 'value': 0},
+                {'name': 'axis', 'type': 'list', 'limits': ['X', 'Y'], 'value': 'X'},
+            ]},
+            {'name': 'units', 'type': 'str', 'value': ''},
+            {'name': 'epsilon', 'type': 'float', 'value': 0.01},
+            {'name': 'timeout', 'type': 'int', 'value': 10},
+        ])
+        return thread_obj, plugin
+
+    def _make_thread_with_new_style_settings(self, qapp):
+        """Return a thread whose _plugin_settings already has axis_settings group."""
+        from pymodaq_gui.parameter import Parameter
+        thread_obj, plugin = make_thread()
+        thread_obj.ini_hardware()
+        thread_obj._plugin_settings = Parameter.create(name='Settings', type='group', children=[
+            {'name': 'controller', 'type': 'group', 'children': [
+                {'name': 'controller_ID', 'type': 'int', 'value': 0},
+            ]},
+            {'name': 'axis_settings', 'type': 'group', 'children': [
+                {'name': 'axis', 'type': 'list', 'limits': ['X', 'Y'], 'value': 'X'},
+                {'name': 'units', 'type': 'str', 'value': ''},
+            ]},
+        ])
+        return thread_obj, plugin
+
+    def test_non_axis_settings_path_unchanged(self, qapp):
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['controller', 'controller_ID']) == \
+               ['controller', 'controller_ID']
+
+    def test_empty_path_unchanged(self, qapp):
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        assert thread._translate_module_path_to_plugin([]) == []
+
+    def test_flat_plugin_axis_translated(self, qapp):
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['axis_settings', 'axis']) == \
+               ['controller', 'axis']
+
+    def test_flat_plugin_units_translated(self, qapp):
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['axis_settings', 'units']) == ['units']
+
+    def test_flat_plugin_epsilon_translated(self, qapp):
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['axis_settings', 'epsilon']) == ['epsilon']
+
+    def test_flat_plugin_timeout_translated(self, qapp):
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['axis_settings', 'timeout']) == ['timeout']
+
+    def test_new_style_plugin_axis_unchanged(self, qapp):
+        thread, _ = self._make_thread_with_new_style_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['axis_settings', 'axis']) == \
+               ['axis_settings', 'axis']
+
+    def test_new_style_plugin_units_unchanged(self, qapp):
+        thread, _ = self._make_thread_with_new_style_settings(qapp)
+        assert thread._translate_module_path_to_plugin(['axis_settings', 'units']) == \
+               ['axis_settings', 'units']
+
+    def test_update_settings_reaches_flat_axis(self, qapp):
+        """Axis update via module path actually lands on the plugin's controller/axis."""
+        thread, _ = self._make_thread_with_flat_settings(qapp)
+        thread.update_settings(['axis_settings', 'axis'], 'Y', 'value')
+        assert thread._plugin_settings['controller', 'axis'] == 'Y'
+
+    def test_update_settings_calls_commit_with_axis_param(self, qapp):
+        """After path translation, commit_settings receives the axis Parameter node."""
+        from pymodaq_gui.parameter import Parameter
+        thread, plugin = self._make_thread_with_flat_settings(qapp)
+        thread.update_settings(['axis_settings', 'axis'], 'Y', 'value')
+        assert len(plugin.commit_calls) == 1
+        assert plugin.commit_calls[0].name() == 'axis'
 
 
 # ---------------------------------------------------------------------------
@@ -621,7 +714,7 @@ def make_old_style_thread() -> tuple['ControllerThread', OldStyleActuatorPlugin]
 
     _PluginClass.__name__ = 'OldStyleActuatorPlugin'
 
-    thread_obj = ControllerThread(plugin_class=_PluginClass, settings=FakeSettings())
+    thread_obj = ControllerThread(plugin_class=_PluginClass, params_state=None)
     return thread_obj, plugin_instance
 
 
@@ -821,7 +914,7 @@ class TestToPluginUnits:
                 plugin_instance.parent = parent
                 return plugin_instance
 
-        thread_obj = ControllerThread(plugin_class=_PluginClass, settings=FakeSettings())
+        thread_obj = ControllerThread(plugin_class=_PluginClass, params_state=None)
         thread_obj.ini_hardware()
         fa = FakeDataActuator(42.0, 'm')
         thread_obj.request_write('axis_x', fa)
@@ -920,7 +1013,7 @@ def make_old_style_detector_thread() -> tuple['ControllerThread', OldStyleDetect
 
     _PluginClass.__name__ = 'OldStyleDetectorPlugin'
 
-    thread_obj = ControllerThread(plugin_class=_PluginClass, settings=FakeSettings())
+    thread_obj = ControllerThread(plugin_class=_PluginClass, params_state=None)
     return thread_obj, plugin_instance
 
 
@@ -1113,3 +1206,462 @@ class TestRequestSnap:
         assert received_naverage[0] == 5
         assert collector.count == 1
         assert collector.last()[2] is False  # is_temp=False — single final emission
+
+
+# ---------------------------------------------------------------------------
+# Combined plugin mock
+# ---------------------------------------------------------------------------
+
+class CombinedPlugin:
+    """Plugin with both ini_stage and ini_detector on one SDK object.
+
+    Represents instruments that move and acquire data (e.g. a piezo stage
+    with a built-in position sensor).
+    """
+
+    axis_name = 'axis_x'
+    axis_unit = 'mm'
+    hardware_averaging = False
+
+    class _FakeTimer:
+        def stop(self): pass
+
+    def __init__(self, parent=None, params_state=None):
+        self.parent = parent
+        self.controller = object()
+        self._stage_calls = 0
+        self._detector_calls = 0
+        self._read_calls = 0
+        self._grab_calls = 0
+        self._move_calls: list = []
+        self.move_is_done = False
+        self._dte_listeners: list = []
+        self._move_done_listeners: list = []
+        self.poll_timer = self._FakeTimer()
+
+    class _DTESig:
+        def __init__(self, listeners):
+            self._listeners = listeners
+        def connect(self, fn):
+            self._listeners.append(fn)
+
+    class _MoveSig:
+        def __init__(self, plugin):
+            self._plugin = plugin
+        def connect(self, fn):
+            self._plugin._move_done_listeners.append(fn)
+
+    @property
+    def dte_signal(self):
+        return self._DTESig(self._dte_listeners)
+
+    @property
+    def move_done_signal(self):
+        return self._MoveSig(self)
+
+    def _emit_dte(self, dte=None):
+        dte = dte or FAKE_DTE_DETECTOR
+        for fn in self._dte_listeners:
+            fn(dte)
+
+    def _emit_move_done(self, value):
+        for fn in self._move_done_listeners:
+            fn(value)
+
+    def ini_stage(self, controller=None):
+        self._stage_calls += 1
+        return 'stage initialized', True
+
+    def ini_detector(self, controller=None):
+        self._detector_calls += 1
+        return 'detector initialized', True
+
+    def close(self):
+        pass
+
+    def get_actuator_value(self):
+        self._read_calls += 1
+        return FakeDataActuator(1.0)
+
+    def move_abs(self, value):
+        self._move_calls.append(('abs', value))
+
+    def move_home(self):
+        self._move_calls.append(('home', None))
+
+    def stop_motion(self):
+        self._move_calls.append(('stop', None))
+        self._emit_move_done(FakeDataActuator(0.0))
+
+    def poll_moving(self):
+        self._emit_move_done(FakeDataActuator(0.0))
+
+    def grab_data(self, Naverage=1, **kwargs):
+        self._grab_calls += 1
+        self._emit_dte()
+
+    def stop(self):
+        pass
+
+    def commit_settings(self, param):
+        pass
+
+
+def make_combined_thread() -> tuple['ControllerThread', CombinedPlugin]:
+    """Return a (ControllerThread, CombinedPlugin) pair, not yet initialised."""
+    plugin_instance = CombinedPlugin()
+
+    class _PluginClass(CombinedPlugin):
+        def __new__(cls, parent=None, params_state=None):
+            plugin_instance.parent = parent
+            return plugin_instance
+
+    _PluginClass.__name__ = 'CombinedPlugin'
+
+    thread_obj = ControllerThread(plugin_class=_PluginClass, params_state=None)
+    return thread_obj, plugin_instance
+
+
+# ---------------------------------------------------------------------------
+# Combined plugin tests
+# ---------------------------------------------------------------------------
+
+class TestCombinedPlugin:
+
+    def test_ini_calls_both_ini_stage_and_ini_detector(self, qapp):
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+        assert plugin._stage_calls == 1
+        assert plugin._detector_calls == 1
+
+    def test_ini_emits_hardware_status_true(self, qapp):
+        thread_obj, plugin = make_combined_thread()
+        collector = Collector()
+        thread_obj.hardware_status.connect(collector)
+        thread_obj.ini_hardware()
+        assert collector.last()[0] is True
+
+    def test_is_combined_detected(self, qapp):
+        thread_obj, _ = make_combined_thread()
+        assert thread_obj._is_combined()
+        assert thread_obj._is_old_style_actuator()
+        assert thread_obj._is_old_style_detector()
+        assert not thread_obj._is_new_style()
+
+    def test_actuator_group_reads_position_not_grab(self, qapp):
+        """group with role='actuator' calls get_actuator_value, not grab_data."""
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+        thread_obj.start_grab('axis_x', 100.0, group='actuator', role='actuator')
+        thread_obj._on_group_tick('actuator')
+        thread_obj.stop_grab('axis_x')
+        assert plugin._read_calls >= 1
+        assert plugin._grab_calls == 0
+
+    def test_detector_group_calls_grab_data(self, qapp):
+        """group with role='detector' calls grab_data, not get_actuator_value."""
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+        thread_obj.start_grab('image', 500.0, group='detector', role='detector')
+        thread_obj._on_group_tick('detector')
+        thread_obj.stop_grab('image')
+        assert plugin._grab_calls >= 1
+        assert plugin._read_calls == 0
+
+    def test_detector_grab_in_flight_does_not_block_actuator_group(self, qapp):
+        """A detector grab in-flight must never block actuator position reads."""
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+
+        # Override grab_data so it never emits dte_signal — simulates async hardware.
+        def slow_grab(Naverage=1, **kwargs):
+            plugin._grab_calls += 1
+        plugin.grab_data = slow_grab
+
+        thread_obj.start_grab('image', 500.0, group='detector', role='detector')
+        thread_obj._on_group_tick('detector')   # sets _grab_in_flight = True
+        assert thread_obj._grab_in_flight is True
+
+        thread_obj.start_grab('axis_x', 100.0, group='actuator', role='actuator')
+        reads_before = plugin._read_calls
+        thread_obj._on_group_tick('actuator')   # must NOT be blocked
+        assert plugin._read_calls > reads_before
+
+        thread_obj.stop_grab('image')
+        thread_obj.stop_grab('axis_x')
+
+    def test_auto_role_combined_defaults_to_detector(self, qapp):
+        """role='auto' on a combined plugin resolves to detector (safe default)."""
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+        thread_obj.start_grab('ch', 100.0, group='', role='auto')
+        thread_obj._on_group_tick('')
+        thread_obj.stop_grab('ch')
+        assert plugin._grab_calls >= 1
+        assert plugin._read_calls == 0
+
+    def test_actuator_group_emits_data_ready(self, qapp):
+        """Actuator group tick must emit data_ready with the correct channel."""
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+        collector = Collector()
+        thread_obj.data_ready.connect(collector)
+        thread_obj.start_grab('axis_x', 100.0, group='actuator', role='actuator')
+        thread_obj._on_group_tick('actuator')
+        thread_obj.stop_grab('axis_x')
+        assert collector.count >= 1
+        channel, _, is_temp = collector.last()
+        assert channel == 'axis_x'
+        assert is_temp is False
+
+    def test_detector_group_emits_data_ready(self, qapp):
+        """Detector group tick must emit data_ready for each channel in the group."""
+        thread_obj, plugin = make_combined_thread()
+        thread_obj.ini_hardware()
+        collector = Collector()
+        thread_obj.data_ready.connect(collector)
+        thread_obj.start_grab('image', 500.0, group='detector', role='detector')
+        thread_obj._on_group_tick('detector')
+        thread_obj.stop_grab('image')
+        assert collector.count >= 1
+        channel, dte, is_temp = collector.last()
+        assert channel == 'image'
+        assert is_temp is False
+
+
+# ---------------------------------------------------------------------------
+# Multi-axis actuator: axis-switching suppression (spinbox-selection regression)
+# ---------------------------------------------------------------------------
+
+class MultiAxisActuatorPlugin:
+    """Old-style actuator with two axes and per-axis units.
+
+    Simulates the real ``DAQ_Move_base.axis_name.setter`` side effect:
+    every axis switch fires ``parent.status_sig.emit(ThreadCommand('units', unit))``
+    — the path that was causing set_unit_as_suffix → setOpts → updateText →
+    lineEdit.setText to clear the user's spinbox selection on every refresh cycle.
+    """
+
+    _AXES = ['X', 'Y']
+    _UNITS = {'X': 'µm', 'Y': 'mm'}
+
+    class _FakeTimer:
+        def stop(self): pass
+
+    class _Sig:
+        def __init__(self, plugin):
+            self._plugin = plugin
+        def connect(self, fn):
+            self._plugin._move_done_listeners.append(fn)
+
+    def __init__(self, parent=None, params_state=None):
+        self.parent = parent
+        self._axis = 'X'
+        self.controller = object()
+        self.move_is_done = False
+        self._read_calls = 0
+        self._move_done_listeners: list = []
+        self.poll_timer = self._FakeTimer()
+
+    # ── axis_name with side-effect ────────────────────────────────────────
+
+    @property
+    def axis_name(self) -> str:
+        return self._axis
+
+    @axis_name.setter
+    def axis_name(self, name: str):
+        if name in self._AXES:
+            self._axis = name
+            if self.parent is not None:
+                from pymodaq_utils.utils import ThreadCommand
+                self.parent.status_sig.emit(ThreadCommand('units', self._UNITS[name]))
+
+    @property
+    def axis_unit(self) -> str:
+        return self._UNITS[self._axis]
+
+    # ── old-style plugin API ──────────────────────────────────────────────
+
+    @property
+    def move_done_signal(self):
+        return self._Sig(self)
+
+    def ini_stage(self, controller=None):
+        return 'initialized', True
+
+    def close(self):
+        pass
+
+    def get_actuator_value(self):
+        self._read_calls += 1
+        return FakeDataActuator(1.0)
+
+    def move_abs(self, value):
+        pass
+
+    def move_home(self):
+        pass
+
+    def stop_motion(self):
+        for fn in self._move_done_listeners:
+            fn(FakeDataActuator(0.0))
+
+    def poll_moving(self):
+        for fn in self._move_done_listeners:
+            fn(FakeDataActuator(1.0))
+
+    def commit_settings(self, param):
+        pass
+
+
+def make_multi_axis_thread():
+    plugin_instance = MultiAxisActuatorPlugin()
+
+    class _PluginClass(MultiAxisActuatorPlugin):
+        def __new__(cls, parent=None, params_state=None):
+            plugin_instance.parent = parent
+            return plugin_instance
+
+    _PluginClass.__name__ = 'MultiAxisActuatorPlugin'
+    thread_obj = ControllerThread(plugin_class=_PluginClass, params_state=None)
+    return thread_obj, plugin_instance
+
+
+class TestAxisSwitchingSuppression:
+    """Regression tests for the spinbox-selection-clearing bug.
+
+    Root cause: on every refresh cycle, _read_old_style_actuator switches
+    plugin.axis_name, whose setter calls status_sig.emit('units', unit).
+    _StatusSig.emit forwarded that as settings_changed → _update_units_ui →
+    set_unit_as_suffix → setOpts → updateText → lineEdit.setText, which
+    clears the active text selection in the target-position spinbox.
+
+    Fix: _axis_switching flag suppresses all plugin events during the switch;
+    _emit_channel_state re-emits units once after the switch.
+    The set_unit_as_suffix guard prevents setOpts from firing when the suffix
+    has not actually changed (making subsequent re-emissions no-ops in the UI).
+    """
+
+    def test_axis_switching_flag_false_after_read(self, qapp):
+        """_axis_switching must be cleared even when an exception escapes the setter."""
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+        thread_obj.request_read('Y')
+        assert thread_obj._axis_switching is False
+
+    def test_status_sig_units_not_forwarded_while_switching(self, qapp):
+        """Units emitted via status_sig while _axis_switching is True must be
+        swallowed — no settings_changed signal reaches the GUI."""
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+        sc = Collector()
+        thread_obj.settings_changed.connect(sc)
+
+        thread_obj._axis_switching = True
+        from pymodaq_utils.utils import ThreadCommand
+        plugin.parent.status_sig.emit(ThreadCommand('units', 'mm'))
+
+        assert sc.count == 0, "settings_changed must not fire while _axis_switching"
+
+    def test_emit_channel_state_sends_settings_changed_for_units(self, qapp):
+        """_emit_channel_state must emit settings_changed carrying the correct
+        units for the channel that was just switched to."""
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+
+        # Manually place plugin on axis Y so axis_unit returns the Y unit.
+        plugin._axis = 'Y'
+
+        sc = Collector()
+        thread_obj.settings_changed.connect(sc)
+        thread_obj._emit_channel_state('Y')
+
+        assert sc.count == 1
+        channel, path, data, change = sc.last()
+        assert channel == 'Y'
+        assert path == ['units']
+        assert data == 'mm'
+        assert change == 'value'
+
+    def test_no_spurious_settings_changed_when_axis_unchanged(self, qapp):
+        """Reading the same channel repeatedly must not emit settings_changed at all
+        (axis_name.setter is never called when the axis is already correct)."""
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+        sc = Collector()
+        thread_obj.settings_changed.connect(sc)
+
+        # Plugin starts on 'X'; read 'X' three times — no switch, no emission.
+        thread_obj.request_read('X')
+        thread_obj.request_read('X')
+        thread_obj.request_read('X')
+
+        assert sc.count == 0
+
+    def test_alternating_reads_emit_exactly_one_settings_changed_per_switch(self, qapp):
+        """Each axis switch must produce exactly one settings_changed (from
+        _emit_channel_state), never the multiple emissions that the old code
+        produced via _StatusSig.emit for every read cycle.
+
+        Before the fix: every X→Y switch fired settings_changed twice
+        (once from _StatusSig, once — indirectly — from plugin.settings change),
+        causing lineEdit.setText to clear the spinbox selection on every tick.
+        After the fix: exactly one emission per switch, from _emit_channel_state.
+        """
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+        sc = Collector()
+        thread_obj.settings_changed.connect(sc)
+
+        # Read X: no axis switch (already on X), no emission.
+        thread_obj.request_read('X')
+        assert sc.count == 0, "no switch → no settings_changed"
+
+        # Switch X→Y: exactly one settings_changed(Y, units, mm).
+        thread_obj.request_read('Y')
+        assert sc.count == 1, "X→Y switch must emit exactly one settings_changed"
+        ch, path, data, _ = sc.calls[0]
+        assert (ch, path, data) == ('Y', ['units'], 'mm')
+
+        # Switch Y→X: exactly one settings_changed(X, units, µm).
+        thread_obj.request_read('X')
+        assert sc.count == 2, "Y→X switch must emit exactly one settings_changed"
+        ch, path, data, _ = sc.calls[1]
+        assert (ch, path, data) == ('X', ['units'], 'µm')
+
+        # Second X→Y: exactly one more settings_changed.
+        thread_obj.request_read('Y')
+        assert sc.count == 3, "second X→Y switch must emit exactly one settings_changed"
+
+    def test_write_axis_switch_also_suppressed(self, qapp):
+        """_write_old_style_actuator switches axis_name too; that switch must
+        also be suppressed and re-emitted cleanly."""
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+        sc = Collector()
+        thread_obj.settings_changed.connect(sc)
+
+        # Move on Y while plugin is on X → triggers axis switch X→Y.
+        thread_obj.request_write('Y', FakeDataActuator(5.0))
+
+        # Exactly one settings_changed from _emit_channel_state, none from status_sig.
+        units_changes = [c for c in sc.calls if c[1] == ['units']]
+        assert len(units_changes) == 1
+        ch, path, data, _ = units_changes[0]
+        assert (ch, path, data) == ('Y', ['units'], 'mm')
+
+    def test_data_ready_still_emitted_after_suppressed_switch(self, qapp):
+        """The suppression must not block data_ready — the position value must
+        always arrive at subscribers after an axis switch."""
+        thread_obj, plugin = make_multi_axis_thread()
+        thread_obj.ini_hardware()
+        dr = Collector()
+        thread_obj.data_ready.connect(dr)
+
+        thread_obj.request_read('Y')   # axis switch X→Y
+
+        assert dr.count == 1
+        channel, _, is_temp = dr.last()
+        assert channel == 'Y'
+        assert is_temp is False

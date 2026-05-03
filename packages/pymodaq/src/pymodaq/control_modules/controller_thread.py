@@ -47,13 +47,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
-from qtpy.QtCore import QObject, Signal, Slot, QTimer
+from qtpy.QtCore import QObject, Signal, Slot, QTimer, QSignalBlocker
 
 from pymodaq_utils.utils import ThreadCommand
 
 if TYPE_CHECKING:
     from pymodaq_gui.parameter import Parameter
     from pymodaq.control_modules.move_utility_classes import DataActuatorType
+
+_UNSET = object()  # sentinel for _params_state default
 
 __all__ = ['ControllerThread', 'ControlCommand']
 
@@ -99,9 +101,17 @@ class _ReadGroup:
     handled by the CT-level ``_grab_in_flight`` flag, not per-group.
     ``_pending_group`` on the CT records which group triggered the current
     grab so ``_on_detector_data_ready`` can fan out to the right channels.
+
+    role : str
+        Dispatch key for hardware reads: ``'auto'`` (resolve from plugin type),
+        ``'actuator'`` (always call ``get_actuator_value``), or
+        ``'detector'`` (always call ``grab_data``).  Explicit roles are
+        required for combined plugins where a single plugin instance exposes
+        both interfaces; ``'auto'`` is correct for single-role plugins.
     """
     channels: dict  # str → _ChannelState; plain dict avoids dataclass field issues
     timer: Any = None           # QTimer | None
+    role: str = 'auto'          # 'auto' | 'actuator' | 'detector'
 
     @property
     def period_ms(self) -> float:
@@ -143,6 +153,8 @@ class _StatusSig:
         the shared hw_settings Parameter.  All other text is forwarded as
         ``status_message``.
         """
+        if self._ct._axis_switching:
+            return  # suppress all side-effects while switching axis for a read/write
         attr = cmd.attribute
         command = cmd.command          # may be str or StrEnum (compares equal to str)
 
@@ -215,11 +227,12 @@ class ControllerThread(QObject):
     settings_changed    = Signal(str, list, object, str)  # (channel, path, data, change)
     capabilities_signal = Signal(object)             # Capabilities
 
-    def __init__(self, plugin_class: type, settings: 'Parameter') -> None:
+    def __init__(self, plugin_class: type, params_state: dict | None = None) -> None:
         super().__init__()
         self._plugin_class = plugin_class
-        self._settings_ref = settings           # shared hw_settings (GUI thread)
+        self._params_state: dict | None = params_state  # initial config dict (safe across threads)
         self._plugin: Any = None
+        self._plugin_settings: Any = None              # plugin's working Parameter (hardware thread)
         self._controller: Any = None            # shared SDK object
         # ── Grab-timer state ─────────────────────────────────────────────────
         # Named groups: each _ReadGroup owns one QTimer + grab_in_flight guard.
@@ -227,7 +240,8 @@ class ControllerThread(QObject):
         # group='detector', group='actuator', etc. for combined instruments.
         self._groups: dict[str, _ReadGroup] = {}
         # Solo channels: group=None; each gets its own independent QTimer.
-        self._solo: dict[str, tuple[_ChannelState, QTimer]] = {}
+        # Tuple layout: (ChannelState, QTimer, role_str)
+        self._solo: dict[str, tuple[_ChannelState, Any, str]] = {}
         # _grab_in_flight serialises grab_data() calls across ALL modes (group
         # timers, solo timers, snaps).  Only one grab_data() can be outstanding
         # at a time per plugin instance.
@@ -237,6 +251,86 @@ class ControllerThread(QObject):
         # None means solo or snap; _pending_channel holds the channel in that case.
         self._pending_group: str | None = None
         self._pending_channel: str = ''         # channel of in-flight move/grab
+        # Set to True while switching axis_name for a read/write so that
+        # spurious settings_changed emissions (units, epsilon side effects
+        # of axis_name.setter) are not forwarded to the GUI subscribers.
+        self._axis_switching: bool = False
+
+    # ── Plugin settings helpers ──────────────────────────────────────────────
+
+    def _plugin_params_state(self) -> dict | None:
+        """Return params_state with the 'name' key removed.
+
+        The module's params_state has ``name='actuator_settings'`` (or
+        ``'detector_settings'``).  Passing it unchanged to a plugin's
+        ``__init__`` causes ``Parameter.restoreState`` to rename the
+        plugin's root parameter from ``'Settings'`` to
+        ``'actuator_settings'``.  Any subsequent ``settings.child('units')``
+        call (flat path used by old-style plugins) then raises::
+
+            ParameterError: Parameter actuator_settings has no child named units
+
+        Stripping ``'name'`` prevents the rename; the plugin's root stays
+        ``'Settings'`` and per-channel lookup paths resolve correctly.
+        """
+        state = self._params_state
+        if isinstance(state, dict) and 'name' in state:
+            return {k: v for k, v in state.items() if k != 'name'}
+        return state
+
+    def _create_plugin_settings(self) -> 'Parameter':
+        """Create a fresh Parameter in the hardware thread for new-style plugins.
+
+        Old-style plugins create their own ``self.settings`` in ``__init__``;
+        this method is only needed for new-style plugins that receive a
+        settings object via ``plugin.open(settings)``.
+        """
+        from pymodaq_gui.parameter import Parameter
+        all_params = getattr(self._plugin_class, 'params', [])
+        s = Parameter.create(name='Settings', type='group', children=all_params)
+        if self._params_state is not None:
+            s.restoreState(self._params_state, addChildren=False, removeChildren=False)
+        s.sigTreeStateChanged.connect(self._on_plugin_settings_changed)
+        return s
+
+    # Paths that should never be echoed back via settings_changed because they
+    # are module-controlled (each DAQ_Move picks its own axis independently).
+    _AXIS_PATHS: frozenset = frozenset({
+        ('controller', 'axis'),
+        ('axis_settings', 'axis'),
+    })
+
+    def _on_plugin_settings_changed(self, param: object, changes: list) -> None:
+        """Relay plugin settings changes to the GUI thread via settings_changed.
+
+        Runs in the hardware thread (direct connection from hardware-thread
+        Parameter).  Qt's queued delivery carries settings_changed to GUI.
+
+        Axis-selector paths are excluded: they are set by each DAQ_Move
+        independently and must not be echoed back, which would otherwise
+        overwrite another module's axis choice whenever the CT switches axes.
+        """
+        if self._plugin_settings is None or self._axis_switching:
+            return
+        for p, change, data in changes:
+            path = self._plugin_settings.childPath(p)
+            if path and change == 'value':
+                if tuple(path) in self._AXIS_PATHS:
+                    continue
+                channel = getattr(self._plugin, 'axis_name', '') if self._plugin else ''
+                self.settings_changed.emit(channel, list(path), data, change)
+
+    def _connect_plugin_settings(self, plugin: object) -> None:
+        """Wire an old-style plugin's own settings tree into the CT relay.
+
+        Called after plugin construction but before ``ini_stage`` /
+        ``ini_detector`` so that any settings writes during hardware init
+        are captured and forwarded to the GUI thread.
+        """
+        s = getattr(plugin, 'settings', None)
+        if s is not None:
+            s.sigTreeStateChanged.connect(self._on_plugin_settings_changed)
+            self._plugin_settings = s
 
     # ── Slots ← GUI thread ───────────────────────────────────────────────────
 
@@ -268,11 +362,20 @@ class ControllerThread(QObject):
             if group.timer is not None:
                 group.timer.stop()
         self._groups.clear()
-        for _, (_, timer) in list(self._solo.items()):
+        for _, (_, timer, _) in list(self._solo.items()):
             timer.stop()
         self._solo.clear()
         self._grab_in_flight = False
         self._pending_group = None
+
+        if self._plugin_settings is not None:
+            try:
+                self._plugin_settings.sigTreeStateChanged.disconnect(
+                    self._on_plugin_settings_changed
+                )
+            except Exception:
+                pass
+            self._plugin_settings = None
 
         if self._plugin is not None:
             try:
@@ -352,7 +455,8 @@ class ControllerThread(QObject):
 
     @Slot(str, float)
     @Slot(str, float, str)
-    def start_grab(self, channel: str, period_ms: float, group: str | None = '') -> None:
+    def start_grab(self, channel: str, period_ms: float, group: str | None = '',
+                   role: str = 'auto') -> None:
         """Register a subscriber for periodic reads on *channel*.
 
         Parameters
@@ -370,25 +474,38 @@ class ControllerThread(QObject):
             per tick fans out to all channels in this group.  Suitable for
             multi-axis controllers that return all positions in one SDK call.
 
-            Any other string — a separate group with its own QTimer and its
-            own grab-in-flight guard.  Use distinct group names when parts of
-            a combined instrument need independent polling rates or when
-            actuator polling must not be blocked by a slow detector grab
-            (e.g. ``group='detector'`` vs ``group='actuator'``).
+            Any other string — a separate group with its own QTimer.  Use
+            distinct group names when parts of a combined instrument need
+            independent polling rates (e.g. ``group='detector'`` vs
+            ``group='actuator'``).
 
             ``None`` — solo: the channel gets its own independent QTimer,
             completely decoupled from every other channel.
+        role : str, default 'auto'
+            How to read this channel when the timer fires.  Only relevant for
+            combined plugins (those with both actuator and detector
+            interfaces).
+
+            ``'auto'``     — resolve from plugin type at tick time (correct
+                             for single-role plugins; defaults to
+                             ``'detector'`` for combined plugins).
+            ``'actuator'`` — always call ``get_actuator_value``.
+            ``'detector'`` — always call ``grab_data``.
+
+            The role is fixed when the group is first created; later
+            ``start_grab`` calls that join an existing group do not change
+            its role.
         """
         if group is not None:
             if group not in self._groups:
-                self._groups[group] = _ReadGroup(channels={})
+                self._groups[group] = _ReadGroup(channels={}, role=role)
             rg = self._groups[group]
             state = rg.channels.setdefault(channel, _ChannelState())
             state.subscribe(period_ms)
             self._update_group(group)
         else:
             if channel in self._solo:
-                state, timer = self._solo[channel]
+                state, timer, _role = self._solo[channel]
                 state.subscribe(period_ms)
                 timer.setInterval(int(state.period_ms))
             else:
@@ -398,7 +515,7 @@ class ControllerThread(QObject):
                 timer.setInterval(int(period_ms))
                 timer.timeout.connect(lambda: self._solo_tick(channel))
                 timer.start()
-                self._solo[channel] = (state, timer)
+                self._solo[channel] = (state, timer, role)
 
     @Slot(str)
     def stop_grab(self, channel: str) -> None:
@@ -416,7 +533,7 @@ class ControllerThread(QObject):
                 break
         else:
             if channel in self._solo:
-                state, timer = self._solo[channel]
+                state, timer, _role = self._solo[channel]
                 if state.unsubscribe():
                     timer.stop()
                     del self._solo[channel]
@@ -431,21 +548,94 @@ class ControllerThread(QObject):
                 except Exception:
                     pass
 
+    # Per-channel param names in axis_settings (flat layout for old-style plugins)
+    _FLAT_PER_CHANNEL_NAMES: frozenset = frozenset({'units', 'epsilon', 'timeout', 'bounds', 'scaling'})
+
+    def _translate_module_path_to_plugin(self, path: list) -> list:
+        """Translate a module-side settings path to the plugin's settings path.
+
+        The module groups per-channel params under ``axis_settings``.
+        For multi-axis new-style modules: ``['axis_settings', axis_name, 'units']``.
+        For single-axis new-style modules: ``['axis_settings', 'units']``.
+        Old-style plugins keep a flat layout (``axis`` lives at
+        ``['controller', 'axis']``; others are top-level).
+
+        New-style plugins that already have an ``axis_settings`` group need
+        either no translation (if they also have per-axis sub-groups) or
+        stripping of the per-axis level (if they have flat axis_settings).
+        """
+        if not path or path[0] != 'axis_settings' or self._plugin_settings is None:
+            return list(path)
+
+        # Check if plugin has axis_settings
+        try:
+            plugin_as = self._plugin_settings.child('axis_settings')
+        except Exception:
+            # Old-style plugin: no axis_settings group
+            rest = list(path[1:])
+            if rest and rest[0] == 'axis':
+                return ['controller', 'axis'] + rest[1:]
+            # path is ['axis_settings', axis_name?, 'units']: strip axis_settings + optional axis_name
+            if len(rest) >= 2 and rest[0] not in self._FLAT_PER_CHANNEL_NAMES and rest[0] != 'axis':
+                # rest[0] is axis_name, rest[1:] is the actual param path
+                return list(rest[1:])
+            return list(rest)
+
+        # Plugin has axis_settings. Check if it has per-axis sub-groups.
+        try:
+            axis_param = plugin_as.child('axis')
+            limits = axis_param.opts.get('limits', [])
+            if isinstance(limits, list) and limits:
+                first_name = str(limits[0])
+            elif isinstance(limits, dict) and limits:
+                first_name = str(list(limits.keys())[0])
+            else:
+                first_name = None
+
+            if first_name is not None and first_name != '':
+                try:
+                    plugin_as.child(first_name)
+                    # Plugin has per-axis sub-groups: path works as-is
+                    return list(path)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Plugin has flat axis_settings (single-axis or old-format multi-axis):
+        # strip per-axis level from path if present.
+        rest = list(path[1:])  # strip 'axis_settings'
+        if (len(rest) >= 2
+                and rest[0] not in self._FLAT_PER_CHANNEL_NAMES
+                and rest[0] != 'axis'):
+            # rest[0] is axis_name (e.g. 'X'), rest[1:] is the actual param path
+            return ['axis_settings'] + rest[1:]
+        return ['axis_settings'] + rest
+
     @Slot(list, object, str)
     def update_settings(self, path: list, data: object, change: str) -> None:
         """Relay a GUI hw_settings edit to the plugin's commit_settings(param).
 
-        All plugins (old-style and new-style) use the same signature:
-        ``commit_settings(param: Parameter)``.  We look up the Parameter
-        node from the shared hw_settings using *path* and pass it through.
+        Translates the module-side path to the plugin's own layout before
+        looking up the Parameter node, then applies the change under a
+        QSignalBlocker (no re-trigger) and calls commit_settings.
         """
-        if self._plugin is None:
+        if self._plugin is None or self._plugin_settings is None:
             return
+        plugin_path = self._translate_module_path_to_plugin(path)
+        with QSignalBlocker(self._plugin_settings):
+            try:
+                param = (self._plugin_settings.child(*plugin_path)
+                         if plugin_path else self._plugin_settings)
+                param.setValue(data)
+            except Exception:
+                return
         commit = getattr(self._plugin, 'commit_settings', None)
         if commit is None:
             return
         try:
-            param = self._settings_ref.child(*path) if path else self._settings_ref
+            param = (self._plugin_settings.child(*plugin_path)
+                     if plugin_path else self._plugin_settings)
             commit(param)
         except Exception:
             pass
@@ -473,29 +663,34 @@ class ControllerThread(QObject):
     def _on_group_tick(self, group_name: str) -> None:
         """One hardware read for all channels in *group_name*; fan out data_ready.
 
-        For new-style plugins: one query_data(names=all_channels) call.
-        For old-style detectors: one grab_data() call; the grab_in_flight guard
-            on the group prevents re-entry; _on_detector_data_ready fans out the
-            single DTE to every channel in the group.
-        For old-style actuators: one get_actuator_value() per channel
-            (sequential reads within a single event-loop tick).
+        Dispatches based on the group's *role* (resolved via ``_resolve_role``):
+
+        ``'new_style'``  — one ``query_data(names=all_channels)`` call; result
+                           fanned out per channel.
+        ``'detector'``   — one ``grab_data()`` call guarded by
+                           ``_grab_in_flight``; ``_on_detector_data_ready``
+                           fans the DTE to every channel in the group.
+        ``'actuator'``   — one ``get_actuator_value()`` per channel
+                           (sequential reads within a single event-loop tick);
+                           never blocked by ``_grab_in_flight``.
         """
         rg = self._groups.get(group_name)
         if rg is None or rg.is_empty() or self._plugin is None:
             return
         channels = list(rg.channels.keys())
+        role = self._resolve_role(rg.role)
         try:
-            if self._is_new_style():
+            if role == 'new_style':
                 dte = self._plugin.query_data(names=channels, fresh=True)
                 for ch in channels:
                     self.data_ready.emit(ch, dte, False)
-            elif self._is_old_style_detector():
+            elif role == 'detector':
                 if self._grab_in_flight:
                     return
                 self._grab_in_flight = True
                 self._pending_group = group_name
                 self._plugin.grab_data(Naverage=1)
-            elif self._is_old_style_actuator():
+            else:  # 'actuator'
                 for ch in channels:
                     self._read_old_style_actuator(ch)
         except Exception as exc:
@@ -505,21 +700,41 @@ class ControllerThread(QObject):
         """Periodic read for one independently-timed (solo) channel."""
         if self._plugin is None or channel not in self._solo:
             return
+        _, _, stored_role = self._solo[channel]
+        role = self._resolve_role(stored_role)
         try:
-            if self._is_new_style():
+            if role == 'new_style':
                 dte = self._plugin.query_data(names=[channel], fresh=True)
                 self.data_ready.emit(channel, dte, False)
-            elif self._is_old_style_detector():
+            elif role == 'detector':
                 if self._grab_in_flight:
                     return
                 self._grab_in_flight = True
                 self._pending_group = None
                 self._pending_channel = channel
                 self._plugin.grab_data(Naverage=1)
-            elif self._is_old_style_actuator():
+            else:  # 'actuator'
                 self._read_old_style_actuator(channel)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
+
+    # ── Internal: role resolution ────────────────────────────────────────────
+
+    def _resolve_role(self, role: str) -> str:
+        """Map a *role* string to a concrete dispatch key.
+
+        New-style plugins always use the ``'new_style'`` path regardless of
+        the requested role.  For old-style plugins, ``'auto'`` maps to
+        ``'detector'`` when the plugin has ``ini_detector`` (including
+        combined plugins), and to ``'actuator'`` otherwise.  Explicit
+        ``'actuator'`` / ``'detector'`` values are passed through unchanged
+        and let callers target one side of a combined plugin directly.
+        """
+        if self._is_new_style():
+            return 'new_style'
+        if role == 'auto':
+            return 'detector' if self._is_old_style_detector() else 'actuator'
+        return role   # explicit 'actuator' or 'detector'
 
     # ── Internal: plugin-type detection ──────────────────────────────────────
 
@@ -550,8 +765,9 @@ class ControllerThread(QObject):
     # ── Internal: new-style plugin ────────────────────────────────────────────
 
     def _ini_new_style(self) -> None:
+        self._plugin_settings = self._create_plugin_settings()
         plugin = self._plugin_class()
-        plugin.open(self._settings_ref)
+        plugin.open(self._plugin_settings)
         self._plugin = plugin
 
         new_data = getattr(plugin, 'new_data', None)
@@ -571,8 +787,11 @@ class ControllerThread(QObject):
         shim = _PluginParentShim(self, self._plugin_class.__name__)
         plugin = self._plugin_class(
             parent=shim,
-            params_state=self._settings_ref.saveState(),
+            params_state=self._plugin_params_state(),
         )
+        # Wire plugin's own settings tree before ini_stage so settings changes
+        # emitted during hardware init are forwarded to the GUI thread.
+        self._connect_plugin_settings(plugin)
         info, initialized = plugin.ini_stage(self._controller)
         if not initialized:
             self.hardware_status.emit(False, str(info))
@@ -592,8 +811,9 @@ class ControllerThread(QObject):
         shim = _PluginParentShim(self, self._plugin_class.__name__)
         plugin = self._plugin_class(
             parent=shim,
-            params_state=self._settings_ref.saveState(),
+            params_state=self._plugin_params_state(),
         )
+        self._connect_plugin_settings(plugin)
         info, initialized = plugin.ini_stage(self._controller)
         if not initialized:
             self.hardware_status.emit(False, str(info))
@@ -611,6 +831,21 @@ class ControllerThread(QObject):
             plugin.dte_signal_temp.connect(self._on_detector_temp_data_ready)
         self.hardware_status.emit(True, str(info))
 
+    def _emit_channel_state(self, channel: str) -> None:
+        """Re-emit per-channel state (units) after a suppressed axis switch.
+
+        ``axis_name.setter`` fires ``emit_status(UNITS, ...)`` and updates
+        ``plugin.settings['units']``, but both paths are suppressed while
+        ``_axis_switching`` is True.  This method re-emits the units so that
+        late-attached subscribers can sync their display.  The guard in
+        ``set_unit_as_suffix`` (skip when suffix already matches) ensures
+        this is a no-op once the unit is set, preventing repeated
+        ``updateText()`` calls from clearing the spinbox selection.
+        """
+        unit = getattr(self._plugin, 'axis_unit', None)
+        if unit is not None:
+            self.settings_changed.emit(channel, ['units'], unit, 'value')
+
     def _read_old_style_actuator(self, channel: str) -> None:
         """One-shot position read for an old-style actuator plugin.
 
@@ -619,7 +854,12 @@ class ControllerThread(QObject):
         """
         if channel and hasattr(self._plugin, 'axis_name'):
             if self._plugin.axis_name != channel:
-                self._plugin.axis_name = channel
+                self._axis_switching = True
+                try:
+                    self._plugin.axis_name = channel
+                finally:
+                    self._axis_switching = False
+                self._emit_channel_state(channel)
         pos = self._plugin.get_actuator_value()
         self.data_ready.emit(channel, pos, False)
 
@@ -639,7 +879,12 @@ class ControllerThread(QObject):
         """
         if channel and hasattr(self._plugin, 'axis_name'):
             if self._plugin.axis_name != channel:
-                self._plugin.axis_name = channel
+                self._axis_switching = True
+                try:
+                    self._plugin.axis_name = channel
+                finally:
+                    self._axis_switching = False
+                self._emit_channel_state(channel)
                 # _current_value may carry units from the previous axis; refresh it
                 # so check_target_reached can subtract current from target without a
                 # pint DimensionalityError.
@@ -704,8 +949,9 @@ class ControllerThread(QObject):
         shim = _PluginParentShim(self, self._plugin_class.__name__)
         plugin = self._plugin_class(
             parent=shim,
-            params_state=self._settings_ref.saveState(),
+            params_state=self._plugin_params_state(),
         )
+        self._connect_plugin_settings(plugin)
         info, initialized = plugin.ini_detector(self._controller)
         if not initialized:
             self.hardware_status.emit(False, str(info))

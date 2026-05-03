@@ -555,6 +555,10 @@ class ModulesManager(QObject, ParameterManager):
     def poll_init(self, module):
         tstart = time.perf_counter()
         while not module.initialized_state:
+            # Exit immediately if the CT reported an init failure, rather than
+            # waiting for the full 60-second timeout.
+            if getattr(module, '_init_failed', False):
+                break
             QThread.msleep(1000)
             QtWidgets.QApplication.processEvents()
             if time.perf_counter() - tstart > config('pymodaq', 'control_module_ini_polling'):  # timeout of 60sec

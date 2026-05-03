@@ -40,7 +40,10 @@ if local_path.joinpath('camera_calibrations').is_dir():
 
 
 
-comon_parameters = [create_controller_param()]  #
+comon_parameters = [
+    create_controller_param(),
+    {'title': 'Channel Settings:', 'name': 'channel_settings', 'type': 'group', 'children': []},
+]
 
 params = [
     {'title': 'Main Settings:', 'name': 'main_settings', 'expanded': False, 'type': 'group', 'children': [

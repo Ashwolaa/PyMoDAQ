@@ -370,11 +370,10 @@ class DAQ_Move_UI_Base(ControlModuleUI):
     def set_unit_as_suffix(self, unit: str):
         """Will append the actuator units in the value display"""
         self._unit = unit
-        self.current_value_sb.setOpts(suffix=unit)
-        self.abs_value_sb_bis.setOpts(suffix=unit)
-        self.abs_value_sb.setOpts(suffix=unit)
-        self.abs_value_sb_2.setOpts(suffix=unit)
-        self.rel_value_sb.setOpts(suffix=unit)
+        for sb in (self.current_value_sb, self.abs_value_sb_bis,
+                   self.abs_value_sb, self.abs_value_sb_2, self.rel_value_sb):
+            if sb.opts.get('suffix') != unit:
+                sb.setOpts(suffix=unit)
 
     def set_unit_prefix(self, show=True):
         """ Change the display status of the spinbox SI prefix"""

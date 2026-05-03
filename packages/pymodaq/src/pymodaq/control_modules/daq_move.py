@@ -68,6 +68,123 @@ HardwareController = TypeVar("HardwareController")
 
 STATUS_WAIT_TIME = 1000
 
+# Per-channel param names emitted flat by old-style plugins (pre-axis_settings).
+# Used by _to_module_params and the path-remapping bridge in ct_module.
+_FLAT_PER_CHANNEL: frozenset = frozenset({'units', 'epsilon', 'timeout', 'bounds', 'scaling'})
+
+
+def _upgrade_axis_settings(existing_as: dict, params: list) -> list:
+    """Convert an existing axis_settings from flat to per-axis sub-group format if needed.
+
+    Returns the params list unchanged if already in the correct format or
+    if it's single-axis. Converts flat multi-axis axis_settings to per-axis groups.
+    """
+    children = existing_as.get('children', [])
+    axis_child = next((c for c in children if c.get('name') == 'axis'), None)
+
+    if axis_child is None:
+        # No axis selector: single-axis flat, no change needed
+        return params
+
+    limits = axis_child.get('limits', [])
+    axis_names_list = list(limits.keys()) if isinstance(limits, dict) else list(limits)
+
+    if len(axis_names_list) <= 1:
+        # Single-axis (or empty), keep flat
+        return params
+
+    # Check if already has per-axis sub-groups
+    child_names = {c.get('name') for c in children}
+    if any(str(n) in child_names for n in axis_names_list):
+        # Already new format
+        return params
+
+    # Flat multi-axis: convert to per-axis sub-groups
+    flat_per_channel = [c for c in children if c.get('name') != 'axis']
+    per_axis = [
+        {'title': f'{n}:', 'name': str(n), 'type': 'group',
+         'children': list(flat_per_channel)}
+        for n in axis_names_list
+    ]
+    new_as = {**existing_as, 'children': [axis_child] + per_axis}
+    return [p if p.get('name') != 'axis_settings' else new_as for p in params]
+
+
+def _to_module_params(params: list) -> list:
+    """Re-group a plugin's flat params list into the module-side layout.
+
+    Converts the flat output of old-style ``comon_parameters_fun`` into the
+    structured layout expected by the module's local settings tree:
+
+    - ``units``, ``epsilon``, ``timeout``, ``bounds``, ``scaling`` are
+      collected into an ``axis_settings`` group.
+    - ``axis`` (from inside the ``controller`` group) is moved into
+      ``axis_settings`` as well.
+    - For multi-axis plugins, per-axis sub-groups are created inside
+      ``axis_settings`` (one sub-group per axis name).
+    - ``controller_ID`` and ``controller_status`` stay in ``controller``.
+    - All other (plugin-specific hardware) params remain at the top level.
+
+    If the input already contains an ``axis_settings`` group (new-style
+    plugins that use the restructured ``comon_parameters_fun``), the list
+    is passed through _upgrade_axis_settings to ensure per-axis sub-groups
+    exist for multi-axis plugins.
+    """
+    # New-style plugin: has axis_settings already. Upgrade if needed.
+    existing_as = next((p for p in params if p.get('name') == 'axis_settings'), None)
+    if existing_as is not None:
+        return _upgrade_axis_settings(existing_as, params)
+
+    # Old-style plugin: flat layout with axis in controller group
+    axis_child = None
+    flat_per_channel: list = []
+    hardware: list = []
+
+    for p in params:
+        name = p.get('name', '')
+        if name in _FLAT_PER_CHANNEL:
+            flat_per_channel.append(p)
+        elif name == 'controller':
+            ctrl_children = []
+            for child in p.get('children', []):
+                if child.get('name') == 'axis':
+                    axis_child = child
+                else:
+                    ctrl_children.append(child)
+            hardware.append({**p, 'children': ctrl_children})
+        else:
+            hardware.append(p)
+
+    if not flat_per_channel and axis_child is None:
+        return hardware  # no per-channel params at all
+
+    # Determine axis names from the axis child
+    if axis_child is not None:
+        limits = axis_child.get('limits', [])
+        axis_names_list = list(limits.keys()) if isinstance(limits, dict) else list(limits)
+    else:
+        axis_names_list = []
+
+    # Build axis_settings children
+    if len(axis_names_list) > 1 and flat_per_channel:
+        # Multi-axis: create per-axis sub-groups
+        as_children = [axis_child] + [
+            {'title': f'{n}:', 'name': str(n), 'type': 'group',
+             'children': list(flat_per_channel)}
+            for n in axis_names_list
+        ]
+    else:
+        # Single-axis or no axis: flat axis_settings (axis first if present)
+        as_children = ([axis_child] if axis_child is not None else []) + flat_per_channel
+
+    hardware.append({
+        'title': 'Axis Settings:',
+        'name': 'axis_settings',
+        'type': 'group',
+        'children': as_children,
+    })
+    return hardware
+
 
 class DAQ_Move(ControllerThreadModule):
     """Main PyMoDAQ class to drive actuators
@@ -92,13 +209,40 @@ class DAQ_Move(ControllerThreadModule):
     _ini_hw_cmd = ControlToHardware.INI_HARDWARE
 
     # Per-channel (per-DAQ-module) params: each axis owns its own values for
-    # these and they are never relayed to the shared ControllerThread or
-    # mirrored to hw_settings.  ('controller', 'axis') uses a full path tuple
-    # so only that leaf is per-channel, not the entire 'controller' group.
-    _PER_CHANNEL_PARAMS: frozenset = frozenset({
-        'units', 'epsilon', 'timeout', 'bounds', 'scaling',
-        ('controller', 'axis'),
-    })
+    # Per-channel parameters live in each module's local axis_settings group.
+    # They are never relayed to the shared hw_settings or mirrored to other
+    # subscribers.  Old-style plugins emit flat paths; _map_to_module_path
+    # normalises them to ['axis_settings', ...] before the check.
+    _PER_CHANNEL_PARAMS: frozenset = frozenset({'axis_settings'})
+
+    def _map_to_module_path(self, path: list) -> list:
+        """Normalise flat plugin paths to the axis_settings grouped layout.
+
+        Old-style plugins emit ``['units']``; new-style flat emit
+        ``['axis_settings', 'units']``; new multi-axis emit
+        ``['axis_settings', axis_name, 'units']``.
+
+        For multi-axis plugins (self._channel != '' and not None),
+        flat per-channel params are routed through the channel sub-group.
+        """
+        if not path:
+            return list(path)
+        # Flat per-channel name from old-style plugin
+        if path[0] in _FLAT_PER_CHANNEL:
+            ch = getattr(self, '_channel', None) or ''
+            if ch:
+                return ['axis_settings', ch] + list(path)
+            return ['axis_settings'] + list(path)
+        # axis in controller → axis_settings.axis
+        if path[0] == 'controller' and len(path) > 1 and path[1] == 'axis':
+            return ['axis_settings', 'axis'] + list(path[2:])
+        # Intermediate: ['axis_settings', 'units'] → route through channel for multi-axis
+        if (path[0] == 'axis_settings' and len(path) >= 2
+                and path[1] in _FLAT_PER_CHANNEL):
+            ch = getattr(self, '_channel', None) or ''
+            if ch:
+                return ['axis_settings', ch] + list(path[1:])
+        return list(path)
 
     move_done_signal = Signal(DataActuator)
     current_value_signal = Signal(DataActuator)
@@ -187,9 +331,21 @@ class DAQ_Move(ControllerThreadModule):
             self.current_value.origin = self.title
         return self._current_value
 
+    def _axis_setting(self, *path):
+        """Read a per-channel param from the module's local axis_settings group.
+
+        For multi-axis plugins (axis_name != ''), routes through the current
+        axis sub-group, e.g. ``('epsilon',)`` → ``axis_settings.{axis_name}.epsilon``.
+        For single-axis plugins, reads directly from ``axis_settings``.
+        """
+        ax = self.axis_name  # '' for single-axis
+        if ax:
+            return self.settings[self._hw_settings_name, 'axis_settings', ax, *path]
+        return self.settings[self._hw_settings_name, 'axis_settings', *path]
+
     @property
     def epsilon(self) -> float:
-        return self._hw('epsilon')
+        return self._axis_setting('epsilon')
 
     @property
     def move_done_bool(self):
@@ -228,12 +384,19 @@ class DAQ_Move(ControllerThreadModule):
         its own axis's units in the local ``self.settings`` subtree, which is
         updated by ``_on_hw_settings_changed`` only when the reported channel
         matches ``self._channel``.
+
+        For multi-axis plugins, reads from ``axis_settings.{axis_name}.units``.
+        For single-axis plugins, reads from ``axis_settings.units``.
         """
-        return self.settings[self._hw_settings_name, 'units']
+        return self._axis_setting('units')
 
     @units.setter
     def units(self, unit: str):
-        self.settings.child(self._hw_settings_name, 'units').setValue(unit)
+        ax = self.axis_name  # '' for single-axis
+        if ax:
+            self.settings.child(self._hw_settings_name, 'axis_settings', ax, 'units').setValue(unit)
+        else:
+            self.settings.child(self._hw_settings_name, 'axis_settings', 'units').setValue(unit)
         self._update_units_ui(unit)
 
     def _update_units_ui(self, unit: str) -> None:
@@ -249,7 +412,9 @@ class DAQ_Move(ControllerThreadModule):
     @property
     def axis_names(self) -> Union[List, Dict]:
         """ Get the names of all possible axis"""
-        return self._hw_child('controller', 'axis').opts['limits']
+        return self.settings.child(
+            self._hw_settings_name, 'axis_settings', 'axis'
+        ).opts['limits']
 
     @property
     def axis_name(self) -> str:
@@ -258,7 +423,7 @@ class DAQ_Move(ControllerThreadModule):
         Reads from LOCAL settings so each DAQ_Move instance keeps its own
         axis selection independently of other subscribers on the same CT.
         """
-        param = self.settings.child(self._hw_settings_name, 'controller', 'axis')
+        param = self.settings.child(self._hw_settings_name, 'axis_settings', 'axis')
         limits = param.opts['limits']
         val = param.value()
         if isinstance(limits, list):
@@ -270,7 +435,7 @@ class DAQ_Move(ControllerThreadModule):
 
     @axis_name.setter
     def axis_name(self, name: str):
-        param = self.settings.child(self._hw_settings_name, 'controller', 'axis')
+        param = self.settings.child(self._hw_settings_name, 'axis_settings', 'axis')
         limits = param.opts['limits']
         if name in limits:
             if isinstance(limits, list):
@@ -378,8 +543,14 @@ class DAQ_Move(ControllerThreadModule):
         self.get_actuator_value()
 
     def _on_per_channel_param_changed(self, path: list, data) -> None:
-        """Update the units suffix/prefix in the UI when the axis unit changes."""
-        if path == ['units'] and isinstance(data, str):
+        """Update the units suffix/prefix in the UI when the axis unit changes.
+
+        *path* is already normalised to the module layout by _map_to_module_path.
+        For single-axis: ``['axis_settings', 'units']``.
+        For multi-axis: ``['axis_settings', axis_name, 'units']``.
+        """
+        if (path and path[0] == 'axis_settings' and 'units' in path
+                and isinstance(data, str)):
             self._update_units_ui(data)
 
     # -------------------------------------------------------------------------
@@ -671,8 +842,9 @@ class DAQ_Move(ControllerThreadModule):
             getattr(parent_module["module"], "daq_move_" + self._actuator_type),
             "DAQ_Move_" + self._actuator_type,
         )
-        params = getattr(class_, "params")
-        return Parameter.create(name=self._hw_settings_name, type="group", children=params)
+        raw_params = getattr(class_, "params")
+        grouped = _to_module_params(list(raw_params))
+        return Parameter.create(name=self._hw_settings_name, type="group", children=grouped)
 
     def _reload_plugin_settings(self):
         """Reload plugin settings, also updating the move_type in main_settings."""
@@ -682,6 +854,11 @@ class DAQ_Move(ControllerThreadModule):
     def _module_value_changed(self, param: Parameter):
         """Handle actuator-specific parameter changes."""
         super()._module_value_changed(param)  # CT settings forwarding (base class)
+
+        if param.name() == 'axis':
+            path = self.settings.childPath(param) or []
+            if 'axis_settings' in path:
+                self._channel = self.axis_name
 
         if param.name() == "refresh_timeout":
             self._refresh_timer.setInterval(param.value())

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from qtpy.QtCore import Signal, Slot, QSignalBlocker
+from qtpy.QtCore import Signal, Slot, QSignalBlocker, QMetaObject, Qt
 
 from pymodaq.control_modules.utils import ParameterControlModule
 from pymodaq.control_modules.controller_registry import ControllerRegistry, ControllerKey
@@ -74,6 +74,7 @@ class ControllerThreadModule(ParameterControlModule):
         self._channel: str = ''
         self._hw_settings: Optional[Parameter] = None
         self._syncing_from_hw: bool = False
+        self._init_failed: bool = False  # set True on hardware_status(False) for fast poll_init exit
         super().__init__(**kwargs)
 
     # ── Helpers ──────────────────────────────────────────────────────────────
@@ -124,6 +125,7 @@ class ControllerThreadModule(ParameterControlModule):
         if not do_init:
             self._detach_controller()
             return
+        self._init_failed = False
         try:
             plugin_class = self._get_plugin_class()
             hw_cls = getattr(plugin_class, 'hardware_class', plugin_class)
@@ -133,7 +135,8 @@ class ControllerThreadModule(ParameterControlModule):
             )
             params_state = self.settings.child(self._hw_settings_name).saveState()
             ct, hw_settings = ControllerRegistry.get().attach(
-                key, plugin_class, params_state=params_state, subscriber=self
+                key, plugin_class, params_state=params_state, subscriber=self,
+                exclude_params=self._PER_CHANNEL_PARAMS,
             )
             self._ct = ct
             self._ct_key = key
@@ -157,12 +160,28 @@ class ControllerThreadModule(ParameterControlModule):
             self._connect_ct_signals(ct)
             self.connect_leco(True)
 
+            # Point the UI's settings action at the hw_settings panel for this
+            # plugin class.  Move and Viewer on the same CT each get their own
+            # panel (built from their respective plugin params).
+            if self.ui is not None:
+                hw_panel = ControllerRegistry.get().get_hw_panel(key, plugin_class)
+                hw_action = ControllerRegistry.get().get_hw_action(key, plugin_class)
+                if hw_panel is not None and hw_action is not None:
+                    self.ui.use_shared_settings_action(hw_action, hw_panel)
+
             # Second (and later) subscribers attach after the CT has already
             # emitted hardware_status(True).  They miss that signal, so
             # _on_hardware_connected (initial position read, units sync) is
             # never triggered.  Fire a synthetic status here.
             if getattr(ct, '_plugin', None) is not None:
                 self._on_hardware_status(True, 'Hardware already initialized')
+            else:
+                # First subscriber: all signal connections are now in place.
+                # Queue ini_hardware() in the hardware thread so that any
+                # settings_changed emissions from ini_stage (e.g. units) arrive
+                # AFTER settings_changed is connected above, not before.
+                QMetaObject.invokeMethod(ct, 'ini_hardware',
+                                         Qt.ConnectionType.QueuedConnection)
         except Exception as e:
             self.logger.exception(str(e))
 
@@ -170,6 +189,9 @@ class ControllerThreadModule(ParameterControlModule):
         """Disconnect signals and release the registry reference."""
         self._pre_close_hardware()
         self.connect_leco(False)
+        # Restore the per-module settings action before releasing the key.
+        if self.ui is not None:
+            self.ui.release_shared_settings_action()
         if self._ct is not None:
             try:
                 self._disconnect_ct_signals(self._ct)
@@ -197,6 +219,8 @@ class ControllerThreadModule(ParameterControlModule):
         """Receive hardware connection status from ControllerThread."""
         self.update_status(f'Hardware initialized: {connected}  info: {info}')
         self._initialized_state = connected
+        if not connected:
+            self._init_failed = True  # lets poll_init exit immediately on failure
         if self.ui is not None:
             setattr(self.ui, self._ui_init_attr, connected)
         if connected:
@@ -213,26 +237,38 @@ class ControllerThreadModule(ParameterControlModule):
             if path is not None:
                 self._settings_update.emit(path, data, change)
 
+    def _map_to_module_path(self, path: list) -> list:
+        """Normalise a plugin-emitted param path to the module's local layout.
+
+        Base implementation is an identity — subclasses override when their
+        plugin may emit flat paths that need regrouping (e.g. DAQ_Move maps
+        ``['units']`` → ``['axis_settings', 'units']``).
+        """
+        return list(path)
+
     @Slot(str, list, object, str)
     def _on_hw_settings_changed(self, channel: str, path: list, data, change: str):
         """Receive plugin-initiated settings changes and apply them selectively.
 
         Per-channel parameters (in _PER_CHANNEL_PARAMS) are written to this
-        module's local settings, filtered by channel.  Per-controller params
-        are written to the shared _hw_settings under a QSignalBlocker to
-        prevent the write from re-triggering the relay → commit_settings loop.
+        module's local settings under the ``axis_settings`` group, filtered
+        by channel.  Old-style plugins emit flat paths (e.g. ``['units']``);
+        ``_map_to_module_path`` normalises these to the grouped layout before
+        writing.  Per-controller params are written to the shared _hw_settings.
         """
         if change != 'value' or not path:
             return
 
-        if self._is_per_channel(path):
+        mapped = self._map_to_module_path(path)
+
+        if self._is_per_channel(mapped):
             if channel and channel != self._channel:
                 return
             try:
-                self.settings.child(self._hw_settings_name, *path).setValue(data)
+                self.settings.child(self._hw_settings_name, *mapped).setValue(data)
             except Exception:
                 pass
-            self._on_per_channel_param_changed(path, data)
+            self._on_per_channel_param_changed(mapped, data)
             return
 
         if self._hw_settings is None:

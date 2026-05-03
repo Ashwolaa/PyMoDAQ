@@ -245,10 +245,35 @@ class ActuatorValueSubEntryHandler(SubEntryHandler):
     def get_units_from_module_name(self, actuator_name: str):
         mods_settings = [group.child('name').value() for
                         group in self.settings.child(ModuleType.Actuator).children()]
-        actuator_settings = self.settings.child(ModuleType.Actuator).children()[
+        actuator_group = self.settings.child(ModuleType.Actuator).children()[
             mods_settings.index(actuator_name)]
 
-        return actuator_settings.child(ACTUATOR_SETTINGS_KEY, 'units').value()
+        try:
+            hw = actuator_group.child(ACTUATOR_SETTINGS_KEY)
+            axis_settings = hw.child('axis_settings')
+            try:
+                # Multi-axis new format: axis_settings.{axis_name}.units
+                axis_param = axis_settings.child('axis')
+                limits = axis_param.opts.get('limits', [])
+                if isinstance(limits, list):
+                    axis_name = axis_param.value() or ''
+                elif isinstance(limits, dict):
+                    from pymodaq_utils.utils import find_keys_from_val
+                    keys = find_keys_from_val(limits, val=axis_param.value())
+                    axis_name = keys[0] if keys else ''
+                else:
+                    axis_name = ''
+                if axis_name:
+                    try:
+                        return axis_settings.child(axis_name, 'units').value()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            # Single-axis or flat format: units directly in axis_settings
+            return axis_settings.child('units').value()
+        except Exception:
+            return ''
 
     def update_suffix_in_dialog(self, actuator_name: str):
         self.value_sb.setOpts(suffix=self.get_units_from_module_name(actuator_name))

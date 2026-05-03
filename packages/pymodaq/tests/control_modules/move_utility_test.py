@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 from pymodaq.control_modules.move_utility_classes import (DAQ_Move_base, comon_parameters_fun, main,
                                                           DataActuatorType, check_units,
-                                                          DataActuator)
+                                                          DataActuator, comon_parameters)
+from pymodaq.control_modules.utils import create_controller_param
 
 
 def test_check_units():
@@ -150,3 +151,126 @@ def test_axis_dict(qtbot, AXIS_NAMES, EPSILONS, UNITS, error):
             else:
                 assert hardware.axis_unit == UNITS[axis_name]
                 assert hardware.axis_units == UNITS
+
+
+class TestPerChannelPathShim:
+    """DAQ_Move_base._per_channel_path detects old/new layout at runtime.
+
+    There are three plugin layouts:
+
+    1. **Truly old style** (legacy): axis in ``controller`` group, per-channel
+       params (units, epsilon, …) at top level — no ``axis_settings`` group.
+    2. **Single-axis new style**: flat ``axis_settings`` (axis selector with
+       single empty-string limit, plus per-channel params directly).
+    3. **Multi-axis new style**: ``axis_settings`` with per-axis sub-groups.
+
+    ``comon_parameters_fun`` now generates layouts 2 or 3 depending on
+    whether axis_names has more than one entry.
+    """
+
+    def _make_truly_old_style(self, axis_names=None):
+        """Plugin using truly old layout: axis in controller, per-channel params flat."""
+        from pymodaq_gui.parameter.ioxml import VALID_FOR_CONFIGURATION
+        names = axis_names or ['X', 'Y']
+
+        class TrulyOldPlugin(DAQ_Move_base):
+            _axis_names = names
+            params = [
+                create_controller_param(names[0], names.copy()),  # axis inside controller
+                *comon_parameters(),  # flat per-channel at top level
+            ]
+
+        return TrulyOldPlugin()
+
+    def _make_single_axis_style(self, axis_names=None):
+        """Plugin with single-axis flat axis_settings (new-style, single axis)."""
+        names = axis_names or ['X']
+
+        class SingleAxisPlugin(DAQ_Move_base):
+            _axis_names = names
+            params = comon_parameters_fun(axis_names=names)
+
+        return SingleAxisPlugin()
+
+    def _make_multiaxis_style(self, axis_names=None):
+        """Plugin with per-axis sub-groups inside axis_settings (new-style, multi-axis)."""
+        names = axis_names or ['X', 'Y']
+
+        class MultiAxisPlugin(DAQ_Move_base):
+            _axis_names = names
+            params = comon_parameters_fun(axis_names=names)
+
+        return MultiAxisPlugin()
+
+    # --- Truly old style (axis in controller, no axis_settings) ---
+
+    def test_old_style_axis_path(self, qtbot):
+        hw = self._make_truly_old_style()
+        assert hw._per_channel_path('axis') == ('controller', 'axis')
+
+    def test_old_style_units_path(self, qtbot):
+        hw = self._make_truly_old_style()
+        assert hw._per_channel_path('units') == ('units',)
+
+    def test_old_style_bounds_path(self, qtbot):
+        hw = self._make_truly_old_style()
+        assert hw._per_channel_path('bounds', 'is_bounds') == ('bounds', 'is_bounds')
+
+    def test_old_style_axis_name_readable(self, qtbot):
+        hw = self._make_truly_old_style(['X', 'Y'])
+        assert hw.axis_name in ['X', 'Y']
+
+    def test_old_style_axis_name_settable(self, qtbot):
+        hw = self._make_truly_old_style(['X', 'Y'])
+        hw.axis_name = 'Y'
+        assert hw.axis_name == 'Y'
+
+    # --- Single-axis new style (flat axis_settings) ---
+
+    def test_single_axis_axis_path(self, qtbot):
+        hw = self._make_single_axis_style(['X'])
+        assert hw._per_channel_path('axis') == ('axis_settings', 'axis')
+
+    def test_single_axis_units_path(self, qtbot):
+        hw = self._make_single_axis_style(['X'])
+        # Single-axis: no per-axis sub-group, units directly in axis_settings
+        assert hw._per_channel_path('units') == ('axis_settings', 'units')
+
+    def test_single_axis_bounds_path(self, qtbot):
+        hw = self._make_single_axis_style(['X'])
+        assert hw._per_channel_path('bounds', 'is_bounds') == ('axis_settings', 'bounds', 'is_bounds')
+
+    def test_single_axis_name_readable(self, qtbot):
+        hw = self._make_single_axis_style(['X'])
+        assert hw.axis_name == ''  # single-axis sentinel
+
+    # --- Multi-axis new style (per-axis sub-groups) ---
+
+    def test_new_style_axis_path(self, qtbot):
+        hw = self._make_multiaxis_style()
+        assert hw._per_channel_path('axis') == ('axis_settings', 'axis')
+
+    def test_new_style_units_path(self, qtbot):
+        hw = self._make_multiaxis_style(['X', 'Y'])
+        # Multi-axis: per-axis sub-groups; units routed through the active axis (default 'X')
+        assert hw._per_channel_path('units') == ('axis_settings', 'X', 'units')
+
+    def test_new_style_bounds_path(self, qtbot):
+        hw = self._make_multiaxis_style(['X', 'Y'])
+        # Multi-axis: bounds routed through active axis sub-group
+        assert hw._per_channel_path('bounds', 'is_bounds') == ('axis_settings', 'X', 'bounds', 'is_bounds')
+
+    def test_new_style_axis_name_readable(self, qtbot):
+        hw = self._make_multiaxis_style(['X', 'Y'])
+        assert hw.axis_name in ['X', 'Y']
+
+    def test_new_style_axis_name_settable(self, qtbot):
+        hw = self._make_multiaxis_style(['X', 'Y'])
+        hw.axis_name = 'Y'
+        assert hw.axis_name == 'Y'
+
+    def test_new_style_units_path_after_axis_change(self, qtbot):
+        hw = self._make_multiaxis_style(['X', 'Y'])
+        hw.axis_name = 'Y'
+        # After switching to 'Y', units are routed through the 'Y' sub-group
+        assert hw._per_channel_path('units') == ('axis_settings', 'Y', 'units')

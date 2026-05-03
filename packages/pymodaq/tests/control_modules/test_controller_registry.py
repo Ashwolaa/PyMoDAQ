@@ -25,7 +25,7 @@ import threading
 
 import pytest
 
-from pymodaq.control_modules.controller_registry import ControllerKey, ControllerRegistry
+from pymodaq.control_modules.controller_registry import ControllerKey, ControllerRegistry, strip_params
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ class FakeSettings:
 class FakeRegistry(ControllerRegistry):
     """Registry that injects FakeThread + FakeSettings instead of real ones."""
 
-    def _make_settings(self, plugin_class, params_state):
+    def _make_settings(self, plugin_class, params_state, exclude_params=frozenset()):
         settings = FakeSettings()
         settings.params_state = params_state
         return settings
@@ -191,6 +191,68 @@ class TestHardwareClassSharing:
         thread0, _ = self.registry.attach(key0, cls)
         thread1, _ = self.registry.attach(key1, cls)
         assert thread0 is not thread1
+
+
+# ---------------------------------------------------------------------------
+# X-1: Cross-type sharing (Move + Viewer on same ControllerKey)
+# ---------------------------------------------------------------------------
+
+class TestCrossTypeSharing:
+    """Move and Viewer that share hardware_class share the CT but get separate hw_settings."""
+
+    def setup_method(self):
+        self.registry = FakeRegistry()
+        self.driver = make_hardware_class('SharedDriver')
+        self.move_cls = make_plugin_class('DAQ_Move_Shared', hardware_class=self.driver)
+        self.view_cls = make_plugin_class('DAQ_0DViewer_Shared', hardware_class=self.driver)
+        self.key = key_for(self.move_cls)
+
+    def test_same_key(self):
+        assert key_for(self.move_cls) == key_for(self.view_cls)
+
+    def test_share_thread(self):
+        thread_m, _ = self.registry.attach(self.key, self.move_cls)
+        thread_v, _ = self.registry.attach(self.key, self.view_cls)
+        assert thread_m is thread_v
+
+    def test_different_hw_settings(self):
+        _, hw_m = self.registry.attach(self.key, self.move_cls)
+        _, hw_v = self.registry.attach(self.key, self.view_cls)
+        assert hw_m is not hw_v
+
+    def test_same_plugin_class_same_hw_settings(self):
+        """Two DAQ_Move on the same key must share one hw_settings object."""
+        _, hw1 = self.registry.attach(self.key, self.move_cls)
+        _, hw2 = self.registry.attach(self.key, self.move_cls)
+        assert hw1 is hw2
+
+    def test_ref_count_three_after_move_move_viewer(self):
+        self.registry.attach(self.key, self.move_cls)
+        self.registry.attach(self.key, self.move_cls)
+        self.registry.attach(self.key, self.view_cls)
+        assert self.registry.ref_count(self.key) == 3
+
+    def test_second_plugin_type_gets_its_own_params_state(self):
+        """params_state passed by the second plugin type is used to build ITS settings."""
+        _, hw_m = self.registry.attach(self.key, self.move_cls, params_state={'move': True})
+        _, hw_v = self.registry.attach(self.key, self.view_cls, params_state={'view': True})
+        # FakeRegistry stores params_state on the FakeSettings object
+        assert hw_v.params_state == {'view': True}
+
+    def test_second_plugin_same_class_ignores_new_params_state(self):
+        """A second subscriber with the same plugin class must NOT rebuild settings."""
+        _, hw1 = self.registry.attach(self.key, self.move_cls, params_state={'first': True})
+        _, hw2 = self.registry.attach(self.key, self.move_cls, params_state={'second': True})
+        # Same object — params_state from second call was not applied
+        assert hw1 is hw2
+        assert hw1.params_state == {'first': True}
+
+    def test_teardown_clears_all_plugin_type_entries(self):
+        self.registry.attach(self.key, self.move_cls)
+        self.registry.attach(self.key, self.view_cls)
+        self.registry.detach(self.key)
+        self.registry.detach(self.key)
+        assert not self.registry.is_known(self.key)
 
 
 # ---------------------------------------------------------------------------
@@ -488,3 +550,177 @@ class TestMakeSettings:
         _, hw = reg.attach(key_for(pc), pc, params_state=dummy.saveState())
         assert hw['voltage'] == 3.3
         reg.close_all()
+
+    def test_exclude_params_strips_top_level_node(self, qapp):
+        """Per-channel params must not appear in hw_settings."""
+        pc = make_plugin_class(params=[
+            {'name': 'voltage', 'type': 'float', 'value': 0.0},
+            {'name': 'units', 'type': 'str', 'value': 'mm'},
+            {'name': 'epsilon', 'type': 'float', 'value': 0.01},
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc,
+                           exclude_params=frozenset({'units', 'epsilon'}))
+        names = {ch.name() for ch in hw.children()}
+        assert 'voltage' in names
+        assert 'units' not in names
+        assert 'epsilon' not in names
+        reg.close_all()
+
+    def test_exclude_params_strips_nested_child(self, qapp):
+        """('controller', 'axis') must remove only the axis child, keeping controller_ID."""
+        pc = make_plugin_class(params=[
+            {'name': 'voltage', 'type': 'float', 'value': 0.0},
+            {'name': 'controller', 'type': 'group', 'children': [
+                {'name': 'controller_ID', 'type': 'int', 'value': 0},
+                {'name': 'axis', 'type': 'list', 'value': 'X'},
+            ]},
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc,
+                           exclude_params=frozenset({('controller', 'axis')}))
+        names = {ch.name() for ch in hw.children()}
+        assert 'controller' in names
+        ctrl_children = {ch.name() for ch in hw.child('controller').children()}
+        assert 'controller_ID' in ctrl_children
+        assert 'axis' not in ctrl_children
+        reg.close_all()
+
+    def test_legacy_flat_move_plugin_strips_per_channel(self, qapp):
+        """Old-style flat Move plugins (no axis_settings group) have per-channel
+        params stripped via LEGACY_PER_CHANNEL_NAMES when the caller passes
+        exclude_params containing 'axis_settings' (the Move subscriber marker)."""
+        pc = make_plugin_class(params=[
+            {'name': 'voltage', 'type': 'float', 'value': 0.0},
+            {'name': 'units', 'type': 'str', 'value': 'mm'},   # per-channel → stripped
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc,
+                           exclude_params=frozenset({'axis_settings'}))
+        names = {ch.name() for ch in hw.children()}
+        assert 'voltage' in names
+        assert 'units' not in names   # stripped via LEGACY_PER_CHANNEL_NAMES
+        reg.close_all()
+
+    def test_viewer_plugin_strips_channel_settings_only(self, qapp):
+        """Viewer plugins use the caller-provided exclude_params directly.
+        channel_settings is stripped; hardware params are kept."""
+        pc = make_plugin_class(params=[
+            {'name': 'integration_time', 'type': 'float', 'value': 0.1},
+            {'name': 'channel_settings', 'type': 'group', 'children': []},
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc,
+                           exclude_params=frozenset({'channel_settings'}))
+        names = {ch.name() for ch in hw.children()}
+        assert 'integration_time' in names
+        assert 'channel_settings' not in names
+        reg.close_all()
+
+    def test_viewer_plugin_does_not_apply_legacy_move_exclusions(self, qapp):
+        """A viewer plugin whose params happen to contain 'units' must NOT have
+        it stripped — LEGACY_PER_CHANNEL_NAMES only fires for Move subscribers."""
+        pc = make_plugin_class(params=[
+            {'name': 'units', 'type': 'str', 'value': 'nm'},   # wavelength units — hw param for a spectrometer
+            {'name': 'channel_settings', 'type': 'group', 'children': []},
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc,
+                           exclude_params=frozenset({'channel_settings'}))
+        names = {ch.name() for ch in hw.children()}
+        assert 'units' in names   # NOT stripped — not a Move subscriber
+        assert 'channel_settings' not in names
+        reg.close_all()
+
+    def test_new_style_plugin_with_axis_settings_strips_group(self, qapp):
+        """New-style plugins that already have an axis_settings group use the
+        caller-provided exclude_params (frozenset({'axis_settings'}))."""
+        pc = make_plugin_class(params=[
+            {'name': 'voltage', 'type': 'float', 'value': 0.0},
+            {'name': 'axis_settings', 'type': 'group', 'children': [
+                {'name': 'units', 'type': 'str', 'value': 'mm'},
+            ]},
+        ])
+        reg = RealSettingsRegistry()
+        _, hw = reg.attach(key_for(pc), pc, exclude_params=frozenset({'axis_settings'}))
+        names = {ch.name() for ch in hw.children()}
+        assert 'voltage' in names
+        assert 'axis_settings' not in names
+        reg.close_all()
+
+
+# ---------------------------------------------------------------------------
+# strip_params (pure-Python, no Qt required)
+# ---------------------------------------------------------------------------
+
+class TestStripParams:
+    """strip_params must remove named nodes and handle nested paths."""
+
+    def _p(self, name, children=None):
+        d = {'name': name, 'type': 'str'}
+        if children is not None:
+            d['children'] = children
+        return d
+
+    def test_empty_exclude_returns_all(self):
+        params = [self._p('a'), self._p('b')]
+        assert strip_params(params, frozenset()) == params
+
+    def test_top_level_name_stripped(self):
+        params = [self._p('units'), self._p('voltage')]
+        result = strip_params(params, frozenset({'units'}))
+        assert [p['name'] for p in result] == ['voltage']
+
+    def test_multiple_top_level_stripped(self):
+        params = [self._p('units'), self._p('epsilon'), self._p('voltage')]
+        result = strip_params(params, frozenset({'units', 'epsilon'}))
+        assert [p['name'] for p in result] == ['voltage']
+
+    def test_nested_path_strips_child_keeps_parent(self):
+        controller = self._p('controller', children=[
+            self._p('controller_ID'),
+            self._p('axis'),
+        ])
+        params = [self._p('voltage'), controller]
+        result = strip_params(params, frozenset({('controller', 'axis')}))
+        names = [p['name'] for p in result]
+        assert 'voltage' in names
+        assert 'controller' in names
+        ctrl = next(p for p in result if p['name'] == 'controller')
+        child_names = [c['name'] for c in ctrl['children']]
+        assert 'controller_ID' in child_names
+        assert 'axis' not in child_names
+
+    def test_does_not_mutate_original(self):
+        controller = self._p('controller', children=[
+            self._p('controller_ID'),
+            self._p('axis'),
+        ])
+        params = [controller]
+        _ = strip_params(params, frozenset({('controller', 'axis')}))
+        # Original must be untouched.
+        orig_children = [c['name'] for c in controller['children']]
+        assert 'axis' in orig_children
+
+    def test_unknown_name_is_noop(self):
+        params = [self._p('voltage')]
+        result = strip_params(params, frozenset({'nonexistent'}))
+        assert [p['name'] for p in result] == ['voltage']
+
+    def test_combined_top_and_nested(self):
+        """Units (top-level) and axis (nested) are both stripped; voltage and
+        controller_ID survive."""
+        controller = self._p('controller', children=[
+            self._p('controller_ID'),
+            self._p('axis'),
+        ])
+        params = [self._p('units'), self._p('voltage'), controller]
+        result = strip_params(
+            params,
+            frozenset({'units', ('controller', 'axis')}),
+        )
+        top_names = [p['name'] for p in result]
+        assert top_names == ['voltage', 'controller']
+        ctrl = next(p for p in result if p['name'] == 'controller')
+        child_names = [c['name'] for c in ctrl['children']]
+        assert child_names == ['controller_ID']

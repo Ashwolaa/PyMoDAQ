@@ -142,6 +142,29 @@ class ControlModuleUI(CustomApp):
         if hasattr(self, '_init_action_name') and self._init_action_name in self.actions_names:
             self.connect_action(self._init_action_name, self.send_init)
 
+    def use_shared_settings_action(self, shared_action, shared_panel) -> None:
+        """Add a shared hardware-settings action alongside this module's own one.
+
+        The per-module settings button (axis, units, epsilon, …) is kept
+        fully visible and functional.  ``shared_action`` is appended to every
+        toolbar as an *extra* button that opens the shared hardware panel.
+
+        Call :meth:`release_shared_settings_action` on detach to remove it.
+        """
+        self._shared_hw_action = shared_action
+        for toolbar in self.toolbars:
+            toolbar.addAction(shared_action)
+
+    def release_shared_settings_action(self) -> None:
+        """Remove the shared hardware-settings action added by
+        :meth:`use_shared_settings_action`.
+        """
+        shared_action = getattr(self, '_shared_hw_action', None)
+        if shared_action is not None:
+            for toolbar in self.toolbars:
+                toolbar.removeAction(shared_action)
+            del self._shared_hw_action
+
     def close(self):
         """Close and clean up the settings widget. Subclasses should call super().close()."""
         if self._settings_widget is not None:
