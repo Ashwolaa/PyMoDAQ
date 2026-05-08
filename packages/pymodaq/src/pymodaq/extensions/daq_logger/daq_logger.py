@@ -19,7 +19,7 @@ from pymodaq_gui.parameter import ioxml
 from qtpy import QtWidgets
 from qtpy.QtCore import QObject, Slot, QThread, Signal, Qt
 
-from pymodaq_gui.utils.widgets import QLED
+from pymodaq_gui.utils.widgets import MultistateLED, StatusPalette
 
 
 from pymodaq.extensions.daq_logger.h5logging import H5Logger
@@ -124,9 +124,15 @@ class DAQ_Logger(CustomExt):
         self.start_log_time.setToolTip('Logging started at:')
         self.statusbar.addPermanentWidget(self.start_log_time)
 
-        self.logging_state = QLED()
-        self.logging_state.setToolTip('logging status: green (running), red (idle)')
-        self.logging_state.clickable = False
+        self.logging_state = MultistateLED(
+            states=[
+                ('idle',    StatusPalette.color('off')),
+                ('running', StatusPalette.color('running')),
+                ('error',   StatusPalette.color('critical')),
+            ],
+            readonly=True,
+        )
+        self.logging_state.setToolTip('Logging state: idle / running / error')
         self.statusbar.addPermanentWidget(self.logging_state)
 
     def connect_things(self):
@@ -305,9 +311,8 @@ class DAQ_Logger(CustomExt):
 
         self._actions['start'].setEnabled(False)
         QtWidgets.QApplication.processEvents()
-        self.logging_state.set_as_false()
-
         self.command_DAQ_signal.emit(["start_logging"])
+        self.logging_state.set_state('running')
         self.status_widget.setText('Running acquisition')
 
     def stop_logging(self):
@@ -328,6 +333,7 @@ class DAQ_Logger(CustomExt):
         else:
             status = 'Data Logging has been stopped due to overshoot'
 
+        self.logging_state.set_state('idle')
         self.update_status(status)
         self._actions['start'].setEnabled(True)
 

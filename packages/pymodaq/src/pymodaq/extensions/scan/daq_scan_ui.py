@@ -17,7 +17,7 @@ from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_gui.utils import CustomApp
 from pymodaq_gui.utils import Dock
 from pymodaq_gui.utils.widgets.spinbox import QSpinBox_ro
-from pymodaq_gui.utils.widgets import QLED
+from pymodaq_gui.utils.widgets import QLED, MultistateLED, StatusPalette
 from pymodaq_gui.plotting.data_viewers.viewer import ViewerDispatcher
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
 from pymodaq_gui.parameter import ParameterTree
@@ -207,10 +207,16 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
         self._indice_average_sb = QSpinBox_ro()
         self._indice_average_sb.setToolTip('Current average value')
         
-        self._scan_done_LED = QLED()
-        self._scan_done_LED.set_as_false()
-        self._scan_done_LED.clickable = False
-        self._scan_done_LED.setToolTip('Scan done state')
+        self._scan_done_LED = MultistateLED(
+            states=[
+                ('idle',     StatusPalette.color('off')),
+                ('running',  StatusPalette.color('running')),
+                ('complete', StatusPalette.color('idle')),
+                ('error',    StatusPalette.color('critical')),
+            ],
+            readonly=True,
+        )
+        self._scan_done_LED.setToolTip('Scan state: idle / running / complete / error')
 
         self._file_open_LED = QLED()
         self._file_open_LED.set_as_false()
@@ -255,8 +261,13 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
     def set_scan_step_average(self, step_ind: int):
         self._indice_average_sb.setValue(step_ind)
 
+    def set_scan_state(self, state: str):
+        """Set the scan LED to a named state: 'idle', 'running', 'complete', or 'error'."""
+        self._scan_done_LED.set_state(state)
+
     def set_scan_done(self, done=True):
-        self._scan_done_LED.set_as(done)
+        """Compatibility shim: True → 'complete', False → 'running'."""
+        self._scan_done_LED.set_state('complete' if done else 'running')
 
     def set_file_open(self, is_open: bool):
         """Update the file-open status LED.
