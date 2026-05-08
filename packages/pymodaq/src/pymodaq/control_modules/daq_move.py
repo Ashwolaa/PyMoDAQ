@@ -38,13 +38,12 @@ from pymodaq_gui.qt_utils import mkQApp
 from pymodaq.utils.h5modules import module_saving
 from pymodaq.control_modules.instruments import ACTUATOR_TYPES, ACTUATOR_NAMES
 from pymodaq.control_modules.utils import ParameterControlModule, HardwareWorkerBase
-from pymodaq.control_modules.ct_module import ControllerThreadModule
 
 from pymodaq.control_modules.thread_commands import (ThreadStatus, ThreadStatusMove, ControlToHardware,
                                                      ControlToHardwareMove, UiToMainMove,
                                                      )
 from pymodaq.control_modules.move_utility_classes import (ThreadCommand, MoveCommand, DAQ_Move_base, DataActuatorType,
-                                                           check_units, DataUnitError)
+                                                           check_units)
 
 
 from pymodaq.control_modules.move_utility_classes import params as daq_move_params
@@ -53,7 +52,6 @@ from pymodaq import Q_, Unit
 
 
 from pymodaq.control_modules.daq_move_ui.factory import ActuatorUIFactory
-from pymodaq.control_modules.controller_thread import ControllerThread, ControlCommand
 
 if TYPE_CHECKING:
     from pymodaq.control_modules.daq_move_ui.ui_base import DAQ_Move_UI_Base
@@ -68,125 +66,8 @@ HardwareController = TypeVar("HardwareController")
 
 STATUS_WAIT_TIME = 1000
 
-# Per-channel param names emitted flat by old-style plugins (pre-axis_settings).
-# Used by _to_module_params and the path-remapping bridge in ct_module.
-_FLAT_PER_CHANNEL: frozenset = frozenset({'units', 'epsilon', 'timeout', 'bounds', 'scaling'})
 
-
-def _upgrade_axis_settings(existing_as: dict, params: list) -> list:
-    """Convert an existing axis_settings from flat to per-axis sub-group format if needed.
-
-    Returns the params list unchanged if already in the correct format or
-    if it's single-axis. Converts flat multi-axis axis_settings to per-axis groups.
-    """
-    children = existing_as.get('children', [])
-    axis_child = next((c for c in children if c.get('name') == 'axis'), None)
-
-    if axis_child is None:
-        # No axis selector: single-axis flat, no change needed
-        return params
-
-    limits = axis_child.get('limits', [])
-    axis_names_list = list(limits.keys()) if isinstance(limits, dict) else list(limits)
-
-    if len(axis_names_list) <= 1:
-        # Single-axis (or empty), keep flat
-        return params
-
-    # Check if already has per-axis sub-groups
-    child_names = {c.get('name') for c in children}
-    if any(str(n) in child_names for n in axis_names_list):
-        # Already new format
-        return params
-
-    # Flat multi-axis: convert to per-axis sub-groups
-    flat_per_channel = [c for c in children if c.get('name') != 'axis']
-    per_axis = [
-        {'title': f'{n}:', 'name': str(n), 'type': 'group',
-         'children': list(flat_per_channel)}
-        for n in axis_names_list
-    ]
-    new_as = {**existing_as, 'children': [axis_child] + per_axis}
-    return [p if p.get('name') != 'axis_settings' else new_as for p in params]
-
-
-def _to_module_params(params: list) -> list:
-    """Re-group a plugin's flat params list into the module-side layout.
-
-    Converts the flat output of old-style ``comon_parameters_fun`` into the
-    structured layout expected by the module's local settings tree:
-
-    - ``units``, ``epsilon``, ``timeout``, ``bounds``, ``scaling`` are
-      collected into an ``axis_settings`` group.
-    - ``axis`` (from inside the ``controller`` group) is moved into
-      ``axis_settings`` as well.
-    - For multi-axis plugins, per-axis sub-groups are created inside
-      ``axis_settings`` (one sub-group per axis name).
-    - ``controller_ID`` and ``controller_status`` stay in ``controller``.
-    - All other (plugin-specific hardware) params remain at the top level.
-
-    If the input already contains an ``axis_settings`` group (new-style
-    plugins that use the restructured ``comon_parameters_fun``), the list
-    is passed through _upgrade_axis_settings to ensure per-axis sub-groups
-    exist for multi-axis plugins.
-    """
-    # New-style plugin: has axis_settings already. Upgrade if needed.
-    existing_as = next((p for p in params if p.get('name') == 'axis_settings'), None)
-    if existing_as is not None:
-        return _upgrade_axis_settings(existing_as, params)
-
-    # Old-style plugin: flat layout with axis in controller group
-    axis_child = None
-    flat_per_channel: list = []
-    hardware: list = []
-
-    for p in params:
-        name = p.get('name', '')
-        if name in _FLAT_PER_CHANNEL:
-            flat_per_channel.append(p)
-        elif name == 'controller':
-            ctrl_children = []
-            for child in p.get('children', []):
-                if child.get('name') == 'axis':
-                    axis_child = child
-                else:
-                    ctrl_children.append(child)
-            hardware.append({**p, 'children': ctrl_children})
-        else:
-            hardware.append(p)
-
-    if not flat_per_channel and axis_child is None:
-        return hardware  # no per-channel params at all
-
-    # Determine axis names from the axis child
-    if axis_child is not None:
-        limits = axis_child.get('limits', [])
-        axis_names_list = list(limits.keys()) if isinstance(limits, dict) else list(limits)
-    else:
-        axis_names_list = []
-
-    # Build axis_settings children
-    if len(axis_names_list) > 1 and flat_per_channel:
-        # Multi-axis: create per-axis sub-groups
-        as_children = [axis_child] + [
-            {'title': f'{n}:', 'name': str(n), 'type': 'group',
-             'children': list(flat_per_channel)}
-            for n in axis_names_list
-        ]
-    else:
-        # Single-axis or no axis: flat axis_settings (axis first if present)
-        as_children = ([axis_child] if axis_child is not None else []) + flat_per_channel
-
-    hardware.append({
-        'title': 'Axis Settings:',
-        'name': 'axis_settings',
-        'type': 'group',
-        'children': as_children,
-    })
-    return hardware
-
-
-class DAQ_Move(ControllerThreadModule):
+class DAQ_Move(ParameterControlModule):
     """Main PyMoDAQ class to drive actuators
 
     Qt object and generic UI to drive actuators.
@@ -208,50 +89,11 @@ class DAQ_Move(ControllerThreadModule):
     _hw_kind = 'actuator'
     _ini_hw_cmd = ControlToHardware.INI_HARDWARE
 
-    # Per-channel (per-DAQ-module) params: each axis owns its own values for
-    # Per-channel parameters live in each module's local axis_settings group.
-    # They are never relayed to the shared hw_settings or mirrored to other
-    # subscribers.  Old-style plugins emit flat paths; _map_to_module_path
-    # normalises them to ['axis_settings', ...] before the check.
-    _PER_CHANNEL_PARAMS: frozenset = frozenset({'axis_settings'})
-
-    def _map_to_module_path(self, path: list) -> list:
-        """Normalise flat plugin paths to the axis_settings grouped layout.
-
-        Old-style plugins emit ``['units']``; new-style flat emit
-        ``['axis_settings', 'units']``; new multi-axis emit
-        ``['axis_settings', axis_name, 'units']``.
-
-        For multi-axis plugins (self._channel != '' and not None),
-        flat per-channel params are routed through the channel sub-group.
-        """
-        if not path:
-            return list(path)
-        # Flat per-channel name from old-style plugin
-        if path[0] in _FLAT_PER_CHANNEL:
-            ch = getattr(self, '_channel', None) or ''
-            if ch:
-                return ['axis_settings', ch] + list(path)
-            return ['axis_settings'] + list(path)
-        # axis in controller → axis_settings.axis
-        if path[0] == 'controller' and len(path) > 1 and path[1] == 'axis':
-            return ['axis_settings', 'axis'] + list(path[2:])
-        # Intermediate: ['axis_settings', 'units'] → route through channel for multi-axis
-        if (path[0] == 'axis_settings' and len(path) >= 2
-                and path[1] in _FLAT_PER_CHANNEL):
-            ch = getattr(self, '_channel', None) or ''
-            if ch:
-                return ['axis_settings', ch] + list(path[1:])
-        return list(path)
-
     move_done_signal = Signal(DataActuator)
     current_value_signal = Signal(DataActuator)
     bounds_signal = Signal(bool)
 
-    # Actuator-specific cross-thread signal (write command or ControlCommand).
-    _write_request = Signal(str, object)   # (channel, value|ControlCommand) → ct.request_write
-
-    params = daq_move_params +  [
+    params = daq_move_params + [
         {'title': 'Saver Settings:', 'name': 'saver_settings', 'type': 'group',
          'visible': True, 'children': H5Saver.get_params_for_save_type(SaveType.actuator), 'expanded': False}]
 
@@ -273,8 +115,6 @@ class DAQ_Move(ControllerThreadModule):
         self.logger = set_logger(f"{logger.name}.{title}")
         self.logger.info(f"Initializing DAQ_Move: {title}")
 
-        # CT attributes (_ct, _ct_key, _channel, _hw_settings) are initialised
-        # by ControllerThreadModule.__init__ before ParameterControlModule runs.
         super().__init__(listener_class=MoveActorListener, action_list=("save", "update"), **kwargs)
 
         if not (
@@ -320,7 +160,6 @@ class DAQ_Move(ControllerThreadModule):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.timeout.connect(self.get_actuator_value)
 
-
     # -------------------------------------------------------------------------
     # Properties
     # -------------------------------------------------------------------------
@@ -331,21 +170,9 @@ class DAQ_Move(ControllerThreadModule):
             self.current_value.origin = self.title
         return self._current_value
 
-    def _axis_setting(self, *path):
-        """Read a per-channel param from the module's local axis_settings group.
-
-        For multi-axis plugins (axis_name != ''), routes through the current
-        axis sub-group, e.g. ``('epsilon',)`` → ``axis_settings.{axis_name}.epsilon``.
-        For single-axis plugins, reads directly from ``axis_settings``.
-        """
-        ax = self.axis_name  # '' for single-axis
-        if ax:
-            return self.settings[self._hw_settings_name, 'axis_settings', ax, *path]
-        return self.settings[self._hw_settings_name, 'axis_settings', *path]
-
     @property
     def epsilon(self) -> float:
-        return self._axis_setting('epsilon')
+        return self.settings[self._hw_settings_name, 'epsilon']
 
     @property
     def move_done_bool(self):
@@ -377,30 +204,12 @@ class DAQ_Move(ControllerThreadModule):
 
     @property
     def units(self):
-        """Get/Set the units for this channel.
-
-        Units are **per-channel**, not per-controller: a multi-axis plugin may
-        have ``{'x': 'µm', 'y': 'mm'}``.  Each ``DAQ_Move`` instance tracks
-        its own axis's units in the local ``self.settings`` subtree, which is
-        updated by ``_on_hw_settings_changed`` only when the reported channel
-        matches ``self._channel``.
-
-        For multi-axis plugins, reads from ``axis_settings.{axis_name}.units``.
-        For single-axis plugins, reads from ``axis_settings.units``.
-        """
-        return self._axis_setting('units')
+        """Get/Set the units for the controller"""
+        return self.settings[self._hw_settings_name, "units"]
 
     @units.setter
     def units(self, unit: str):
-        ax = self.axis_name  # '' for single-axis
-        if ax:
-            self.settings.child(self._hw_settings_name, 'axis_settings', ax, 'units').setValue(unit)
-        else:
-            self.settings.child(self._hw_settings_name, 'axis_settings', 'units').setValue(unit)
-        self._update_units_ui(unit)
-
-    def _update_units_ui(self, unit: str) -> None:
-        """Apply unit string to the UI suffix/prefix (no Parameter writes)."""
+        self.settings.child(self._hw_settings_name, "units").setValue(unit)
         if self.ui is not None and config("pymodaq", "actuator", "display_units"):
             unit = self.get_unit_to_display(unit)
             self.ui.set_unit_as_suffix(unit)
@@ -412,31 +221,24 @@ class DAQ_Move(ControllerThreadModule):
     @property
     def axis_names(self) -> Union[List, Dict]:
         """ Get the names of all possible axis"""
-        return self.settings.child(
-            self._hw_settings_name, 'axis_settings', 'axis'
-        ).opts['limits']
+        return self.settings.child(self._hw_settings_name, 'controller', 'axis').opts['limits']
 
     @property
     def axis_name(self) -> str:
-        """Get/Set the axis for this module.
-
-        Reads from LOCAL settings so each DAQ_Move instance keeps its own
-        axis selection independently of other subscribers on the same CT.
-        """
-        param = self.settings.child(self._hw_settings_name, 'axis_settings', 'axis')
-        limits = param.opts['limits']
-        val = param.value()
+        """ Get/Set the current axis"""
+        limits = self.settings.child(self._hw_settings_name, 'controller', 'axis').opts['limits']
+        val = self.settings[self._hw_settings_name, 'controller', 'axis']
         if isinstance(limits, list):
             return val
         elif isinstance(limits, dict):
             return find_keys_from_val(limits, val=val)[0]
         else:
-            raise TypeError('Unknown limits type')
+            TypeError('Unknown limits type')
 
     @axis_name.setter
     def axis_name(self, name: str):
-        param = self.settings.child(self._hw_settings_name, 'axis_settings', 'axis')
-        limits = param.opts['limits']
+        """ Get/Set the current axis"""
+        limits = self.settings.child(self._hw_settings_name, 'controller', 'axis').opts['limits']
         if name in limits:
             if isinstance(limits, list):
                 value = name
@@ -444,8 +246,7 @@ class DAQ_Move(ControllerThreadModule):
                 value = limits[name]
             else:
                 return
-            param.setValue(value)
-            self._channel = name
+            self.settings.child(self._hw_settings_name, 'controller', 'axis').setValue(value)
 
     # -------------------------------------------------------------------------
     # UI command processing
@@ -501,57 +302,15 @@ class DAQ_Move(ControllerThreadModule):
             self._relative_value = cmd.attribute
 
     # -------------------------------------------------------------------------
-    # Hardware lifecycle hooks (ControllerThreadModule interface)
+    # Hardware lifecycle hooks
     # -------------------------------------------------------------------------
 
     def _pre_close_hardware(self):
-        """Stop the refresh timer before closing."""
+        """Stop the refresh timer before closing so no more commands reach the hardware thread."""
         self._refresh_timer.stop()
 
     def _create_hardware(self):
         return ActuatorWorker(self._actuator_type, self._current_value, self._title)
-
-    def _get_plugin_class(self) -> type:
-        """Return the plugin class for the currently selected actuator type."""
-        parent_module = utils.find_dict_in_list_from_key_val(
-            ACTUATOR_TYPES, "name", self._actuator_type
-        )
-        return getattr(
-            getattr(parent_module["module"], "daq_move_" + self._actuator_type),
-            "DAQ_Move_" + self._actuator_type,
-        )
-
-    def _derive_channel(self) -> str:
-        """Return the current axis name as the channel ('' for single-axis)."""
-        return self.axis_name
-
-    def _connect_ct_signals(self, ct: 'ControllerThread') -> None:
-        ct.change_done.connect(self._on_change_done)
-        ct.data_ready.connect(self._on_data_ready)
-        self._write_request.connect(ct.request_write)
-
-    def _disconnect_ct_signals(self, ct: 'ControllerThread') -> None:
-        try:
-            ct.change_done.disconnect(self._on_change_done)
-            ct.data_ready.disconnect(self._on_data_ready)
-            self._write_request.disconnect(ct.request_write)
-        except Exception:
-            pass
-
-    def _on_hardware_connected(self) -> None:
-        """Trigger an initial position read after hardware comes up."""
-        self.get_actuator_value()
-
-    def _on_per_channel_param_changed(self, path: list, data) -> None:
-        """Update the units suffix/prefix in the UI when the axis unit changes.
-
-        *path* is already normalised to the module layout by _map_to_module_path.
-        For single-axis: ``['axis_settings', 'units']``.
-        For multi-axis: ``['axis_settings', axis_name, 'units']``.
-        """
-        if (path and path[0] == 'axis_settings' and 'units' in path
-                and isinstance(data, str)):
-            self._update_units_ui(data)
 
     # -------------------------------------------------------------------------
     # Acquisition API
@@ -595,18 +354,24 @@ class DAQ_Move(ControllerThreadModule):
         try:
             if isinstance(value, Number):
                 value = DataActuator(
-                    self.title, data=[np.array([value])], units=self.units
+                    self.title, data=[np.array([value])], units=self.units,
                 )
             self._send_to_leco = send_to_leco
-            if value.equal_to(self._current_value, Q_(self.epsilon, self.units)):
-                self._on_change_done(self._channel, value)
+            if value.equal_to(self._current_value, self.epsilon):
+                self.thread_status(ThreadCommand(ThreadStatusMove.MOVE_DONE, value))
             else:
                 if self.ui is not None:
                     self.ui.move_done = False
                 self._move_done_bool = False
                 self._target_value = value
                 self.update_status("Moving")
-                self._write_request.emit(self._channel, value)
+                self.command_hardware.emit(
+                    ThreadCommand(ControlToHardwareMove.RESET_STOP_MOTION),
+                )
+                self.command_hardware.emit(
+                    ThreadCommand(ControlToHardwareMove.MOVE_ABS, attribute=[value]),
+                )
+
         except Exception as e:
             self.logger.exception(str(e))
 
@@ -624,12 +389,16 @@ class DAQ_Move(ControllerThreadModule):
                 self.ui.move_done = False
             self._move_done_bool = False
             self.update_status("Moving")
-            self._write_request.emit(self._channel, ControlCommand.HOME)
+            self.command_hardware.emit(
+                ThreadCommand(ControlToHardwareMove.RESET_STOP_MOTION),
+            )
+            self.command_hardware.emit(ThreadCommand(ControlToHardwareMove.MOVE_HOME))
+
         except Exception as e:
             self.logger.exception(str(e))
 
     def move_rel(
-        self, rel_value: Union[DataActuator, numbers.Number], send_to_leco=False
+        self, rel_value: Union[DataActuator, numbers.Number], send_to_leco=False,
     ):
         """Move the connected hardware to the relative value
 
@@ -646,16 +415,21 @@ class DAQ_Move(ControllerThreadModule):
         try:
             if isinstance(rel_value, Number):
                 rel_value = DataActuator(
-                    self.title, data=[np.array([rel_value])], units=self.units
+                    self.title, data=[np.array([rel_value])], units=self.units,
                 )
             self._send_to_leco = send_to_leco
             if self.ui is not None:
                 self.ui.move_done = False
             self._move_done_bool = False
-            abs_value = self._current_value + rel_value
-            self._target_value = abs_value
+            self._target_value = self._current_value + rel_value
             self.update_status("Moving")
-            self._write_request.emit(self._channel, abs_value)
+            self.command_hardware.emit(
+                ThreadCommand(ControlToHardwareMove.RESET_STOP_MOTION),
+            )
+            self.command_hardware.emit(
+                ThreadCommand(ControlToHardwareMove.MOVE_REL, attribute=[rel_value]),
+            )
+
         except Exception as e:
             self.logger.exception(str(e))
 
@@ -666,20 +440,21 @@ class DAQ_Move(ControllerThreadModule):
         self.move_rel(-self._relative_value)
 
     def get_actuator_value(self, send_to_leco=False):
-        """Get the current actuator value.
+        """Get the current actuator value via the "get_actuator_value" command send to the hardware
 
-        Returns nothing but ``current_value_signal`` will be emitted once the
-        read completes.
-
+        Returns nothing but the  `move_done_signal` will be send once the action is done
         Parameters
         ----------
         send_to_leco: bool
             if True, this position is send through the LECO communication canal
         """
         self._send_to_leco = send_to_leco
+
         try:
-            if self._ct is not None:
-                self._read_request.emit(self._channel)
+            self.command_hardware.emit(
+                ThreadCommand(ControlToHardwareMove.GET_ACTUATOR_VALUE)
+            )
+
         except Exception as e:
             self.logger.exception(str(e))
 
@@ -709,10 +484,9 @@ class DAQ_Move(ControllerThreadModule):
         self.get_continuous_actuator_value(False)
 
     def stop_motion(self):
-        """Abort the current motion by sending a STOP command to the hardware thread."""
+        """Stop any motion"""
         try:
-            if self._ct is not None:
-                self._write_request.emit(self._channel, ControlCommand.STOP)
+            self.command_hardware.emit(ThreadCommand(ControlToHardwareMove.STOP_MOTION))
         except Exception as e:
             self.logger.exception(str(e))
 
@@ -842,9 +616,8 @@ class DAQ_Move(ControllerThreadModule):
             getattr(parent_module["module"], "daq_move_" + self._actuator_type),
             "DAQ_Move_" + self._actuator_type,
         )
-        raw_params = getattr(class_, "params")
-        grouped = _to_module_params(list(raw_params))
-        return Parameter.create(name=self._hw_settings_name, type="group", children=grouped)
+        params = getattr(class_, "params")
+        return Parameter.create(name=self._hw_settings_name, type="group", children=params)
 
     def _reload_plugin_settings(self):
         """Reload plugin settings, also updating the move_type in main_settings."""
@@ -853,13 +626,6 @@ class DAQ_Move(ControllerThreadModule):
 
     def _module_value_changed(self, param: Parameter):
         """Handle actuator-specific parameter changes."""
-        super()._module_value_changed(param)  # CT settings forwarding (base class)
-
-        if param.name() == 'axis':
-            path = self.settings.childPath(param) or []
-            if 'axis_settings' in path:
-                self._channel = self.axis_name
-
         if param.name() == "refresh_timeout":
             self._refresh_timer.setInterval(param.value())
         elif param.name() in putils.iter_children(self.settings.child('saver_settings'), []):
@@ -869,44 +635,7 @@ class DAQ_Move(ControllerThreadModule):
             self.h5saver.settings.child(*path[1:]).setValue(param.value())
 
     # -------------------------------------------------------------------------
-    # ControllerThread subscriber slots
-    # -------------------------------------------------------------------------
-
-    @Slot(str, object)
-    def _on_change_done(self, channel: str, value):
-        """Receive move completion from ControllerThread."""
-        if channel and channel != self._channel:
-            return
-        data_act = self._check_data_type(value)
-        self._current_value = data_act
-        self._move_done_bool = True
-        if self.ui is not None:
-            self.ui.display_value(data_act)
-            self.ui.move_done = True
-        data_act.origin = data_act.origin or self.title
-        self.move_done_signal.emit(data_act)
-        if self.settings['main_settings', 'leco', 'leco_connected'] and self._send_to_leco:
-            self._leco_commands_signal.emit(ThreadCommand(LECOMoveCommands.MOVE_DONE, data_act))
-
-    @Slot(str, object)
-    def _on_data_ready(self, channel: str, value):
-        """Receive a position read from ControllerThread."""
-        if channel and channel != self._channel:
-            return
-        data_act = self._check_data_type(value)
-        self._current_value = data_act
-        if self.ui is not None:
-            self.ui.display_value(data_act)
-            if self.ui.has_action("show_graph") and not self.ui.is_action_checked("show_graph"):
-                self.ui.show_data(DataToExport(name=self.title, data=[data_act]))
-        if self.settings['saver_settings', 'do_save']:
-            self.append_data()
-        self.current_value_signal.emit(data_act)
-        if self.settings['main_settings', 'leco', 'leco_connected'] and self._send_to_leco:
-            self._leco_commands_signal.emit(ThreadCommand(LECOMoveCommands.POSITION, data_act))
-
-    # -------------------------------------------------------------------------
-    # Thread status handler (legacy — kept for LECO and custom_sig consumers)
+    # Thread status handler
     # -------------------------------------------------------------------------
 
     def _check_data_type(
@@ -916,9 +645,7 @@ class DAQ_Move(ControllerThreadModule):
 
         Mostly to make sure DAQ_Move is backcompatible with old style plugins
         """
-        if isinstance(data_act, Number):  # plain float/int from old-style plugins
-            data_act = DataActuator(data=float(data_act), units=self.units)
-        elif isinstance(data_act, list):  # backcompatibility
+        if isinstance(data_act, list):  # backcompatibility
             if isinstance(data_act[0], Number):
                 data_act = DataActuator(
                     data=[np.atleast_1d(val) for val in data_act], units=self.units
@@ -944,7 +671,7 @@ class DAQ_Move(ControllerThreadModule):
 
     @Slot(ThreadCommand)
     def thread_status(
-        self, status: ThreadCommand
+        self, status: ThreadCommand,
     ):  # general function to get datas/infos from all threads back to the main
         """Get back info (using the ThreadCommand object) from the hardware
 
@@ -972,7 +699,7 @@ class DAQ_Move(ControllerThreadModule):
         if status.command == ThreadStatus.INI_HARDWARE or status.command == ThreadStatusMove.INI_STAGE:
             self.update_status(
                 f"Stage initialized: {status.attribute['initialized']} "
-                f"info: {status.attribute['info']}"
+                f"info: {status.attribute['info']}",
             )
             if status.attribute["initialized"]:
                 self.controller = status.attribute["controller"]
@@ -993,7 +720,7 @@ class DAQ_Move(ControllerThreadModule):
             if self.ui is not None:
                 self.ui.display_value(data_act)
                 if self.ui.has_action("show_graph") and not self.ui.is_action_checked(
-                    "show_graph"
+                    "show_graph",
                 ):
                     self.ui.show_data(DataToExport(name=self.title, data=[data_act]))
 
@@ -1058,7 +785,7 @@ class DAQ_Move(ControllerThreadModule):
             self.move_rel(status.attribute, send_to_leco=True)
         elif status.command == LECOMoveCommands.MOVE_HOME:
             self.move_home(send_to_leco=True)
-        elif status.command ==  LECOMoveCommands.GET_ACTUATOR_VALUE:
+        elif status.command == LECOMoveCommands.GET_ACTUATOR_VALUE:
             self.get_actuator_value(send_to_leco=True)
         elif status.command == LECOMoveCommands.STOP:
             self.stop_motion()
@@ -1150,7 +877,7 @@ class ActuatorWorker(HardwareWorkerBase):
                     controller
                 )  # return edict(info="", controller=, stage=)
             except Exception as e:
-                logger.exception("Hardware couldn't be initialized", exc_info=e)
+                self.logger.exception("Hardware couldn't be initialized", exc_info=e)
                 infos = str(e), False
 
             if isinstance(infos, edict):  # following old plugin templating
@@ -1169,8 +896,8 @@ class ActuatorWorker(HardwareWorkerBase):
             if status.initialized:
                 self.status_sig.emit(
                     ThreadCommand(
-                        ThreadStatusMove.GET_ACTUATOR_VALUE, self.get_actuator_value()
-                    )
+                        ThreadStatusMove.GET_ACTUATOR_VALUE, self.get_actuator_value(),
+                    ),
                 )
 
             return status
@@ -1234,7 +961,7 @@ class ActuatorWorker(HardwareWorkerBase):
         self._move_completed = True
         self._current_value = pos
         self.status_sig.emit(
-            ThreadCommand(command=ThreadStatusMove.MOVE_DONE, attribute=pos)
+            ThreadCommand(command=ThreadStatusMove.MOVE_DONE, attribute=pos),
         )
 
     @Slot(ThreadCommand)
@@ -1267,7 +994,7 @@ class ActuatorWorker(HardwareWorkerBase):
             elif command.command == ControlToHardwareMove.GET_ACTUATOR_VALUE:
                 pos = self.get_actuator_value()
                 self.status_sig.emit(
-                    ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos)
+                    ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos),
                 )
 
             elif command.command == ControlToHardwareMove.STOP_MOTION:

@@ -95,7 +95,7 @@ def comon_parameters(epsilon=config('pymodaq', 'actuator', 'epsilon_default'),
             {'title': 'Bounds:', 'name': 'bounds', 'type': 'group', 'children': [
                 {'title': 'Set Bounds:', 'name': 'is_bounds', 'type': 'bool', 'value': False},
                 {'title': 'Min:', 'name': 'min_bound', 'type': 'float', 'value': 0, 'default': 0},
-                {'title': 'Max:', 'name': 'max_bound', 'type': 'float', 'value': 1, 'default': 1}, ]},
+                {'title': 'Max:', 'name': 'max_bound', 'type': 'float', 'value': 1, 'default': 1}]},
             {'title': 'Scaling:', 'name': 'scaling', 'type': 'group', 'children': [
                 {'title': 'Use scaling:', 'name': 'use_scaling', 'type': 'bool', 'value': False,
                  'default': False},
@@ -161,74 +161,20 @@ def comon_parameters_fun(is_multiaxes=False, axes_names=None,
             axis_names = ['']
             axis_name = ''
     elif isinstance(axis_names, dict):
-        if len(axis_names) > 0:
-            axis_name = list(axis_names.keys())[0]
-        else:
-            axis_names = ['']
-            axis_name = ''
+        axis_name = axis_names[list(axis_names.keys())[0]]
     else:
         raise ValueError('axis_names should be either a list of string or a dict with strings '
                          'as keys')
 
-    # Controller group: no axis child (axis lives in axis_settings)
-    controller_status_param = create_controller_param()
+    controller_status_param = create_controller_param(axis_name, axis_names.copy())
 
-    # Build axis_settings.
-    # Multi-axis: one named sub-group per axis so presets store all axes' settings
-    # and params_state restores correctly when the module passes it back to the plugin.
-    # Single-axis: flat layout (no sub-groups needed since there is no choice).
-    if is_multiaxes:
-        if isinstance(axis_names, list):
-            axis_selector = {
-                'title': 'Axis:', 'name': 'axis', 'type': 'list',
-                'limits': list(axis_names), 'value': axis_name,
-                VALID_FOR_CONFIGURATION: False,
-            }
-            names_list = list(axis_names)
-        else:
-            axis_selector = {
-                'title': 'Axis:', 'name': 'axis', 'type': 'list',
-                'limits': dict(axis_names), 'value': axis_names[axis_name],
-                VALID_FOR_CONFIGURATION: False,
-            }
-            names_list = list(axis_names.keys())
-
-        def _eps_for(name):
-            if isinstance(epsilon, (list, tuple)):
-                i = names_list.index(str(name))
-                return epsilon[i] if i < len(epsilon) else epsilon[0]
-            elif isinstance(epsilon, dict):
-                return epsilon.get(name, list(epsilon.values())[0])
-            return epsilon
-
-        per_axis_groups = [
-            {'title': f'{n}:', 'name': str(n), 'type': 'group',
-             'children': comon_parameters(_eps_for(str(n)))}
-            for n in names_list
-        ]
-        axis_settings_param = {
-            'title': 'Axis Settings:', 'name': 'axis_settings', 'type': 'group',
-            'children': [axis_selector] + per_axis_groups,
-        }
-    else:
-        # Single-axis: flat axis_settings with single-element sentinel list
-        axis_selector = {
-            'title': 'Axis:', 'name': 'axis', 'type': 'list',
-            'limits': [''], 'value': '',
-            VALID_FOR_CONFIGURATION: False,
-        }
-        axis_settings_param = {
-            'title': 'Axis Settings:', 'name': 'axis_settings', 'type': 'group',
-            'children': [axis_selector] + comon_parameters(epsilon),
-        }
-
-    params = [controller_status_param, axis_settings_param]
+    params = [controller_status_param] + comon_parameters(epsilon)
     return params
 
 
 params = [
     {'title': 'Main Settings:', 'name': 'main_settings', 'type': 'group', 'children': [
-        {'title': 'Actuator type:', 'name': 'move_type', 'type': 'str', 'value': '', 'readonly': True,},
+        {'title': 'Actuator type:', 'name': 'move_type', 'type': 'str', 'value': '', 'readonly': True},
         {'title': 'Actuator name:', 'name': 'module_name', 'type': 'str', 'value': '', 'readonly': True},
         {'title': 'UI type:', 'name': 'ui_type', 'type': 'list',
          'value': config('pymodaq', 'actuator', 'ui') if config('pymodaq', 'actuator', 'ui') in ActuatorUIFactory.keys() else
@@ -249,21 +195,17 @@ def main(plugin_file, init=True, title='test'):
 
     """
     import sys
-    from qtpy import QtWidgets
-    from pymodaq.control_modules.daq_move import DAQ_Move
     from pathlib import Path
 
     act = Path(plugin_file).stem.split('daq_move_')[1]
 
-    app = mkQApp("PyMoDAQ Viewer")
+    from pymodaq.utils.gui_utils.loader_utils import create_load_daq_move
+    app = mkQApp("PyMoDAQ Move")
+    shared_ui, daq_move = create_load_daq_move('simple')
 
-    widget = QtWidgets.QWidget()
-    prog = DAQ_Move(widget, title=title, actuator=act)
-    widget.show()
-    prog.actuator = Path(plugin_file).stem[9:]
-    if init:
-        prog.init_hardware_ui()
+    daq_move.actuator = act
 
+    shared_ui.show()
     sys.exit(app.exec())
 
 
@@ -392,7 +334,7 @@ class DAQ_Move_base(PluginBase):
     @axis_unit.setter
     def axis_unit(self, unit: str):
         self.axis_units[self.axis_index_key] = unit
-        self.settings.child(*self._per_channel_path('units')).setValue(unit)
+        self.settings.child('units').setValue(unit)
         self.emit_status(ThreadCommand(ThreadStatusMove.UNITS, unit))
 
     @property
@@ -483,26 +425,24 @@ class DAQ_Move_base(PluginBase):
     @property
     def axis_name(self) -> Union[str]:
         """Get/Set the current axis using its string identifier"""
-        axis_child = self.settings.child(*self._per_channel_path('axis'))
-        limits = axis_child.opts['limits']
+        limits = self.settings.child('controller', 'axis').opts['limits']
         if isinstance(limits, list):
-            return axis_child.value()
+            return self.settings['controller', 'axis']
         elif isinstance(limits, dict):
-            return find_keys_from_val(limits, val=axis_child.value())[0]
+            return find_keys_from_val(limits, val=self.settings['controller', 'axis'])[0]
         else:
             return ''
 
     @axis_name.setter
     def axis_name(self, name: str):
-        axis_child = self.settings.child(*self._per_channel_path('axis'))
-        limits = axis_child.opts['limits']
+        limits = self.settings.child('controller', 'axis').opts['limits']
         if name in limits:
             if isinstance(limits, list):
-                axis_child.setValue(name)
+                self.settings.child('controller', 'axis').setValue(name)
             elif isinstance(limits, dict):
-                axis_child.setValue(limits[name])
+                self.settings.child('controller', 'axis').setValue(limits[name])
             self.axis_unit = self.axis_unit
-            self.settings.child(*self._per_channel_path('epsilon')).setValue(self.epsilon)
+            self.settings.child('epsilon').setValue(self.epsilon)
             if self.controller is not None:
                 self._current_value = self.get_actuator_value()
 
@@ -514,11 +454,11 @@ class DAQ_Move_base(PluginBase):
         -------
         List of string or dictionary mapping names to integers
         """
-        return self.settings.child(*self._per_channel_path('axis')).opts['limits']
+        return self.settings.child('controller', 'axis').opts['limits']
 
     @axis_names.setter
     def axis_names(self, names: Union[List, Dict]):
-        self.settings.child(*self._per_channel_path('axis')).setLimits(names)
+        self.settings.child('controller', 'axis').setLimits(names)
 
     @property
     def axis_value(self) -> int:
@@ -544,53 +484,6 @@ class DAQ_Move_base(PluginBase):
             return self.axis_names.index(self.axis_name)
         else:
             return self.axis_name
-
-    def _per_channel_path(self, *path) -> tuple:
-        """Return the correct settings path for a per-channel param.
-
-        Three layouts are recognised:
-
-        * No ``axis_settings`` (truly old plugins):
-          ``'axis'`` → ``('controller', 'axis')``; others → flat top-level.
-        * ``axis_settings`` with flat children (single-axis new-style):
-          ``'axis'`` → ``('axis_settings', 'axis')``; others → ``('axis_settings', *path)``.
-        * ``axis_settings`` with per-axis sub-groups (multi-axis new-style):
-          ``'axis'`` → ``('axis_settings', 'axis')``; others → ``('axis_settings', axis_name, *path)``.
-        """
-        try:
-            axis_settings = self.settings.child('axis_settings')
-        except Exception:
-            # Truly old plugin: axis in controller, other params flat
-            if path and path[0] == 'axis':
-                return ('controller', 'axis') + path[1:]
-            return path
-
-        # axis selector is always directly in axis_settings
-        if path and path[0] == 'axis':
-            return ('axis_settings', 'axis') + path[1:]
-
-        # Check for per-axis sub-groups (multi-axis new-style).
-        # Detect by verifying all axis names appear as group-type children.
-        try:
-            axis_param = axis_settings.child('axis')
-            limits = axis_param.opts.get('limits', [])
-            if isinstance(limits, list):
-                axis_names_list = list(limits)
-            elif isinstance(limits, dict):
-                axis_names_list = list(limits.keys())
-            else:
-                axis_names_list = []
-
-            if len(axis_names_list) > 1 and axis_names_list[0] != '':
-                child_types = {c.name(): c.type() for c in axis_settings.children()}
-                if all(str(n) in child_types and child_types[str(n)] == 'group'
-                       for n in axis_names_list):
-                    return ('axis_settings', self.axis_name) + path
-        except Exception:
-            pass
-
-        # Flat axis_settings (single-axis or intermediate flat layout)
-        return ('axis_settings',) + path
 
     def ini_attributes(self):
         """To be subclassed, in order to init specific attributes needed by the real implementation."""
@@ -712,22 +605,22 @@ class DAQ_Move_base(PluginBase):
 
         Return the new position eventually coerced within the bounds
         """
-        if self.settings[self._per_channel_path('bounds', 'is_bounds')]:
-            min_b = self.settings[self._per_channel_path('bounds', 'min_bound')]
-            max_b = self.settings[self._per_channel_path('bounds', 'max_bound')]
+        if self.settings['bounds', 'is_bounds']:
             if self.data_actuator_type == DataActuatorType.DataActuator:
                 for data_array in position:
-                    if np.any(data_array > max_b) or np.any(data_array < min_b):
+                    if np.any(data_array > self.settings['bounds', 'max_bound']) or \
+                            np.any(data_array < self.settings['bounds', 'min_bound']):
                         self.emit_status(ThreadCommand('outofbounds'))
-                    data_array[data_array > max_b] = max_b
-                    data_array[data_array < min_b] = min_b
+                    data_array[data_array > self.settings['bounds', 'max_bound']] = self.settings['bounds', 'max_bound']
+                    data_array[data_array < self.settings['bounds', 'min_bound']] = self.settings['bounds', 'min_bound']
+
             else:
-                if position > max_b:
+                if position > self.settings['bounds', 'max_bound']:
                     self.emit_status(ThreadCommand('outofbounds'))
-                    position = max_b
-                elif position < min_b:
+                    position = self.settings['bounds', 'max_bound']
+                elif position < self.settings['bounds', 'min_bound']:
                     self.emit_status(ThreadCommand('outofbounds'))
-                    position = min_b
+                    position = self.settings['bounds', 'min_bound']
         return position
 
     @abstractmethod
@@ -769,16 +662,9 @@ class DAQ_Move_base(PluginBase):
         self.emit_status(ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos))
 
     def commit_settings(self, param: Parameter):
-        """Apply a settings change to the hardware.
-
-        Base implementation handles axis selection and epsilon.  Subclasses
-        should call ``super().commit_settings(param)`` so these are always
-        processed, then add hardware-specific handling.
         """
-        if param.name() == 'axis':
-            self.axis_name = param.value()
-        elif param.name() == 'epsilon':
-            self.epsilon = param.value()
+          to subclass to transfer parameters to hardware
+        """
 
     def move_done(self, position: Optional[
         DataActuator] = None):  # the position argument is just there to match some signature of child classes
@@ -833,7 +719,7 @@ class DAQ_Move_base(PluginBase):
                 logger.debug(f'Current position: {self._current_value}')
                 self.move_done(self._current_value)
 
-    def _condition_to_reach_target(self, check_absolute_difference=True,) -> bool:
+    def _condition_to_reach_target(self, check_absolute_difference=True) -> bool:
         """Implement the condition for exiting the polling mechanism and specifying that the
         target value has been reached
 
@@ -900,15 +786,15 @@ class DAQ_Move_base(PluginBase):
 
             logger.debug(f'Check move_is_done: {self.move_is_done}')
             if self.move_is_done:
-                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Move has been stopped', ))
+                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Move has been stopped'))
                 logger.info('Move has been stopped')
             self.current_value = self.get_actuator_value()
             self.emit_value(self._current_value)
             logger.debug(f'Current value: {self._current_value}')
 
-            if perf_counter() - self.start_time >= self.settings[self._per_channel_path('timeout')]:
+            if perf_counter() - self.start_time >= self.settings['timeout']:
                 self.poll_timer.stop()
-                self.emit_status(ThreadCommand(ThreadStatus.RAISE_TIMEOUT, ))
+                self.emit_status(ThreadCommand(ThreadStatus.RAISE_TIMEOUT))
                 logger.info('Timeout activated')
         else:
             self.poll_timer.stop()
@@ -919,32 +805,29 @@ class DAQ_Move_base(PluginBase):
     def get_position_with_scaling(self, pos: DataActuator) -> DataActuator:
         """ Get the current position from the hardware with scaling conversion.
         """
-        if self.settings[self._per_channel_path('scaling', 'use_scaling')]:
-            scale = self.settings[self._per_channel_path('scaling', 'scaling')]
-            offset = self.settings[self._per_channel_path('scaling', 'offset')]
+        if self.settings['scaling', 'use_scaling']:
             if self.data_actuator_type == DataActuatorType.float:
-                pos = (pos - offset) * scale
+                pos = (pos - self.settings['scaling', 'offset']) * self.settings['scaling', 'scaling']
             else:
-                pos = (pos - Q_(offset, self.axis_unit)) * scale
+                pos = (pos - Q_(self.settings['scaling', 'offset'],
+                                self.axis_unit)) * self.settings['scaling', 'scaling']
         return pos
 
     def set_position_with_scaling(self, pos: DataActuator) -> DataActuator:
         """ Set the current position from the parameter and hardware with scaling conversion.
         """
-        if self.settings[self._per_channel_path('scaling', 'use_scaling')]:
-            scale = self.settings[self._per_channel_path('scaling', 'scaling')]
-            offset = self.settings[self._per_channel_path('scaling', 'offset')]
+        if self.settings['scaling', 'use_scaling']:
             if self.data_actuator_type == DataActuatorType.DataActuator:
-                pos = pos / scale + Q_(offset, self.axis_unit)
+                pos = pos / self.settings['scaling', 'scaling'] + Q_(self.settings['scaling', 'offset'], self.axis_unit)
             else:
-                pos = pos / scale + offset
+                pos = pos / self.settings['scaling', 'scaling'] + self.settings['scaling', 'offset']
         return pos
 
     def set_position_relative_with_scaling(self, pos: DataActuator) -> DataActuator:
         """ Set the scaled positions in case of relative moves
         """
-        if self.settings[self._per_channel_path('scaling', 'use_scaling')]:
-            pos = pos / self.settings[self._per_channel_path('scaling', 'scaling')]
+        if self.settings['scaling', 'use_scaling']:
+            pos = pos / self.settings['scaling', 'scaling']
         return pos
 
     @Slot(edict)
@@ -989,12 +872,6 @@ class DAQ_Move_base(PluginBase):
         pass
 
 
-
-# ---------------------------------------------------------------------------
-# Naming alias — preferred name for new plugin authors.
-# DAQ_Move_base is kept for full backward compatibility.
-# ---------------------------------------------------------------------------
-ActuatorPlugin = DAQ_Move_base
 
 if __name__ == '__main__':
     test = DAQ_Move_base()

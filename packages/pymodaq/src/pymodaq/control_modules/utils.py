@@ -5,7 +5,6 @@ Created the 03/10/2022
 @author: Sebastien Weber
 """
 
-import warnings
 from random import randint
 from typing import Optional, Type, Union, TYPE_CHECKING
 from easydict import EasyDict as edict
@@ -40,15 +39,12 @@ logger = set_logger(get_module_name(__file__))
 
 def create_controller_param(axis_name: str = None, axis_names: Optional[list[str]] = None) -> dict:
     controller_param = {'title': 'Controller:', 'name': 'controller', 'type': 'group', 'children': [
-        # Deprecated: the Master/Slave concept is replaced by ControllerRegistry.
-        # This parameter is kept hidden so existing preset XML files load without errors.
-        # It will be removed in a future release.
         {'title': 'Controller Status:', 'name': 'controller_status', 'type': 'list',
          'value': ControllerStatus.MASTER.value,
-         'limits': [ControllerStatus.MASTER.value, ControllerStatus.SLAVE.value],
-         'visible': False, 'readonly': True},
+         'limits': [ControllerStatus.MASTER.value, ControllerStatus.SLAVE.value]},
         {'title': 'Controller ID:', 'name': 'controller_ID', 'type': 'int', 'value': randint(0, 9999),
          'default': 0, 'readonly': False},
+
     ]}
     if axis_names is not None and axis_name is not None:
         controller_param['children'].append({'title': 'Axis:', 'name': 'axis', 'type': 'list',
@@ -604,23 +600,17 @@ class ParameterControlModule(ParameterManager,LECOComponentMixin, ControlModule)
 
     @property
     def master(self) -> bool:
-        """Whether this module owns the hardware controller.
-
-        .. deprecated::
-            The Master/Slave concept is superseded by ControllerRegistry, which
-            handles controller sharing automatically.  This property always
-            returns ``True`` and will be removed in a future release.
-        """
+        """Get/Set programmatically the Master/Slave status of the module's controller."""
+        if self.initialized_state:
+            return (self.settings[self._hw_settings_name, 'controller', 'controller_status']
+                    == ControllerStatus.MASTER)
         return True
 
     @master.setter
     def master(self, is_master: bool):
-        warnings.warn(
-            "Setting 'master' is deprecated and has no effect. "
-            "Controller sharing is handled automatically by ControllerRegistry.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        if self.initialized_state:
+            self.settings.child(self._hw_settings_name, 'controller', 'controller_status').setValue(
+                ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE)
 
     def param_deleted(self, param):
         """Propagate parameter deletion to the hardware thread."""
@@ -724,16 +714,9 @@ class PluginBase(QObject):
         self.settings = Parameter.create(name='Settings', type='group', children=self.params)
         if params_state is not None:
             if isinstance(params_state, dict):
-                # addChildren=False: don't add nodes that aren't in the plugin's
-                # own params (e.g. axis_settings from a restructured module state).
-                # removeChildren=False: don't remove nodes the plugin defines but
-                # are absent from the state (e.g. 'axis' when the module state has
-                # it under axis_settings instead of controller).
-                self.settings.restoreState(params_state,
-                                           addChildren=False, removeChildren=False)
+                self.settings.restoreState(params_state)
             elif isinstance(params_state, Parameter):
-                self.settings.restoreState(params_state.saveState(),
-                                           addChildren=False, removeChildren=False)
+                self.settings.restoreState(params_state.saveState())
         self.settings.sigTreeStateChanged.connect(self.send_param_status)
         self.parent = parent
         self.status = edict(info="", controller=None, initialized=False)
@@ -917,9 +900,3 @@ class HardwareWorkerBase(QObject):
         else:
             return False
         return True
-
-# ---------------------------------------------------------------------------
-# Naming alias — DAQ_Plugin_base is the name used in the new capabilities
-# architecture. PluginBase is kept for full backward compatibility.
-# ---------------------------------------------------------------------------
-DAQ_Plugin_base = PluginBase
