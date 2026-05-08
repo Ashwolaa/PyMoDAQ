@@ -15,11 +15,11 @@ DAQ_Viewer, scan engines, dashboards) to the same instrument without conflict.
 |---|---|
 | 0 — Naming aliases | ✅ Complete (`ActuatorPlugin`, `DetectorPlugin`, `PluginBase` aliases present) |
 | 1 — ControllerRegistry | ✅ Complete |
-| 2 — ControllerThread | ✅ Complete |
+| 2 — ControllerThread | ✅ Complete (role-based dispatch for combined plugins — see Phase 2 notes) |
 | 3a — DAQ_Move / DAQ_Viewer wiring | ✅ Complete |
 | 3b — HardwareWidget | ✅ Complete (shared HardwarePanel per key; group_snapshot dialog deferred) |
-| 4 — Old-style adapter hardening | ✅ Complete (multi-axis `axis_name`, `hardware_averaging`, SDK-callback thread all tested in `test_controller_thread.py` + `test_multi_subscriber_integration.py`) |
-| 5 — Deprecate master/slave param tree | ❌ Not started |
+| 4 — Old-style adapter hardening | ✅ Complete (multi-axis `axis_name`, `hardware_averaging`, SDK-callback thread all tested in `test_controller_thread.py` + `test_multi_subscriber_integration.py`; combined plugin dispatch tested in `TestCombinedPlugin`) |
+| 5 — Deprecate master/slave param tree | ✅ Complete (deprecation cycle in progress — see Phase 5 notes) |
 
 ---
 
@@ -221,6 +221,26 @@ and `self.parent.status_sig.emit()` without the full Worker hierarchy. The shim
 forwards `ThreadCommand` payloads to `status_message`, `data_ready`, or
 `settings_changed` as appropriate.
 
+**Combined plugin role-based dispatch**: `_on_group_tick` and `_solo_tick`
+originally dispatched by plugin-type ordering (`_is_old_style_detector()` checked
+before `_is_old_style_actuator()`), which made the actuator path unreachable for
+combined plugins and caused `_grab_in_flight` to block actuator position reads.
+
+Fixed by adding a `role` field to `_ReadGroup` (and solo tracking) and a
+`_resolve_role()` helper. `start_grab` now accepts an optional `role='auto'`
+parameter. Explicit `role='actuator'` or `role='detector'` lets callers target one
+side of a combined plugin directly; `'auto'` resolves to `'detector'` for
+plugins with `ini_detector` and `'actuator'` otherwise.
+
+```python
+# Combined plugin: two independent groups, each with its own role
+ct.start_grab('axis_x', 100.0, group='actuator', role='actuator')
+ct.start_grab('image',  500.0, group='detector', role='detector')
+```
+
+A detector grab in-flight (`_grab_in_flight=True`) no longer blocks the actuator
+group tick — position reads (`get_actuator_value`) are synchronous and conflict-free.
+
 **Plugin-type detection**:
 
 | Condition | Plugin type |
@@ -332,6 +352,9 @@ per-channel subscriber counts, current grab rate, and in-flight state. Useful
 for diagnosing rate-inheritance surprises (why is X polling at 100 ms when I
 asked for 200?) and confirming channel routing for combined instruments.
 
+**Status**: `group_snapshot` property is implemented on `ControllerThread`.
+The HardwareWidget dialog that surfaces it is **deferred** (not started).
+
 ---
 
 ## Phase 4 — Old-style plugin adapters
@@ -351,13 +374,39 @@ Remaining: edge-case regression tests for
 
 ---
 
-## Phase 5 — Deprecate master/slave parameter tree
+## Phase 5 — Deprecate master/slave parameter tree ✅
 
-Remove `create_controller_param`, `controller_status`, `controller_ID` from
-parameter trees. Replace with `ControllerKey` derivation. Keep removed
-parameters as deprecated no-ops for one release cycle. Migrate preset XML files.
+`controller_status` (Master/Slave selector) is now a hidden, read-only no-op in
+every parameter tree. `controller_ID` is kept — it still drives `ControllerKey`
+derivation in `ControllerThreadModule.init_hardware`. Existing preset XML files
+load without errors because the parameter node is still present; users no longer
+see the dropdown.
 
-**Deliverable**: simpler parameter trees; migration tool for existing presets.
+Changes landed:
+
+- `create_controller_param` — `controller_status` gains `visible=False,
+  readonly=True`.
+- `ParameterControlModule.master` getter — always returns `True`; no longer reads
+  `controller_status` from settings.
+- `ParameterControlModule.master` setter — emits `DeprecationWarning`, no-op.
+- `ExperimentManager._group_plugins_by_id` — removed `sort(key=lambda p:
+  p["status"])`; plugins within a group keep preset order.
+- `ExperimentManager.list_control_modules_from_preset` — removed `plug["status"]`
+  read.
+- `ExperimentManager.create_control_modules_from_preset` — removed master/slave
+  validation, `master_controller` tracking, `module.master = True`, and
+  `controller=master_controller` argument; every module calls `init_module(module)`.
+- `ExperimentManager._init_module_master_slave` (old-preset path) — simplified to
+  call `init_module(module)`.
+- `ExperimentManager.create_control_modules_from_old_preset` — removed
+  `master_controller` variable; simplified init loop.
+
+**Deprecation cleanup** (next release — remove these):
+- `controller_status` field from `create_controller_param`
+- `ControllerStatus` enum in `thread_commands.py`
+- `MasterSlaveError` exception and its import in `experiment_manager.py`
+- `_init_module_master_slave` method
+- `is_master` property on `DAQ_Move_base` / `PluginBase`
 
 ---
 
