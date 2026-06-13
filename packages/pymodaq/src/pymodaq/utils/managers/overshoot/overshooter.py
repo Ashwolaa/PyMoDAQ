@@ -265,12 +265,18 @@ class Overshooter(ManagerBase):
             addList=self.modules_manager.available_data)
 
     def _update_entry(self, entry: Path):
+        # Always build from params so all children (including recently-added ones
+        # like 'state') are present even when loading an older XML file.
+        settings = Parameter.create(title='Overshoots', name='overshoot',
+                                    type='group', children=self.params)
         if entry.exists():
-            self.settings = entry
-        else:
-            self.settings = Parameter.create(title='Overshoots', name='overshoot',
-                                             type='group',
-                                             children=self.params)
+            xml_params = ioxml.XML_file_to_parameter(str(entry))
+            saved = Parameter.create(title='Overshoots', name='overshoot',
+                                     type='group', children=xml_params)
+            # addChildren=True  → restore saved overshoot items from XML
+            # removeChildren=False → keep new params (e.g. 'state') not in XML
+            settings.restoreState(saved.saveState(), addChildren=True, removeChildren=False)
+        self.settings = settings
 
         self.create_slots()
 

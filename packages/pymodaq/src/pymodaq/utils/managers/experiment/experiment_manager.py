@@ -265,39 +265,7 @@ class ExperimentManager(ManagerBase):
                     self.dashboard.add_move(plug_name, None, plug_type, actuator_docks, actuator_widgets,
                                             actuators_modules,
                                             ui_identifier=plugin["settings"].child("info", "ui").value())
-
-                    if ind_plugin == 0:  # should be a master type plugin
-                        if plugin["status"] != ControllerStatus.MASTER:
-                            raise MasterSlaveError(f"The instrument {plug_name} should"
-                                                   f" be defined as Master")
-                        if plug_init:
-                            actuators_modules[-1].apply_controller_parameters(plugin["settings"].child("controller"))
-                            actuators_modules[-1].init_hardware_ui()
-                            actuators_modules[-1].master = True
-                            QtWidgets.QApplication.processEvents()
-                            self.dashboard.modules_manager.poll_init(actuators_modules[-1])
-                            QtWidgets.QApplication.processEvents()
-                            master_controller = actuators_modules[-1].controller
-
-                        elif plugin["status"] == ControllerStatus.MASTER and len(plug_IDs) > 1:
-                            raise MasterSlaveError(
-                                f"The instrument {plug_name} defined as Master has to be "
-                                f"initialized (init checked in the experiment) in order to init "
-                                f"its associated slave instrument",
-                            )
-                    else:
-                        if plugin["status"] != ControllerStatus.SLAVE:
-                            raise MasterSlaveError(f"The instrument {plug_name} should"
-                                                   f" be defined as slave")
-                        if plug_init:
-                            actuators_modules[-1].apply_controller_parameters(plugin["settings"].child("controller"))
-                            actuators_modules[-1].controller = master_controller
-                            actuators_modules[-1].init_hardware_ui()
-                            QtWidgets.QApplication.processEvents()
-                            self.dashboard.modules_manager.poll_init(actuators_modules[-1])
-                            QtWidgets.QApplication.processEvents()
-
-                    self.subentries_model.set_status(ind_module, True)
+                    module = actuators_modules[-1]
 
                 else:
                     plug_dim = plugin["settings"].child("info", "dim").value()
