@@ -11,7 +11,7 @@ from easydict import EasyDict as edict
 import numpy as np
 from qtpy import QtWidgets
 from qtpy.QtCore import QObject, Slot, Signal, QTimer
-from pint.errors import OffsetUnitCalculusError
+from pint.errors import OffsetUnitCalculusError, DimensionalityError
 
 
 from pymodaq_utils.utils import ThreadCommand, find_keys_from_val
@@ -318,6 +318,7 @@ class DAQ_Move_base(PluginBase):
         self.poll_timer.setInterval(config('pymodaq', 'actuator', 'polling_interval_ms'))
         self._poll_timeout = config('pymodaq', 'actuator', 'polling_timeout_s')
         self.poll_timer.timeout.connect(self.check_target_reached)
+        self._move_axis_key = self.axis_index_key
 
         self.ini_attributes()
 
@@ -488,6 +489,15 @@ class DAQ_Move_base(PluginBase):
     def ini_attributes(self):
         """To be subclassed, in order to init specific attributes needed by the real implementation."""
         pass
+
+    def _per_channel_path(self, name: str) -> tuple:
+        """Return the settings parameter path tuple for a per-channel param.
+
+        Plugins call ``self.settings.child(*self._per_channel_path('units'))`` so
+        they remain layout-agnostic.  The flat (legacy) layout stores these params
+        directly at the plugin-settings root, so the path is simply ``(name,)``.
+        """
+        return (name,)
 
     def ini_stage_init(
         self,
@@ -700,6 +710,10 @@ class DAQ_Move_base(PluginBase):
         """
         if not ('TCPServer' in self.__class__.__name__ or
                 'LECODirector' in self.__class__.__name__):
+            # Record which axis key this move belongs to so that concurrent
+            # axis switching (e.g. "refresh value" on another module) cannot
+            # corrupt the target-reached comparison.
+            self._move_axis_key = self.axis_index_key
             self.start_time = perf_counter()
             if self.ispolling:
                 self.poll_timer.start()
@@ -748,22 +762,26 @@ class DAQ_Move_base(PluginBase):
         --------
         user_condition_to_reach_target
         """
+        move_unit = self.axis_units[self._move_axis_key]
+        move_epsilon = self.epsilons[self._move_axis_key]
         try:
             epsilon_calculated = (
-                    self._current_value - self._target_value).abs().value(self.axis_unit)
-        except DataUnitError as e:
-            epsilon_calculated = abs(self._current_value.value() - self._target_value.value())
-            logger.warning(f'Unit issue when calculating epsilon, units are not compatible between'
-                           f'target and current values')
+                    self._current_value - self._target_value).abs().value(move_unit)
+        except (DataUnitError, DimensionalityError):
+            logger.warning(
+                f'Unit mismatch between current ({self._current_value.units}) and '
+                f'target ({self._target_value.units}) values; skipping tick.'
+            )
+            return False
         except OffsetUnitCalculusError as e:
-            if '°C' in self.axis_unit or 'celcius' in self.axis_unit.lower():
+            if '°C' in move_unit or 'celcius' in move_unit.lower():
                 epsilon_calculated = (
                         self._current_value.to_base_units() -
                         self._target_value.to_base_units()).abs().value()
             else:
                 raise e
 
-        return (epsilon_calculated < self.epsilon)
+        return (epsilon_calculated < move_epsilon)
 
     def user_condition_to_reach_target(self) -> bool:
         """ Implement a user defined condition for exiting the polling mechanism and specifying

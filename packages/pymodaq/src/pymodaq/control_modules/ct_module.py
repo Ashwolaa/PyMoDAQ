@@ -163,7 +163,7 @@ class ControllerThreadModule(ParameterControlModule):
             # Point the UI's settings action at the hw_settings panel for this
             # plugin class.  Move and Viewer on the same CT each get their own
             # panel (built from their respective plugin params).
-            if self.ui is not None:
+            if self.ui is not None and hasattr(self.ui, 'use_shared_settings_action'):
                 hw_panel = ControllerRegistry.get().get_hw_panel(key, plugin_class)
                 hw_action = ControllerRegistry.get().get_hw_action(key, plugin_class)
                 if hw_panel is not None and hw_action is not None:
@@ -190,7 +190,7 @@ class ControllerThreadModule(ParameterControlModule):
         self._pre_close_hardware()
         self.connect_leco(False)
         # Restore the per-module settings action before releasing the key.
-        if self.ui is not None:
+        if self.ui is not None and hasattr(self.ui, 'release_shared_settings_action'):
             self.ui.release_shared_settings_action()
         if self._ct is not None:
             try:
@@ -264,10 +264,13 @@ class ControllerThreadModule(ParameterControlModule):
         if self._is_per_channel(mapped):
             if channel and channel != self._channel:
                 return
+            self._syncing_from_hw = True
             try:
                 self.settings.child(self._hw_settings_name, *mapped).setValue(data)
             except Exception:
                 pass
+            finally:
+                self._syncing_from_hw = False
             self._on_per_channel_param_changed(mapped, data)
             return
 

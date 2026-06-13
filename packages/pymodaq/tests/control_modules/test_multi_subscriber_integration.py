@@ -602,3 +602,182 @@ class TestRegistrySameHardwareSharesCT:
         t1, _ = reg.attach(key1, cls)
 
         assert t0 is not t1   # two physical instruments
+
+
+# ---------------------------------------------------------------------------
+# E. Refresh-while-moving: axis restoration after a read on a different channel
+# ---------------------------------------------------------------------------
+
+class MultiAxisWithPendingMove(MultiAxisActuatorPlugin):
+    """Variant of MultiAxisActuatorPlugin where poll_moving() does NOT
+    immediately call move_done — it just records the move as in-flight,
+    simulating a slow hardware move.  check_target_reached() must be
+    called explicitly by the test to resolve the move."""
+
+    def __init__(self, parent=None, params_state=None):
+        super().__init__(parent, params_state)
+        self.get_actuator_value_calls: list[str] = []
+
+    def poll_moving(self):
+        """Start polling without immediately completing — let the test drive it."""
+        pass  # no immediate move_done
+
+    def get_actuator_value(self):
+        self.get_actuator_value_calls.append(self.axis_name)
+        return FakeDataActuator(self.controller.get_value(self.axis_name))
+
+
+class TestRefreshWhileMoving:
+    """Verify that a refresh read on channel Y while a move on channel X is
+    in progress does NOT leave the plugin's axis pointing at Y, which would
+    cause check_target_reached() to poll the wrong hardware position."""
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(MultiAxisWithPendingMove)
+        self.ct.ini_hardware()
+
+    def test_plugin_axis_restored_to_pending_after_refresh_read(self, qapp):
+        """After request_read('Y') during a move on 'X', plugin axis == 'X'."""
+        # Simulate a move in-flight on X
+        self.ct._pending_channel = 'X'
+        self.plugin.axis_name = 'X'
+
+        self.ct._read_old_style_actuator('Y')
+
+        assert self.plugin.axis_name == 'X', (
+            "Plugin axis must be restored to the pending move channel after a refresh read"
+        )
+
+    def test_refresh_read_still_emits_correct_channel_data(self, qapp):
+        """data_ready still carries the correct channel and position for Y,
+        even though we restore the plugin axis to X afterwards."""
+        self.plugin.controller.set_value('X', 1.0)
+        self.plugin.controller.set_value('Y', 99.0)
+        self.ct._pending_channel = 'X'
+        self.plugin.axis_name = 'X'
+
+        col = Collector()
+        self.ct.data_ready.connect(col)
+        self.ct._read_old_style_actuator('Y')
+
+        assert col.count == 1
+        ch, val, _ = col.last()
+        assert ch == 'Y'
+        assert val.value_float == pytest.approx(99.0)
+        # And axis is back on X
+        assert self.plugin.axis_name == 'X'
+
+    def test_group_tick_restores_axis_after_multi_channel_read(self, qapp):
+        """_on_group_tick reads X then Y; plugin must be restored to X (pending)
+        so that check_target_reached polls X, not Y."""
+        self.plugin.controller.set_value('X', 5.0)
+        self.plugin.controller.set_value('Y', 42.0)
+        self.ct._pending_channel = 'X'
+        self.plugin.axis_name = 'X'
+
+        # Register both channels in the default group
+        self.ct.start_grab('X', 200.0)
+        self.ct.start_grab('Y', 200.0)
+
+        # Fire one group tick manually (both channels)
+        self.ct._on_group_tick('')
+
+        assert self.plugin.axis_name == 'X', (
+            "After group tick reading X and Y, plugin must be back on the pending channel X"
+        )
+
+    def test_get_actuator_value_reads_pending_channel_after_refresh(self, qapp):
+        """When check_target_reached calls get_actuator_value() after a Y refresh,
+        it must read X's position, not Y's."""
+        self.plugin.controller.set_value('X', 10.0)
+        self.plugin.controller.set_value('Y', 999.0)
+        self.ct._pending_channel = 'X'
+        self.plugin.axis_name = 'X'
+
+        self.plugin.get_actuator_value_calls.clear()
+        self.ct._read_old_style_actuator('Y')
+
+        # Simulate what check_target_reached does next: read current position
+        val = self.plugin.get_actuator_value()
+
+        assert val.value_float == pytest.approx(10.0), (
+            "After restoring axis to X, get_actuator_value must return X's position"
+        )
+
+    def test_no_restore_when_no_pending_move(self, qapp):
+        """When there is no in-flight move (_pending_channel=''), a refresh read
+        on Y leaves the plugin on Y (normal one-shot read behaviour)."""
+        self.ct._pending_channel = ''
+        self.plugin.axis_name = 'X'
+
+        self.ct._read_old_style_actuator('Y')
+
+        assert self.plugin.axis_name == 'Y'
+
+    def test_no_restore_when_pending_is_same_channel(self, qapp):
+        """When the refresh read is for the same channel as the pending move,
+        no restoration is needed (and none should happen)."""
+        self.ct._pending_channel = 'Y'
+        self.plugin.axis_name = 'X'  # starts elsewhere
+
+        self.ct._read_old_style_actuator('Y')
+
+        assert self.plugin.axis_name == 'Y'
+
+    def test_emit_channel_state_suppresses_duplicate_units(self, qapp):
+        """_emit_channel_state must not fire settings_changed when the unit for
+        the channel has not changed — this is the root cause of spinbox focus
+        loss when two DAQ_Move instances both run refresh value on the same CT.
+
+        Without the _emitted_units guard, every group tick causes an axis switch
+        which calls _emit_channel_state, which emits settings_changed every tick,
+        which calls _sync_units_ui → spinbox.setOpts() on all input spinboxes,
+        triggering a PyQtGraph redraw that steals keyboard focus.
+        """
+        col = Collector()
+        self.ct.settings_changed.connect(col)
+        self.plugin.axis_name = 'X'
+
+        # First call: unit is new → must emit
+        self.ct._emit_channel_state('X')
+        assert col.count == 1, "First call for X should emit"
+
+        # Second call: same unit → must NOT emit
+        self.ct._emit_channel_state('X')
+        assert col.count == 1, "Duplicate emission must be suppressed"
+
+        # Different channel Y: must emit (new channel)
+        self.plugin.axis_name = 'Y'
+        self.ct._emit_channel_state('Y')
+        assert col.count == 2, "New channel Y should emit"
+
+        # Y again: suppress
+        self.ct._emit_channel_state('Y')
+        assert col.count == 2, "Duplicate emission for Y must be suppressed"
+
+    def test_group_tick_does_not_spam_settings_changed(self, qapp):
+        """Multiple group ticks must not keep firing settings_changed for units
+        that haven't changed — simulates both DAQ_Move instances refreshing."""
+        col = Collector()
+        self.ct.settings_changed.connect(col)
+        self.plugin.controller.set_value('X', 1.0)
+        self.plugin.controller.set_value('Y', 2.0)
+        self.plugin.axis_name = 'X'
+
+        self.ct.start_grab('X', 200.0)
+        self.ct.start_grab('Y', 200.0)
+
+        # Run several ticks
+        for _ in range(5):
+            self.ct._on_group_tick('')
+
+        # settings_changed for units should fire at most once per channel
+        # (on the first tick that reads each channel), never more.
+        units_events = [c for c in col.calls if c[1] == ['units']]
+        channels_seen = {e[0] for e in units_events}
+        for ch in channels_seen:
+            count = sum(1 for e in units_events if e[0] == ch)
+            assert count == 1, (
+                f"settings_changed(units) for channel '{ch}' fired {count} times "
+                f"across 5 ticks — should be exactly 1"
+            )

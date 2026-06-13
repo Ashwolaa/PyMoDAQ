@@ -25,6 +25,43 @@ DAQ_Viewer can filter to its own channel::
 
 An empty channel means "broadcast": all connected subscribers receive it.
 
+Plugin-style dispatch
+---------------------
+Every public slot and timer callback dispatches to a style-specific helper.
+The mapping is:
+
+New-style (``open`` / ``query_data`` / ``change_to`` API):
+    init        → ``_ini_new_style``
+    periodic    → ``_on_group_tick`` / ``_solo_tick``  (``new_style`` branch)
+    one-shot    → ``request_read`` / ``request_snap``  (new-style branch)
+    write       → ``request_write``                    (new-style branch)
+    push-mode   → ``_on_plugin_new_data``
+
+Old-style actuator (``ini_stage`` / ``move_abs`` / ``get_actuator_value``):
+    init        → ``_ini_old_style_actuator``
+    periodic    → ``_on_group_tick`` / ``_solo_tick``  (``actuator`` branch)
+    one-shot    → ``_read_old_style_actuator``
+    write       → ``_write_old_style_actuator``
+    move done   → ``_on_move_done``
+    axis mux    → ``_emit_channel_state``, ``_axis_switching``  ← old-style only
+
+Old-style detector (``ini_detector`` / ``grab_data``):
+    init        → ``_ini_old_style_detector``
+    periodic    → ``_on_group_tick`` / ``_solo_tick``  (``detector`` branch)
+    snap        → ``_snap_old_style_detector``
+    grab done   → ``_on_detector_data_ready`` / ``_on_detector_temp_data_ready``
+
+Old-style combined (both ``ini_stage`` + ``ini_detector``):
+    init        → ``_ini_combined``
+    per-role    → same old-style actuator / detector paths above
+
+Detection helpers (used throughout):
+    ``_is_new_style``        → True for open/query_data/change_to API
+    ``_is_old_style_actuator`` → True if plugin has ``ini_stage``
+    ``_is_old_style_detector`` → True if plugin has ``ini_detector``
+    ``_is_combined``           → True if plugin has both
+    ``_resolve_role``          → maps 'auto'/'actuator'/'detector' to dispatch key
+
 Old-style plugin support
 ------------------------
 Plugins that subclass ``DAQ_Move_base`` / ``DAQ_Viewer_base`` are fully
@@ -251,10 +288,25 @@ class ControllerThread(QObject):
         # None means solo or snap; _pending_channel holds the channel in that case.
         self._pending_group: str | None = None
         self._pending_channel: str = ''         # channel of in-flight move/grab
+
+        # ── Old-style-only state ─────────────────────────────────────────────
+        # The two fields below are needed because old-style plugins have a
+        # single ``axis_name`` slot that the CT must time-multiplex across
+        # channels.  New-style plugins expose per-channel APIs (query_data /
+        # change_to) so axis switching is never needed there.
+
         # Set to True while switching axis_name for a read/write so that
         # spurious settings_changed emissions (units, epsilon side effects
         # of axis_name.setter) are not forwarded to the GUI subscribers.
-        self._axis_switching: bool = False
+        self._axis_switching: bool = False    # [old-style only]
+
+        # Last units value emitted per channel via settings_changed.  Used by
+        # _emit_channel_state to suppress redundant emissions: units only change
+        # at ini_stage or if a plugin explicitly updates them, never on every
+        # group-tick axis switch.  Without this guard every tick causes
+        # _sync_units_ui → spinbox.setOpts() on all input spinboxes, which
+        # triggers a PyQtGraph redraw that steals keyboard focus.
+        self._emitted_units: dict[str, str] = {}  # [old-style only]
 
     # ── Plugin settings helpers ──────────────────────────────────────────────
 
@@ -399,12 +451,12 @@ class ControllerThread(QObject):
         if self._plugin is None:
             return
         try:
-            if self._is_new_style():
+            if self._is_new_style():                     # [new-style]
                 dte = self._plugin.query_data(names=[channel], fresh=fresh)
                 self.data_ready.emit(channel, dte, False)
-            elif self._is_old_style_actuator():
+            elif self._is_old_style_actuator():          # [old-style actuator]
                 self._read_old_style_actuator(channel)
-            else:
+            else:                                        # [old-style detector]
                 self._read_old_style_detector(channel)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
@@ -419,14 +471,13 @@ class ControllerThread(QObject):
         if self._plugin is None:
             return
         try:
-            if self._is_new_style():
+            if self._is_new_style():                     # [new-style]
                 dte = self._plugin.query_data(names=[channel], fresh=True)
                 self.data_ready.emit(channel, dte, False)
-            elif self._is_old_style_detector():
-                # request_snap is always a detector operation (DAQ_Viewer).
+            elif self._is_old_style_detector():          # [old-style detector / combined]
                 # Check detector before actuator so combined plugins route here.
                 self._snap_old_style_detector(channel, Naverage)
-            else:
+            else:                                        # [old-style actuator]
                 self._read_old_style_actuator(channel)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
@@ -445,10 +496,10 @@ class ControllerThread(QObject):
         if self._plugin is None:
             return
         try:
-            if self._is_new_style():
+            if self._is_new_style():      # [new-style]
                 self._plugin.change_to(channel, value)
                 self.change_done.emit(channel, value)
-            else:
+            else:                         # [old-style actuator]
                 self._write_old_style_actuator(channel, value)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
@@ -680,17 +731,17 @@ class ControllerThread(QObject):
         channels = list(rg.channels.keys())
         role = self._resolve_role(rg.role)
         try:
-            if role == 'new_style':
+            if role == 'new_style':      # [new-style]
                 dte = self._plugin.query_data(names=channels, fresh=True)
                 for ch in channels:
                     self.data_ready.emit(ch, dte, False)
-            elif role == 'detector':
+            elif role == 'detector':     # [old-style detector / combined]
                 if self._grab_in_flight:
                     return
                 self._grab_in_flight = True
                 self._pending_group = group_name
                 self._plugin.grab_data(Naverage=1)
-            else:  # 'actuator'
+            else:                        # [old-style actuator]  role == 'actuator'
                 for ch in channels:
                     self._read_old_style_actuator(ch)
         except Exception as exc:
@@ -703,17 +754,17 @@ class ControllerThread(QObject):
         _, _, stored_role = self._solo[channel]
         role = self._resolve_role(stored_role)
         try:
-            if role == 'new_style':
+            if role == 'new_style':      # [new-style]
                 dte = self._plugin.query_data(names=[channel], fresh=True)
                 self.data_ready.emit(channel, dte, False)
-            elif role == 'detector':
+            elif role == 'detector':     # [old-style detector / combined]
                 if self._grab_in_flight:
                     return
                 self._grab_in_flight = True
                 self._pending_group = None
                 self._pending_channel = channel
                 self._plugin.grab_data(Naverage=1)
-            else:  # 'actuator'
+            else:                        # [old-style actuator]  role == 'actuator'
                 self._read_old_style_actuator(channel)
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
@@ -721,20 +772,27 @@ class ControllerThread(QObject):
     # ── Internal: role resolution ────────────────────────────────────────────
 
     def _resolve_role(self, role: str) -> str:
-        """Map a *role* string to a concrete dispatch key.
+        """Map a *role* string to a concrete dispatch key used by tick handlers.
 
-        New-style plugins always use the ``'new_style'`` path regardless of
-        the requested role.  For old-style plugins, ``'auto'`` maps to
+        Return values and their dispatch targets:
+
+        ``'new_style'``  → ``_on_group_tick`` / ``_solo_tick`` new-style branch
+                           (plugin.query_data)                    [new-style only]
+        ``'detector'``   → ``_snap_old_style_detector``           [old-style detector / combined]
+        ``'actuator'``   → ``_read_old_style_actuator``           [old-style actuator / combined]
+
+        New-style plugins always resolve to ``'new_style'`` regardless of the
+        requested role.  For old-style plugins, ``'auto'`` maps to
         ``'detector'`` when the plugin has ``ini_detector`` (including
         combined plugins), and to ``'actuator'`` otherwise.  Explicit
         ``'actuator'`` / ``'detector'`` values are passed through unchanged
         and let callers target one side of a combined plugin directly.
         """
-        if self._is_new_style():
+        if self._is_new_style():                                  # [new-style]
             return 'new_style'
-        if role == 'auto':
+        if role == 'auto':                                        # [old-style]
             return 'detector' if self._is_old_style_detector() else 'actuator'
-        return role   # explicit 'actuator' or 'detector'
+        return role   # explicit 'actuator' or 'detector'        # [old-style combined]
 
     # ── Internal: plugin-type detection ──────────────────────────────────────
 
@@ -832,18 +890,23 @@ class ControllerThread(QObject):
         self.hardware_status.emit(True, str(info))
 
     def _emit_channel_state(self, channel: str) -> None:
-        """Re-emit per-channel state (units) after a suppressed axis switch.
+        """[old-style actuator only] Re-emit per-channel state (units) after a suppressed axis switch.
 
-        ``axis_name.setter`` fires ``emit_status(UNITS, ...)`` and updates
-        ``plugin.settings['units']``, but both paths are suppressed while
-        ``_axis_switching`` is True.  This method re-emits the units so that
-        late-attached subscribers can sync their display.  The guard in
-        ``set_unit_as_suffix`` (skip when suffix already matches) ensures
-        this is a no-op once the unit is set, preventing repeated
-        ``updateText()`` calls from clearing the spinbox selection.
+        Old-style plugins expose one ``axis_name`` slot; the CT must switch it
+        before each per-channel read.  ``_axis_switching`` suppresses all
+        ``settings_changed`` emissions during the switch, so after the switch
+        completes we must re-emit state that genuinely changed.
+
+        Only emits when the unit for *channel* has genuinely changed since the
+        last emission.  Units are fixed at ini_stage and only change if a plugin
+        explicitly updates them — they never change on routine group-tick axis
+        switches.  Suppressing redundant emissions prevents _sync_units_ui from
+        calling spinbox.setOpts() on every refresh tick, which triggers a
+        PyQtGraph redraw that steals keyboard focus from input spinboxes.
         """
         unit = getattr(self._plugin, 'axis_unit', None)
-        if unit is not None:
+        if unit is not None and self._emitted_units.get(channel) != unit:
+            self._emitted_units[channel] = unit
             self.settings_changed.emit(channel, ['units'], unit, 'value')
 
     def _read_old_style_actuator(self, channel: str) -> None:
@@ -851,6 +914,12 @@ class ControllerThread(QObject):
 
         Emits the raw return value of ``get_actuator_value``.  The receiver
         (``DAQ_Move._on_data_ready``) normalises it via ``_check_data_type``.
+
+        After the read the plugin's axis is restored to ``_pending_channel``
+        when a move is in progress on a different channel.  Without this,
+        ``poll_timer.check_target_reached()`` would read the wrong axis on the
+        next event-loop tick, causing spurious move-done or motion that never
+        converges.
         """
         if channel and hasattr(self._plugin, 'axis_name'):
             if self._plugin.axis_name != channel:
@@ -862,6 +931,17 @@ class ControllerThread(QObject):
                 self._emit_channel_state(channel)
         pos = self._plugin.get_actuator_value()
         self.data_ready.emit(channel, pos, False)
+        # Restore the plugin's axis to the channel under active motion so that
+        # check_target_reached() always polls the correct axis.
+        pending = self._pending_channel
+        if (pending and pending != channel
+                and hasattr(self._plugin, 'axis_name')
+                and self._plugin.axis_name != pending):
+            self._axis_switching = True
+            try:
+                self._plugin.axis_name = pending
+            finally:
+                self._axis_switching = False
 
     def _write_old_style_actuator(self, channel: str, value: object) -> None:
         """Dispatch a hardware command to an old-style actuator plugin.
