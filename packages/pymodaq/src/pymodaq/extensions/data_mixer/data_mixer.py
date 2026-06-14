@@ -39,7 +39,7 @@ class DataMixer(CustomExt):
          'children': [
              {'title': 'Models class:', 'name': 'model_class', 'type': 'list',
               'limits': [d['name'] for d in models]},
-             {'title': 'Ini Model', 'name': 'ini_model', 'type': 'action', },
+             {'title': 'Ini Model', 'name': 'ini_model', 'type': 'action'},
              {'title': 'Model params:', 'name': 'model_params', 'type': 'group', 'children': []},
 
          ]}]
@@ -47,7 +47,7 @@ class DataMixer(CustomExt):
     dte_computed_signal = QtCore.Signal(DataToExport)
 
     def __init__(self, parent: gutils.DockArea, dashboard):
-        super().__init__(parent, dashboard)
+        super().__init__(parent, dashboard, add_toolbar_break=False)
 
         self.model_class: Optional[DataMixerModel] = None
         self.datamixer_config = DataMixerConfig()
@@ -64,15 +64,13 @@ class DataMixer(CustomExt):
             self.settings.child('models', 'model_params').addChildren(params)
 
 
-    def setup_docks(self):
+    def setup_docks_and_widgets(self):
         """Mandatory method to be subclassed to setup the docks layout
 
         """
-        self.create_dashboard_toolbar()
-
         self.docks['settings'] = gutils.Dock('Settings')
         self.dockarea.addDock(self.docks['settings'])
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.docks['settings'].addWidget(splitter)
         splitter.addWidget(self.modules_manager.settings_tree)
         self.modules_manager.tree.header().setVisible(False)
@@ -112,7 +110,7 @@ class DataMixer(CustomExt):
 
         """
         combo_model = QtWidgets.QComboBox()
-        combo_model.addItems([model['name'] for  model in self.models])
+        combo_model.addItems([model['name'] for model in self.models])
         self.add_widget('models', combo_model, tip='List of available models')
         self.add_action('ini_model', 'Init Model', 'ini')
         self.add_widget('model_led', QLED, toolbar=self.toolbar)
@@ -152,8 +150,8 @@ class DataMixer(CustomExt):
     def create_computed_detectors(self):
         try:
             self.dashboard.add_det_from_extension('DataMixer', 'DAQ0D', 'DataMixer', self)
-            self.dashboard.modules_manager.get_mod_from_name(
-                'DataMixer', 'det').settings.child('detector_settings', 'overridden_detectors').setOpts(
+            datamixer_mod = self.dashboard.modules_manager.get_mod_from_name('DataMixer', 'det')
+            datamixer_mod.settings.child(datamixer_mod._hw_settings_name, 'overridden_detectors').setOpts(
                 limits=self.modules_manager.selected_detectors_name)
             self.set_action_enabled('create_computed_detectors', False)
             #self.dashboard.override_det_from_extension(self.modules_manager.selected_detectors_name)
@@ -200,26 +198,8 @@ class DataMixer(CustomExt):
             self.models, 'name', model_name)['class'](self)
         self.model_class.ini_model_base()
 
-    def setup_menu(self, menubar: QtWidgets.QMenuBar = None):
-        """Non mandatory method to be subclassed in order to create a menubar
-
-        create menu for actions contained into the self._actions, for instance:
-
-        Examples
-        --------
-        >>>file_menu = self.mainwindow.menuBar().addMenu('File')
-        >>>self.affect_to('load', file_menu)
-        >>>self.affect_to('save', file_menu)
-
-        >>>file_menu.addSeparator()
-        >>>self.affect_to('quit', file_menu)
-
-        See Also
-        --------
-        pymodaq.utils.managers.action_manager.ActionManager
-        """
-        # todo create and populate menu using actions defined above in self.setup_actions
-        pass
+    def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
+        self.create_dashboard_toolbar()
 
     def value_changed(self, param):
         """ Actions to perform when one of the param's value in self.settings is changed from the
@@ -254,11 +234,10 @@ def main():
 
     app = mkQApp('Data Mixer')
 
-
     win, dashboard = create_load_dashboard()
     win.mainwindow.setVisible(False)
 
-    win_ext, scan = create_extension(dashboard, DataMixer)
+    win_ext, data_mixer = create_extension(dashboard, DataMixer)
     win_ext.show()
 
     sys.exit(app.exec())

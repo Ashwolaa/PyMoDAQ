@@ -18,13 +18,14 @@ from qtpy.QtWidgets import QDialogButtonBox
 from qtpy.QtCore import QObject, QThread, Signal, QDateTime, QDate, QTime
 
 from pymodaq.extensions.custom_ext import CustomExt
+from pymodaq.extensions.scan.scan_manager import ScanManager
 from pymodaq_data.plotting.utils import PlotColors
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_utils import utils
 
-from pymodaq_data import data as data_mod, DataDistribution, DataDim
+from pymodaq_data import data as data_mod, DataDistribution, DataDim, DataToExport
 from pymodaq_data.h5modules import data_saving
 
 from pymodaq_gui.parameter import ioxml, Parameter
@@ -34,6 +35,7 @@ from pymodaq_gui.plotting.navigator import Navigator
 from pymodaq_gui.messenger import messagebox
 from pymodaq_gui import utils as gutils
 from pymodaq_gui.h5modules.saving import H5Saver
+from pymodaq_gui.utils.shared_ui import MenuToolbarNames
 
 from pymodaq.utils.scanner.scanner import Scanner
 from pymodaq.utils.managers.batchscan_manager import BatchScanner
@@ -74,7 +76,10 @@ class DAQScan(CustomExt):
     """
     settings_name = 'daq_scan_settings'
     command_daq_signal = Signal(utils.ThreadCommand)
-    live_data_1D_signal = Signal(list)
+
+    scan_done_signal = QtCore.Signal()
+
+    icon_name = 'qr_code_scanner'
 
     params = [
         {'title': 'Time Flow:', 'name': 'time_flow', 'type': 'group', 'expanded': False,
@@ -123,9 +128,11 @@ class DAQScan(CustomExt):
         """
         
         logger.info('Initializing DAQScan')
-        self.ui: DAQScanUI = DAQScanUI(dockarea)
+        self.ui: DAQScanUI = None  #important to be here before super is called , see do_things_after_experiment_set
+
         super().__init__(parent=dockarea,
-                         dashboard=dashboard)
+                         dashboard=dashboard,
+                         add_toolbar_break=False)
 
         self.wait_time = 1000
 
@@ -168,8 +175,11 @@ class DAQScan(CustomExt):
 
         self.modules_manager.actuators_changed[list].connect(self.update_actuators)
 
-        self.setup_ui()
+        self.ui: DAQScanUI = DAQScanUI(dockarea, toolbar=self.toolbar)
         self.ui.command_sig.connect(self.process_ui_cmds)
+        self.ui.finalize_ui(self)
+
+        self.setup_ui()
 
         self.create_dataset_settings()
 
@@ -179,16 +189,27 @@ class DAQScan(CustomExt):
         self.live_timer = QtCore.QTimer(self)
         self.live_timer.timeout.connect(self.update_live_plots)
 
-        if self.dashboard.preset_manager.entry_applied:
+        self.scan_manager = ScanManager(dashboard, self)
+        self.scan_manager.get_external_toolbar_menu(toolbar=self.ui.get_toolbar('scan_manager'),
+                                                    menu=self.ui.get_menu('scan_manager'))
+
+        if self.dashboard.experiment_manager.entry_applied:
             self.ui.enable_start_stop(True)
+            self.ini_scan_manager()
+
         logger.info('DAQScan Initialized')
 
-    def get_main_toolbar(self) -> QtWidgets.QToolBar:
-        """ Get the main toolbar widget to be eventually added in the main window toolbararea
+    def ini_scan_manager(self):
+        self.scan_manager.enable_actions()
+        self.scan_manager.modules_manager.actuators_all = self.modules_manager.actuators_all
+        self.scan_manager.modules_manager.detectors_all = self.modules_manager.detectors_all
+
+    def get_app_toolbars(self) -> list[QtWidgets.QToolBar]:
+        """ Get the main toolbars widget to be eventually added in the main window toolbararea
 
         Default is the default toolbar. To be reimplemented if needed
         """
-        return self.ui.toolbar
+        return [self.ui.toolbar, self.ui.get_toolbar('scan_manager')]
 
     def plot_from(self):
         self.modules_manager.get_det_data_list()
@@ -199,38 +220,27 @@ class DAQScan(CustomExt):
         self.settings.child('plot_options', 'plot_1d').setValue(
             dict(all_items=data1D_names, selected=data1D_names))
 
+    ####
+    def setup_docks_and_widgets(self):
+        """ Mandatory even if empty"""
+        pass
 
-    def setup_docks(self):
-        self.mainwindow.removeToolBar(self.toolbar)  # hides it
-
-        self.create_dashboard_toolbar()
-
-        self.ui.populate_toolbox_widget([self.settings_tree, self._h5saver.settings_tree],
-                                        ['General Settings', 'Save Settings'])
-
-        self.ui.set_scanner_settings(self.scanner.parent_widget)
-        self.ui.set_modules_settings(self.modules_manager.settings_tree)
-
-        self.plotting_settings_tree = ParameterTree()
-        self.plotting_settings_tree.setParameters(self.settings.child('plot_options'))
-        self.ui.set_plotting_settings(self.plotting_settings_tree)
+    def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
+        """ Mandatory even if empty"""
 
     def setup_actions(self):
-
-        self.ui.enable_start_stop(False)
-
-    def setup_menu(self, menubar: QtWidgets.QMenuBar = None):
-        pass
+        """ Mandatory even if empty"""
 
     def connect_things(self):
         self.scanner.scanner_updated_signal.connect(self.do_things_after_scanner_changed)
+    ####
 
     def do_things_after_scanner_changed(self):
         self.ui.set_action_enabled('ini_positions',
                                        self.scanner.actuators == self.modules_manager.actuators)
 
-    def do_things_after_preset_set(self, preset_name: str):
-        """ This method is called whenever a preset entry has been set.
+    def do_things_after_experiment_set(self, experiment_name: str):
+        """ This method is called whenever a experiment entry has been set.
 
         Its main purpose is to update the list of control modules in the manager and
         some other actions.
@@ -238,11 +248,16 @@ class DAQScan(CustomExt):
         Can be reimplemented to add some more evolved actions
         """
 
-        super().do_things_after_preset_set(preset_name)
-        self.ui.enable_start_stop(True)
+        super().do_things_after_experiment_set(experiment_name)
 
         # set the module saver type and applies its h5saver to submodules
         self._module_and_data_saver: module_saving.ScanSaver = module_saving.ScanSaver(self)
+
+        if self.ui is not None:
+            self.ui.enable_start_stop(True)
+
+        if hasattr(self, 'scan_manager'):
+            self.ini_scan_manager()
 
     ################
     #  CONFIG/SETUP UI / EXIT
@@ -251,7 +266,7 @@ class DAQScan(CustomExt):
         self.settings.child('time_flow', 'wait_time').setValue(config('pymodaq', 'scan', 'timeflow', 'wait_time'))
         self.settings.child('time_flow', 'wait_time_between').setValue(config('pymodaq', 'scan', 'timeflow', 'wait_time'))
 
-        self.settings.child('scan_options',  'scan_average').setValue(config('pymodaq', 'scan', 'Naverage'))
+        self.settings.child('scan_options', 'scan_average').setValue(config('pymodaq', 'scan', 'Naverage'))
 
     def process_ui_cmds(self, cmd: utils.ThreadCommand):
         """Process commands sent by actions done in the ui
@@ -534,20 +549,21 @@ class DAQScan(CustomExt):
             attr['settings'] = settings_str
 
         elif type_info == 'scan_info':
-            settings_all = [ioxml.parameter_to_xml_string(params),
-                           ioxml.parameter_to_xml_string(self.settings),
-                           ioxml.parameter_to_xml_string(self.h5saver.settings),
-                           ioxml.parameter_to_xml_string(self.scanner.settings)]
 
-            settings_str = b'<All_settings title="All Settings" type="group">'
-            for set in settings_all:
-                if len(settings_str + set) < 60000:
-                    # size limit for any object header (including all the other attributes) is 64kb
-                    settings_str += set
-                else:
-                    break
-            settings_str += b'</All_settings>'
-            attr['settings'] = settings_str
+            for name, param in ((self.__class__.__name__.lower(), self.settings),
+                                ('scan_info', params),
+                                ('saver', self.h5saver.settings),
+                                ('scanner', self.scanner.settings),):
+
+                _settings = Parameter.create(name=f'{name}_settings', type='group',
+                                             children=[param.saveState()])
+                attr[name] = ioxml.parameter_to_xml_string(_settings)
+
+
+            for instrument in self.modules_manager.modules_all:
+                instrument_settings = Parameter.create(name=f'{instrument.title}_settings', type='group',
+                                                      children=[instrument.settings.saveState()])
+                attr[f'{instrument.title}_settings'] = ioxml.parameter_to_xml_string(instrument_settings)
 
     def create_new_file(self, new_file):
         if new_file:
@@ -623,7 +639,7 @@ class DAQScan(CustomExt):
                         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
                             None, "Select HDF5 File",
                             str(Path(current_file).parent),
-                            "HDF5 Files (*.h5);;All Files (*)"
+                            "HDF5 Files (*.h5);;All Files (*)",
                         )
                         if file_path:
                             logger.info(f"User selected file: {file_path}")
@@ -835,7 +851,7 @@ class DAQScan(CustomExt):
         viewers_enum, data_names, _ = self.check_number_type_viewers()
         self.live_plotter.prepare_viewers(viewers_enum, viewers_name=data_names)
 
-    def update_status(self, txt: str, wait_time=0):
+    def update_status(self, txt: str, wait_time: int = None):
         """ Show the txt message in the status bar with a delay of wait_time ms.
 
         add an info log in the logger
@@ -844,10 +860,11 @@ class DAQScan(CustomExt):
         ----------
         txt: str
             the message to log
-        wait_time: int
-            leave the message apparent in the status bar for this duration in ms
+        wait_time: int or None
+            leave the message apparent in the status bar for this duration in ms.
+            If None, uses the value from config('gui', 'message_status_persistence')
         """
-        self.ui.display_status(txt, wait_time)
+        self.ui.update_status(txt, wait_time)
         self.status_signal.emit(txt)
         logger.info(txt)
 
@@ -876,6 +893,7 @@ class DAQScan(CustomExt):
             self.modules_manager.reset_signals()
             self.live_timer.stop()
             self.ui.set_scan_done()
+            self.scan_done_signal.emit()
             try:
                 self.module_and_data_saver.flush()
                 if self._h5saver.settings['close_after_scan']:
@@ -910,20 +928,41 @@ class DAQScan(CustomExt):
 
         elif status.command == 'add_data':
             ind_scan = status.attribute.pop('ind_scan')
-            self.module_and_data_saver.add_data(**status.attribute)
+            self.module_and_data_saver.add_data(dte=status.attribute.pop('extra_data', None), **status.attribute)
             self.module_and_data_saver.add_time(status.attribute['indexes'])
-            if ind_scan == 0:  #only the h5arrays initialization can take some time and one need to make sure
-                # it is finished
-                self.command_daq_signal.emit(utils.ThreadCommand("data_saved"))
+            self.command_daq_signal.emit(utils.ThreadCommand("data_saved"))
 
         elif status.command == 'add_nav_axes':
             self.module_and_data_saver.add_nav_axes(status.attribute)
+
+        elif status.command == 'splash':
+            if status.attribute is None:
+                self.splash_sc.setVisible(False)
+            else:
+                self.splash_sc.show()
+                self.splash_sc.showMessage(status.attribute)
 
     ############
     #  PLOTTING
 
     def save_temp_live_data(self, scan_data: ScanDataTemp):
         if scan_data.scan_index == 0:
+            if self.scanner.scanner.do_process_data:
+                viewers_enum, data_names, _ = self.check_number_type_viewers()
+                for dwa in scan_data.data:
+                    if dwa.get_full_name() not in data_names:
+                        viewer_enum = ViewersEnum.get_viewers_enum_from_data(dwa).increase_dim(self.scanner.n_axes)
+
+                        if self.settings['plot_options', 'group0D'] and ViewersEnum.get_viewers_enum_from_data(dwa) == ViewersEnum.Viewer0D:
+                            if not ViewersEnum.Viewer0D.increase_dim(self.scanner.n_axes) in viewers_enum:
+                                viewers_enum.append(viewer_enum)
+                                data_names.append(self.live_plotter.grouped_data0D_fullname)
+                        else:
+                            viewers_enum.append(viewer_enum)
+                            data_names.append(dwa.get_full_name())
+
+                self.live_plotter.prepare_viewers(viewers_enum, viewers_name=data_names)
+
             nav_axes = self.scanner.get_nav_axes()
             Naverage = self.settings['scan_options', 'scan_average']
             if Naverage > 1:
@@ -951,10 +990,10 @@ class DAQScan(CustomExt):
                                              remove_navigation=self.scanner.distribution == DataDistribution.uniform,
                                              average_axis=average_axis,
                                              average_index=self.ind_average,
-                                             separate_average= not self.settings['scan_options', 'average_on_top'],
+                                             separate_average=not self.settings['scan_options', 'average_on_top'],
                                              target_at=self.scanner.positions[self.ind_scan],
                                              last_step=(self.ind_scan ==
-                                                        self.scanner.positions.size - 1 and
+                                                        self.scanner.n_steps - 1 and
                                                         self.ind_average ==
                                                         self.settings[
                                                             'scan_options', 'scan_average'] - 1))
@@ -986,8 +1025,7 @@ class DAQScan(CustomExt):
 
             _, _, viewer2D_overload = self.check_number_type_viewers()
             if viewer2D_overload:
-                messagebox(text=
-                           'The number of live data chosen and the selected options '
+                messagebox(text='The number of live data chosen and the selected options '
                            'will not be able to render fully on the 2D live viewers. Consider changing '
                            'the options, such as "plot on top" for the averaging or "Group 0D data" '
                            'or the number of selected data')
@@ -1059,7 +1097,7 @@ class DAQScan(CustomExt):
             --------
             set_scan
         """
-        self.ui.display_status('Starting acquisition')
+        self.ui.update_status('Starting acquisition')
         #deactivate double_clicked
         if self.ui.is_action_checked('move_at'):
             self.ui.get_action('move_at').trigger()
@@ -1223,7 +1261,7 @@ class DAQScanAcquisition(QObject):
     status_sig = Signal(utils.ThreadCommand)
 
     def __init__(self, scan_settings: Parameter = None, scanner: Scanner = None,
-                 modules_manager: ModulesManager = None,):
+                 modules_manager: ModulesManager = None):
 
         """
         DAQScanAcquisition deal with the acquisition part of daq_scan, that is transferring commands to modules,
@@ -1334,7 +1372,7 @@ class DAQScanAcquisition(QObject):
                     QThread.msleep(self.scan_settings['time_flow', 'wait_time_between'])
 
                     #grab datas and wait for grab completion
-                    self.det_done(self.modules_manager.grab_data(positions=positions), positions)
+                    self.det_done(self.modules_manager.grab_data(positions=positions))
 
                     # daq_scan wait time
                     QThread.msleep(self.scan_settings.child('time_flow', 'wait_time').value())
@@ -1352,7 +1390,7 @@ class DAQScanAcquisition(QObject):
             # Ensure the file is closed even after an unexpected crash
             self.status_sig.emit(utils.ThreadCommand("Scan_done"))
 
-    def det_done(self, det_done_datas: data_mod.DataToExport, positions):
+    def det_done(self, det_done_datas: data_mod.DataToExport):
         """
 
         """
@@ -1364,10 +1402,11 @@ class DAQScanAcquisition(QObject):
                 indexes = [self.ind_average] + list(indexes)
             indexes = tuple(indexes)
             if self.ind_scan == 0:
-                self.status_sig.emit(utils.ThreadCommand("Update_Status",
+                self.status_sig.emit(utils.ThreadCommand("splash",
                                                          "Creating the arrays nodes in the h5file, please be patient"))
                 QtWidgets.QApplication.processEvents()
                 QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+                QThread.msleep(50)
                 nav_axes = self.scanner.get_nav_axes()
                 if self.Naverage > 1:
                     for nav_axis in nav_axes:
@@ -1376,28 +1415,32 @@ class DAQScanAcquisition(QObject):
                                                   index=0))
                 self.status_sig.emit(utils.ThreadCommand("add_nav_axes", nav_axes))
 
+            if self.scanner.scanner.do_process_data:
+                data_temp = self.scanner.scanner.process_data(det_done_datas)
+            else:
+                full_names: list = self.scan_settings['plot_options', 'plot_0d']['selected'][:]
+                full_names.extend(self.scan_settings['plot_options', 'plot_1d']['selected'][:])
+                data_temp = det_done_datas.get_data_from_full_names(full_names, deepcopy=False)
+                n_nav_axis_selection = 2-len(indexes) + 1 if self.Naverage > 1 else 2-len(indexes)
+                data_temp = data_temp.get_data_with_naxes_lower_than(n_nav_axis_selection)  # maximum Data2D included nav indexes
 
             # async saving command sent to all concerned detector control modules
             # because async if the first initialization takes a long time, the next async move will timeout therefore wait for the _data_saved_flag to be run
             self.status_sig.emit(
                 utils.ThreadCommand("add_data",
                                     dict(indexes=indexes, distribution=self.scanner.distribution,
-                                         ind_scan=self.ind_scan)))
+                                         ind_scan=self.ind_scan,
+                                         extra_data=data_temp if self.scanner.scanner.do_process_data else None,)))
+
+            while not self._data_saved_flag:  # this flag is changed by a command from the add_data process in main thread
+                QThread.msleep(50)
+                QtWidgets.QApplication.processEvents()
+
             if self.ind_scan == 0:
-                while not self._data_saved_flag:  # this flag is changed by a command from the add_data process in main thread
-                    QThread.msleep(50)
-                    QtWidgets.QApplication.processEvents()
                 self.status_sig.emit(utils.ThreadCommand("Update_Status", attribute="Acquisition has started"))
+                self.status_sig.emit(utils.ThreadCommand("splash", attribute=None))
 
             self.det_done_flag = True
-
-
-            full_names: list = self.scan_settings['plot_options', 'plot_0d']['selected'][:]
-            full_names.extend(self.scan_settings['plot_options', 'plot_1d']['selected'][:])
-            data_temp = det_done_datas.get_data_from_full_names(full_names, deepcopy=False)
-            n_nav_axis_selection = 2-len(indexes) + 1 if self.Naverage > 1 else 2-len(indexes)
-            data_temp = data_temp.get_data_with_naxes_lower_than(n_nav_axis_selection)  # maximum Data2D included nav indexes
-
             self.scan_data_tmp.emit(ScanDataTemp(self.ind_scan, indexes, data_temp))
 
         except Exception as e:
@@ -1420,6 +1463,7 @@ def main():
     from pymodaq_gui.qt_utils import mkQApp
     from pymodaq.dashboard import create_load_dashboard
     from pymodaq.utils.gui_utils.loader_utils import create_extension
+
     app = mkQApp('DAQScan')
 
     win, dashboard = create_load_dashboard()
@@ -1427,6 +1471,9 @@ def main():
 
     win_ext, scan = create_extension(dashboard, DAQScan)
     win_ext.show()
+
+    # preset_file_name = config("pymodaq", "presets", "default_preset_for_scan")
+    # dashboard.preset_manager.execute_entry(preset_file_name)
 
     sys.exit(app.exec())
 

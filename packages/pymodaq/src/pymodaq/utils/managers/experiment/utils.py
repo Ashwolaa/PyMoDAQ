@@ -16,7 +16,7 @@ config = Config()
 logger = set_logger(get_module_name(__file__))
 
 # Fixed names that will sort the plugin in remote/mock
-REMOTE_ITEMS  = {'LECODirector', 'TCPServer'}
+REMOTE_ITEMS = {'LECODirector', 'TCPServer'}
 MOCK_ITEMS = {}
 
 
@@ -28,9 +28,9 @@ def iterative_show_pb(params):
             iterative_show_pb(param['children'])
 
 
-def find_last_index(list_children:list=[], name_prefix ='',format_string='02.0f'):
+def find_last_index(list_children:list=[], name_prefix='',format_string='02.0f'):
     # Custom function to find last available index
-    child_indexes = ([int(par.name()[len(name_prefix) + 1:]) for par in list_children if name_prefix in par.name()])
+    child_indexes = ([int(par.name()[len(name_prefix):]) for par in list_children if name_prefix in par.name()])
     if child_indexes == []:
         newindex = 0
     else:
@@ -109,7 +109,7 @@ def make_detector_controller_param():
 def create_info_param(module_type: ModuleType,
                       module_class_name: str,
                       dim: str = None) -> dict:
-    """ Create a generic info parameter dictionary for a ControlModule in a Preset. """
+    """ Create a generic info parameter dictionary for a ControlModule in an Experiment. """
 
     if module_type == ModuleType.Actuator:
         ui = ActuatorUIFactory.keys()
@@ -132,7 +132,7 @@ def create_info_param(module_type: ModuleType,
     return info_param
 
     
-class PresetScalableGroupMove(GroupParameter):
+class ExperimentScalableGroupMove(GroupParameter):
     """
     """
 
@@ -146,7 +146,7 @@ class PresetScalableGroupMove(GroupParameter):
         """
         """
         name_prefix = ModuleType.Actuator.value
-        typ = typ[-1] #Only need last entry here
+        typ = typ[-1]  #Only need last entry here
         new_index = find_last_index(self.children(), name_prefix, format_string='02.0f')
         child = {'title': f'Actuator {new_index}',
                  'name': f'{name_prefix}{new_index}',
@@ -159,10 +159,10 @@ class PresetScalableGroupMove(GroupParameter):
                  ]}
         self.addChild(child)
 
-registerParameterType('groupmove', PresetScalableGroupMove, override=True)
+registerParameterType('groupmove', ExperimentScalableGroupMove, override=True)
 
 
-class PresetScalableGroupDet(GroupParameter):
+class ExperimentScalableGroupDet(GroupParameter):
     """
         =============== ==============
         **Attributes**    **Type**
@@ -198,17 +198,17 @@ class PresetScalableGroupDet(GroupParameter):
         """
 
         name_prefix = ModuleType.Detector.value
-        typ_full = "/".join((typ[0],typ[-1])) #Only need first and last element to retrieve associated plugin
+        typ_full = "/".join((typ[0],typ[-1]))  #Only need first and last element to retrieve associated plugin
         new_index = find_last_index(list_children=self.children(), name_prefix=name_prefix, format_string='02.0f')
         child = {'title': f'Detector {new_index}', 'name': f'{name_prefix}{new_index}',
                  'type': 'group', 'removable': True,
                  'children': [
                      {'title': 'Name:', 'name': 'name', 'type': 'str', 'value': f'{name_prefix} {new_index}'},
                      create_info_param(ModuleType.Detector, typ[-1], dim=typ[0]),
-                     make_detector_controller_param()
+                     make_detector_controller_param(),
                  ]}
 
         self.addChild(child)
 
 
-registerParameterType('groupdet', PresetScalableGroupDet, override=True)
+registerParameterType('groupdet', ExperimentScalableGroupDet, override=True)
