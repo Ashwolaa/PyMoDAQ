@@ -374,6 +374,20 @@ class DAQ_Move(ControllerThreadModule):
         """Trigger an initial position read after hardware comes up."""
         self.get_actuator_value()
 
+    def _dispatch_command_hardware(self, command: ThreadCommand) -> None:
+        """Translate legacy command_hardware commands (e.g. from ModulesManager)
+        onto the CT-based move API."""
+        if command.command == ControlToHardwareMove.MOVE_ABS:
+            value = command.attribute[0]
+            self.move_abs(value)
+        elif command.command == ControlToHardwareMove.MOVE_REL:
+            value = command.attribute[0]
+            self.move_rel(value)
+        elif command.command == ControlToHardwareMove.MOVE_HOME:
+            self.move_home()
+        elif command.command == ControlToHardwareMove.STOP_MOTION:
+            self.stop_motion()
+
     def _pre_close_hardware(self) -> None:
         """Stop continuous polling before detaching from the CT."""
         self._stop_grab_request.emit(self._channel)
@@ -480,6 +494,8 @@ class DAQ_Move(ControllerThreadModule):
                 rel_value = DataActuator(
                     self.title, data=[np.array([rel_value])], units=self.units,
                 )
+            elif not Unit(rel_value.units).is_compatible_with(self._current_value.units):
+                rel_value.force_units(self._current_value.units)
             self._send_to_leco = send_to_leco
             if self.ui is not None:
                 self.ui.move_done = False

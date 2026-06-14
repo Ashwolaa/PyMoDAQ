@@ -411,6 +411,24 @@ class DAQ_Viewer(ControllerThreadModule):
             for dock in self.ui.viewer_docks:
                 dock.setEnabled(True)
 
+    def _dispatch_command_hardware(self, command: ThreadCommand) -> None:
+        """Translate legacy command_hardware commands (e.g. from ModulesManager)
+        onto the CT-based acquisition API."""
+        if command.command == ControlToHardwareViewer.SINGLE:
+            kwargs = command.attribute or {}
+            self.grab_data(grab_state=False, snap_state=True, Naverage=kwargs.get('Naverage'))
+        elif command.command == ControlToHardwareViewer.GRAB:
+            kwargs = command.attribute or {}
+            self.grab_data(grab_state=True, snap_state=False, Naverage=kwargs.get('Naverage'))
+        elif command.command == ControlToHardwareViewer.STOP_GRAB:
+            self.stop_grab()
+        elif command.command == ControlToHardwareViewer.ROI_SELECT:
+            attr = command.attribute or {}
+            self._roi_select.emit(self._channel, attr.get('roi_info'), attr.get('ind_viewer', 0))
+        elif command.command == ControlToHardwareViewer.CROSSHAIR:
+            attr = command.attribute or {}
+            self._crosshair.emit(self._channel, attr.get('crosshair_info'), attr.get('ind_viewer', 0))
+
     # -------------------------------------------------------------------------
     # Legacy hardware lifecycle hooks (kept for DetectorWorker compat path)
     # -------------------------------------------------------------------------
@@ -475,7 +493,7 @@ class DAQ_Viewer(ControllerThreadModule):
         except Exception as e:
             self.logger.exception(str(e))
 
-    def grab_data(self, grab_state=False, send_to_leco=False, snap_state=False):
+    def grab_data(self, grab_state=False, send_to_leco=False, snap_state=False, Naverage=None):
         """ Generic method to grab or snap data from the selected (and initialized) detector
 
         Parameters
@@ -486,6 +504,9 @@ class DAQ_Viewer(ControllerThreadModule):
             If True, send the grabbed data through the LECO Coordinator
         snap_state: bool
             if True performs a single grab
+        Naverage: int, optional
+            If provided, overrides the 'main_settings'/'Naverage' setting for this
+            acquisition only (used by external callers such as ModulesManager).
         """
         self._grabing = grab_state
         self._send_to_leco = send_to_leco
@@ -498,7 +519,7 @@ class DAQ_Viewer(ControllerThreadModule):
 
         if self._ct is not None:
             # ── CT path ──────────────────────────────────────────────────────
-            Naverage = self.settings['main_settings', 'Naverage']
+            Naverage = Naverage if Naverage is not None else self.settings['main_settings', 'Naverage']
             hw_avg = getattr(
                 getattr(self._ct, '_plugin', None), 'hardware_averaging', False
             )

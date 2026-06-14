@@ -14,6 +14,8 @@ from typing import Optional, TYPE_CHECKING
 
 from qtpy.QtCore import Signal, Slot, QSignalBlocker, QMetaObject, Qt
 
+from pymodaq_utils.utils import ThreadCommand
+
 from pymodaq.control_modules.utils import ParameterControlModule
 from pymodaq.control_modules.controller_registry import ControllerRegistry, ControllerKey
 
@@ -132,6 +134,19 @@ class ControllerThreadModule(ParameterControlModule):
         """Called after a per-channel param is written to local settings."""
         pass
 
+    def _dispatch_command_hardware(self, command: ThreadCommand) -> None:
+        """Handle a legacy ``command_hardware`` ThreadCommand.
+
+        ``command_hardware`` predates the ControllerThread architecture and
+        was historically wired to a per-module hardware-thread worker's
+        ``queue_command``.  External callers (e.g. ``ModulesManager``, used
+        by ``DAQ_Scan`` and other extensions) still emit commands on this
+        signal to trigger grabs/moves.  Override in subclasses to translate
+        those commands onto the CT-based public API (``grab_data``,
+        ``move_abs``, ...).
+        """
+        pass
+
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def init_hardware(self, do_init=True):
@@ -167,6 +182,8 @@ class ControllerThreadModule(ParameterControlModule):
             ct.status_message.connect(self.update_status)
             ct.settings_changed.connect(self._on_hw_settings_changed)
             ct.custom_command.connect(self.thread_status)
+
+            self.command_hardware[ThreadCommand].connect(self._dispatch_command_hardware)
 
             self._read_request.connect(ct.request_read)
             self._stop_grab_request.connect(ct.stop_grab)
@@ -227,6 +244,7 @@ class ControllerThreadModule(ParameterControlModule):
                 self._ct.status_message.disconnect(self.update_status)
                 self._ct.settings_changed.disconnect(self._on_hw_settings_changed)
                 self._ct.custom_command.disconnect(self.thread_status)
+                self.command_hardware[ThreadCommand].disconnect(self._dispatch_command_hardware)
                 self._read_request.disconnect(self._ct.request_read)
                 self._stop_grab_request.disconnect(self._ct.stop_grab)
                 self._settings_update.disconnect(self._ct.update_settings)

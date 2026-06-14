@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import copy
 
+import numpy as np
 import pytest
 
 from pymodaq_gui.parameter import Parameter
@@ -26,7 +27,7 @@ from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq.control_modules.controller_registry import ControllerRegistry
 from pymodaq.control_modules.move_utility_classes import comon_parameters
 from pymodaq.control_modules.utils import create_controller_param
-from pymodaq.utils.data import DataActuator
+from pymodaq.utils.data import DataActuator, DataFromPlugins, DataToExport
 
 from .test_multi_subscriber_integration import CombinedCameraPlugin, FakeCamera
 
@@ -71,6 +72,13 @@ class SharedCombinedPlugin(CombinedCameraPlugin):
 
     def poll_moving(self):
         self._emit_move_done(self.get_actuator_value())
+
+    def grab_data(self, Naverage=1):
+        frame = self.controller.get_data()
+        dte = DataToExport('shared', data=[
+            DataFromPlugins(name='shared', data=[np.array([list(frame.values())])])])
+        for fn in self._dte_listeners:
+            fn(dte)
 
 
 def _load_shared_settings(module, hw_settings_name: str) -> None:
