@@ -28,6 +28,7 @@ import pytest
 
 from pymodaq.control_modules.controller_thread import ControllerThread
 from pymodaq.control_modules.controller_registry import ControllerKey, ControllerRegistry
+from pymodaq_utils.utils import ThreadCommand
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +195,65 @@ class CameraDetectorPlugin:
     def stop(self): pass
     def close(self): pass
     def commit_settings(self, param): pass
+
+
+# ---------------------------------------------------------------------------
+# Detector plugin emitting averagable frames (software averaging tests)
+# ---------------------------------------------------------------------------
+
+class AvgFrame:
+    """Minimal DataToExport-like object exposing ``.average()``.
+
+    ``CT._on_detector_data_ready`` calls ``dte.average(previous, ind)`` to
+    accumulate a running average — mimic that protocol on a plain dict.
+    """
+
+    def __init__(self, data: dict):
+        self.data = dict(data)
+
+    def average(self, previous: 'AvgFrame', ind: int) -> 'AvgFrame':
+        return AvgFrame({
+            key: (previous.data[key] * (ind - 1) + value) / ind
+            for key, value in self.data.items()
+        })
+
+
+class AveragingCameraPlugin(CameraDetectorPlugin):
+    """Old-style detector plugin whose frames support software averaging."""
+
+    def grab_data(self, Naverage=1):
+        frame = AvgFrame(self.controller.get_data())
+        for fn in self._dte_listeners: fn(frame)
+
+
+# ---------------------------------------------------------------------------
+# Detector plugin with ROI / crosshair hooks
+# ---------------------------------------------------------------------------
+
+class ROICrosshairCameraPlugin(CameraDetectorPlugin):
+    """Old-style detector plugin recording ROISelect / crosshairChanged calls."""
+
+    def __init__(self, parent=None, params_state=None):
+        super().__init__(parent, params_state)
+        self.roi_calls: list = []
+        self.crosshair_calls: list = []
+
+    def ROISelect(self, roi_info, ind_viewer):
+        self.roi_calls.append((roi_info, ind_viewer))
+
+    def crosshairChanged(self, crosshair_info):
+        self.crosshair_calls.append(crosshair_info)
+
+
+class ROIOneArgCameraPlugin(CameraDetectorPlugin):
+    """Old-style detector plugin whose ROISelect takes a single argument."""
+
+    def __init__(self, parent=None, params_state=None):
+        super().__init__(parent, params_state)
+        self.roi_calls: list = []
+
+    def ROISelect(self, roi_info):
+        self.roi_calls.append(roi_info)
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +482,167 @@ class TestMultiSubscriberDetector:
         for _ in range(3):
             self.ct.request_snap('', 1)
         assert self.plugin.controller._grab_count == 3
+
+
+# ---------------------------------------------------------------------------
+# B2. Software averaging (set_averaging + chained grab_data)
+# ---------------------------------------------------------------------------
+
+class TestSoftwareAveraging:
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(AveragingCameraPlugin)
+        self.ct.ini_hardware()
+
+    def test_naverage_1_is_passthrough(self, qapp):
+        self.ct.set_averaging('', 1)
+        col = Collector()
+        self.ct.data_ready.connect(col)
+
+        self.ct.request_snap('', 1)
+
+        assert self.plugin.controller._grab_count == 1
+        assert col.count == 1
+        _, _, is_temp = col.last()
+        assert is_temp is False
+
+    def test_naverage_3_chains_grabs_and_emits_once(self, qapp):
+        self.ct.set_averaging('', 3)
+        col = Collector()
+        self.ct.data_ready.connect(col)
+
+        self.ct.request_snap('', 1)
+
+        assert self.plugin.controller._grab_count == 3
+        assert col.count == 1
+        _, _, is_temp = col.last()
+        assert is_temp is False
+
+    def test_show_intermediate_emits_temp_frames(self, qapp):
+        self.ct.set_averaging('', 3, show_intermediate=True)
+        col = Collector()
+        self.ct.data_ready.connect(col)
+
+        self.ct.request_snap('', 1)
+
+        # One temp frame per accumulated grab (3) plus the final averaged frame.
+        assert col.count == 4
+        assert [c[2] for c in col.calls] == [True, True, True, False]
+
+    def test_averaging_of_constant_value(self, qapp):
+        self.plugin.controller.set_value('X', 7.0)
+        self.ct.set_averaging('', 3)
+        col = Collector()
+        self.ct.data_ready.connect(col)
+
+        self.ct.request_snap('', 1)
+
+        _, frame, _ = col.last()
+        assert frame.data['X'] == pytest.approx(7.0)
+
+    def test_set_averaging_back_to_1_clears_state(self, qapp):
+        self.ct.set_averaging('', 3)
+        assert '' in self.ct._averaging
+
+        self.ct.set_averaging('', 1)
+
+        assert '' not in self.ct._averaging
+
+
+# ---------------------------------------------------------------------------
+# B3. Continuous grab via start_grab / stop_grab (QTimer-driven)
+# ---------------------------------------------------------------------------
+
+class TestContinuousGrab:
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(CameraDetectorPlugin)
+        self.ct.ini_hardware()
+
+    def teardown_method(self):
+        # Make sure no leftover timers keep firing into the next test.
+        rg = self.ct._groups.get('')
+        if rg is not None:
+            for ch in list(rg.channels):
+                self.ct.stop_grab(ch)
+
+    def test_start_grab_emits_periodically(self, qtbot):
+        col = Collector()
+        self.ct.data_ready.connect(col)
+
+        self.ct.start_grab('', 20)
+        qtbot.waitUntil(lambda: col.count >= 2, timeout=2000)
+        self.ct.stop_grab('')
+
+        assert self.plugin.controller._grab_count >= 2
+
+    def test_stop_grab_stops_timer(self, qtbot):
+        col = Collector()
+        self.ct.data_ready.connect(col)
+
+        self.ct.start_grab('', 20)
+        qtbot.waitUntil(lambda: col.count >= 1, timeout=2000)
+        self.ct.stop_grab('')
+
+        count_after_stop = col.count
+        qtbot.wait(100)
+
+        assert col.count == count_after_stop
+
+    def test_fastest_subscriber_wins_period(self, qtbot):
+        self.ct.start_grab('', 200)
+        self.ct.start_grab('', 20)
+
+        rg = self.ct._groups['']
+        assert rg.channels[''].period_ms == pytest.approx(20)
+
+        self.ct.stop_grab('')
+        self.ct.stop_grab('')
+
+        assert '' not in self.ct._groups
+
+
+# ---------------------------------------------------------------------------
+# B4. ROI / crosshair forwarding to the plugin
+# ---------------------------------------------------------------------------
+
+class TestROIAndCrosshair:
+
+    def test_roi_select_forwarded_with_ind_viewer(self, qapp):
+        ct, plugin = _make_ct(ROICrosshairCameraPlugin)
+        ct.ini_hardware()
+
+        ct.request_roi_select('', {'roi': 1}, 2)
+
+        assert plugin.roi_calls == [({'roi': 1}, 2)]
+
+    def test_crosshair_forwarded(self, qapp):
+        ct, plugin = _make_ct(ROICrosshairCameraPlugin)
+        ct.ini_hardware()
+
+        ct.request_crosshair('', {'pos': (1, 2)}, 0)
+
+        assert plugin.crosshair_calls == [{'pos': (1, 2)}]
+
+    def test_roi_select_one_arg_signature(self, qapp):
+        ct, plugin = _make_ct(ROIOneArgCameraPlugin)
+        ct.ini_hardware()
+
+        ct.request_roi_select('', {'roi': 1}, 5)
+
+        assert plugin.roi_calls == [{'roi': 1}]
+
+    def test_roi_select_missing_method_silently_ignored(self, qapp):
+        ct, plugin = _make_ct(CameraDetectorPlugin)
+        ct.ini_hardware()
+
+        ct.request_roi_select('', {'roi': 1}, 0)  # no ROISelect on plugin: no-op
+
+    def test_crosshair_missing_method_silently_ignored(self, qapp):
+        ct, plugin = _make_ct(CameraDetectorPlugin)
+        ct.ini_hardware()
+
+        ct.request_crosshair('', {'pos': (0, 0)}, 0)  # no crosshairChanged: no-op
 
 
 # ---------------------------------------------------------------------------
@@ -725,35 +946,42 @@ class TestRefreshWhileMoving:
         assert self.plugin.axis_name == 'Y'
 
     def test_emit_channel_state_suppresses_duplicate_units(self, qapp):
-        """_emit_channel_state must not fire settings_changed when the unit for
-        the channel has not changed — this is the root cause of spinbox focus
-        loss when two DAQ_Move instances both run refresh value on the same CT.
+        """During a group tick, _emit_channel_state must suppress units that
+        haven't changed — this is the root cause of spinbox focus loss when two
+        DAQ_Move instances both run refresh value on the same CT.
 
-        Without the _emitted_units guard, every group tick causes an axis switch
-        which calls _emit_channel_state, which emits settings_changed every tick,
-        which calls _sync_units_ui → spinbox.setOpts() on all input spinboxes,
-        triggering a PyQtGraph redraw that steals keyboard focus.
+        Suppression is scoped to group-tick context (_in_group_tick=True) so
+        that explicit request_read() calls always emit (a subscriber freshly
+        attached to a channel still gets notified).
         """
         col = Collector()
         self.ct.settings_changed.connect(col)
         self.plugin.axis_name = 'X'
 
-        # First call: unit is new → must emit
-        self.ct._emit_channel_state('X')
-        assert col.count == 1, "First call for X should emit"
+        # Simulate being inside a group tick.
+        self.ct._in_group_tick = True
 
-        # Second call: same unit → must NOT emit
+        # First call inside tick: unit is new → must emit.
         self.ct._emit_channel_state('X')
-        assert col.count == 1, "Duplicate emission must be suppressed"
+        assert col.count == 1, "First call for X inside group tick should emit"
 
-        # Different channel Y: must emit (new channel)
+        # Second call, same unit, same tick → suppress.
+        self.ct._emit_channel_state('X')
+        assert col.count == 1, "Duplicate emission during group tick must be suppressed"
+
+        # Different channel Y: must emit (new channel).
         self.plugin.axis_name = 'Y'
         self.ct._emit_channel_state('Y')
-        assert col.count == 2, "New channel Y should emit"
+        assert col.count == 2, "New channel Y inside group tick should emit"
 
-        # Y again: suppress
+        # Y again, same tick → suppress.
         self.ct._emit_channel_state('Y')
-        assert col.count == 2, "Duplicate emission for Y must be suppressed"
+        assert col.count == 2, "Duplicate emission for Y during group tick must be suppressed"
+
+        # Outside group tick: always emit, even for already-seen units.
+        self.ct._in_group_tick = False
+        self.ct._emit_channel_state('X')
+        assert col.count == 3, "Outside group tick, emit always fires even for same units"
 
     def test_group_tick_does_not_spam_settings_changed(self, qapp):
         """Multiple group ticks must not keep firing settings_changed for units
@@ -781,3 +1009,81 @@ class TestRefreshWhileMoving:
                 f"settings_changed(units) for channel '{ch}' fired {count} times "
                 f"across 5 ticks — should be exactly 1"
             )
+
+
+# ---------------------------------------------------------------------------
+# Custom command forwarding
+# ---------------------------------------------------------------------------
+
+class TestCustomCommand:
+    """CT.custom_command forwards unhandled plugin ThreadCommands to subscribers.
+
+    Plugins call emit_status(ThreadCommand('update_main_settings', ...)) (or
+    'show_splash' / 'close_splash' / 'lcd') to communicate with the DAQ module.
+    In the old DetectorWorker path these commands arrived via status_sig →
+    thread_status().  In the CT path _StatusSig.emit must relay them through
+    CT.custom_command so subscribers can handle them via thread_status().
+    """
+
+    def setup_method(self):
+        self.ct, self.plugin = _make_ct(CameraDetectorPlugin)
+        self.ct.ini_hardware()
+
+    def test_update_main_settings_forwarded(self, qapp):
+        """'update_main_settings' ThreadCommand must arrive on custom_command."""
+        received = []
+        self.ct.custom_command.connect(lambda cmd: received.append(cmd))
+
+        cmd = ThreadCommand('update_main_settings', [['wait_time'], 100, 'value'])
+        self.ct._plugin.parent.status_sig.emit(cmd)
+
+        assert len(received) == 1
+        assert received[0].command == 'update_main_settings'
+        assert received[0].attribute == [['wait_time'], 100, 'value']
+
+    def test_show_splash_forwarded(self, qapp):
+        """'show_splash' ThreadCommand must arrive on custom_command."""
+        received = []
+        self.ct.custom_command.connect(lambda cmd: received.append(cmd))
+
+        cmd = ThreadCommand('show_splash', 'Initialising...')
+        self.ct._plugin.parent.status_sig.emit(cmd)
+
+        assert len(received) == 1
+        assert received[0].command == 'show_splash'
+
+    def test_close_splash_forwarded(self, qapp):
+        """'close_splash' with no attribute must still arrive on custom_command."""
+        received = []
+        self.ct.custom_command.connect(lambda cmd: received.append(cmd))
+
+        cmd = ThreadCommand('close_splash')
+        self.ct._plugin.parent.status_sig.emit(cmd)
+
+        assert len(received) == 1
+        assert received[0].command == 'close_splash'
+
+    def test_update_settings_not_doubled(self, qapp):
+        """'update_settings' is handled by settings_changed, NOT custom_command."""
+        custom_received = []
+        settings_received = []
+        self.ct.custom_command.connect(lambda cmd: custom_received.append(cmd))
+        self.ct.settings_changed.connect(lambda *a: settings_received.append(a))
+
+        cmd = ThreadCommand('update_settings', [['some', 'path'], 42, 'value'])
+        self.ct._plugin.parent.status_sig.emit(cmd)
+
+        assert len(settings_received) == 1, "update_settings must fire settings_changed"
+        assert len(custom_received) == 0, "update_settings must NOT fire custom_command"
+
+    def test_check_position_not_forwarded_to_custom(self, qapp):
+        """Position updates go to data_ready, NOT custom_command."""
+        custom_received = []
+        self.ct.custom_command.connect(lambda cmd: custom_received.append(cmd))
+
+        from pymodaq.utils.data import DataActuator
+        da = DataActuator(data=5.0)
+        cmd = ThreadCommand('check_position', da)
+        self.ct._plugin.parent.status_sig.emit(cmd)
+
+        assert len(custom_received) == 0, "check_position must NOT fire custom_command"

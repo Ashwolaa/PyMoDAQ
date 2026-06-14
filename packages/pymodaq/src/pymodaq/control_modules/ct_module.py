@@ -48,6 +48,12 @@ class ControllerThreadModule(ParameterControlModule):
     # the shared _hw_settings.
     _PER_CHANNEL_PARAMS: frozenset = frozenset()
 
+    # Set to True in detector subclasses (DAQ_Viewer) to wire the detector-
+    # specific cross-thread signals (_snap_request, _start_grab_request, etc.).
+    # Actuator subclasses (DAQ_Move) leave this False so those signals are never
+    # connected and produce no spurious disconnect warnings on detach.
+    _uses_detector_signals: bool = False
+
     def _is_per_channel(self, path: list) -> bool:
         """Return True if *path* identifies a per-channel (per-module) parameter.
 
@@ -64,6 +70,14 @@ class ControllerThreadModule(ParameterControlModule):
     _read_request      = Signal(str)               # (channel,) → ct.request_read
     _stop_grab_request = Signal(str)               # (channel,) → ct.stop_grab
     _settings_update   = Signal(list, object, str) # (path, data, change) → ct.update_settings
+
+    # Detector-specific cross-thread signals  [old-style detector only]
+    _start_grab_request = Signal(str, float)        # (channel, period_ms) → ct.start_grab
+    _snap_request       = Signal(str, int)           # (channel, Naverage)  → ct.request_snap
+    _stop_request       = Signal()                   # ()                   → ct.request_stop
+    _set_averaging      = Signal(str, int, bool)     # (channel, N, show)   → ct.set_averaging
+    _roi_select         = Signal(str, object, int)   # (channel, roi, idx)  → ct.request_roi_select
+    _crosshair          = Signal(str, object, int)   # (channel, info, idx) → ct.request_crosshair
 
     def __init__(self, **kwargs):
         # Set CT attributes before ParameterControlModule (and its ParameterManager
@@ -152,10 +166,24 @@ class ControllerThreadModule(ParameterControlModule):
             ct.hardware_status.connect(self._on_hardware_status)
             ct.status_message.connect(self.update_status)
             ct.settings_changed.connect(self._on_hw_settings_changed)
+            ct.custom_command.connect(self.thread_status)
 
             self._read_request.connect(ct.request_read)
             self._stop_grab_request.connect(ct.stop_grab)
             self._settings_update.connect(ct.update_settings)
+
+            # Detector signals: only connect when this module actually uses them.
+            # DAQ_Move (actuator) must not get these wired — it never emits them
+            # and the spurious connections produce disconnect warnings on detach.
+            self._ct_detector_signals_connected = False
+            if self._uses_detector_signals and hasattr(ct, 'request_snap'):
+                self._start_grab_request.connect(ct.start_grab)
+                self._snap_request.connect(ct.request_snap)
+                self._stop_request.connect(ct.request_stop)
+                self._set_averaging.connect(ct.set_averaging)
+                self._roi_select.connect(ct.request_roi_select)
+                self._crosshair.connect(ct.request_crosshair)
+                self._ct_detector_signals_connected = True
 
             self._connect_ct_signals(ct)
             self.connect_leco(True)
@@ -198,9 +226,18 @@ class ControllerThreadModule(ParameterControlModule):
                 self._ct.hardware_status.disconnect(self._on_hardware_status)
                 self._ct.status_message.disconnect(self.update_status)
                 self._ct.settings_changed.disconnect(self._on_hw_settings_changed)
+                self._ct.custom_command.disconnect(self.thread_status)
                 self._read_request.disconnect(self._ct.request_read)
                 self._stop_grab_request.disconnect(self._ct.stop_grab)
                 self._settings_update.disconnect(self._ct.update_settings)
+                if getattr(self, '_ct_detector_signals_connected', False):
+                    self._start_grab_request.disconnect(self._ct.start_grab)
+                    self._snap_request.disconnect(self._ct.request_snap)
+                    self._stop_request.disconnect(self._ct.request_stop)
+                    self._set_averaging.disconnect(self._ct.set_averaging)
+                    self._roi_select.disconnect(self._ct.request_roi_select)
+                    self._crosshair.disconnect(self._ct.request_crosshair)
+                    self._ct_detector_signals_connected = False
             except Exception:
                 pass
             self._ct = None

@@ -12,7 +12,8 @@ from pymodaq_gui.utils.dock import DockArea
 from pymodaq.control_modules import daq_viewer as daqvm
 from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq.control_modules.viewer_utility_classes import HW_SETTINGS_KEY as DETECTOR_SETTINGS_KEY
-from pymodaq.control_modules.utils import ControlModule
+from pymodaq.control_modules import viewer_utility_classes
+from pymodaq.control_modules.utils import ControlModule, create_controller_param
 from pymodaq.control_modules.instruments import DET_TYPES, get_viewer_plugins, DAQTypesEnum
 from pymodaq.utils.conftests import qtbotskip, main_modules_skip
 from pymodaq.utils.config import GlobalConfig
@@ -78,6 +79,54 @@ class TestWithoutUI:
         det_params, _class = get_viewer_plugins(prog.detector.daq_type.name, prog.detector.module_name)
         assert putils.iter_children(prog.settings.child(DETECTOR_SETTINGS_KEY), []) == \
             putils.iter_children(det_params, [])
+
+
+class TestChannelSelector:
+    """controller.channel selector: channel_name / channel_names / _derive_channel."""
+
+    def _set_detector_settings(self, prog, children):
+        plugin_params = Parameter.create(name=DETECTOR_SETTINGS_KEY, type='group', children=children)
+        for child in prog.settings.child(DETECTOR_SETTINGS_KEY).children():
+            child.remove()
+        prog.settings.child(DETECTOR_SETTINGS_KEY).addChildren(plugin_params.children())
+
+    def test_default_plugin_defaults_to_broadcast(self, ini_daq_viewer_without_ui):
+        prog, qtbot = ini_daq_viewer_without_ui
+
+        assert prog.channel_names == ['']
+        assert prog.channel_name == ''
+        assert prog._derive_channel() == ''
+
+    def test_default_comon_parameters_channel(self, ini_daq_viewer_without_ui):
+        prog, qtbot = ini_daq_viewer_without_ui
+        self._set_detector_settings(prog, viewer_utility_classes.comon_parameters)
+
+        assert prog.channel_names == ['']
+        assert prog.channel_name == ''
+        assert prog._derive_channel() == ''
+
+    def test_multi_channel_plugin(self, ini_daq_viewer_without_ui):
+        prog, qtbot = ini_daq_viewer_without_ui
+        self._set_detector_settings(prog, [
+            create_controller_param(channel_name='ChannelA', channel_names=['ChannelA', 'ChannelB'])
+        ])
+
+        assert prog.channel_names == ['ChannelA', 'ChannelB']
+        assert prog.channel_name == 'ChannelA'
+        assert prog._derive_channel() == 'ChannelA'
+
+        prog.channel_name = 'ChannelB'
+        assert prog.channel_name == 'ChannelB'
+        assert prog._derive_channel() == 'ChannelB'
+
+    def test_setting_invalid_channel_name_is_ignored(self, ini_daq_viewer_without_ui):
+        prog, qtbot = ini_daq_viewer_without_ui
+        self._set_detector_settings(prog, [
+            create_controller_param(channel_name='ChannelA', channel_names=['ChannelA', 'ChannelB'])
+        ])
+
+        prog.channel_name = 'NotAChannel'
+        assert prog.channel_name == 'ChannelA'
 
 #@pytest.mark.skip
 class TestWithUI:

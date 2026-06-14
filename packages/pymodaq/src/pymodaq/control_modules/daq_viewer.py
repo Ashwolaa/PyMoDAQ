@@ -17,7 +17,7 @@ import time
 
 from easydict import EasyDict as edict
 import numpy as np
-from qtpy import QtWidgets
+from qtpy import QtWidgets, QtCore
 from qtpy.QtCore import Qt, QObject, Slot, QThread, Signal
 
 from pymodaq_data import DataSource
@@ -26,6 +26,7 @@ from pymodaq.utils.data import DataFromPlugins
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq.control_modules.utils import ParameterControlModule, HardwareWorkerBase
+from pymodaq.control_modules.ct_module import ControllerThreadModule
 
 from pymodaq_gui.utils.file_io import select_file
 from pymodaq_gui.utils.widgets.lcd import LCD
@@ -66,7 +67,7 @@ config = Config()
 local_path = get_set_local_dir()
 
 
-class DAQ_Viewer(ParameterControlModule):
+class DAQ_Viewer(ControllerThreadModule):
     """ Main PyMoDAQ class to drive detectors
 
     Qt object and generic UI to drive actuators. The class is giving you full functionality to select (daq_detector),
@@ -97,7 +98,9 @@ class DAQ_Viewer(ParameterControlModule):
     """
     settings_name = 'daq_viewer_settings'
     _hw_kind = 'detector'
+    _uses_detector_signals = True
     _ini_hw_cmd = ControlToHardware.INI_HARDWARE
+    _PER_CHANNEL_PARAMS = frozenset({('controller', 'channel')})
     custom_sig = Signal(ThreadCommand)  # particular case where DAQ_Viewer is used for a custom module
 
     grab_done_signal = Signal(DataToExport)
@@ -252,16 +255,23 @@ class DAQ_Viewer(ParameterControlModule):
         for ind_viewer, viewer in enumerate(viewers):
             viewer.data_to_export_signal.connect(self._get_data_from_viewer)
 
+            # Capture ind_viewer by value with a default argument.
             viewer.roi_select_signal.connect(
-                lambda roi_info: self.command_hardware.emit(
-                    ThreadCommand(ControlToHardwareViewer.ROI_SELECT,
-                                  dict(roi_info=roi_info,
-                                       ind_viewer=ind_viewer))))
+                lambda roi_info, idx=ind_viewer: (
+                    self._roi_select.emit(self._channel, roi_info, idx)
+                    if self._ct is not None
+                    else self.command_hardware.emit(
+                        ThreadCommand(ControlToHardwareViewer.ROI_SELECT,
+                                      dict(roi_info=roi_info, ind_viewer=idx)))
+                ))
             viewer.crosshair_dragged.connect(
-                lambda crosshair_info: self.command_hardware.emit(
-                    ThreadCommand(ControlToHardwareViewer.CROSSHAIR,
-                                  dict(crosshair_info=crosshair_info,
-                                       ind_viewer=ind_viewer))))
+                lambda crosshair_info, idx=ind_viewer: (
+                    self._crosshair.emit(self._channel, crosshair_info, idx)
+                    if self._ct is not None
+                    else self.command_hardware.emit(
+                        ThreadCommand(ControlToHardwareViewer.CROSSHAIR,
+                                      dict(crosshair_info=crosshair_info, ind_viewer=idx)))
+                ))
 
 
         self._viewers = viewers
@@ -342,7 +352,67 @@ class DAQ_Viewer(ParameterControlModule):
         self._reload_plugin_settings()
 
     # -------------------------------------------------------------------------
-    # Hardware lifecycle hooks
+    # ControllerThreadModule hooks
+    # -------------------------------------------------------------------------
+
+    def _get_plugin_class(self) -> type:
+        """Return the detector plugin class for the currently selected detector."""
+        _params, plugin_class = get_viewer_plugins(
+            self.detector.daq_type.name, self.detector.module_name
+        )
+        return plugin_class
+
+    def _local_channel_param(self) -> 'Parameter':
+        """Return the controller.channel Parameter from local settings."""
+        return self.settings.child(self._hw_settings_name, 'controller', 'channel')
+
+    @property
+    def channel_names(self) -> List[str]:
+        """Get the names of all data channels this DAQ_Viewer can subscribe to."""
+        try:
+            return self._local_channel_param().opts['limits']
+        except Exception:
+            return []
+
+    @property
+    def channel_name(self) -> str:
+        """Get/Set the data channel this DAQ_Viewer subscribes to ('' = broadcast)."""
+        try:
+            return self._local_channel_param().value()
+        except Exception:
+            return ''
+
+    @channel_name.setter
+    def channel_name(self, name: str):
+        try:
+            channel_p = self._local_channel_param()
+            if name in channel_p.opts['limits']:
+                channel_p.setValue(name)
+        except Exception:
+            pass
+
+    def _derive_channel(self) -> str:
+        """Return the selected data channel ('' = single-stream, broadcast)."""
+        try:
+            return self.channel_name or ''
+        except Exception:
+            return ''
+
+    def _connect_ct_signals(self, ct) -> None:
+        """Connect CT data signals to DAQ_Viewer display slots."""
+        ct.data_ready.connect(self._on_ct_data_ready)
+
+    def _disconnect_ct_signals(self, ct) -> None:
+        ct.data_ready.disconnect(self._on_ct_data_ready)
+
+    def _on_hardware_connected(self) -> None:
+        """Enable viewer docks once hardware is ready."""
+        if self.ui is not None:
+            for dock in self.ui.viewer_docks:
+                dock.setEnabled(True)
+
+    # -------------------------------------------------------------------------
+    # Legacy hardware lifecycle hooks (kept for DetectorWorker compat path)
     # -------------------------------------------------------------------------
 
     def _create_hardware(self):
@@ -425,13 +495,46 @@ class DAQ_Viewer(ParameterControlModule):
             self.ui.data_ready = False
 
         self._start_grab_time = time.perf_counter()
-        if snap_state:
-            self.update_status(f'{self._title}: Snap')
-            self.command_hardware.emit(
-                ThreadCommand(ControlToHardwareViewer.SINGLE,
-                              dict(Naverage=self.settings['main_settings', 'Naverage'])))
+
+        if self._ct is not None:
+            # ── CT path ──────────────────────────────────────────────────────
+            Naverage = self.settings['main_settings', 'Naverage']
+            hw_avg = getattr(
+                getattr(self._ct, '_plugin', None), 'hardware_averaging', False
+            )
+            show_avg = self.settings['main_settings', 'show_averaging']
+            wait_ms = float(self.settings['main_settings', 'wait_time'])
+
+            if snap_state:
+                self.update_status(f'{self._title}: Snap')
+                self._set_averaging.emit(self._channel, Naverage if not hw_avg else 1, show_avg)
+                self._snap_request.emit(self._channel, Naverage if hw_avg else 1)
+            elif not grab_state:
+                # Stop: clear flag, stop CT timer, call plugin.stop().
+                self.update_status(f'{self._title}: Stop Grab')
+                self._grabing = False
+                self._stop_request.emit()
+                self.grab_status.emit(False)
+            else:
+                # Start continuous grab: CT timer drives acquisition at wait_time rate.
+                # _grab_in_flight in CT skips timer ticks when hardware is busy,
+                # preventing queue flooding without serialising through the GUI.
+                # show_data's refresh_time controls display rate independently.
+                self.update_status(f'{self._title}: Continuous Grab')
+                self._set_averaging.emit(self._channel, Naverage if not hw_avg else 1, show_avg)
+                # Fire an immediate first snap so data appears without waiting wait_time.
+                self._snap_request.emit(self._channel, Naverage if hw_avg else 1)
+                # Then start the timer for all subsequent frames.
+                self._start_grab_request.emit(self._channel, max(wait_ms, 0.))
+                self.grab_status.emit(True)
         else:
-            if not grab_state:
+            # ── Legacy DetectorWorker path ────────────────────────────────────
+            if snap_state:
+                self.update_status(f'{self._title}: Snap')
+                self.command_hardware.emit(
+                    ThreadCommand(ControlToHardwareViewer.SINGLE,
+                                  dict(Naverage=self.settings['main_settings', 'Naverage'])))
+            elif not grab_state:
                 self.update_status(f'{self._title}: Stop Grab')
                 self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.STOP_GRAB))
             else:
@@ -468,8 +571,12 @@ class DAQ_Viewer(ParameterControlModule):
     def stop(self):
         """ Stop the current continuous grabbing """
         self.update_status(f'{self._title}: Stop Grab')
-        self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.STOP_GRAB))
         self._grabing = False
+        if self._ct is not None:
+            self._stop_request.emit()
+        else:
+            self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.STOP_GRAB))
+        self.grab_status.emit(False)
 
     # -------------------------------------------------------------------------
     # Data handling
@@ -673,6 +780,24 @@ class DAQ_Viewer(ParameterControlModule):
             if self._received_data == len(self.viewers):
                 self._grab_done = True
                 self.grab_done_signal.emit(self._data_to_save_export)
+
+    @Slot(str, object, bool)
+    def _on_ct_data_ready(self, channel: str, dte: object, is_temp: bool) -> None:
+        """Receive data from ControllerThread and route to show_data / show_temp_data.
+
+        Channel filtering: detectors use channel='' (broadcast), so all frames
+        are accepted regardless of the channel value.
+
+        The CT's QTimer (started by _start_grab_request) drives continuous
+        acquisition at wait_time rate independently of the GUI.  show_data's
+        refresh_time check controls display rate without affecting hardware speed.
+        """
+        if channel and channel != self._channel:
+            return
+        if is_temp:
+            self.show_temp_data(dte)
+            return
+        self.show_data(dte)
 
     @Slot(DataToExport)
     def show_temp_data(self, data: DataToExport):
@@ -881,8 +1006,13 @@ class DAQ_Viewer(ParameterControlModule):
                         viewer.x_axis, viewer.y_axis = self.get_scaling_options()
 
         elif param.name() == 'wait_time':
-            self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.UPDATE_WAIT_TIME,
-                                                     [param.value()]))
+            if self._ct is not None:
+                # Re-register with the new period if a live grab is running.
+                if self._grabing:
+                    self._start_grab_request.emit(self._channel, float(param.value()))
+            else:
+                self.command_hardware.emit(ThreadCommand(ControlToHardwareViewer.UPDATE_WAIT_TIME,
+                                                         [param.value()]))
 
         elif param.name() in putils.iter_children(self.settings.child('saver_settings'), []):
             try:

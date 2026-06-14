@@ -97,6 +97,24 @@ _UNSET = object()  # sentinel for _params_state default
 __all__ = ['ControllerThread', 'ControlCommand']
 
 @dataclass
+class _AveragingState:
+    """Per-channel software averaging state for old-style detectors.
+
+    CT accumulates frames here and only emits ``data_ready`` when *Naverage*
+    frames have been collected.  Between frames ``_grab_in_flight`` stays True
+    so the periodic timer cannot start a competing grab.
+
+    ``show_intermediate`` mirrors ``DetectorWorker.show_averaging``: when True,
+    each intermediate average is broadcast as a temp frame so the viewer can
+    display live progress.
+    """
+    Naverage: int
+    ind: int = 0
+    datas: object = None           # DataToExport running average, or None
+    show_intermediate: bool = False
+
+
+@dataclass
 class _ChannelState:
     """Subscriber tracking for one polled channel.
 
@@ -219,13 +237,14 @@ class _StatusSig:
             self._ct.settings_changed.emit(channel, ['units'], attr, 'value')
             return
 
-        # --- plain text status -------------------------------------------------
+        # --- forward unhandled commands to subscribers (e.g. update_main_settings,
+        #     show_splash, close_splash, lcd) ------------------------------------
+        self._ct.custom_command.emit(cmd)
+        # Also propagate a human-readable text for the status bar.
         if isinstance(attr, str):
             self._ct.status_message.emit(attr)
-        elif isinstance(attr, (list, tuple)) and attr:
+        elif isinstance(attr, (list, tuple)) and attr and isinstance(attr[0], str):
             self._ct.status_message.emit(str(attr[0]))
-        elif attr is not None:
-            self._ct.status_message.emit(str(attr))
 
 
 class _PluginParentShim:
@@ -263,6 +282,7 @@ class ControllerThread(QObject):
     status_message      = Signal(str)                # text for DAQ status bars
     settings_changed    = Signal(str, list, object, str)  # (channel, path, data, change)
     capabilities_signal = Signal(object)             # Capabilities
+    custom_command      = Signal(object)             # (ThreadCommand,) unhandled plugin commands
 
     def __init__(self, plugin_class: type, params_state: dict | None = None) -> None:
         super().__init__()
@@ -289,23 +309,35 @@ class ControllerThread(QObject):
         self._pending_group: str | None = None
         self._pending_channel: str = ''         # channel of in-flight move/grab
 
+        # Per-channel software averaging state (old-style detectors only).
+        # Keyed by channel name; created/updated by set_averaging().
+        # Cleared on close_hardware() or when averaging completes.
+        self._averaging: dict[str, _AveragingState] = {}  # [old-style detector only]
+
         # ── Old-style-only state ─────────────────────────────────────────────
-        # The two fields below are needed because old-style plugins have a
-        # single ``axis_name`` slot that the CT must time-multiplex across
-        # channels.  New-style plugins expose per-channel APIs (query_data /
-        # change_to) so axis switching is never needed there.
+        # The fields below are needed because old-style plugins have a single
+        # ``axis_name`` slot that the CT must time-multiplex across channels.
+        # New-style plugins expose per-channel APIs (query_data / change_to)
+        # so axis switching is never needed there.
 
         # Set to True while switching axis_name for a read/write so that
         # spurious settings_changed emissions (units, epsilon side effects
         # of axis_name.setter) are not forwarded to the GUI subscribers.
         self._axis_switching: bool = False    # [old-style only]
 
-        # Last units value emitted per channel via settings_changed.  Used by
-        # _emit_channel_state to suppress redundant emissions: units only change
-        # at ini_stage or if a plugin explicitly updates them, never on every
-        # group-tick axis switch.  Without this guard every tick causes
-        # _sync_units_ui → spinbox.setOpts() on all input spinboxes, which
-        # triggers a PyQtGraph redraw that steals keyboard focus.
+        # True while _on_group_tick is iterating over channels.  Used by
+        # _emit_channel_state to suppress redundant unit emissions that occur
+        # on EVERY tick when the group reads multiple axes in sequence: the
+        # axis-switch to Y emits units(Y) on tick 1; suppressing it on tick
+        # 2, 3, … prevents _sync_units_ui → spinbox.setOpts() from firing
+        # every tick and stealing keyboard focus from input spinboxes.
+        # Explicit request_read() calls are NOT suppressed — _in_group_tick
+        # is False outside of _on_group_tick.
+        self._in_group_tick: bool = False     # [old-style only]
+
+        # Last units value emitted per channel via settings_changed.
+        # Checked by _emit_channel_state when _in_group_tick is True to decide
+        # whether to suppress a redundant emission.
         self._emitted_units: dict[str, str] = {}  # [old-style only]
 
     # ── Plugin settings helpers ──────────────────────────────────────────────
@@ -419,6 +451,7 @@ class ControllerThread(QObject):
         self._solo.clear()
         self._grab_in_flight = False
         self._pending_group = None
+        self._averaging.clear()
 
         if self._plugin_settings is not None:
             try:
@@ -599,6 +632,95 @@ class ControllerThread(QObject):
                 except Exception:
                     pass
 
+    # ── Slots ← GUI thread (detector-specific) ───────────────────────────────
+
+    @Slot()
+    def request_stop(self) -> None:
+        """[old-style detector] Stop any ongoing grab immediately.
+
+        Calls ``plugin.stop()``, stops all timer groups, and resets all
+        in-flight grab state so the next snap or start_grab begins clean.
+        """
+        if self._plugin is not None and self._is_old_style_detector():
+            try:
+                self._plugin.stop()
+            except Exception:
+                pass
+        for group in self._groups.values():
+            if group.timer is not None:
+                group.timer.stop()
+        self._groups.clear()
+        for _, (_, timer, _) in list(self._solo.items()):
+            timer.stop()
+        self._solo.clear()
+        self._grab_in_flight = False
+        self._pending_group = None
+        self._pending_channel = ''
+        self._averaging.clear()
+
+    @Slot(str, int, bool)
+    def set_averaging(self, channel: str, Naverage: int, show_intermediate: bool = False) -> None:
+        """[old-style detector only] Configure software averaging for *channel*.
+
+        Call this before ``request_snap`` / ``start_grab`` whenever Naverage > 1
+        and the plugin does not support hardware averaging.  When Naverage <= 1
+        any existing averaging state for the channel is cleared (pass-through mode).
+
+        ``show_intermediate`` mirrors ``DetectorWorker.show_averaging``: if True,
+        each partial average is broadcast as a temp frame so the viewer shows
+        live progress.
+        """
+        if Naverage <= 1:
+            self._averaging.pop(channel, None)
+        else:
+            existing = self._averaging.get(channel)
+            if existing is not None:
+                existing.Naverage = Naverage
+                existing.show_intermediate = show_intermediate
+            else:
+                self._averaging[channel] = _AveragingState(
+                    Naverage=Naverage, show_intermediate=show_intermediate
+                )
+
+    @Slot(str, object, int)
+    def request_roi_select(self, channel: str, roi_info: object, ind_viewer: int) -> None:
+        """[old-style detector only] Forward a ROI selection from a viewer widget to the plugin.
+
+        Calls ``plugin.ROISelect(roi_info)`` if the plugin defines it.
+        ``ind_viewer`` is forwarded to ``ROISelect`` when the plugin's signature
+        accepts it; otherwise it is silently ignored.
+        """
+        if self._plugin is None:
+            return
+        roi_select = getattr(self._plugin, 'ROISelect', None)
+        if roi_select is None:
+            return
+        try:
+            import inspect
+            sig = inspect.signature(roi_select)
+            if len(sig.parameters) >= 2:
+                roi_select(roi_info, ind_viewer)
+            else:
+                roi_select(roi_info)
+        except Exception as exc:
+            self.hardware_status.emit(False, str(exc))
+
+    @Slot(str, object, int)
+    def request_crosshair(self, channel: str, crosshair_info: object, ind_viewer: int) -> None:
+        """[old-style detector only] Forward a crosshair-drag event to the plugin.
+
+        Calls ``plugin.crosshairChanged(crosshair_info)`` if defined.
+        """
+        if self._plugin is None:
+            return
+        crosshair_changed = getattr(self._plugin, 'crosshairChanged', None)
+        if crosshair_changed is None:
+            return
+        try:
+            crosshair_changed(crosshair_info)
+        except Exception as exc:
+            self.hardware_status.emit(False, str(exc))
+
     # Per-channel param names in axis_settings (flat layout for old-style plugins)
     _FLAT_PER_CHANNEL_NAMES: frozenset = frozenset({'units', 'epsilon', 'timeout', 'bounds', 'scaling'})
 
@@ -742,8 +864,12 @@ class ControllerThread(QObject):
                 self._pending_group = group_name
                 self._plugin.grab_data(Naverage=1)
             else:                        # [old-style actuator]  role == 'actuator'
-                for ch in channels:
-                    self._read_old_style_actuator(ch)
+                self._in_group_tick = True
+                try:
+                    for ch in channels:
+                        self._read_old_style_actuator(ch)
+                finally:
+                    self._in_group_tick = False
         except Exception as exc:
             self.hardware_status.emit(False, str(exc))
 
@@ -897,17 +1023,27 @@ class ControllerThread(QObject):
         ``settings_changed`` emissions during the switch, so after the switch
         completes we must re-emit state that genuinely changed.
 
-        Only emits when the unit for *channel* has genuinely changed since the
-        last emission.  Units are fixed at ini_stage and only change if a plugin
-        explicitly updates them — they never change on routine group-tick axis
-        switches.  Suppressing redundant emissions prevents _sync_units_ui from
-        calling spinbox.setOpts() on every refresh tick, which triggers a
-        PyQtGraph redraw that steals keyboard focus from input spinboxes.
+        Suppression strategy — two layers:
+
+        1. **Always**: skip emission when ``unit`` is None (plugin does not
+           expose ``axis_unit``).
+        2. **Inside group ticks only** (``_in_group_tick=True``): skip
+           emission when the unit for *channel* matches the last emitted value
+           (``_emitted_units``).  Group ticks read all channels every period,
+           so without this guard every tick causes _sync_units_ui →
+           spinbox.setOpts() on all input spinboxes, triggering a PyQtGraph
+           redraw that steals keyboard focus.
+        3. **Outside group ticks** (explicit ``request_read``): always emit.
+           A subscriber that newly attaches or a DAQ_Move that was waiting for
+           its axis to be read deserves a fresh notification.
         """
         unit = getattr(self._plugin, 'axis_unit', None)
-        if unit is not None and self._emitted_units.get(channel) != unit:
-            self._emitted_units[channel] = unit
-            self.settings_changed.emit(channel, ['units'], unit, 'value')
+        if unit is None:
+            return
+        if self._in_group_tick and self._emitted_units.get(channel) == unit:
+            return  # suppress redundant emission during periodic group tick
+        self._emitted_units[channel] = unit
+        self.settings_changed.emit(channel, ['units'], unit, 'value')
 
     def _read_old_style_actuator(self, channel: str) -> None:
         """One-shot position read for an old-style actuator plugin.
@@ -1063,24 +1199,57 @@ class ControllerThread(QObject):
 
     @Slot(object)  # DataToExport
     def _on_detector_data_ready(self, dte: object) -> None:
-        """Receive grab completion from the plugin; emit data_ready.
+        """[old-style detector] Receive grab completion from the plugin; emit data_ready.
 
-        _pending_group is set when the grab was triggered by a named group's
-        timer.  In that case the single DTE is fanned out to every channel in
-        the group.  Otherwise _pending_channel holds the solo/snap channel name.
+        Resolves the affected channels from ``_pending_group`` (named group timer)
+        or ``_pending_channel`` (solo / snap), then runs software averaging if
+        ``set_averaging`` was called for those channels.
+
+        Software averaging (non-blocking):
+        - ``_grab_in_flight`` stays True between frames so the timer cannot
+          fire a competing grab while accumulation is in progress.
+        - When the target frame count is reached, the averaged DTE is published
+          and the averaging counter resets for the next snap / grab cycle.
+        - Intermediate frames are published as temp data when
+          ``_AveragingState.show_intermediate`` is True.
         """
-        self._grab_in_flight = False
         group_name = self._pending_group
         self._pending_group = None
+
+        # Resolve channel list from pending state.
         if group_name is not None:
             rg = self._groups.get(group_name)
-            if rg is not None:
-                for ch in list(rg.channels.keys()):
-                    self.data_ready.emit(ch, dte, False)
+            channels = list(rg.channels.keys()) if rg is not None else []
         else:
-            channel = self._pending_channel
+            channels = [self._pending_channel]
             self._pending_channel = ''
-            self.data_ready.emit(channel, dte, False)
+
+        for ch in channels:
+            avg = self._averaging.get(ch)
+            if avg is None or avg.Naverage <= 1:
+                # No averaging: publish immediately.
+                self._grab_in_flight = False
+                self.data_ready.emit(ch, dte, False)
+                continue
+
+            # Software averaging: accumulate this frame.
+            avg.ind += 1
+            avg.datas = dte if avg.ind == 1 else dte.average(avg.datas, avg.ind)
+
+            if avg.show_intermediate:
+                self.data_ready.emit(ch, avg.datas, True)  # temp frame
+
+            if avg.ind < avg.Naverage:
+                # Chain next grab; _grab_in_flight stays True.
+                self._pending_channel = ch
+                self._plugin.grab_data(Naverage=1)
+                return  # wait for next _on_detector_data_ready
+
+            # All frames collected: publish final average and reset.
+            self._grab_in_flight = False
+            self.data_ready.emit(ch, avg.datas, False)
+            avg.ind = 0
+            avg.datas = None
 
     @Slot(object)  # DataToExport
     def _on_detector_temp_data_ready(self, dte: object) -> None:

@@ -37,7 +37,8 @@ if TYPE_CHECKING:
 config = Config()
 logger = set_logger(get_module_name(__file__))
 
-def create_controller_param(axis_name: str = None, axis_names: Optional[list[str]] = None) -> dict:
+def create_controller_param(axis_name: str = None, axis_names: Optional[list[str]] = None,
+                              channel_name: str = None, channel_names: Optional[list[str]] = None) -> dict:
     controller_param = {'title': 'Controller:', 'name': 'controller', 'type': 'group', 'children': [
         {'title': 'Controller Status:', 'name': 'controller_status', 'type': 'list',
          'value': ControllerStatus.MASTER.value,
@@ -50,6 +51,11 @@ def create_controller_param(axis_name: str = None, axis_names: Optional[list[str
         controller_param['children'].append({'title': 'Axis:', 'name': 'axis', 'type': 'list',
                                              'limits': axis_names.copy(),
                                              'value': axis_name,
+                                             VALID_FOR_CONFIGURATION: False})
+    if channel_names is not None and channel_name is not None:
+        controller_param['children'].append({'title': 'Channel:', 'name': 'channel', 'type': 'list',
+                                             'limits': channel_names.copy(),
+                                             'value': channel_name,
                                              VALID_FOR_CONFIGURATION: False})
     return controller_param
 def create_remote_connection_params() -> list[dict]:
