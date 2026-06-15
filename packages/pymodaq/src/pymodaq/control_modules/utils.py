@@ -32,6 +32,7 @@ from pymodaq.control_modules.thread_commands import (ThreadStatus, ControlToHard
 if TYPE_CHECKING:
     from .daq_move_ui.ui_base import DAQ_Move_UI_Base
     from .daq_viewer_ui.ui_base import DAQ_Viewer_UI
+    from .capabilities import Capabilities
 
 
 config = Config()
@@ -738,6 +739,28 @@ class PluginBase(QObject):
     def is_master(self) -> bool:
         """True when this plugin is the controller master."""
         return self.settings['controller', 'controller_status'] == ControllerStatus.MASTER
+
+    @property
+    def capabilities(self) -> 'Capabilities':
+        """Hardware capabilities of this plugin (see ``infer_capabilities``).
+
+        Lazily inferred and cached on first access. Subclasses may override
+        with a class-level ``capabilities = Capabilities(...)`` attribute,
+        which takes precedence over this property.
+        """
+        caps = self.__dict__.get('_capabilities')
+        if caps is not None:
+            return caps
+        if self.__dict__.get('_caps_computing'):
+            return None
+        self.__dict__['_caps_computing'] = True
+        try:
+            from pymodaq.control_modules.capabilities import infer_capabilities
+            result = infer_capabilities(self)
+            self.__dict__['_capabilities'] = result
+            return result
+        finally:
+            self.__dict__['_caps_computing'] = False
 
     def ini_attributes(self):
         """Hook called at the end of each subclass __init__ for plugin-specific setup."""

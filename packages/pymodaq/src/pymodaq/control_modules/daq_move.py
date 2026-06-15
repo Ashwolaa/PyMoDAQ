@@ -596,6 +596,10 @@ class DAQ_Move(ControllerThreadModule):
         """Receive a position read-back from ControllerThread."""
         if channel and channel != self._channel:
             return
+        if isinstance(dte, DataToExport):
+            # New-style plugins emit the full query_data() result; extract
+            # the entry for this channel.
+            dte = dte.get_data_from_name(channel)
         data_act = self._check_data_type(dte)
         if self.ui is not None:
             self.ui.display_value(data_act)

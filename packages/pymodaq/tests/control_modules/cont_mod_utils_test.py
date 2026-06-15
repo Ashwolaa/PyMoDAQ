@@ -7,6 +7,8 @@ Created the 15/11/2022
 import pytest
 
 from pymodaq.control_modules import utils
+from pymodaq.control_modules.utils import PluginBase
+from pymodaq.control_modules.capabilities import Capabilities, ContinuousVariable, Observable
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
 from pymodaq.control_modules.instruments import DAQTypesEnum
 
@@ -58,3 +60,38 @@ class TestCreateControllerParam:
         assert children['axis']['limits'] == ['X', 'Y']
         assert children['channel']['limits'] == ['ChannelA', 'ChannelB']
         assert children['channel']['value'] == 'ChannelA'
+
+
+class TestPluginBaseCapabilities:
+    def test_default_is_detector_fallback(self, qtbot):
+        plugin = PluginBase()
+        caps = plugin.capabilities
+        assert isinstance(caps, Capabilities)
+        assert caps.observables == [Observable(name='data', label='Data', units='', shape=(1,))]
+        assert caps.variables == []
+
+    def test_actuator_attributes_infer_continuous_variables(self, qtbot):
+        class MyActuator(PluginBase):
+            _axis_names = ['X', 'Y']
+            _controller_units = ['mm', 'deg']
+            _epsilons = [0.01, 0.5]
+
+        plugin = MyActuator()
+        caps = plugin.capabilities
+        assert [v.name for v in caps.variables] == ['X', 'Y']
+        assert [v.units for v in caps.variables] == ['mm', 'deg']
+        assert [v.epsilon for v in caps.variables] == [0.01, 0.5]
+        assert all(isinstance(v, ContinuousVariable) for v in caps.variables)
+
+    def test_result_is_cached(self, qtbot):
+        plugin = PluginBase()
+        assert plugin.capabilities is plugin.capabilities
+
+    def test_class_level_capabilities_shadows_property(self, qtbot):
+        declared = Capabilities(variables=[ContinuousVariable(name='wavelength', units='nm')])
+
+        class MyPlugin(PluginBase):
+            capabilities = declared
+
+        plugin = MyPlugin()
+        assert plugin.capabilities is declared

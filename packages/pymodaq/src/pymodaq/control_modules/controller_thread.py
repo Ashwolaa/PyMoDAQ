@@ -77,6 +77,19 @@ New-style plugin interface (future)
     def query_data(self, names=None, fresh=True) -> DataToExport
     def change_to(self, name: str, value) -> None
     def commit_settings(self, path, data, change) -> None   # optional
+
+A new-style plugin may declare its readable/writable channels via
+``pymodaq.control_modules.capabilities``, e.g.::
+
+    from pymodaq.control_modules.capabilities import Capabilities, ContinuousVariable
+
+    class MyPlugin:
+        capabilities = Capabilities(
+            variables=[ContinuousVariable(name='x', lo=0, hi=10, epsilon=0.01)],
+        )
+
+``_ini_new_style`` reads ``plugin.capabilities`` (if present) and emits it via
+``capabilities_signal``.
 """
 from __future__ import annotations
 
