@@ -628,7 +628,7 @@ class DAQ_Move(ControllerThreadModule):
     def _init_continuous_save(self):
         """ Initialize the continuous saving H5Saver object
 
-        Update the module_and_data_saver attribute as :class:`DetectorTimeSaver` object
+        Update the module_and_data_saver attribute as :class:`ActuatorTimeSaver` object
         """
         if self.settings.child('saver_settings', 'do_save').value():
 
