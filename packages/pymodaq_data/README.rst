@@ -11,19 +11,11 @@ PyMoDAQ Data
    :target: https://pypi.org/project/pymodaq_data/
    :alt: Latest Version
 
-<<<<<<< HEAD
-.. image:: https://readthedocs.org/projects/pymodaq/badge/?version=state-machine-simplify
-   :target: https://pymodaq.readthedocs.io/en/stable/?badge=state-machine-simplify
-   :alt: Documentation Status
-
-.. image:: https://codecov.io/gh/PyMoDAQ/PyMoDAQ/branch/state-machine-simplify/graph/badge.svg?token=IQNJRCQDM2 
-=======
 .. image:: https://readthedocs.org/projects/pymodaq/badge/?version=dev
    :target: https://pymodaq.readthedocs.io/en/stable/?badge=dev
    :alt: Documentation Status
 
 .. image:: https://codecov.io/gh/PyMoDAQ/PyMoDAQ/branch/dev/graph/badge.svg?token=IQNJRCQDM2 
->>>>>>> 318900e7d4e1166e5ec845f99112b122e0f3c8b8
  :target: https://codecov.io/gh/PyMoDAQ/PyMoDAQ
 
 +-------------+-------------+---------------+
@@ -42,30 +34,6 @@ PyMoDAQ Data
 
 
 
-<<<<<<< HEAD
-.. |310-linux| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Linux_3.10.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |311-linux| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Linux_3.11.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |312-linux| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Linux_3.12.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |313-linux| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Linux_3.13.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |310-windows| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Windows_3.10.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |311-windows| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Windows_3.11.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |312-windows| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Windows_3.12.svg
-    :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
-
-.. |313-windows| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/state-machine-simplify/tests_Windows_3.13.svg
-=======
 .. |310-linux| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/dev/tests_Linux_3.10.svg
     :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
 
@@ -88,7 +56,6 @@ PyMoDAQ Data
     :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
 
 .. |313-windows| image:: https://raw.githubusercontent.com/PyMoDAQ/PyMoDAQ/badges/pymodaq_data/dev/tests_Windows_3.13.svg
->>>>>>> 318900e7d4e1166e5ec845f99112b122e0f3c8b8
     :target: https://github.com/PyMoDAQ/PyMoDAQ/actions/workflows/tests-data.yml
 
 
