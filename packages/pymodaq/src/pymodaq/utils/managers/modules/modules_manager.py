@@ -1,4 +1,5 @@
 from typing import List, Union, TYPE_CHECKING, Optional, Sequence
+
 from pymodaq.control_modules.viewer_utility_classes import HW_SETTINGS_KEY as DETECTOR_SETTINGS_KEY
 
 from qtpy.QtCore import QObject, Signal, Slot
@@ -19,7 +20,7 @@ from pymodaq_gui.parameter import Parameter
 from pymodaq_gui.utils import Dock
 
 from pymodaq.utils.data import DataActuator
-from pymodaq.control_modules.thread_commands import ControlToHardwareViewer
+from pymodaq.control_modules.thread_commands import ControlToHardwareMove, ControlToHardwareViewer
 
 if TYPE_CHECKING:
     from pymodaq.control_modules.daq_viewer import DAQ_Viewer
@@ -48,7 +49,8 @@ class ModulesManager(QObject, ParameterManager):
     actuators_changed = Signal(list)
     det_done_signal = Signal(DataToExport)  # dte here contains DataWithAxes
     move_done_signal = Signal(DataToExport)  # dte here contains DataActuators
-    timeout_signal = Signal(bool)
+    timeout_signal = Signal(list)  # list of titles of the modules whose origin wasn't found among
+                                    # the received responses (see grab_data/move_actuators)
 
     params = [
         {'title': 'Detectors', 'name': 'detectors', 'type': 'itemselect', 'checkbox': True},
@@ -103,7 +105,7 @@ class ModulesManager(QObject, ParameterManager):
 
     @property
     def actuator_timeout(self):
-        return config('pymodaq', 'actuator', 'timeout')
+        return config('pymodaq', 'actuator', 'polling_timeout_s')
 
     @property
     def detector_timeout(self):
@@ -170,12 +172,22 @@ class ModulesManager(QObject, ParameterManager):
             logger.warning(f'No detector with this name: {name}')
             return None
 
+    def add_modules(self, modules: list[Union['DAQ_Move', 'DAQ_Viewer']]):
+        """ Add new modules to the manager keeping the initial set of selected actuators or detectors"""
+        actuators = [act for act in modules if act.__class__.__name__ == 'DAQ_Move']
+        detectors = [det for det in modules if det.__class__.__name__ == 'DAQ_Viewer']
+
+        self.set_actuators(self.actuators_all + actuators, self.actuators)
+        self.set_detectors(self.detectors_all + detectors, self.detectors)
+        logger.debug(f"New modules added to the ModulesManager: {modules}"
+                     f"Total list is: {self.modules_name}")
+
+
     def set_actuators(self, actuators: list['DAQ_Move'], selected_actuators: list['DAQ_Move']):
         """Populates actuators and the subset to be selected in the UI"""
         self._actuators = actuators
         self.settings.child('actuators').setValue(dict(all_items=self.get_names(actuators),
                                                        selected=self.get_names(selected_actuators)))
-
     def set_actuators_from_names(self, actuators: list[str], selected_actuators: list[str]):
         """Populates actuators and the subset to be selected in the UI from their names"""
         for act in actuators:
@@ -239,6 +251,10 @@ class ModulesManager(QObject, ParameterManager):
         return self.detectors_all + self.actuators_all
 
     @property
+    def modules_name(self) -> list[str]:
+        return [mod.title for mod in self.modules_all]
+
+    @property
     def Ndetectors(self):
         """Get the number of selected detectors"""
         return len(self.detectors)
@@ -279,6 +295,7 @@ class ModulesManager(QObject, ParameterManager):
         if set(actuators).issubset(self.actuators_name):
             self.settings.child('actuators').setValue(dict(all_items=self.actuators_name,
                                                            selected=actuators))
+
 
     def value_changed(self, param):
         if param.name() == 'detectors':
@@ -371,8 +388,14 @@ class ModulesManager(QObject, ParameterManager):
             # wait for grab done signals to end
             QtWidgets.QApplication.processEvents()  # mandatory for the det_done_flag boolean to be modified in the corresponding method
             if time.perf_counter() - tzero > self.detector_timeout / 1000:
-                self.timeout_signal.emit(True)
-                logger.error('Timeout Fired during waiting for data to be acquired')
+                # match on origin (stable per-module id) rather than name, since a single
+                # detector emits one DataWithAxes per channel, each possibly named differently
+                received_origins = {dwa.origin for dwa in self.det_done_datas}
+                missing_detectors = [det_title for det_title in self.selected_detectors_name
+                                      if det_title not in received_origins]
+                self.timeout_signal.emit(missing_detectors)
+                logger.error('Timeout Fired during waiting for data to be acquired from: '
+                              f'{", ".join(missing_detectors)}')
                 break
             QThread.msleep(10)
 
@@ -536,9 +559,9 @@ class ModulesManager(QObject, ParameterManager):
         self.settings.child('test_actuator').setValue(self.move_done_flag)
 
         if mode == 'abs':
-            command = 'move_abs'
+            command = ControlToHardwareMove.MOVE_ABS
         elif mode == 'rel':
-            command = 'move_rel'
+            command = ControlToHardwareMove.MOVE_REL
         else:
             logger.error(f'Invalid positioning mode: {mode}')
             return self.move_done_positions
@@ -558,25 +581,35 @@ class ModulesManager(QObject, ParameterManager):
             while not self.move_done_flag:  # polling move done
 
                 QtWidgets.QApplication.processEvents()  # mandatory for the det_done_flag boolean to be modified in the corresponding method
-                if time.perf_counter() - tzero > self.actuator_timeout / 1000:  # timeout in seconds
-                    self.timeout_signal.emit(True)
-                    logger.error('Timeout Fired during waiting for actuators to be moved')
+                if time.perf_counter() - tzero > self.actuator_timeout:  # timeout in seconds
+                    # match on origin (stable per-module id) rather than name: dte_act's
+                    # `.name` holds the requested actuator's title, which is what gets
+                    # stamped as `.origin` on the DataActuator the actuator reports back
+                    received_origins = {dact.origin for dact in self.move_done_positions}
+                    missing_actuators = [dact.name for dact in dte_act
+                                          if dact.name not in received_origins]
+                    self.timeout_signal.emit(missing_actuators)
+                    logger.error('Timeout Fired during waiting for actuators to be moved: '
+                                  f'{", ".join(missing_actuators)}')
                     break
                 QThread.msleep(10)
 
         self.move_done_signal.emit(self.move_done_positions)
         return self.move_done_positions
 
+    def raise_actuator_timeout(self, module_name: str):
+        pass
+
     def reset_signals(self):
         self.move_done_flag = True
         self.det_done_flag = True
 
-    def poll_init(self, module):
+    def poll_init(self, module: Union['DAQ_Move', 'DAQ_Viewer']):
         tstart = time.perf_counter()
         while not module.initialized_state:
             QThread.msleep(1000)
             QtWidgets.QApplication.processEvents()
-            if time.perf_counter() - tstart > config('pymodaq', 'control_module_ini_polling'):  # timeout of 60sec
+            if time.perf_counter() - tstart > config('pymodaq', 'control_modules', 'control_module_ini_polling'):  # timeout of 60sec
                 break
         return module.initialized_state
 
@@ -591,7 +624,8 @@ class ModulesManager(QObject, ParameterManager):
     @Slot(DataActuator)
     def move_done(self, data_act: DataActuator):
         try:
-            if data_act.name not in self.move_done_positions.get_names():
+            # match on origin, not name, for the same reason as in move_actuators above
+            if data_act.origin not in {dact.origin for dact in self.move_done_positions}:
                 self.move_done_positions.append(data_act)
 
             if len(self.move_done_positions) == len(self.actuators):

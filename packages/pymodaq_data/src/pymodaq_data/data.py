@@ -86,7 +86,9 @@ def dimensionless_aware_reduce_units(q: Type[Q_]) -> Type[Q_]:
     -------
     The reduced quantity
     """
-
+    # this may fire a pint.errors.UndefinedBehavior warning when the magnitude is a numpy array
+    # but pint https://github.com/hgrecco/pint/issues/2274 fixed this in July 2026
+    # at the moment, it just returns the same quantity layout
     return q.to_compact() if q.dimensionless else q.to_reduced_units()
 
 def check_units(units: str):
@@ -529,6 +531,16 @@ class Axis(SerializableBase):
         if self._data is None:
             self._size = _size
 
+    @property
+    def axis_width(self) -> Q_:
+        """get the width of the axis in axis unit
+
+        That is the difference between the max value and the min value of the axis
+        """
+        if self.scaling is not None:
+            return Q_(self.size * self.scaling, self.units)
+        else:
+            return Q_(self.get_data().max() - self.get_data().min(), self.units)
     @staticmethod
     def _check_index_valid(index: int):
         if not isinstance(index, int):
@@ -653,10 +665,10 @@ class Axis(SerializableBase):
         """find the index of the threshold value within the axis"""
         if isinstance(threshold, Q_):
             threshold = threshold.m_as(self.units)
-        if threshold < self.min():
+        if threshold <= self.min():
             return 0
-        elif threshold > self.max():
-            return len(self) - 1
+        elif threshold >= self.max():
+            return len(self)
         elif self._data is not None:
             return mutils.find_index(self._data, threshold)[0][0]
         else:
@@ -702,7 +714,7 @@ class DataLowLevel:
 
     @name.setter
     def name(self, other_name: str):
-        self._name = other_name
+        self._name = str(other_name)
 
     @property
     def timestamp(self):
@@ -2137,6 +2149,10 @@ class DataWithAxes(DataBase, SerializableBase):
         dwa.timestamp = timestamp
         return dwa, remaining_bytes
 
+    def get_axes_sizes(self) -> Iterable[Q_]:
+        self.create_missing_axes()
+        return [self.get_axis_from_index(index)[0].axis_width for index in range(len(self.axes))]
+
     def check_axes_linear(self, axes: List[Axis] = None) -> bool:
         """ Check if any axis may be non linear
 
@@ -2795,6 +2811,10 @@ class DataWithAxes(DataBase, SerializableBase):
 
         do_squeeze = self.check_squeeze(total_slices, is_navigation)
         new_arrays_data = [squeeze(dat[total_slices], do_squeeze) for dat in self.data]
+        if self.errors is not None:
+            new_errors_data = [squeeze(dat[total_slices], do_squeeze) for dat in self.errors]
+        else:
+            new_errors_data = None
         tmp_axes = self._am.get_signal_axes() if is_navigation else self._am.get_nav_axes()
         axes_to_append = [copy.deepcopy(axis) for axis in tmp_axes]
 
@@ -2843,17 +2863,22 @@ class DataWithAxes(DataBase, SerializableBase):
         else:
             distribution = DataDistribution.uniform
 
-        data = DataWithAxes(self.name, data=new_arrays_data, nav_indexes=tuple(nav_indexes),
+        data = DataWithAxes(self.name,
+                            data=new_arrays_data,
+                            errors=new_errors_data,
+                            nav_indexes=tuple(nav_indexes),
                             axes=axes,
                             source=DataSource.calculated, origin=self.origin,
                             labels=self.labels[:],
                             distribution=distribution)
         return data
 
-    def deepcopy_with_new_data(self, data: List[np.ndarray] = None,
+    def deepcopy_with_new_data(self,
+                               data: List[np.ndarray] = None,
                                remove_axes_index: Union[int, List[int]] = None,
                                source: DataSource = DataSource.calculated,
-                               keep_dim=False) -> DataWithAxes:
+                               keep_dim=False,
+                               errors: List[np.ndarray] = None,) -> DataWithAxes:
         """deepcopy without copying the initial data (saving memory)
 
         The new data, may have some axes stripped as specified in remove_axes_index
@@ -2868,16 +2893,26 @@ class DataWithAxes(DataBase, SerializableBase):
         keep_dim: bool
             if False (the default) will calculate the new dim based on the data shape
             else keep the same (be aware it could lead to issues)
+        errors: list of numpy ndarray
+            The new errors corresponding to the new data
 
         Returns
         -------
         DataWithAxes
         """
+        def check_errors(data: list[np.ndarray], errors: list[np.ndarray]) -> bool:
+            for data_array, error_array in zip(data, errors):
+                if data_array.shape != error_array.shape:
+                    return False
+            return True
         try:
+            if errors is not None and check_errors(data, errors):
+                errors = None
             old_data = self.data
             self._data = None
             new_data = self.deepcopy()
             new_data._data = data
+            new_data.errors = errors
             new_data.get_dim_from_data(data)
 
             if source is not None:
