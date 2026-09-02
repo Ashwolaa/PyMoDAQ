@@ -89,6 +89,7 @@ class Scanner(QObject, ParameterManager):
     def setup_ui(self):
         self.parent_widget.setLayout(QtWidgets.QVBoxLayout())
         self.parent_widget.layout().setContentsMargins(0, 0, 0, 0)
+        self._settings_tree.collapsible_widget.setVisible(False)
         self.parent_widget.layout().addWidget(self.settings_tree)
         self._scanner_settings_widget = QtWidgets.QWidget()
         self._scanner_settings_widget.setLayout(QtWidgets.QVBoxLayout())
@@ -113,6 +114,7 @@ class Scanner(QObject, ParameterManager):
                 child.widget().deleteLater()
                 QtWidgets.QApplication.processEvents()
 
+            self._scanner._settings_tree.collapsible_widget.setVisible(False)
             self._scanner_settings_widget.layout().addWidget(self._scanner.settings_tree)
             self._scanner.settings.sigTreeStateChanged.connect(self._update_steps)
 
