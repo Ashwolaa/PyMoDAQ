@@ -50,8 +50,7 @@ class Scanner(QObject, ParameterManager):
     settings_name = 'scanner'
 
     params = [
-        {'title': 'Calculate positions:', 'name': 'calculate_positions', 'type': 'bool_push',
-         'label': 'Calculate positions'},
+        {'title': 'Show positions', 'name': 'show_positions', 'type': 'action'},
         {'title': 'N steps:', 'name': 'n_steps', 'type': 'int', 'value': 0, 'readonly': True},
         {'title': 'Scan type:', 'name': 'scan_type', 'type': 'list',
          'limits': scanner_factory.scan_types()},
@@ -130,10 +129,6 @@ class Scanner(QObject, ParameterManager):
         return self._scanner.settings
 
     def value_changed(self, param: Parameter):
-        if param.name() == 'calculate_positions':
-            if param.value():
-
-                param.setValue(False)
         if param.name() in ('scan_type', 'scan_sub_type') and param.value() is None:
             return  # transient reset fired by setOpts(limits=...); the real value follows right after
         if param.name() == 'scan_type':
@@ -233,6 +228,7 @@ class Scanner(QObject, ParameterManager):
 
     def connect_things(self):
         self.scanner_updated_signal.connect(self.save_scanner_settings)
+        self.settings.child('show_positions').sigActivated.connect(self.show_positions)
 
     def save_scanner_settings(self):
         self._scanner.save_scan_parameters()
@@ -303,6 +299,42 @@ class Scanner(QObject, ParameterManager):
         self.settings.child('n_steps').setValue(self.n_steps)
         self.scanner_updated_signal.emit()
         return False
+
+    def show_positions(self):
+        """Compute the current scan and preview the resulting positions in a read-only table"""
+        if self.set_scan():
+            messagebox(text='This scan would generate more steps than the configured limit '
+                            f"({config('pymodaq', 'scan', 'steps_limit')}). Reduce the range or "
+                            'increase the step size before previewing.')
+            return
+
+        positions = self.positions
+        if positions is None or len(positions) == 0:
+            messagebox(text='No positions to show for the current scan settings.')
+            return
+
+        labels = [axis.label if not axis.units else f'{axis.label} ({axis.units})'
+                 for axis in self.get_nav_axes()]
+
+        dialog = QtWidgets.QDialog()
+        dialog.setWindowTitle(f'Scan positions ({self.n_steps} steps)')
+        layout = QtWidgets.QVBoxLayout()
+        dialog.setLayout(layout)
+
+        table = QtWidgets.QTableWidget(len(positions), len(labels))
+        table.setHorizontalHeaderLabels(labels)
+        table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        for row, pos in enumerate(positions):
+            for col, value in enumerate(pos):
+                table.setItem(row, col, QtWidgets.QTableWidgetItem(f'{value:.6g}'))
+        layout.addWidget(table)
+
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        dialog.resize(500, 400)
+        dialog.exec()
 
     def update_from_scan_selector(self, scan_selector: Selector):
         self._scanner.update_from_scan_selector(scan_selector)
