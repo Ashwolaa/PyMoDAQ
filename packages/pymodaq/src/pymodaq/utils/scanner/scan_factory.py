@@ -90,6 +90,9 @@ class ScannerBase(ScanParameterManager, metaclass=ABCMeta):
     n_axes: int = abstract_attribute()
     distribution: DataDistribution = abstract_attribute()
     save_settings = True
+    n_axes_fixed: bool = True
+    """ True if n_axes is a fixed requirement (Scan1D, Scan2D, ...); False if this scanner
+    adapts to however many actuators are selected (Sequential, Tabular, ...) """
 
     def __init__(self, actuators: List[DAQ_Move] = None, settings: Parameter = None):
         super().__init__()
@@ -283,10 +286,16 @@ class ScannerFactory(ObjectFactory):
         return inner_wrapper
 
     @classmethod
-    def create(cls, key, sub_key, **kwargs) -> ScannerBase:
+    def get_builder(cls, key, sub_key) -> type:
+        """Return the registered scanner class itself, without instantiating it"""
         builder = cls._builders[cls.__name__].get(key).get(sub_key)
         if not builder:
             raise ValueError(key)
+        return builder
+
+    @classmethod
+    def create(cls, key, sub_key, **kwargs) -> ScannerBase:
+        builder = cls.get_builder(key, sub_key)
         return builder(**kwargs)
 
     def get(self, scan_type, scan_sub_type, **kwargs):
@@ -299,4 +308,23 @@ class ScannerFactory(ObjectFactory):
     def scan_sub_types(self, scan_type: str) -> List[str]:
         """Returns the list of scan subtypes, second identifier of a given scanner of type scan_type"""
         return list(self.builders[self.__class__.__name__][scan_type].keys())
+
+    def compatible_scan_types(self, n_actuators: int) -> List[str]:
+        """Scan types that support scanning exactly n_actuators actuators, either because a
+        sub type's fixed n_axes matches, or because the scanner adapts to any actuator count"""
+        compatible = []
+        for scan_type in self.scan_types():
+            for sub_type in self.scan_sub_types(scan_type):
+                builder = self.get_builder(scan_type, sub_type)
+                if not builder.n_axes_fixed or builder.n_axes == n_actuators:
+                    compatible.append(scan_type)
+                    break
+        return compatible or self.scan_types()
+
+    def compatible_scan_sub_types(self, scan_type: str, n_actuators: int) -> List[str]:
+        """Sub types of scan_type that support scanning exactly n_actuators actuators"""
+        compatible = [sub_type for sub_type in self.scan_sub_types(scan_type)
+                     if not self.get_builder(scan_type, sub_type).n_axes_fixed
+                     or self.get_builder(scan_type, sub_type).n_axes == n_actuators]
+        return compatible or self.scan_sub_types(scan_type)
 
