@@ -85,7 +85,7 @@ class DAQScan(CustomExt):
     icon_name = 'qr_code_scanner'
 
     params = [
-        {'title': 'Time Flow:', 'name': 'time_flow', 'type': 'group', 'expanded': False,
+        {'title': 'Time Flow:', 'name': 'time_flow', 'type': 'group', 'expanded': True,
          'children': [
             {'title': 'Wait time step (ms)', 'name': 'wait_time', 'type': 'int', 'value': 0,
              'tip': 'Wait time in ms after each step of acquisition (move and grab)'},
@@ -110,11 +110,13 @@ class DAQScan(CustomExt):
         ]},
 
         {'title': 'Plotting options', 'name': 'plot_options', 'type': 'group', 'children': [
-            {'title': 'Get data', 'name': 'plot_probe', 'type': 'bool_push'},
+            {'title': 'Get data', 'name': 'plot_probe', 'type': 'action_led',
+             'value': False, 'children': []},
             {'title': 'Group 0D data:', 'name': 'group0D', 'type': 'bool', 'value': True},
             {'title': 'Plot 0Ds:', 'name': 'plot_0d', 'type': 'itemselect', 'checkbox': True},
             {'title': 'Plot 1Ds:', 'name': 'plot_1d', 'type': 'itemselect', 'checkbox': True},
-            {'title': 'Prepare Viewers', 'name': 'prepare_viewers', 'type': 'bool_push'},
+            {'title': 'Prepare Viewers', 'name': 'prepare_viewers', 'type': 'action_led',
+             'value': False, 'children': []},
             {'title': 'Plot at each step?', 'name': 'plot_at_each_step', 'type': 'bool',
              'value': True},
             {'title': 'Refresh Plots (ms)', 'name': 'refresh_live', 'type': 'int',
@@ -191,9 +193,13 @@ class DAQScan(CustomExt):
 
         self.set_config()
 
-        self.live_plotter = LoaderPlotter(self.dockarea)
+        self.live_plotter = LoaderPlotter(None)
+        self.live_plotter.dispatcher.dockarea.hide()
         self.live_timer = QtCore.QTimer(self)
         self.live_timer.timeout.connect(self.update_live_plots)
+
+        self.settings.child('plot_options', 'prepare_viewers').sigActivated.connect(self.prepare_viewers)
+        self.settings.child('plot_options', 'plot_probe').sigActivated.connect(self.plot_from)
 
         self.scan_manager = ScanManager(self)
         self.scan_manager.get_external_toolbar_menu(toolbar=self.ui.get_toolbar('scan_manager'),
@@ -297,6 +303,7 @@ class DAQScan(CustomExt):
                 * close_file
                 * navigator
                 * batch
+                * show_viewers
                 * viewers_changed
         """
         if cmd.command == 'ini_positions':
@@ -323,6 +330,8 @@ class DAQScan(CustomExt):
             self.show_navigator()
         elif cmd.command == 'batch':
             self.show_batcher(self.ui.menubar)
+        elif cmd.command == 'show_viewers':
+            self.toggle_viewers_window()
         elif cmd.command == 'open_file':
             self.open_file()
         elif cmd.command == 'close_file':
@@ -805,10 +814,6 @@ class DAQScan(CustomExt):
         """
         if param.name() == 'scan_average':
             self.ui.show_average_step(param.value() > 1)
-        elif param.name() == 'prepare_viewers':
-            self.prepare_viewers()
-        elif param.name() == 'plot_probe':
-            self.plot_from()
         elif param.name() == 'plot_at_each_step':
             self.settings.child('plot_options', 'refresh_live').show(not param.value())
 
@@ -864,6 +869,20 @@ class DAQScan(CustomExt):
         """
         viewers_enum, data_names, _ = self.check_number_type_viewers()
         self.live_plotter.prepare_viewers(viewers_enum, viewers_name=data_names)
+        self.live_plotter.dispatcher.dockarea.show()
+        self.live_plotter.dispatcher.dockarea.raise_()
+
+    def toggle_viewers_window(self):
+        """ Show or hide the independent window holding the live plot viewers
+
+        Showing always goes through prepare_viewers() first, so the viewers are rebuilt
+        from the current Plotting options selection rather than raising a stale/empty window.
+        """
+        dockarea = self.live_plotter.dispatcher.dockarea
+        if dockarea.isVisible():
+            dockarea.hide()
+        else:
+            self.prepare_viewers()
 
     def update_status(self, txt: str, wait_time: int = None):
         """ Show the txt message in the status bar with a delay of wait_time ms.
