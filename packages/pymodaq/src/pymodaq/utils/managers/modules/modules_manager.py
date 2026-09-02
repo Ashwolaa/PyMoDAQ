@@ -21,6 +21,7 @@ from pymodaq_data.data import DataToExport, DataSource, DataDim
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.parameter import Parameter
 from pymodaq_gui.utils import Dock
+from pymodaq_gui.messenger import messagebox
 
 from pymodaq.utils.data import DataActuator, DataToActuators
 from pymodaq.control_modules.thread_commands import ControlToHardwareMove, ControlToHardwareViewer
@@ -350,6 +351,7 @@ class ModulesManager(QObject, ParameterManager):
             add_to_this_param = self.settings.child('probe_data')
 
         self.connect_detectors()
+        self.timeout_signal.connect(self._on_detector_probe_timeout)
         try:
             datas: DataToExport = self.grab_data(Naverage=1)
             logger.debug(f'Acquired: {datas.get_full_names()}')
@@ -368,8 +370,21 @@ class ModulesManager(QObject, ParameterManager):
                         ]})
             add_to_this_param.addChildren(data_children)
         finally:
+            self.timeout_signal.disconnect(self._on_detector_probe_timeout)
             self.connect_detectors(False)
         return datas
+
+    def _on_detector_probe_timeout(self, missing_modules: List[str]):
+        """ Report which detectors failed to answer a probe, naming them explicitly """
+        self.settings.child('probe_data').setValue(False)
+        messagebox(text="The following detector(s) did not respond in time:\n"
+                        + "\n".join(missing_modules))
+
+    def _on_actuator_probe_timeout(self, missing_modules: List[str]):
+        """ Report which actuators failed to answer a probe, naming them explicitly """
+        self.settings.child('test_actuator').setValue(False)
+        messagebox(text="The following actuator(s) did not respond in time:\n"
+                        + "\n".join(missing_modules))
 
     def get_probed_data_full_names(self, dim: DataDim | str = None) -> List[str]:
         """Return full names (origin/name) of probed data, optionally filtered by dim.
@@ -591,8 +606,12 @@ class ModulesManager(QObject, ParameterManager):
             dte_act.append(DataActuator(mod.title, data=spinboxes[mod.title].value()))
 
         self.connect_actuators()
-        self.move_actuators(dte_act)
-        self.connect_actuators(False)
+        self.timeout_signal.connect(self._on_actuator_probe_timeout)
+        try:
+            self.move_actuators(dte_act)
+        finally:
+            self.timeout_signal.disconnect(self._on_actuator_probe_timeout)
+            self.connect_actuators(False)
 
         test_actuator = self.settings.child('test_actuator')
         test_actuator.clearChildren()
