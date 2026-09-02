@@ -63,39 +63,83 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
         self.dock_command.addWidget(widget_command)
 
         splitter_widget = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
-        splitter_v_widget = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         widget_command.layout().addWidget(splitter_widget)
-        splitter_widget.addWidget(splitter_v_widget)
-        self.module_widget = QtWidgets.QWidget()
-        self.module_widget.setLayout(QtWidgets.QVBoxLayout())
-        self.module_widget.setMinimumWidth(220)
-        self.module_widget.setMaximumWidth(400)
 
-        self.plotting_widget = QtWidgets.QWidget()
-        self.plotting_widget.setLayout(QtWidgets.QVBoxLayout())
-        self.plotting_widget.setMinimumWidth(220)
-        self.plotting_widget.setMaximumWidth(400)
+        # Column 1: Actuators (selection + probe, and scan geometry)
+        self.actuators_widget = self._make_section_groupbox('Actuators')
+        self.actuators_widget.setMinimumWidth(220)
+        self.actuators_widget.setMaximumWidth(400)
 
+        self.actuators_settings_tree = ParameterTree()
+        self.actuators_widget.layout().addWidget(self.actuators_settings_tree)
+
+        self.actuators_widget.layout().addWidget(self._section_label('Scan Parameters'))
+        self.scanner_widget = QtWidgets.QWidget()
+        self.scanner_widget.setLayout(QtWidgets.QVBoxLayout())
+        self.actuators_widget.layout().addWidget(self.scanner_widget)
+
+        # Column 2: Detectors (selection + probe, and what/how to plot from them)
+        self.detectors_widget = self._make_section_groupbox('Detectors')
+        self.detectors_widget.setMinimumWidth(220)
+        self.detectors_widget.setMaximumWidth(400)
+
+        self.detectors_settings_tree = ParameterTree()
+        self.detectors_widget.layout().addWidget(self.detectors_settings_tree)
+
+        self.detectors_widget.layout().addWidget(self._section_label('Plotting Parameters'))
         self.plotting_settings_tree = ParameterTree()
-        self.plotting_widget.layout().addWidget(self.plotting_settings_tree)
+        self.detectors_widget.layout().addWidget(self.plotting_settings_tree)
 
-        settings_widget = QtWidgets.QWidget()
-        settings_widget.setLayout(QtWidgets.QVBoxLayout())
-        settings_widget.setMinimumWidth(220)
+        # Column 3: General (infrequently-touched, cross-cutting settings, including Save)
+        self.general_widget = self._make_section_groupbox('General')
+        self.general_widget.setMinimumWidth(220)
+        self.general_widget.setMaximumWidth(400)
 
-        splitter_v_widget.addWidget(self.module_widget)
-        splitter_v_widget.addWidget(self.plotting_widget)
+        self.general_settings_tree = ParameterTree()
+        self.general_widget.layout().addWidget(self.general_settings_tree)
 
-        splitter_v_widget.setSizes([400, 400])
-        splitter_widget.addWidget(settings_widget)
+        splitter_widget.addWidget(self.actuators_widget)
+        splitter_widget.addWidget(self.detectors_widget)
+        splitter_widget.addWidget(self.general_widget)
+        splitter_widget.setSizes([300, 300, 300])
 
         self.populate_status_bar()
 
-        self.settings_toolbox = QtWidgets.QToolBox()
-        settings_widget.layout().addWidget(self.settings_toolbox)
-        self.scanner_widget = QtWidgets.QWidget()
-        self.scanner_widget.setLayout(QtWidgets.QVBoxLayout())
-        self.settings_toolbox.addItem(self.scanner_widget, 'Scanner Settings')
+    @staticmethod
+    def _make_section_groupbox(title: str) -> QtWidgets.QGroupBox:
+        """A QGroupBox whose title is bold, larger and centered, for clear section identification"""
+        box = QtWidgets.QGroupBox(title)
+        box.setLayout(QtWidgets.QVBoxLayout())
+        box.layout().setContentsMargins(8, 18, 8, 8)
+        box.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+        box.setStyleSheet(
+            'QGroupBox { font-weight: bold; font-size: 11pt; margin-top: 6px; } '
+            'QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; '
+            'padding: 0 6px; }')
+        return box
+
+    @staticmethod
+    def _section_label(text: str) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel(text)
+        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+        label.setStyleSheet('font-weight: bold; font-size: 10pt;')
+        return label
+
+    @staticmethod
+    def _content_fit_height(tree: ParameterTree, hard_limit: int = 250, min_height: int = 60) -> int:
+        """ Height needed to show all of a populated tree's current (non-collapsed) rows
+        without a scrollbar, capped at hard_limit rather than guessed """
+        tree.expandAll()
+        tree.doItemsLayout()
+        if tree.topLevelItemCount() == 0:
+            return min_height
+        last_item = tree.topLevelItem(tree.topLevelItemCount() - 1)
+        while last_item.childCount() > 0:
+            last_item = last_item.child(last_item.childCount() - 1)
+        bottom = tree.visualItemRect(last_item).bottom()
+        header_height = 0 if tree.header().isHidden() else tree.header().height()
+        content_height = header_height + bottom + 2 * tree.frameWidth() + 4
+        return max(min_height, min(content_height, hard_limit))
 
     def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
         from pymodaq.extensions.scan.manager.scan_manager import ScanManager
@@ -136,6 +180,9 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
 
         self.add_action('navigator', 'Show Navigator', '', menu=MenuToolbarNames.TOOLS, auto_toolbar=False)
         self.add_action('batch', 'Show Batch Scanner', '', menu=MenuToolbarNames.TOOLS, auto_toolbar=False)
+        self.add_action('show_viewers', 'Show/Hide Viewers', 'DAQ_Viewer_pannel',
+                        tip='Show or hide the independent window holding the live plot viewers',
+                        menu=MenuToolbarNames.TOOLS)
         self.set_action_visible('start_batch', False)
 
     def connect_things(self):
@@ -154,18 +201,31 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
         self.connect_action('close_file', lambda: self.command_sig.emit(ThreadCommand('close_file')))
         self.connect_action('navigator', lambda: self.command_sig.emit(ThreadCommand('navigator')))
         self.connect_action('batch', lambda: self.command_sig.emit(ThreadCommand('batch')))
+        self.connect_action('show_viewers', lambda: self.command_sig.emit(ThreadCommand('show_viewers')))
 
     def finalize_ui(self, app: 'DAQScan'):
         app.create_dashboard_toolbar(add_break=False)
 
-        self.populate_toolbox_widget([app.settings_tree,
-                                      app._h5saver.settings_tree],
-                                     ['General Settings', 'Save Settings'])
-
         self.set_scanner_settings(app.scanner.parent_widget)
-        self.set_modules_settings(app.modules_manager.settings_tree)
+
+        self.actuators_settings_tree.addParameters(app.modules_manager.settings.child('actuators'))
+        self.actuators_settings_tree.addParameters(app.modules_manager.settings.child('test_actuator'))
+
+        self.detectors_settings_tree.addParameters(app.modules_manager.settings.child('detectors'))
+        self.detectors_settings_tree.addParameters(app.modules_manager.settings.child('probe_data'))
+
+        selection_tree_height = max(self._content_fit_height(self.actuators_settings_tree),
+                                    self._content_fit_height(self.detectors_settings_tree))
+        self.actuators_settings_tree.setFixedHeight(selection_tree_height)
+        self.detectors_settings_tree.setFixedHeight(selection_tree_height)
 
         self.plotting_settings_tree.setParameters(app.settings.child('plot_options'))
+
+        self.general_settings_tree.addParameters(app.settings.child('time_flow'))
+        self.general_settings_tree.addParameters(app.settings.child('scan_options'))
+
+        app._h5saver.settings.setOpts(title='Save')
+        self.general_settings_tree.addParameters(app._h5saver.settings)
 
         for ind_menu, menu in enumerate(self.menus):
             app.reference_menu(self.menus_names[ind_menu], menu)
@@ -175,17 +235,9 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
 
         self.enable_start_stop(False)
 
-    def add_settings_toolbox_widget(self, widget: QtWidgets.QWidget, name: str):
-        """Add a widget, usaually a ParameterTree to the SettingsToolbox"""
-        self.settings_toolbox.addItem(widget, name)
-
     def add_scanner_settings(self, tree: 'ParameterTree'):
         """Adds a  ParameterTree to the Scanner settings widget"""
         self.scanner_widget.layout().addWidget(tree)
-
-    def populate_toolbox_widget(self, widgets: List[QtWidgets.QWidget], names: List[str]):
-        for widget, name in zip(widgets, names):
-            self.settings_toolbox.addItem(widget, name)
 
     def set_scanner_settings(self, settings_tree: QtWidgets.QWidget):
         while True:
@@ -196,9 +248,6 @@ class DAQScanUI(CustomApp, ViewerDispatcher):
             QtWidgets.QApplication.processEvents()
 
         self.scanner_widget.layout().addWidget(settings_tree)
-
-    def set_modules_settings(self, settings_widget):
-        self.module_widget.layout().addWidget(settings_widget)
 
     def populate_status_bar(self):
         self._status_message_label = QtWidgets.QLabel('Initializing')
