@@ -6,7 +6,7 @@ from qtpy import QtCore, QtWidgets, QtGui
 import qt_themes
 
 from pymodaq_gui.managers.action_manager import QAction
-from pymodaq_gui.utils import CustomApp
+from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.utils import Dock
 from pymodaq_gui.utils.widgets import LabelWithFont
 from pymodaq_gui.utils.styling import create_font, create_icon
@@ -189,6 +189,7 @@ class ControlModuleUI(CustomApp):
     def send_init(self, checked: bool):
         """Should be implemented to send to the main app the fact that someone (un)checked init."""
         raise NotImplementedError
+
 
 
 def register_uis(parent_module_name: str = 'pymodaq.control_modules.daq_move_ui'):
