@@ -13,6 +13,7 @@ from pymodaq.control_modules.daq_viewer_ui.ui_base import ActionIconNames
 from pymodaq.utils.h5modules.module_saving import LoggerSaver
 from pymodaq_gui.managers.runner_thread_manager import WorkerThreadManager
 from pymodaq_gui.messenger import messagebox
+from pymodaq_gui.utils.custom_app import WorkFlowActions
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_gui.utils.dock import Dock, DockArea
@@ -32,6 +33,8 @@ from pymodaq.utils.custom_ext import CustomExt
 from pymodaq_gui.utils.enums import MenuToolbarNames
 
 from pymodaq_gui.utils.widgets import QSpinBox_ro
+from pymodaq.extensions.extension_worker import DataBundle, ExtensionWorker
+
 
 if TYPE_CHECKING:
     from pymodaq.dashboard import DashBoard
@@ -101,13 +104,10 @@ class DAQLogger(CustomExt):
     Main class initializing a DAQ_Logger module
     """
     show_h5file_statusbar_widgets = True
+    show_workflow_actions = True
     icon_name = 'home_storage'
-    params = [
-        {'title': 'Worker:', 'name': 'worker', 'type': 'group', 'children': [
-            {'title': 'Worker Running:', 'name': 'worker_running', 'type': 'led', 'value': False, 'readonly': True},
-            {'title': 'Worker tasks:', 'name': 'worker_tasks', 'type': 'int', 'value': 0, 'readonly': True},
-        ]},
-    ]
+    params = [] + ExtensionWorker.params
+
 
     def __init__(self, dockarea: DockArea = None,
                  dashboard: 'DashBoard' = None,
@@ -125,8 +125,11 @@ class DAQLogger(CustomExt):
 
         self.setup_ui()
 
+    def do_things_after_ui_setup(self):
+        self.set_action_visible(WorkFlowActions.LOG, False) # hide as it should always be True for this extension
+
     def do_things_after_experiment_set(self, experiment_name: str, show_dashboard: bool = None):
-        self.enable_start_stop(True)
+        self.enable_workflow_actions(True)
         super().do_things_after_experiment_set(experiment_name, show_dashboard)
 
     def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
@@ -136,8 +139,6 @@ class DAQLogger(CustomExt):
                          toolbar=self.h5_manager.toolbar, add_break=False)
         self.add_menu(MenuToolbarNames.FILE, MenuToolbarNames.FILE.capitalize(), parent_menu=menubar)
         self.add_menu(MenuToolbarNames.TOOLS, MenuToolbarNames.TOOLS.capitalize(), parent_menu=menubar)
-        self.add_menu('actions', 'Actions', parent_menu=menubar)
-
 
         self.create_dashboard_toolbar(add_break=False)
 
@@ -168,13 +169,6 @@ class DAQLogger(CustomExt):
         subclass method from ActionManager
         '''
         logger.debug('setting actions')
-        self.add_action('start', 'Start Logging', 'motion_play', "Start the Logging",
-                        menu='actions', icon_color=self.get_theme().green)
-        self.add_action('stop', 'Stop Logging', 'stop_circle', "Stop the Logging",
-                        menu='actions', icon_color=self.get_theme().red)
-        self.add_action('pause', 'Pause Logging', 'pause_circle', "Pause/resume the Logging",
-                        checkable=True, menu='actions',
-                        icon_checked_color=self.get_theme().orange)
 
         self.toolbar.addSeparator()
         self.add_action('grab_all', 'Grab All', ActionIconNames.GRAB,
@@ -184,25 +178,17 @@ class DAQLogger(CustomExt):
                         icon_checked_color=self.get_theme().green)
         logger.debug('actions set')
 
-        self.enable_start_stop(False)
-
-    def enable_start_stop(self, enable=True):
-        """If True enable main buttons to launch/stop scan"""
-        self.set_action_enabled('start', enable)
-        self.set_action_enabled('stop', enable)
-        self.set_action_enabled('pause', enable)
-        if enable:
-            self.set_action_checked('pause', False)
+        self.enable_workflow_actions(False)
 
     def connect_things(self):
         self.status_signal[str].connect(self.dashboard.add_status)
 
-        self.connect_action('start', self.logging.start_logging)
-        self.connect_action('pause', self.logging.pause_logging)
-        self.connect_action('stop', lambda: self.logging.stop_logging('Logging Stopped by the User'))
+        self.connect_action(WorkFlowActions.START, self.logging.start)
+        self.connect_action(WorkFlowActions.PAUSE, self.logging.pause)
+        self.connect_action(WorkFlowActions.STOP, lambda: self.logging.stop('Logging Stopped by the User'))
         self.connect_action('grab_all', self.start_stop_all)
 
-    def quit_fun(self) -> bool:
+    def _quit_fun(self) -> bool:
         """
             Quit the current instance of DAQ_scan and close on cascade move and detector modules.
 
@@ -214,15 +200,16 @@ class DAQLogger(CustomExt):
             messagebox(title='Running',
                        text='The Logging is running, first stop it')
             return False
+
         elif self.settings['worker', 'worker_tasks'] > 0:
             messagebox(title='Running',
                        text='The Saver is finishing the savings')
-            self.logging.stop_logging("User prompted a quit of the Application,"
+            self.logging.stop("User prompted a quit of the Application,"
                                       " Stopping the Logging")
             return False
 
         self.h5_manager.close_file()
-        return super().quit_fun()
+        return True
 
     def start_stop_all(self, start=True):
         for det in self.modules_manager.detectors:
@@ -236,113 +223,60 @@ class DAQLogger(CustomExt):
         return super().module_and_data_saver
 
 
-
-class SaverWorker(QtCore.QObject):
-    """ Worker in separated thread receiving the data from a DataGenerator
-    and adding them into the enlargeable arrays with the H5file using the
-     LoggerModuleSaver """
-
-    n_saved = QtCore.Signal(int)
-    data_to_save_signal = QtCore.Signal(DataToExport)
-
-
-    def __init__(self, saver: LoggerSaver, parent=None):
-        super().__init__(parent)
-        self.saver = saver
-        self._n_saved = 0
-        self._show_thread = True
-
-        self.data_to_save_signal.connect(self.save_data, QtCore.Qt.ConnectionType.QueuedConnection)
-
-    @QtCore.Slot(DataToExport)
-    def save_data(self, dte: DataToExport):
-        if self._show_thread:
-            print(f'Saving data in Qthread{self.thread()}')
-            self._show_thread = False
-        self.saver.add_data(dte,)
-        self._n_saved += 1
-        self.n_saved.emit(self._n_saved)
-
-
-class Logging(QObject):
-    _worker_done = QtCore.Signal()
+class Logging(ExtensionWorker):
 
     def __init__(self, logger: DAQLogger, parent=None):
-        super().__init__(parent)
-        self.logger = logger
-        self.thread_manager = WorkerThreadManager(parent=self)
-        self.logger.modules_manager.actuators_changed.connect(self.update_connections)
-        self.logger.modules_manager.detectors_changed.connect(self.update_connections)
+        self._app: DAQLogger = logger
+        super().__init__(app=logger, parent=parent)
 
-        self.saver_worker: SaverWorker = None
-        self._n_emitted = 0
-
-    @property
-    def saver(self) -> LoggerSaver:
-        return self.logger.module_and_data_saver
-
-    @property
-    def is_running(self) -> bool:
-        return self.logger.status_manager.is_logging
-
-    @is_running.setter
-    def is_running(self, value: bool):
-        self.logger.status_manager.is_logging = value
+        self._app.modules_manager.actuators_changed.connect(self.update_connections)
+        self._app.modules_manager.detectors_changed.connect(self.update_connections)
 
     @property
     def n_saved(self) -> int:
-        return self.logger.status_manager.n_saved
+        return self._app.status_manager.n_saved
 
     @n_saved.setter
     def n_saved(self, value: int):
-        self.logger.status_manager.n_saved = value
-
-    @property
-    def modules_manager(self) -> ModulesManager:
-        """ Convenience property"""
-        return self.logger.modules_manager
+        self._app.status_manager.n_saved = value
 
     def _update_status(self, msg: str):
         """ convenience method to update the status signal """
-        self.logger.update_status(msg)
+        self._app.update_status(msg)
         logger.info(msg)
 
-    def start_logging(self):
+    def _start(self):
         """
             Start a logging.
         """
-        self._update_status('Initializing')
-        self._init_logging()
+        self.module_and_data_saver.get_set_node(new=True)
 
-        self.logger.set_action_enabled('start', False)
-        self.logger.status_manager.log_time = QtCore.QDateTime.currentDateTime()
-        self.logger.status_manager.set_permanent_status('Starting logging')
-        self.is_running = True
-
-        self._connect_control_modules()
-        self._n_emitted = 0
+        self._app.status_manager.log_time = QtCore.QDateTime.currentDateTime()
+        self._app.status_manager.set_permanent_status('Starting logging')
         self.n_saved = 0
+        self.update_connections()
 
     def update_connections(self):
-        self._disconnect_control_modules()
-        self._connect_control_modules()
+        if self.is_running:
+            self._disconnect_control_modules()
+            self._connect_control_modules()
 
     def _connect_control_modules(self):
         """ Connect only the selected control modules"""
-        for detector in self.logger.modules_manager.detectors:
+        for detector in self._app.modules_manager.detectors:
             detector.grab_done_signal.connect(self.save_detector)
-        for actuator in self.logger.modules_manager.actuators:
+        for actuator in self._app.modules_manager.actuators:
             actuator.current_value_signal.connect(self.format_and_save_actuator)
 
     def _disconnect_control_modules(self):
         """ Disconnect all the Control Modules """
-        for detector in self.logger.modules_manager.detectors_all:
+        for detector in self._app.modules_manager.detectors_all:
             # disconnect all in case one changed the list of logged modules
             try:
                 detector.grab_done_signal.disconnect(self.save_detector)
             except TypeError:
                 pass
-        for actuator in self.logger.modules_manager.actuators:
+        for actuator in self._app.modules_manager.actuators:
             try:
                 actuator.move_done_signal.disconnect(self.format_and_save_actuator)
             except TypeError:
@@ -351,105 +285,31 @@ class Logging(QObject):
     def save_detector(self, dte: DataToExport):
         self._n_emitted += 1
         self.n_saved += 1
-        self.saver_worker.data_to_save_signal.emit(dte)
+        self.saver_worker.data_to_save_signal.emit(DataBundle(dte=dte))
 
     def format_and_save_actuator(self, dwa: DataActuator):
         self._n_emitted += 1
         self.n_saved += 1
-        self.saver_worker.data_to_save_signal.emit(DataToExport(name=dwa.name,
-                                                                data=[dwa]))
+        self.saver_worker.data_to_save_signal.emit(
+            DataBundle(dte=DataToExport(name=dwa.name,
+                                        data=[dwa])))
 
-    def _init_logging(self):
-        try:
-            self._worker_done.disconnect(self.terminate_worker)
-        except TypeError:
-            pass
-        self.saver.h5saver = self.logger.h5saver
-        self.saver.get_set_node(new=True)
-
-        # managing saver worker
-        self.saver_worker = SaverWorker(saver=self.saver,)
-        self.thread_manager.create_thread_for_worker('saver', self.saver_worker)
-        self.saver_worker.n_saved.connect(self.update_worker_ntask)
-        self.thread_manager.start_thread('saver')
-        self.logger.settings['worker', 'worker_running'] = self.thread_manager.get_thread('saver').isRunning()
-
-    @QtCore.Slot(int)
-    def update_worker_ntask(self, n_saved: int):
-        n_tasks = self._n_emitted - n_saved
-        self.logger.settings['worker', 'worker_tasks'] = n_tasks
-
-        if n_tasks == 0:
-            self._worker_done.emit()
-
-    def terminate_worker(self):
-        """ Will terminate/close/stops a few things when the worker is done working"""
-        # stopping the plotting before flushing/closing the file
-        #1 disconnecting the connection to here (fired once)
-        try:
-            self._worker_done.disconnect(self.terminate_worker)
-        except TypeError:
-            pass
-        try: #2 disconnect the data production from the saving
-            self.saver_worker.data_to_save_signal.disconnect(self.saver_worker.save_data)
-        except TypeError:
-            pass
-
-        #3 quit the thread managing the data saving (nothing left in the loop and no more connection)
-        self.thread_manager.exit_worker_thread('saver', delete_worker=True)
-
-        #4 flushing/closing the file to be able to create new groups...
-        self.logger.h5_manager.close_file()
-
-        #5 updating GUI info
-        self.logger.settings['worker', 'worker_running'] = self.thread_manager.get_thread('saver').isRunning()
-
-
-    def pause_logging(self, do_pause=True):
+    def _pause(self, do_pause=True):
         if do_pause:
-            self.is_running = False
             self._disconnect_control_modules()
         else:
-            self.is_running = True
             self._connect_control_modules()
+        self._app.status_manager.is_logging = not do_pause
 
-        self._on_scan_pausing(do_pause)
-
-    def stop_logging(self, msg: str = None):
+    def _stop(self, msg: str = None):
         """
         """
-        self.is_running = False
 
         #1 Stop the emission of data immediately
         self._disconnect_control_modules()
 
-        #2 terminate the saver worker once its queue is empty
-        if self.logger.settings['worker', 'worker_tasks'] == 0:
-            self.terminate_worker()
-        else:
-            self._worker_done.connect(self.terminate_worker)
-
-        #3 update the GUI
-        self.logger.set_action_checked('pause', False)
-        self.logger.set_action_enabled('start', True)
         if msg is not None:
-            self._update_status(msg)
-            self.logger.status_manager.set_permanent_status(msg)
-
-    @staticmethod
-    def format_actuators_data(data_act: DataActuator) -> DataToExport:
-        return DataToExport(name=data_act.name, data=[data_act])
-
-    def _on_scan_pausing(self, pausing=True):
-        if pausing:
-            message = "Logging has been paused"
-        else:
-            message = "Logging resumed"
-
-        self._update_status(message)
-        self.logger.status_manager.set_permanent_status(message)
-        self.logger.status_manager.is_logging = not pausing
-
+            self._app.status_manager.set_permanent_status(msg)
 
 
 def main():
