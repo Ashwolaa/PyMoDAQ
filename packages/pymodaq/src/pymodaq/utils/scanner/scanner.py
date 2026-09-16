@@ -97,7 +97,7 @@ class Scanner(QObject, ParameterManager):
         self._scanner: ScannerBase = None
 
         self.setup_ui()
-        self.actuators = actuators
+        self.actuators = selected_actuators
         if self._scanner is not None:
             self.settings.child('n_steps').setValue(self._scanner.evaluate_steps())
 
@@ -230,26 +230,10 @@ class Scanner(QObject, ParameterManager):
                 self._actuators_all.append(act)
         self.settings.child('actuators').setValue({'all_items': [actuator.title for actuator in self._actuators_all],
                                                    'selected': [actuator.title for actuator in act_list]})
-        self._restrict_scan_types_to_actuators()
         self.set_scanner()
 
     def set_actuators(self, actuators: list[DAQ_Move]):
         self.actuators = actuators
-
-    def _restrict_scan_types_to_actuators(self):
-        """Restrict scan_type/scan_sub_type to what the current number of selected actuators
-        supports, auto-selecting when only one choice remains valid"""
-        n_actuators = len(self._actuators)
-        compatible_types = scanner_factory.compatible_scan_types(n_actuators)
-        self.settings.child('scan_type').setOpts(limits=compatible_types)
-        if self.settings['scan_type'] not in compatible_types:
-            self.settings.child('scan_type').setValue(compatible_types[0])
-        else:
-            compatible_sub_types = scanner_factory.compatible_scan_sub_types(
-                self.settings['scan_type'], n_actuators)
-            self.settings.child('scan_sub_type').setOpts(limits=compatible_sub_types)
-            if self.settings['scan_sub_type'] not in compatible_sub_types:
-                self.settings.child('scan_sub_type').setValue(compatible_sub_types[0])
 
     def set_scan_type_and_subtypes(self, scan_type: str, scan_subtype: str = None):
         """Convenience function to set the main scan type

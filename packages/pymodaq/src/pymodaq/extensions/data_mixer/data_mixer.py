@@ -79,8 +79,8 @@ class DataMixer(CustomExt):
         splitter.addWidget(self.modules_manager.settings_tree)
         self.modules_manager.tree.header().setVisible(False)
         self.modules_manager.settings.child('actuators').hide()
-        self.modules_manager.settings.child('probe_data').hide()
-        self.modules_manager.settings.child('test_actuator').hide()
+        self.modules_manager.settings.child('probe_detectors').hide()
+        self.modules_manager.settings.child('probe_actuators').hide()
 
         splitter.addWidget(self.settings_tree)
 

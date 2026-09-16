@@ -482,7 +482,7 @@ class TestGetDetDataList:
         with patch.object(manager, 'grab_data', return_value=dte):
             manager.get_det_data_list()
 
-        det_param = manager.settings.child('probe_data').children()[0]
+        det_param = manager.settings.child('probe_detectors').children()[0]
         assert det_param.name() in DataDim.names()
 
     def test_tree_cleared_on_repopulate(self, manager):
@@ -495,7 +495,7 @@ class TestGetDetDataList:
         for dim in DataDim.names():
             for dwa in dte.get_data_from_dim(dim):
                 assert dwa.get_full_name() in [child.name() for child in
-                                           manager.settings.child('probe_data', dim).children()]
+                                           manager.settings.child('probe_detectors', dim).children()]
 
     def test_connect_detectors_released_on_exception(self, manager):
         """connect_detectors(False) must be called via finally even if grab_data raises."""
@@ -510,16 +510,16 @@ class TestGetDetDataList:
 class TestShowOnlyControlModules:
 
     def test_hides_probe_params(self, manager):
-        probe = manager.settings.child('probe_data')
-        test_act = manager.settings.child('test_actuator')
+        probe = manager.settings.child('probe_detectors')
+        test_act = manager.settings.child('probe_actuators')
         with patch.object(probe, 'show') as p, patch.object(test_act, 'show') as t:
             manager.show_only_control_modules(True)
             p.assert_called_once_with(False)
             t.assert_called_once_with(False)
 
     def test_shows_probe_params(self, manager):
-        probe = manager.settings.child('probe_data')
-        test_act = manager.settings.child('test_actuator')
+        probe = manager.settings.child('probe_detectors')
+        test_act = manager.settings.child('probe_actuators')
         with patch.object(probe, 'show') as p, patch.object(test_act, 'show') as t:
             manager.show_only_control_modules(False)
             p.assert_called_once_with(True)
@@ -535,7 +535,7 @@ class TestTestActuatorTree:
         manager.move_done_positions.append(DataActuator('X_axis', data=3.14))
         manager.move_done_positions.append(DataActuator('Y_axis', data=2.71))
 
-        test_act = manager.settings.child('test_actuator')
+        test_act = manager.settings.child('probe_actuators')
         test_act.clearChildren()
         for dact in manager.move_done_positions:
             test_act.addChild(
@@ -551,7 +551,7 @@ class TestTestActuatorTree:
 
     def test_children_cleared_on_new_move(self, manager):
         """A second move replaces the previous children."""
-        test_act = manager.settings.child('test_actuator')
+        test_act = manager.settings.child('probe_actuators')
         test_act.addChild(
             {'title': 'X_axis', 'name': 'X_axis', 'type': 'float', 'value': 0.0, 'readonly': True},
         )

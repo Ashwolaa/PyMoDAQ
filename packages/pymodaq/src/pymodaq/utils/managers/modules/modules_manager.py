@@ -63,8 +63,8 @@ class ModulesManager(QObject, ParameterManager):
         {'title': 'Detectors', 'name': 'detectors', 'type': 'itemselect', 'checkbox': True},
         {'title': 'Actuators', 'name': 'actuators', 'type': 'itemselect', 'checkbox': True},
 
-        {'title': "Probe detectors", 'name': 'probe_data', 'type': 'action_led', 'value': False, 'children': []},
-        {'title': "Probe actuators", 'name': 'test_actuator', 'type': 'action_led', 'value': False, 'children': []},
+        {'title': "Probe detectors", 'name': 'probe_detectors', 'type': 'action_led', 'value': False, 'children': []},
+        {'title': "Probe actuators", 'name': 'probe_actuators', 'type': 'action_led', 'value': False, 'children': []},
     ]
 
     def __init__(self,
@@ -98,8 +98,8 @@ class ModulesManager(QObject, ParameterManager):
         self.move_done_positions: DataToExport = None
         self.move_done_flag = False
 
-        self.settings.child('probe_data').sigActivated.connect(self.get_det_data_list)
-        self.settings.child('test_actuator').sigActivated.connect(self.test_move_actuators)
+        self.settings.child('probe_detectors').sigActivated.connect(self.get_det_data_list)
+        self.settings.child('probe_actuators').sigActivated.connect(self.test_move_actuators)
 
         self._detectors = []
         self._actuators = []
@@ -152,8 +152,8 @@ class ModulesManager(QObject, ParameterManager):
         return f'ModulesManager of "{self.parent_name}" with control modules: {self.get_names(self.modules_all)}'
 
     def show_only_control_modules(self, show: True):
-        self.settings.child('probe_data').show(not show)
-        self.settings.child('test_actuator').show(not show)
+        self.settings.child('probe_detectors').show(not show)
+        self.settings.child('probe_actuators').show(not show)
 
     @classmethod
     def get_names(cls, modules:  list[Union['DAQ_Move', 'DAQ_Viewer']]):
@@ -336,9 +336,12 @@ class ModulesManager(QObject, ParameterManager):
 
     def value_changed(self, param):
         if param.name() == 'detectors':
+            # Previously probed channels no longer reflect the current selection
+            self.settings.child('probe_detectors').clearChildren()
             self.detectors_changed.emit(param.value()['selected'])
 
         elif param.name() == 'actuators':
+            self.settings.child('probe_actuators').clearChildren()
             self.actuators_changed.emit(param.value()['selected'])
 
     def get_det_data_list(self, add_to_this_param: Parameter = None) -> DataToExport:
@@ -348,7 +351,7 @@ class ModulesManager(QObject, ParameterManager):
             return DataToExport(name=__class__.__name__, control_module='DAQ_Viewer')
 
         if add_to_this_param is None:
-            add_to_this_param = self.settings.child('probe_data')
+            add_to_this_param = self.settings.child('probe_detectors')
 
         self.connect_detectors()
         self.timeout_signal.connect(self._on_detector_probe_timeout)
@@ -376,13 +379,13 @@ class ModulesManager(QObject, ParameterManager):
 
     def _on_detector_probe_timeout(self, missing_modules: List[str]):
         """ Report which detectors failed to answer a probe, naming them explicitly """
-        self.settings.child('probe_data').setValue(False)
+        self.settings.child('probe_detectors').setValue(False)
         messagebox(text="The following detector(s) did not respond in time:\n"
                         + "\n".join(missing_modules))
 
     def _on_actuator_probe_timeout(self, missing_modules: List[str]):
         """ Report which actuators failed to answer a probe, naming them explicitly """
-        self.settings.child('test_actuator').setValue(False)
+        self.settings.child('probe_actuators').setValue(False)
         messagebox(text="The following actuator(s) did not respond in time:\n"
                         + "\n".join(missing_modules))
 
@@ -401,7 +404,7 @@ class ModulesManager(QObject, ParameterManager):
         names = []
         if dim is not None:
             dim = enum_checker(DataDim, dim)
-        for det_param in self.settings.child('probe_data').children():
+        for det_param in self.settings.child('probe_detectors').children():
             if dim is None or det_param.name() == dim.name:
                 names.extend([child.name() for child in det_param.children()])
         return names
@@ -410,7 +413,7 @@ class ModulesManager(QObject, ParameterManager):
         self.det_done_datas = DataToExport(name=__class__.__name__, control_module='DAQ_Viewer')
         self._received_data = 0
         self.det_done_flag = False
-        self.settings.child('probe_data').setValue(self.det_done_flag)
+        self.settings.child('probe_detectors').setValue(self.det_done_flag)
 
         if check_do_override and 'DataMixer' in self.selected_detectors_name:
             overridden_detectors = self.get_mod_from_name(
@@ -614,7 +617,7 @@ class ModulesManager(QObject, ParameterManager):
             self.timeout_signal.disconnect(self._on_actuator_probe_timeout)
             self.connect_actuators(False)
 
-        test_actuator = self.settings.child('test_actuator')
+        test_actuator = self.settings.child('probe_actuators')
         test_actuator.clearChildren()
         for dact in self.move_done_positions:
             test_actuator.addChild(
@@ -690,7 +693,7 @@ class ModulesManager(QObject, ParameterManager):
                         mode: MoveType = MoveType.ABS,):
         self.move_done_positions = DataToExport(name=__class__.__name__, control_module='DAQ_Move')
         self.move_done_flag = False
-        self.settings.child('test_actuator').setValue(self.move_done_flag)
+        self.settings.child('probe_actuators').setValue(self.move_done_flag)
 
         if mode == MoveType.ABS:
             command = ControlToHardwareMove.MOVE_ABS
@@ -779,7 +782,7 @@ class ModulesManager(QObject, ParameterManager):
             if len(self.move_done_positions) == len(self.actuators):
                 self.actuators_timeout_timer.stop()
                 self.move_done_flag = True
-                self.settings.child('test_actuator').setValue(self.move_done_flag)
+                self.settings.child('probe_actuators').setValue(self.move_done_flag)
                 self.move_done_signal.emit(self.move_done_positions)
 
         except Exception as e:
@@ -794,7 +797,7 @@ class ModulesManager(QObject, ParameterManager):
             if self._received_data == len(self.detectors):
                 self.detectors_timeout_timer.stop()
                 self.det_done_flag = True
-                self.settings.child('probe_data').setValue(self.det_done_flag)
+                self.settings.child('probe_detectors').setValue(self.det_done_flag)
                 self.det_done_signal.emit(self.det_done_datas)
 
 

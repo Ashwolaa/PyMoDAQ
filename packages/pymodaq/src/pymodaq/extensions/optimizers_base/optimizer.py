@@ -305,8 +305,8 @@ class GenericOptimization(CustomExt):
         self._save_main_settings = True
 
         self.modules_manager.actuators_changed[list].connect(self.update_actuators)
-        self.modules_manager.settings.child('probe_data').setOpts(expanded=False)
-        self.modules_manager.settings.child('test_actuator').setOpts(expanded=False)
+        self.modules_manager.settings.child('probe_detectors').setOpts(expanded=False)
+        self.modules_manager.settings.child('probe_actuators').setOpts(expanded=False)
 
         self._h5saver: H5Saver = None
         self.h5saver.settings.child('do_save').hide()

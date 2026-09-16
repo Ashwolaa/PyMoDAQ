@@ -176,8 +176,6 @@ class DAQScan(CustomExt):
         ]},
 
         {'title': 'Plotting options', 'name': 'plot_options', 'type': 'group', 'children': [
-            {'title': 'Get data', 'name': 'plot_probe', 'type': 'action_led',
-             'value': False, 'children': []},
             {'title': 'Group 0D data:', 'name': 'group0D', 'type': 'bool', 'value': True},
             {'title': 'Plot 0Ds:', 'name': 'plot_0d', 'type': 'itemselect', 'checkbox': True},
             {'title': 'Plot 1Ds:', 'name': 'plot_1d', 'type': 'itemselect', 'checkbox': True},
@@ -204,6 +202,8 @@ class DAQScan(CustomExt):
         
         logger.info('Initializing DAQScan')
 
+        self._ui_ready = False  # important to be here before super is called, see do_things_after_experiment_set
+
         super().__init__(parent=dockarea,
                          dashboard=dashboard,
                          add_toolbar_break=False,
@@ -225,8 +225,8 @@ class DAQScan(CustomExt):
         self.curvilinear_values = []
         self.plot_colors = PlotColors()
 
-        self.modules_manager.settings.child('probe_data').setOpts(expanded=False)
-        self.modules_manager.settings.child('test_actuator').setOpts(expanded=False)
+        self.modules_manager.settings.child('probe_detectors').setOpts(expanded=False)
+        self.modules_manager.settings.child('probe_actuators').setOpts(expanded=False)
         self.modules_manager.detectors_changed.connect(self.clear_plot_from)
 
         self.h5_manager.get_h5saver(create_new_file=False).file_changed_sig.connect(self._on_file_changed)
@@ -253,8 +253,7 @@ class DAQScan(CustomExt):
         self.status_manager = ScanStatusBarManager(self)
 
         self.setup_ui()
-
-
+        self._ui_ready = True
 
         self.h5_manager.command_sig.connect(self.process_cmds)
 
@@ -268,7 +267,9 @@ class DAQScan(CustomExt):
         self.live_timer.timeout.connect(self.update_live_plots)
 
         self.settings.child('plot_options', 'prepare_viewers').sigActivated.connect(self.prepare_viewers)
-        self.settings.child('plot_options', 'plot_probe').sigActivated.connect(self.plot_from)
+        # Reuse the Detectors panel's probe button: probing already grabs the data
+        # (populating its result tree), so just also refresh the plot selections from it
+        self.modules_manager.settings.child('probe_detectors').sigActivated.connect(self.plot_from)
 
         self.scan_manager = ScanManager(self)
         self.scan_manager.get_external_toolbar_menu(toolbar=self.get_toolbar('scan_manager'),
@@ -294,7 +295,8 @@ class DAQScan(CustomExt):
         return [self.toolbar, self.get_toolbar('scan_manager')]
 
     def plot_from(self):
-        self.modules_manager.get_det_data_list()
+        """ Refresh the Plot 0Ds/1Ds selections from the data already probed by the
+        Detectors panel's probe button (this is connected to its sigActivated) """
         data0D_names = self.modules_manager.get_probed_data_full_names(DataDim.Data0D)
         data1D_names = self.modules_manager.get_probed_data_full_names(DataDim.Data1D)
         self.settings.child('plot_options', 'plot_0d').setValue(
@@ -371,10 +373,10 @@ class DAQScan(CustomExt):
         self.set_scanner_settings(self.scanner.parent_widget)
 
         self.actuators_settings_tree.addParameters(self.modules_manager.settings.child('actuators'))
-        self.actuators_settings_tree.addParameters(self.modules_manager.settings.child('test_actuator'))
+        self.actuators_settings_tree.addParameters(self.modules_manager.settings.child('probe_actuators'))
 
         self.detectors_settings_tree.addParameters(self.modules_manager.settings.child('detectors'))
-        self.detectors_settings_tree.addParameters(self.modules_manager.settings.child('probe_data'))
+        self.detectors_settings_tree.addParameters(self.modules_manager.settings.child('probe_detectors'))
 
         selection_tree_height = max(self._content_fit_height(self.actuators_settings_tree),
                                     self._content_fit_height(self.detectors_settings_tree))
@@ -401,9 +403,6 @@ class DAQScan(CustomExt):
         self._toolbar.addSeparator()
         self.add_action('navigator', 'Show Navigator', '', menu=MenuToolbarNames.TOOLS, auto_toolbar=False)
         self.add_action('batch', 'Show Batch Scanner', '', menu=MenuToolbarNames.TOOLS, auto_toolbar=False)
-        self.add_action('show_viewers', 'Show/Hide Viewers', 'DAQ_Viewer_pannel',
-                        tip='Show or hide the independent window holding the live plot viewers',
-                        menu=MenuToolbarNames.TOOLS)
         self.set_action_visible('start_batch', False)
 
     def connect_things(self):
@@ -418,7 +417,6 @@ class DAQScan(CustomExt):
 
         self.connect_action('navigator', self.show_navigator)
         self.connect_action('batch', lambda: self.show_batcher(self.menubar))
-        self.connect_action('show_viewers', self.toggle_viewers_window)
 
     def process_cmds(self, cmd: utils.ThreadCommand):
         """Process commands sent by actions done in the ui
