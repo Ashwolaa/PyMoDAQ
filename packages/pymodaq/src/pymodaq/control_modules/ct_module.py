@@ -91,7 +91,14 @@ class ControllerThreadModule(ParameterControlModule):
         self._hw_settings: Optional[Parameter] = None
         self._syncing_from_hw: bool = False
         self._init_failed: bool = False  # set True on hardware_status(False) for fast poll_init exit
+        self._initialized_state: bool = False
         super().__init__(**kwargs)
+
+    @property
+    def initialized_state(self) -> bool:
+        """bool: Check if the module is initialized (CT-based; overrides the
+        legacy ControlModule property, which reads _controller_and_thread)."""
+        return self._initialized_state
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 

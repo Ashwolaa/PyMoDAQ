@@ -21,6 +21,7 @@ from pymodaq.utils.conftests import qtbotskip, main_modules_skip
 from pymodaq.utils.config import GlobalConfig
 
 from pymodaq_gui.parameter import utils as putils
+from pymodaq_gui.parameter import Parameter
 
 
 config = GlobalConfig()
