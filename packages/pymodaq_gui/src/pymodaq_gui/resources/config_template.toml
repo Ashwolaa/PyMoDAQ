@@ -30,6 +30,8 @@ country = "UnitedStates"
     style = ['rounded']  # pymodaq uses the first elt in config
 
 [viewer]
+rois_as_popup = false
+rois_dock_layout = 'horizontal'  # 'horizontal' or 'vertical', also changeable from the ROIs dock's right-click menu
 
     [viewer.viewer0D]
     show_data_as_list = false  # display last values as numbers in a side panel

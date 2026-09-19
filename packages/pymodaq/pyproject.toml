@@ -34,6 +34,7 @@ dependencies = [
     "pymodaq_utils>5.1",
     "pymodaq_gui>5.1",
     "pymodaq_data>5.1",
+    "pymodaq_scripting==5.3.0a1",
     "pymodaq_plugin_manager>=0.0.17",
     "pymodaq_plugins_mock>=5.0.12",
     "simple_pid",
@@ -41,6 +42,7 @@ dependencies = [
     "pyleco>0.3; python_version>=\"3.10\"",
     "bayesian-optimization>=2.0",
     "adaptive",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
@@ -48,16 +50,26 @@ dev = [
     "hatch",
     "flake8",
     "h5py",
+    "tables",
     "pytest",
     "pytest-cov",
     "pytest-xdist",
-
-    "pyqt5",
-    "pyqt6",
-    "pyside6",
     "pytest-qt",
     "pytest-xvfb",
 ]
+
+pyside6 = [
+    "pyside6"
+]
+
+pyqt6 = [
+    "pyqt6"
+]
+
+pyqt5= [
+    "pyqt5"
+]
+
 
 [project.scripts]
 daq_logger = "pymodaq.extensions.daq_logger:main"
@@ -74,7 +86,7 @@ Tracker = "https://github.com/PyMoDAQ/PyMoDAQ/issues"
 
 [tool.hatch.version.raw-options]
 search_parent_directories = true
-fallback_version = "5.1.0"
+fallback_version = "5.2.0"
 git_describe_command = "python git_describe.py packages/pymodaq"
 
 [tool.hatch.version]

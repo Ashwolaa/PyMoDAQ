@@ -499,10 +499,13 @@ class ViewerND(ParameterManager, ActionManager, ViewerBase):
         ]},
     ]
 
-    def __init__(self, parent: QtWidgets.QWidget = None, title=''):
+    def __init__(self, parent: QtWidgets.QWidget = None, title='',
+                 rois_dock: Dock = None):
         ViewerBase.__init__(self, parent, title=title)
         ActionManager.__init__(self, toolbar=QtWidgets.QToolBar())
         ParameterManager.__init__(self)
+
+        self.rois_dock = rois_dock
 
         self._area = None
         self._data = None
@@ -752,15 +755,18 @@ class ViewerND(ParameterManager, ActionManager, ViewerBase):
         self.parent.layout().addWidget(self._area)
 
         viewer0D_widget = QtWidgets.QWidget()
-        self.viewer0D = Viewer0D(viewer0D_widget)
+        self.viewer0D = Viewer0D(viewer0D_widget, title=self.title,
+                                 rois_dock=self.rois_dock)
 
         viewer1D_widget = QtWidgets.QWidget()
-        self.viewer1D = Viewer1D(viewer1D_widget)
+        self.viewer1D = Viewer1D(viewer1D_widget, title=self.title,
+                                 rois_dock=self.rois_dock)
         self.viewer1D.roi = LinearROI()
         self.viewer1D.view.plotitem.addItem(self.viewer1D.roi)
 
         viewer2D_widget = QtWidgets.QWidget()
-        self.viewer2D = Viewer2D(viewer2D_widget)
+        self.viewer2D = Viewer2D(viewer2D_widget, title=self.title,
+                                 rois_dock=self.rois_dock)
         self.viewer2D.roi = SimpleRectROI(centered=True)
         self.viewer2D.view.plotitem.addItem(self.viewer2D.roi)
         
@@ -775,15 +781,17 @@ class ViewerND(ParameterManager, ActionManager, ViewerBase):
         self._dock_signal.addWidget(viewer2D_widget)
 
         navigator1D_widget = QtWidgets.QWidget()
-        self.navigator1D = Viewer1D(navigator1D_widget)
+        self.navigator1D = Viewer1D(navigator1D_widget, title=self.title,
+                                    rois_dock=self.rois_dock)
         navigator2D_widget = QtWidgets.QWidget()
-        self.navigator2D = Viewer2D(navigator2D_widget)
+        self.navigator2D = Viewer2D(navigator2D_widget, title=self.title,
+                                    rois_dock=self.rois_dock)
         self.navigator2D.get_action('autolevels').trigger()
         self.navigator2D.get_action('crosshair').trigger()
 
         nav_axes_widget = QtWidgets.QWidget()
         nav_axes_widget.setVisible(False)
-        self.axes_viewer = AxesViewer(nav_axes_widget)
+        self.axes_viewer = AxesViewer(nav_axes_widget, title=self.title)
 
         self._dock_navigation = Dock('Navigation')
         self._dock_navigation.addWidget(navigator1D_widget)

@@ -297,12 +297,17 @@ class DataSaverLoader(DataManagement):
     data_type = DataType['data']
 
     def __init__(self, h5saver: Union[H5SaverLowLevel, Path],
-                 new_file: bool = False, metadata: dict = None, save_type=SaveType.custom):
+                 new_file: bool = False,
+                 metadata: dict = None,
+                 save_type=SaveType.custom,
+                 swmr_mode=False):
         self.data_type = enum_checker(DataType, self.data_type)
 
         if isinstance(h5saver, (Path, str)):
             h5saver = H5SaverLowLevel.from_file(h5saver, save_type,
-                                                new_file=new_file, metadata=metadata)
+                                                new_file=new_file,
+                                                metadata=metadata,
+                                                swmr_mode=swmr_mode)
 
         self._h5saver = h5saver
         self._axis_saver = AxisSaverLoader(self._h5saver)
@@ -441,7 +446,11 @@ class DataSaverLoader(DataManagement):
             parent_node = data_node.parent_node
             data_nodes = self._get_nodes_from_data_type(parent_node)
             data_node = data_nodes[0]
-            error_node = data_node
+            error_nodes = self._error_saver._get_nodes_from_data_type(parent_node)
+            if len(error_nodes) > 0:
+                error_node = error_nodes[0]
+            else:
+                error_node = None
         else:
             parent_node = data_node.parent_node
             if not isinstance(data_node, CARRAY):
@@ -463,7 +472,7 @@ class DataSaverLoader(DataManagement):
         else:
             ndarrays = self.get_data_arrays(data_node, with_bkg=with_bkg, load_all=load_all)
             axes = self.get_axes(parent_node)
-            if error_node is not None:
+            if error_node is not None and self.data_type != DataType.error:
                 error_arrays = self._error_saver.get_data_arrays(error_node, load_all=load_all)
                 if len(error_arrays) == 0:
                     error_arrays = None
@@ -591,7 +600,9 @@ class DataEnlargeableSaver(DataSaverLoader):
                 nav_indexes = ([0] +
                                list(np.array(nav_indexes, dtype=int) + 1))
 
-                self._h5saver.add_array(where, self._get_next_node_name(where), self.data_type,
+                self._h5saver.add_array(where,
+                                        self._get_next_node_name(where),
+                                        self.data_type,
                                         title=data.name,
                                         array_to_save=data[ind_data],
                                         data_shape=data[ind_data].shape,
@@ -604,6 +615,24 @@ class DataEnlargeableSaver(DataSaverLoader):
                                                       distribution='spread',
                                                       origin=data.origin,
                                                       nav_indexes=tuple(nav_indexes)))
+                if data.errors is not None:
+                    error_dwa = data.errors_as_dwa()
+                    self._h5saver.add_array(where,
+                                            self._error_saver._get_next_node_name(where),
+                                            self._error_saver.data_type,
+                                            title=error_dwa.name,
+                                            array_to_save=error_dwa[ind_data],
+                                            data_shape=error_dwa[ind_data].shape,
+                                            array_type=error_dwa[ind_data].dtype,
+                                            enlargeable=True,
+                                            data_dimension=error_dwa.dim.name,
+                                            metadata=dict(timestamp=error_dwa.timestamp,
+                                                          label=error_dwa.labels[ind_data],
+                                                          source=error_dwa.source.name,
+                                                          distribution='spread',
+                                                          origin=error_dwa.origin,
+                                                          nav_indexes=tuple(nav_indexes)))
+
             if add_enl_axes:
                 for ind_enl_axis in range(self._n_enl_axes):
                     self._axis_saver.add_axis(where,
@@ -661,6 +690,12 @@ class DataEnlargeableSaver(DataSaverLoader):
         for ind_data in range(len(data)):
             array: EARRAY = self.get_node_from_index(where, ind_data)
             array.append(data[ind_data])
+
+            if data.errors is not None:
+                error_array: EARRAY = self._error_saver.get_node_from_index(where, ind_data)
+                error_array.append(data.errors[ind_data])
+
+
         if add_enl_axes:
             for ind_axis in range(self._n_enl_axes):
                 axis_array: EARRAY = self._axis_saver.get_node_from_index(where, ind_axis)
@@ -678,7 +713,7 @@ class DataExtendedSaver(DataSaverLoader):
     Parameters
     ----------
     h5saver: H5SaverLowLevel
-    extended_shape: Tuple[int]
+    extended_shape: Iterable[int]
         the extra shape compared to the data the h5array will have
 
     Attributes
@@ -688,7 +723,9 @@ class DataExtendedSaver(DataSaverLoader):
     """
     data_type = DataType['data']
 
-    def __init__(self, h5saver: H5SaverLowLevel, extended_shape: Tuple[int], fill_value=None):
+    def __init__(self, h5saver: H5SaverLowLevel,
+                 extended_shape: Iterable[int],
+                 fill_value=None):
         super().__init__(h5saver)
         self.extended_shape = extended_shape
         self.fill_value = fill_value
@@ -715,7 +752,10 @@ class DataExtendedSaver(DataSaverLoader):
                 nav_indexes = [ind for ind in range(len(self.extended_shape))] +\
                               list(np.array(nav_indexes, dtype=int) + len(self.extended_shape))
 
-                self._h5saver.add_array(where, self._get_next_node_name(where), self.data_type, title=data.name,
+                self._h5saver.add_array(where,
+                                        self._get_next_node_name(where),
+                                        self.data_type,
+                                        title=data.name,
                                         data_shape=data[ind_data].shape,
                                         array_type=data[ind_data].dtype,
                                         fill_value=self.fill_value,
@@ -727,13 +767,33 @@ class DataExtendedSaver(DataSaverLoader):
                                                       origin=data.origin,
                                                       nav_indexes=tuple(nav_indexes)))
 
+                if data.errors is not None:
+                    error_dwa = data.errors_as_dwa()
+                    self._h5saver.add_array(where,
+                                            self._error_saver._get_next_node_name(where),
+                                            self._error_saver.data_type,
+                                            title=error_dwa.name,
+                                            data_shape=error_dwa[ind_data].shape,
+                                            array_type=error_dwa[ind_data].dtype,
+                                            fill_value=self.fill_value,
+                                            scan_shape=self.extended_shape,
+                                            add_scan_dim=True,
+                                            data_dimension=error_dwa.dim.name,
+                                            metadata=dict(timestamp=error_dwa.timestamp, label=error_dwa.labels[ind_data],
+                                                          source=error_dwa.source.name, distribution=distribution.name,
+                                                          origin=error_dwa.origin,
+                                                          nav_indexes=tuple(nav_indexes)))
+
+
             if save_axes:
                 for axis in data.axes:
                     axis.index += len(self.extended_shape)
                     # because there will be len(self.extended_shape) extra navigation axes
                     self._axis_saver.add_axis(where, axis)
 
-    def add_data(self, where: Union[Node, str], data: DataWithAxes, indexes: List[int],
+    def add_data(self, where: Union[Node, str],
+                 data: DataWithAxes,
+                 indexes: Iterable[int],
                  distribution=DataDistribution['uniform']):
         """Adds given DataWithAxes at a location within the initialized h5 array
 
@@ -756,10 +816,13 @@ class DataExtendedSaver(DataSaverLoader):
             self._create_data_arrays(where, data, save_axes=True, distribution=distribution)
 
         for ind_data in range(len(data)):
-            #todo check that getting with index is safe...
+
             array: CARRAY = self.get_node_from_index(where, ind_data)
             array[tuple(indexes)] = data[ind_data]
             # maybe use array.__setitem__(indexes, data[ind_data]) if it's not working
+            if data.errors is not None:
+                error_array: CARRAY = self._error_saver.get_node_from_index(where, ind_data)
+                error_array[tuple(indexes)] = data.errors[ind_data]
 
 
 class DataToExportSaver:
@@ -981,7 +1044,10 @@ class DataToExportExtendedSaver(DataToExportSaver):
         the extra shape compared to the data the h5array will have
     """
 
-    def __init__(self, h5saver: H5SaverLowLevel, extended_shape: Tuple[int], fill_value=None):
+    def __init__(self,
+                 h5saver: H5SaverLowLevel,
+                 extended_shape: Iterable[int],
+                 fill_value=None):
         super().__init__(h5saver)
         self._data_saver = DataExtendedSaver(h5saver, extended_shape, fill_value=fill_value)
         self._nav_axis_saver = AxisSaverLoader(h5saver)
@@ -1000,7 +1066,9 @@ class DataToExportExtendedSaver(DataToExportSaver):
             for axis in axes:
                 self._nav_axis_saver.add_axis(nav_group, axis)
 
-    def add_data(self, where: Union[Node, str], data: DataToExport, indexes: Iterable[int],
+    def add_data(self, where: Union[Node, str],
+                 data: DataToExport,
+                 indexes: Iterable[int],
                  distribution=DataDistribution.uniform,
                  settings_as_xml='', **kwargs):
 
@@ -1041,7 +1109,7 @@ class DataToExportExtendedSaver(DataToExportSaver):
 
 
 class DataLoader:
-    """Specialized Object to load DataWithAxes object from a h5file
+    """Specialized Object to load DataWithAxes / DataToExport objects from a h5file
 
     On the contrary to DataSaverLoader, does include navigation axes stored elsewhere in the h5file
     (for instance if saved from the DAQ_Scan)
@@ -1051,12 +1119,15 @@ class DataLoader:
     h5saver: H5SaverLowLevel or Path
     """
 
-    def __init__(self, h5saver: Union[H5SaverLowLevel, Path]):
+    def __init__(self, h5saver: Union[H5SaverLowLevel, Path],
+                 swmr_mode = False):
         self._axis_loader: AxisSaverLoader = None
         self._data_loader: DataSaverLoader = None
 
         if isinstance(h5saver, (Path, str)):
-            h5saver = H5SaverLowLevel.from_file(h5saver)
+            h5saver = H5SaverLowLevel.from_file(h5saver,
+                                                swmr_mode=swmr_mode,
+                                                mode='r')
 
         self.h5saver = h5saver
 
@@ -1075,8 +1146,8 @@ class DataLoader:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close_file()
-    @property
 
+    @property
     def raw_group(self) -> Node:
         """ Get the base RawGroup where raw data should be saved
 
@@ -1087,9 +1158,11 @@ class DataLoader:
     def close_file(self):
         self._h5saver.close_file()
 
-    def walk_nodes(self, where: Union[str, Node] = '/'):
+    def walk_nodes(self, where: Union[str, Node] = '/', depth: int = None,
+                   only_groups=False) -> Iterable[Node]:
         """Return a Node generator iterating over the h5file content"""
-        return self.h5saver.walk_nodes(where)
+        return self.h5saver.walk_nodes(where, depth=depth,
+                                       only_groups=only_groups)
 
     def get_node(self, where: Union[Node, str], name: str = None) -> Node:
         """ Convenience method to get node"""
@@ -1144,17 +1217,25 @@ class DataLoader:
             if nav_group is not None:
                 nav_axes = self._axis_loader.get_axes(nav_group)
                 axes = data.axes[:]
+                # in swmr mode, if at the time where the axis is read, a writer added stuff
+                # then the axis and the data may not be consistent. Below is an attempt to correct this
+                for ind_nav, nav_axe in enumerate(nav_axes):
+                    if nav_axe.size > data.shape[data.nav_indexes[ind_nav]]:
+                        nav_axe.data = nav_axe.get_data()[:data.shape[data.nav_indexes[ind_nav]]]
                 axes.extend(nav_axes)
                 data.axes = axes
                 data.get_dim_from_data_axes()
         data.create_missing_axes()
         return data
 
-    def load_all(self, where: GROUP, data: DataToExport = None, with_bkg=False) -> DataToExport:
+    def load_all(self, where: GROUP | str, data: DataToExport = None, with_bkg=False) -> DataToExport:
         if data is None:
             data = DataToExport('Loaded data')
         where = self._h5saver.get_node(where)
-        children_dict = where.children()
+        try:
+            children_dict = where.children()
+        except AttributeError:
+            children_dict = {where.name: where}
         data_list = []
         for child in children_dict:
             if isinstance(children_dict[child], GROUP):

@@ -19,7 +19,7 @@ from qtpy import QtGui, QtCore
 from qtpy.QtCore import Qt, QObject, Signal, QByteArray
 from qtpy import QtWidgets
 
-from pymodaq_gui.utils.shared_ui import MenuToolbarNames
+
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_utils import utils
@@ -37,7 +37,7 @@ from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.messenger import messagebox
 from pymodaq_gui.utils.custom_app import CustomApp
-
+from pymodaq_gui.utils.enums import MenuToolbarNames
 
 config = Config()
 logger = set_logger(get_module_name(__file__))
@@ -246,7 +246,8 @@ class H5Browser(CustomApp):
         if h5file is None:
             self._file_is_external = False
             if h5file_path is None:
-                h5file_path = select_file(save=False, ext=['h5', 'hdf5'])
+                filter = "Standard Data files (*.h5 *.hdf5);;Custom Data files (*.*h5*);;All files (*.*)"
+                h5file_path = select_file(save=False, filter=filter)
             if Path(h5file_path).is_file():
                 if self.h5utils.isopen():
                     self.h5utils.close_file()

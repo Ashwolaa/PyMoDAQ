@@ -10,7 +10,7 @@ from pymodaq.control_modules import utils
 from pymodaq.control_modules.utils import PluginBase
 from pymodaq.control_modules.capabilities import Capabilities, ContinuousVariable, Observable
 from pymodaq_gui.plotting.data_viewers import ViewersEnum
-from pymodaq.control_modules.instruments import DAQTypesEnum
+from pymodaq.control_modules.enums import DAQTypesEnum
 
 
 class TestDAQType:

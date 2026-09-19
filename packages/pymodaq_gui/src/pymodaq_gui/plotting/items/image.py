@@ -2,6 +2,8 @@ import collections
 
 import numpy as np
 import pyqtgraph as pg
+
+from pymodaq_gui import foreground_color
 from pymodaq_gui.plotting.utils.plot_utils import makeAlphaTriangles, makePolygons
 from pyqtgraph import debug as debug, Point, functions as fn
 from pyqtgraph.util.cupy_helper import getCupy
@@ -9,13 +11,12 @@ from qtpy import QtCore, QtGui
 
 
 class PymodaqImage(pg.ImageItem):
-    def __init__(self, image=None, pen='r', **kargs):
+    def __init__(self, image=None, **kargs):
         super().__init__(image, **kargs)
         self.flipud = False
         self.fliplr = False
         self.rotate90 = False
         self.rescale = None
-        self.opts = {'pen': pen}
 
     def get_val_at(self, xy):
         """
@@ -115,9 +116,8 @@ class UniformImageItem(PymodaqImage):
             self.image = image
             self._imageHasNans = None
             self._imageNanLocations = None
-            if self.image.shape[0] > 2**15-1 or self.image.shape[1] > 2**15-1:
-                if 'autoDownsample' not in kargs:
-                    kargs['autoDownsample'] = True
+            if (self.image.shape[0] > 2**15-1 or self.image.shape[1] > 2**15-1) and 'autoDownsample' not in kargs:
+                kargs['autoDownsample'] = True
             if shapeChanged:
                 self.prepareGeometryChange()
                 self.informViewBoundsChanged()
@@ -154,10 +154,16 @@ class UniformImageItem(PymodaqImage):
 
         if gotNewData:
             self.sigImageChanged.emit()
-        if self._defferedLevels is not None:
-            levels = self._defferedLevels
+        # Patching for people not using the last version of pyqtgraph
+        if hasattr(self, "_defferedLevels") and self._defferedLevels is not None:
+            self._deferredLevels = self._defferedLevels
             self._defferedLevels = None
-            self.setLevels((levels))
+            print("Warning: you are using an old version of pyqtgraph, please update to the last version")
+
+        if self._deferredLevels is not None:
+            levels = self._deferredLevels
+            self._deferredLevels = None
+            self.setLevels(levels)
 
 class SpreadImageItem(PymodaqImage):
     """
@@ -185,7 +191,7 @@ class SpreadImageItem(PymodaqImage):
         self.qimage = None
         self.triangulation = None
         self.tri_data = None
-        self.mesh_pen = [255, 255, 255]
+        self.mesh_pen = foreground_color
 
     def width(self):
         if self.image is None:

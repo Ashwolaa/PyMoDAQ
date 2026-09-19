@@ -9,13 +9,13 @@ Created the 05/09/2022
 from typing import List, Union
 import sys
 
-from qtpy import QtWidgets, QtCore
+from qtpy import QtWidgets, QtCore, QtGui
 from qtpy.QtWidgets import QVBoxLayout,  QWidget
 
 from pymodaq.utils.daq_utils import ThreadCommand
 from pymodaq.control_modules.ui_utils import ControlModuleUI
 
-from pymodaq_gui.utils import DockArea
+from pymodaq_gui.utils import DockArea, Dock
 from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_utils.enums import StrEnum
 from pymodaq.control_modules.instruments import DET_TYPES
@@ -76,14 +76,22 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
     pymodaq.utils.daq_utils.ThreadCommand
     """
 
-    def __init__(self, parent: QtWidgets.QWidget, title="DAQ_Viewer", **kwargs):
-        ControlModuleUI.__init__(self, parent)
+    def __init__(self, parent: QtWidgets.QWidget, title="DAQ_Viewer",
+                 rois_dock: Dock = None,
+                 settings_dock: Dock = None,
+                 area: DockArea = None,
+                 **kwargs):
 
-        self.dockarea = DockArea()
+        ControlModuleUI.__init__(self, parent,
+                                 title=title,
+                                 settings_dock=settings_dock,)
+        if area is not None:
+            self.dockarea = area
+        else:
+            self.dockarea = DockArea()
 
-        ViewerDispatcher.__init__(self, self.dockarea, title=title)
-
-        self.title = title
+        ViewerDispatcher.__init__(self, self.dockarea, title=title,
+                                  rois_dock=rois_dock)
 
         self._data_ready = False
         self._detector_widget = None
@@ -150,16 +158,12 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         layout = QVBoxLayout()
         widget.setLayout(layout)
         layout.setContentsMargins(2, 2, 2, 2)
-        self._settings_widget = QWidget()
-        self._settings_widget.setLayout(QtWidgets.QVBoxLayout())
+
 
         layout.addWidget(self.dockarea)
 
     def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
         self.add_toolbar('viewer', 'DAQViewer')
-
-    def add_setting_tree(self, tree):
-        self._settings_widget.layout().addWidget(tree)
 
     def setup_actions(self):
         # Common actions from ControlModuleUI
@@ -245,7 +249,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
 
     def update_viewers(self, viewers_type: List[Union[str, ViewersEnum]],
                        viewers_name: List[str] = None, force=False):
-        super().update_viewers(viewers_type)
+        super().update_viewers(viewers_type, viewers_name=viewers_name)
         self.command_sig.emit(ThreadCommand(UiToMainViewer.VIEWERS_CHANGED,
                                             attribute=dict(viewer_types=self.viewer_types,
                                                            viewers=self.viewers)))
@@ -257,11 +261,14 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
     def send_init(self, checked: bool):
         self.get_action('selector').widget.setEnabled(not checked)
         if not checked and self.is_action_checked('background_subtract'):
-            self.get_action('background_subtract').trigger()
-        QtWidgets.QApplication.processEvents()
+            self.get_action('background_subtract').setChecked(False)
+
         self.command_sig.emit(ThreadCommand(UiToMainViewer.INIT,
                                             [checked,
                                              self.selector.selected_module]))
+
+    def quit_fun(self):
+        self.command_sig.emit(ThreadCommand(UiToMainViewer.QUIT))
 
     def _enable_detchoices(self, enable=True):
         self.get_action('selector').widget.setEnabled(enable)
@@ -269,8 +276,7 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
     def _detector_changed(self, sel_mod: SelectedModule):
         try:
             self.command_sig.emit(ThreadCommand(UiToMainViewer.DETECTOR_CHANGED, sel_mod))
-            if self.viewer_types != [sel_mod.daq_type.to_viewer_type()]:
-                self.update_viewers([sel_mod.daq_type.to_viewer_type()])
+            self.update_viewers([sel_mod.daq_type.to_viewer_type()])
         except ValueError as e:
             pass
 
@@ -284,9 +290,14 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         if not self.config('pymodaq', 'viewer', 'allow_settings_edition'):
             self._settings_widget.setEnabled(not self.is_action_checked('grab'))
 
+    def quit_fun(self) -> bool | None:
+        self.command_sig.emit(ThreadCommand(UiToMainViewer.QUIT))
+
     # -------------------------------------------------------------------------
     # Visibility / Lifecycle
     # -------------------------------------------------------------------------
+
+
 
     def show_graphs(self, show: bool = True):
         self.parent.setVisible(show)

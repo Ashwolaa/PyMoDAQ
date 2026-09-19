@@ -242,7 +242,7 @@ class Node(object):
         return self.attrs['TITLE']
 
     @property
-    def path(self):
+    def path(self) -> str:
         """return node path
         Parameters
         ----------
@@ -574,6 +574,11 @@ class H5Backend:
         self._swmr_mode = False
         self._swmr_enabled = False
         self.set_backend(backend)
+
+    @property
+    def swmr_mode(self) -> bool:
+        return self._swmr_mode
+
 
     def set_backend(self, backend: str):
         """Switch the active backend, closing any open file first.
@@ -977,7 +982,7 @@ class H5Backend:
         else:
             return self.get_node(node.parent)
 
-    def get_children(self, where):
+    def get_children(self, where) -> dict[str, Node]:
         """Get a dict containing all children node hanging from where with their name as keys and types among Node,
         CARRAY, EARRAY, VLARRAY or StringARRAY
 
@@ -1023,12 +1028,45 @@ class H5Backend:
                 children[child_name] = _cls(child, self.backend)
         return children
 
-    def walk_nodes(self, where):
+    def walk_nodes(self, where: str| Node, depth: int = None, only_groups=False):
+        """ Node Generator recursively iterating in the tree starting from where down to the specified depth
+        (counted from where).
+
+
+        Parameters
+        ----------
+        where: str | Node
+            The starting node of the iteration
+        depth: int
+            The depth of the iteration in the h5 tree
+        only_groups: bool
+            if False (default) return all nodes otherwise retruns only GROUP instances
+
+        Yields
+        ------
+        Node
+        """
         where = self.get_node(where)  # return a node object in case where is a string
-        yield where
-        for gr in self.walk_groups(where):
-            for child in self.get_children(gr).values():
-                yield child
+        if only_groups and where.attrs['CLASS'] != 'GROUP':
+            pass
+        else:
+            yield where
+
+        if depth == 0:
+            return
+        else:
+            for gr in self.walk_groups(where):
+                for child in self.get_children(gr).values():
+                    node_path = child.path[len(where.path):]
+                    if node_path[0] == '/':
+                        node_path = node_path[1:]
+                    if depth is not None and node_path.count('/') == depth:
+                        return
+                    else:
+                        if only_groups and child.attrs['CLASS'] != 'GROUP':
+                            pass
+                        else:
+                            yield child
 
     def walk_groups(self, where):
         where = self.get_node(where)  # return a node object in case where is a string
