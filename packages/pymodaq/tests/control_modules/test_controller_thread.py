@@ -953,6 +953,7 @@ class OldStyleDetectorPlugin:
         self.params_state = params_state
         self.controller = object()   # fake SDK
         self._ini_raises: Exception | None = None
+        self._grab_raises: Exception | None = None
         self._grab_calls: int = 0
         self._stop_calls: int = 0
         self._close_calls: int = 0
@@ -988,6 +989,8 @@ class OldStyleDetectorPlugin:
 
     def grab_data(self, Naverage=1, **kwargs):
         self._grab_calls += 1
+        if self._grab_raises:
+            raise self._grab_raises
         # Synchronously emit dte_signal (in a real plugin this is async)
         self._emit_dte()
 
@@ -1120,6 +1123,116 @@ class TestOldStyleDetectorRequestRead:
         thread_obj.request_read('ch0')
         thread_obj.request_read('ch0')   # should be ignored
         assert plugin._grab_calls == 1   # only one grab started
+
+    def test_grab_data_exception_resets_grab_in_flight(self, qapp):
+        """A synchronous exception from grab_data() must not permanently
+        stall the instrument — _grab_in_flight has to be reset so later
+        reads can still proceed."""
+        thread_obj, plugin = make_old_style_detector_thread()
+        thread_obj.ini_hardware()
+
+        plugin._grab_raises = RuntimeError('device disconnected')
+        collector = Collector()
+        thread_obj.hardware_status.connect(collector)
+
+        thread_obj.request_read('ch0')   # grab_data raises
+
+        assert thread_obj._grab_in_flight is False
+        connected, info = collector.last()
+        assert connected is False
+        assert 'device disconnected' in info
+
+        # The instrument must recover: a later read should actually reach
+        # the hardware again, not silently no-op.
+        plugin._grab_raises = None
+        data_collector = Collector()
+        thread_obj.data_ready.connect(data_collector)
+        thread_obj.request_read('ch0')
+        assert plugin._grab_calls == 2
+        assert data_collector.count == 1
+
+    def test_periodic_tick_exception_resets_grab_in_flight(self, qapp):
+        """Same recovery guarantee for the start_grab (group tick) path."""
+        thread_obj, plugin = make_old_style_detector_thread()
+        thread_obj.ini_hardware()
+        thread_obj.start_grab('ch0', 100.0)
+
+        plugin._grab_raises = RuntimeError('timeout')
+        thread_obj._on_group_tick('')
+
+        assert thread_obj._grab_in_flight is False
+
+        plugin._grab_raises = None
+        data_collector = Collector()
+        thread_obj.data_ready.connect(data_collector)
+        thread_obj._on_group_tick('')
+        assert data_collector.count == 1
+
+    def test_solo_tick_exception_resets_grab_in_flight(self, qapp):
+        """Same recovery guarantee for the solo (independently-timed) tick path."""
+        thread_obj, plugin = make_old_style_detector_thread()
+        thread_obj.ini_hardware()
+        thread_obj.start_grab('ch0', 100.0, group=None)
+
+        plugin._grab_raises = RuntimeError('timeout')
+        thread_obj._solo_tick('ch0')
+
+        assert thread_obj._grab_in_flight is False
+
+        plugin._grab_raises = None
+        data_collector = Collector()
+        thread_obj.data_ready.connect(data_collector)
+        thread_obj._solo_tick('ch0')
+        assert data_collector.count == 1
+
+    def test_averaging_chain_exception_resets_grab_in_flight(self, qapp):
+        """A grab_data() exception mid-average (accumulating frames) must
+        also reset _grab_in_flight and clear the stale accumulator, not
+        just the first-frame case."""
+        thread_obj, plugin = make_old_style_detector_thread()
+        thread_obj.ini_hardware()
+        thread_obj.set_averaging('ch0', Naverage=3)
+
+        class _AvgDTE:
+            """Minimal stand-in that supports the .average() call used
+            while accumulating frames."""
+            def average(self, other, n):
+                return self
+
+        # First frame succeeds and accumulates; the chained second grab_data()
+        # call (still inside _on_detector_data_ready) then raises.
+        calls = {'n': 0}
+
+        def grab_then_raise(Naverage=1, **kwargs):
+            calls['n'] += 1
+            if calls['n'] == 2:
+                raise RuntimeError('camera hiccup')
+            plugin._emit_dte(_AvgDTE())
+
+        def grab_always_succeeds(Naverage=1, **kwargs):
+            plugin._emit_dte(_AvgDTE())
+
+        plugin.grab_data = grab_then_raise
+
+        collector = Collector()
+        thread_obj.hardware_status.connect(collector)
+        thread_obj.request_read('ch0')   # triggers the averaging chain
+
+        assert thread_obj._grab_in_flight is False
+        connected, info = collector.last()
+        assert connected is False
+        assert 'camera hiccup' in info
+        assert thread_obj._averaging['ch0'].ind == 0
+        assert thread_obj._averaging['ch0'].datas is None
+
+        # Recovery: a later read must reach the hardware again and complete
+        # the full 3-frame average chain without getting stuck.
+        plugin.grab_data = grab_always_succeeds
+        data_collector = Collector()
+        thread_obj.data_ready.connect(data_collector)
+        thread_obj.request_read('ch0')
+        assert thread_obj._grab_in_flight is False
+        assert data_collector.count == 1
 
     def test_stop_grab_calls_plugin_stop(self, qapp):
         thread_obj, plugin = make_old_style_detector_thread()

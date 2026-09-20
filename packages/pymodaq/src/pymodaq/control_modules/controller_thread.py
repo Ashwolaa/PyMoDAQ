@@ -875,7 +875,11 @@ class ControllerThread(QObject):
                     return
                 self._grab_in_flight = True
                 self._pending_group = group_name
-                self._plugin.grab_data(Naverage=1)
+                try:
+                    self._plugin.grab_data(Naverage=1)
+                except Exception:
+                    self._grab_in_flight = False
+                    raise
             else:                        # [old-style actuator]  role == 'actuator'
                 self._in_group_tick = True
                 try:
@@ -902,7 +906,11 @@ class ControllerThread(QObject):
                 self._grab_in_flight = True
                 self._pending_group = None
                 self._pending_channel = channel
-                self._plugin.grab_data(Naverage=1)
+                try:
+                    self._plugin.grab_data(Naverage=1)
+                except Exception:
+                    self._grab_in_flight = False
+                    raise
             else:                        # [old-style actuator]  role == 'actuator'
                 self._read_old_style_actuator(channel)
         except Exception as exc:
@@ -1208,7 +1216,11 @@ class ControllerThread(QObject):
         self._pending_group = None
         self._pending_channel = channel
         hw_avg = getattr(self._plugin, 'hardware_averaging', False)
-        self._plugin.grab_data(Naverage=Naverage if hw_avg else 1)
+        try:
+            self._plugin.grab_data(Naverage=Naverage if hw_avg else 1)
+        except Exception:
+            self._grab_in_flight = False
+            raise
 
     @Slot(object)  # DataToExport
     def _on_detector_data_ready(self, dte: object) -> None:
@@ -1255,7 +1267,13 @@ class ControllerThread(QObject):
             if avg.ind < avg.Naverage:
                 # Chain next grab; _grab_in_flight stays True.
                 self._pending_channel = ch
-                self._plugin.grab_data(Naverage=1)
+                try:
+                    self._plugin.grab_data(Naverage=1)
+                except Exception as exc:
+                    self._grab_in_flight = False
+                    avg.ind = 0
+                    avg.datas = None
+                    self.hardware_status.emit(False, str(exc))
                 return  # wait for next _on_detector_data_ready
 
             # All frames collected: publish final average and reset.
