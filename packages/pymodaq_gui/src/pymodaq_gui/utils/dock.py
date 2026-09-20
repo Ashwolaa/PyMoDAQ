@@ -13,11 +13,31 @@ class Dock(Dock):
         kwargs['fontSize'] = fontSize
         super().__init__(name, *args, **kwargs)
 
-    def removeWidgets(self):
+    @property
+    def grid_layout(self) -> QtWidgets.QGridLayout:
+        """ This Dock's internal grid layout, across pyqtgraph versions
+
+        pyqtgraph renamed this attribute from `layout` to `layout_` in versions
+        after 0.14 (the old name shadowed `QWidget.layout()`); older versions only
+        have `layout`.
+
+        Note: an empty QGridLayout is falsy (Qt gives it `__len__` via `count()`), so
+        this must check for `None` rather than use `or`.
+        """
+        layout_ = getattr(self, 'layout_', None)
+        return layout_ if layout_ is not None else self.layout
+
+    def removeWidget(self, widget, close=True):
+        if widget in self.widgets:
+            self.grid_layout.removeWidget(widget)
+            self.widgets.remove(widget)
+            widget.setParent(None)
+            if close:
+                widget.close()
+
+    def removeWidgets(self, close=True):
         for widget in self.widgets:
-            self.layout.removeWidget(widget)
-            widget.close()
-        self.widgets = []
+            self.removeWidget(widget, close=close)
 
     def setOrientation(self, o='auto', force=False):
         """
@@ -52,7 +72,7 @@ class DockArea(DockArea):
     dock_signal = Signal()
 
     def __init__(self, parent=None, temporary=False, home=None):
-        super(DockArea, self).__init__(parent, temporary, home)
+        super().__init__(parent, temporary, home)
 
     def moveDock(self, dock, position, neighbor):
         """

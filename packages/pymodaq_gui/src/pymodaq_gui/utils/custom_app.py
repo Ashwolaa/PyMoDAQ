@@ -1,14 +1,36 @@
-from typing import Union, TYPE_CHECKING, Dict, Optional
+import inspect
+from pathlib import Path
+from typing import Union, TYPE_CHECKING, Dict, Optional, Iterable
 
 import qt_themes
+from qt_themes import Theme
 from qtpy.QtCore import QObject, QLocale
 from qtpy import QtCore, QtWidgets
+
+from pymodaq_gui.h5modules.saving import H5Saver
+from pymodaq_gui.managers.runner_thread_manager import WorkerThreadManager
+from pymodaq_gui.managers.h5manager import FileStatus, H5Manager, FileAction
+from pymodaq_utils.config import GlobalConfig as Config
+from pymodaq_utils.enums import StrEnum
+from pymodaq_utils.logger import set_logger, get_module_name
+from pymodaq_utils.config import get_set_path, get_set_local_dir
+from pymodaq_utils.warnings import deprecation_msg
 
 from pymodaq_gui.utils.dock import DockArea, Dock
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.parameter import ParameterTree
 from pymodaq_gui.utils.splash import get_splash_sc
+
+logger = set_logger(get_module_name(__file__))
+config = Config()
+
+
+class WorkFlowActions(StrEnum):
+    START = 'start'
+    STOP = 'stop'
+    PAUSE = 'pause'
+    LOG = 'log'
 
 
 class CustomApp(QObject, ActionManager, ParameterManager):
@@ -17,48 +39,104 @@ class CustomApp(QObject, ActionManager, ParameterManager):
     Inherits the MixIns ActionManager and ParameterManager classes. You have to subclass some methods and make
     concrete implementation of a given number of methods:
 
-    * setup_actions: mandatory, see :class:`pymodaq.utils.managers.action_manager.ActionManager`
+    * setup_docks_and_widgets: to code the widget layout of your Application using Docks (and the DockArea)
+      or other widgets
+    * setup_menus_and_toolbars: to create the menus and the toolbar associated with actions (see setup_actions)
+    * setup_actions:  add actions (see :class:`pymodaq_gui.managers.action_manager.ActionManager`) or widgets and optionally add them
+      to toolbar and menu
+    * connect_things: to connect signals and slots. Either from actions
+      (:meth:`pymodaq_gui.managers.action_manager.ActionManager.connect_action`)
+      or direct signal connection
+
+    Other methods to reimplement, related to Parameter management
+
     * value_changed: non mandatory, see :class:`pymodaq.utils.managers.parameter_manager.ParameterManager`
     * child_added: non mandatory, see :class:`pymodaq.utils.managers.parameter_manager.ParameterManager`
     * param_deleted: non mandatory, see :class:`pymodaq.utils.managers.parameter_manager.ParameterManager`
-    * setup_docks: mandatory
-    * setup_menu: non mandatory
-    * connect_things: mandatory
+
+    Depending on the object type, the mainwindow and dockarea attributes may be None
+
+    if parent is:
+
+    * None or QWidget, the attributes will be
+        * parent = QWidget
+        * maindow = None
+        * dockarea = None
+    * DockArea, the attributes will be
+        * parent = DockArea
+        * maindow = QMainWindow
+        * dockarea = DockArea
+    * QMainWindow, the attributes will be
+        * parent = QMainWindow
+        * maindow = QMainWindow
+        * dockarea = None
+
 
     Attributes
     ----------
-    splash_sc: QtWidgets.QSplashScreen
-        A splash screen to be used to display information
     title: str
         Get/set the app title
+    parent: QWidget, QMainWindow or DockArea
+    mainwindow: QMainWindow
+        the parent QMainWindow
+    dockarea: DockArea
+        The underlying DockArea (as central widget of the QMainWindow)
+    menubar: QMenuBar
+        The QMainWindow menubar
+    statusbar: QStatusBar
+        The QMainWindow statusbar
+    splash_sc: QtWidgets.QSplashScreen
+        A splash screen to be used to display information
     get_theme: method
-        Returns the curretn QApplication theme, see qt_themes package
+        Returns the current QApplication theme, see qt_themes package
+
 
     Parameters
     ----------
-    parent: DockArea or QtWidget
+    parent: None, QWidget, QMainWindow or DockArea
+
+
+    tree: ParameterTree
+        an optional Custom ParameterTree
+    title: str
+        The title of the Application instance
+    toolbar: QTtWidgets.QToolbar
+        a toolbar from another parent application
+    create_app_toolbar: bool
+        If True (default) will create a default toolbar with the name of the application as reference and title
+    add_toolbar_break: bool
+        If True, will add a break in the QToolbarArea before adding the toolbar
+    create_app_menu: bool
+        If True (default is False) will create a default menu in the menubar with the name of the
+        application as reference and title
 
     See Also
     --------
     :class:`pymodaq.utils.managers.action_manager.ActionManager`,
     :class:`pymodaq.utils.managers.parameter_manager.ParameterManager`,
-    :class:`pymodaq.utils.managers.modules_manager.ModulesManager`,
     """
 
     log_signal = QtCore.Signal(str)
+    show_h5file_statusbar_widgets = False
+    show_workflow_actions = False
+
+    h5_base_group_name = 'AppData'  # rename that in your app/extension to give a meaningful name to your base group
     params = []
 
     def __init__(self, parent: Union[DockArea, QtWidgets.QMainWindow, QtWidgets.QWidget] = None,
-                 tree: ParameterTree = None, title: str = None, toolbar=None):
+                 tree: ParameterTree = None, title: str = None, toolbar: QtWidgets.QToolBar=None,
+                 create_app_toolbar: bool = True, add_toolbar_break=True,
+                 create_app_menu: bool = False,
+                 h5_actions_not: Iterable[FileAction] = (FileAction.CLOSE_FILE, FileAction.OPEN_FILE)):
+
+
         QObject.__init__(self)
         ActionManager.__init__(self)
         ParameterManager.__init__(self, tree=tree)
 
         self._splash_sc: Optional[QtWidgets.QSplashScreen] = None
 
-        if not (isinstance(parent, DockArea) or
-                isinstance(parent, QtWidgets.QMainWindow) or
-                isinstance(parent, QtWidgets.QWidget)):
+        if not (isinstance(parent, (DockArea, QtWidgets.QMainWindow, QtWidgets.QWidget))):
             parent = QtWidgets.QWidget()
 
         self.parent = parent
@@ -72,24 +150,107 @@ class CustomApp(QObject, ActionManager, ParameterManager):
             self.dockarea: DockArea = None
             self.mainwindow: QtWidgets.QMainWindow = None
 
+
         self._title: str = ''
         self.title = title
 
+        # then call self.h5saver property
         self.docks: Dict[str, Dock] = dict([])
-        self.statusbar = None
+
         self._menubar: QtWidgets.QMenuBar = None
-        if toolbar is None:
-            toolbar = QtWidgets.QToolBar(self.title)
-        self.set_toolbar(toolbar) # create self._toolbar
+
+        if toolbar is not None:
+            create_app_toolbar = True  # force the app toolbar to be the given one
+        if create_app_toolbar:
+            self.add_toolbar(self.__class__.__name__.lower(),
+                             self.__class__.__name__,
+                             self.mainwindow,
+                             toolbar,
+                             add_break=add_toolbar_break)
+            self.set_toolbar(toolbar)
 
         if self.mainwindow is not None:
             self.mainwindow.setWindowTitle(self.title)
-            self.mainwindow.addToolBar(self._toolbar)
             self._menubar = self.mainwindow.menuBar()
-            self.statusbar = self.mainwindow.statusBar()
-            self.reference_toolbar('main', self._toolbar)
         else:
             parent.setWindowTitle(self.title)
+            self._statusbar = QtWidgets.QStatusBar()
+
+        self._status_message_label: QtWidgets.QLabel = None
+
+        if create_app_menu:
+            self.add_menu(self.__class__.__name__.lower(),
+                          self.__class__.__name__,
+                          self.menubar if self.mainwindow is not None else None)
+
+        self._h5_manager = H5Manager(self, show_not=h5_actions_not)
+        self._worker_thread_manager = WorkerThreadManager(parent=self)
+
+    @property
+    def thread_manager(self) -> WorkerThreadManager:
+        return self._worker_thread_manager
+
+    @property
+    def h5_manager(self) -> H5Manager:
+        return self._h5_manager
+
+    @property
+    def h5saver(self) -> H5Saver:
+        """ Convenience method to access the h5saver and for backcompatibility"""
+        return self.h5_manager.h5saver
+
+    @classmethod
+    def get_local_folder(cls, user=False) -> Path:
+        """ Create a local User or system wide folder to store things about this extension"""
+        return get_set_path(get_set_local_dir(user=user), cls.__name__)
+
+    @property
+    def menubar(self):
+        return self._menubar
+
+    @property
+    def statusbar(self) -> QtWidgets.QStatusBar | None:
+        return self.mainwindow.statusBar() if self.mainwindow is not None else self._statusbar
+
+    def populate_status_bar(self):
+        """Generic method to populate the Status Bar
+
+        for customization, reimplement insert_custom_status_widgets method
+        """
+        self._status_message_label = QtWidgets.QLabel('')
+        self.statusbar.addPermanentWidget(self._status_message_label)
+
+        self.insert_custom_status_widgets()
+
+        if self.show_h5file_statusbar_widgets:
+            self.h5_manager.insert_h5stuff_status()
+
+    def set_permanent_status(self, status: str):
+        """ Display a permanent status message
+
+        Method populate_status_bar should have been called beforehand
+
+        """
+        self._status_message_label.setText(status)
+
+    def insert_custom_status_widgets(self):
+        """ create here Widgets to be added to the StatusBar
+        To be reimplemented
+
+        Examples
+        --------
+        self._file_open_LED = QLED()
+        self.statusbar.addPermanentWidget(self._file_open_LED)
+        """
+        pass
+
+    def update_status(self, message: str, wait_time: Optional[int] = None):
+        """Show the message in the status bar with a delay of wait_time ms.
+        """
+        if self.statusbar is not None:
+            if wait_time is None:
+                wait_time = config('gui', 'message_status_persistence')
+            self.statusbar.showMessage(message, wait_time)
 
     @property
     def splash_sc(self) -> QtWidgets.QSplashScreen:
@@ -108,36 +269,39 @@ class CustomApp(QObject, ActionManager, ParameterManager):
             self.mainwindow.setWindowTitle(self._title)
 
     @staticmethod
-    def get_theme(name: str = None):
+    def get_theme(name: str = None) -> Theme:
         return qt_themes.get_theme(name)
 
     def setup_ui(self):
-        self.setup_docks()
+        self.setup_docks_and_widgets()
 
+        self.setup_menus_and_toolbars(self.menubar)  # see ActionManager MixIn class
+
+        if self.show_workflow_actions:
+            self.setup_workflow_actions()
         self.setup_actions()  # see ActionManager MixIn class
-
-        try:
-            self.setup_menu(self._menubar)
-        except TypeError:
-            self.setup_menu()  # for backcompatibility
 
         self.connect_things()
 
         self.do_things_after_ui_setup()
 
-    def quit_fun(self):
-        """Method to be subclassed in order to define a custom quit function
+    def quit_fun(self) -> bool | None:
+        """Method to be reimplemented in order to define a custom quit function
         """
+        if len(self.thread_manager.worker_threads) > 0:
+            self.thread_manager.exit_worker_threads()
         if self.mainwindow is not None:
             self.mainwindow.close()
+        self.disconnect_tree()
+        return True
 
     def do_things_after_ui_setup(self):
-        """Non mandatory method to be subclassed in order to do things after the UI setup
+        """ Method to be reimplemented in order to do things after the UI setup
         """
         pass
 
-    def setup_docks(self):
-        """Mandatory method to be subclassed to setup the docks layout
+    def setup_docks_and_widgets(self):
+        """ Method to be reimplemented to set up the docks layout and/or widgets
 
         Examples
         --------
@@ -148,31 +312,112 @@ class CustomApp(QObject, ActionManager, ParameterManager):
 
         See Also
         --------
-        pyqtgraph.dockarea.Dock
         """
-        raise NotImplementedError
+        if hasattr(self, 'setup_docks'):
+            self.setup_docks()  # for backcompatibility
+            deprecation_msg('You should not call setup_docks anymore, use `setup_docks_and_widgets` instead')
 
-    def setup_menu(self, menubar: QtWidgets.QMenuBar = None):
-        """Non mandatory method to be subclassed in order to create a menubar
+    def setup_docks(self):
+        """ deprecated, see setup_docks_and_widgets
+        """
+        pass
 
-        create menu for actions contained into the self._actions, for instance:
+    def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
+        """Non-mandatory method to be subclassed in order to create menus and toolbars
+
+        create menu and toolbar for actions defined in setup_actions, for instance:
 
         Examples
         --------
-        >>>file_menu = self._menubar.addMenu('File')
-        >>>self.affect_to('load', file_menu)
-        >>>self.affect_to('save', file_menu)
+        >>>file_menu = self.add_menu('file_menu', 'File', self.menubar)
+        >>>submenu = self.add_menu('submenu', 'ASubMenu', 'file_menu')
+        >>>file_toolbar = self.add_toolbar('file_toolbar', 'File', self.mainwindow)
 
-        >>>file_menu.addSeparator()
-        >>>self.affect_to('quit', file_menu)
 
         See Also
         --------
         pymodaq.utils.managers.action_manager.ActionManager
         """
+        self.setup_menu(menubar)  # for back-compatibility
+
+    def setup_menu(self, menubar: QtWidgets.QMenuBar = None):
+        """ Deprecated, use `setup_menus_and_toolbars`
+
+        """
         pass
 
-    def connect_things(self):
-        """Connect actions and/or other widgets signal to methods"""
-        raise NotImplementedError
+    def setup_actions(self):
+        """Method where to create actions.
 
+        To be reimplemented
+
+        Examples
+        --------
+        >>> self.add_action('grab', 'Grab', 'camera', "Grab from camera", checkable=True, menu='file_menu')
+        >>> self.add_action('load', 'Load', 'Open', "Load target file (.h5, .png, .jpg) or data from camera", checkable=False)
+        >>> self.add_action('save', 'Save' 'SaveAs', "Save current data", checkable=False)
+
+        >>>self.affect_to('load', 'file_menu')
+        >>>self.affect_to('save', 'file_menu')
+
+        """
+        pass
+
+    def setup_workflow_actions(self):
+        if 'actions' not in self.menus:
+            self.add_menu('actions', 'Actions', parent_menu=self.menubar)
+
+        self.add_action(WorkFlowActions.START, 'Start Workflow', 'motion_play',
+                        "Start the workflow",
+                        menu='actions', icon_color=self.get_theme().green)
+        self.add_action(WorkFlowActions.STOP, 'Stop Workflow', 'stop_circle', "Stop the workflow",
+                        menu='actions', icon_color=self.get_theme().red)
+        self.add_action(WorkFlowActions.PAUSE, 'Pause Workflow', 'pause_circle', "Pause/resume the workflow",
+                        checkable=True, menu='actions',
+                        icon_checked_color=self.get_theme().orange)
+
+        self.toolbar.addSeparator()
+        self.add_action(WorkFlowActions.LOG, 'Do Logging', 'home_storage',
+                        tip='Log all data generated within the workflow',
+                        menu='actions',
+                        icon_checked_color=self.get_theme().green,
+                        icon_color=self.get_theme().red,
+                        checkable=True,
+                        checked=True)
+        self.toolbar.addSeparator()
+
+    def enable_workflow_actions(self,
+                                enable=True,
+                                excepted: Iterable[str | WorkFlowActions] = (),
+                                opposite: Iterable[str | WorkFlowActions] = (),
+                                other_actions: Iterable[str | WorkFlowActions] = ()):
+        """ Enable/Disable workflow actions (start, stop, pause) + other specified ones
+
+        if an action is specified in excepted, nothing is done on it
+        if an action is specified in opposite, the opposite boolean is applied to its enabled status
+
+        Everytime this function is called the Pause action is unchecked
+
+        """
+        if not isinstance(excepted, Iterable):
+            excepted = [excepted]
+        if not isinstance(other_actions, Iterable):
+            other_actions = [other_actions]
+        if not isinstance(opposite, Iterable):
+            opposite = [opposite]
+
+        for action in WorkFlowActions.names() + list(other_actions):
+            if self.has_action(action) and action not in excepted:
+                if action in opposite:
+                    self.set_action_enabled(action, not enable)
+                else:
+                    self.set_action_enabled(action, enable)
+
+        self.set_action_checked(WorkFlowActions.PAUSE, False)
+
+    def connect_things(self):
+        """Connect actions and/or other widgets signal to methods
+
+        To be reimplemented
+        """
+        pass

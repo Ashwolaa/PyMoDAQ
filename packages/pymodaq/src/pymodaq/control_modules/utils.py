@@ -4,45 +4,190 @@ Created the 03/10/2022
 
 @author: Sebastien Weber
 """
+import functools
+import dataclasses
 from random import randint
-from typing import Optional, Type, Union
+from typing import Optional, Type, Union, TYPE_CHECKING, Any
 from easydict import EasyDict as edict
 
-from qtpy.QtCore import Signal, QObject, Qt, Slot, QThread
+from qtpy import QtWidgets
+from qtpy.QtCore import Signal, QObject, Qt, Slot, QThread, SignalInstance
+
+from qt_themes import get_theme
 
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_utils.config import GlobalConfig as Config
-from pymodaq_utils.logger import get_base_logger, set_logger, get_module_name
-from pymodaq_utils.enums import StrEnum
+from pymodaq_utils.logger import set_logger, get_module_name
 
 from pymodaq_gui.parameter import Parameter, ioxml
+from pymodaq_gui.parameter import utils as putils
 from pymodaq_gui.parameter.utils import ParameterWithPath
 from pymodaq_gui.parameter.ioxml import VALID_FOR_CONFIGURATION
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.h5modules.saving import H5Saver
 
-from pymodaq.utils.tcp_ip.tcp_server_client import TCPClient
-from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands
+from pymodaq.utils.leco.pymodaq_listener import ActorListener, LECOClientCommands, LECOCommands, LECOComponentMixin
 from pymodaq.utils.h5modules.module_saving import DetectorSaver, ActuatorSaver
-from pymodaq.control_modules.thread_commands import ThreadStatus
+from pymodaq.control_modules.thread_commands import (ThreadStatus, ControlToHardware,
+                                                     ControleModuleType, ControllerStatus)  # noqa: F401
 
+if TYPE_CHECKING:
+    from .daq_move_ui.ui_base import DAQMoveUI
+    from .daq_viewer_ui.ui_base import DAQ_Viewer_UI
 
 
 config = Config()
 logger = set_logger(get_module_name(__file__))
 
+class HardwareWorkerBase(QObject):
+    """Abstract base shared by ActuatorWorker and DetectorWorker.
 
-class ControleModuleType(StrEnum):
-    DAQ_MOVE = 'DAQ_Move'
-    DAQ_VIEWER = 'DAQ_Viewer'
+    Provides common signals, a unified plugin reference, shared update_settings
+    dispatch, and a queue_command handler for the commands that both
+    worker classes share (ini_hardware, close).
+
+    Subclasses must implement:
+        ini_hardware(params_state, controller) -> edict
+        close() -> str
+    and set class attribute:
+        _kind: str  e.g. 'actuator' or 'detector'
+    The settings key is derived automatically as "<kind>_settings".
+    """
+
+    status_sig = Signal(ThreadCommand)
+
+    # Subclasses set _kind to 'actuator' or 'detector'.
+    # _plugin_settings_key is derived automatically as "<kind>_settings".
+    _kind: str = ''
+
+    @property
+    def _plugin_settings_key(self) -> str:
+        return f"{self._kind}_settings"
+
+    def __init__(self, title: str, plugin_name: str) -> None:
+        super().__init__()
+        self._title = title
+        self._plugin_name = plugin_name
+        self.plugin = None              # set by subclass after ini_hardware
+        self.controller_address = None
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    @property
+    def plugin_name(self) -> str:
+        return self._plugin_name
+
+    def ini_hardware(self, params_state=None, controller=None):
+        raise NotImplementedError
+
+    def update_settings(self, settings_parameter_dict) -> None:
+        """Route a settings change to either main_settings or the plugin subtree."""
+        path = settings_parameter_dict['path']
+        param = settings_parameter_dict['param']
+        if path[0] == 'main_settings':
+            if hasattr(self, path[-1]):
+                setattr(self, path[-1], param.value())
+        elif path[0] == self._plugin_settings_key:
+            if self.plugin is not None:
+                self.plugin.update_settings(settings_parameter_dict)
+
+    def _dispatch_custom_command(self, command) -> None:
+        """Forward an unrecognised ThreadCommand to the plugin instance."""
+        if self.plugin is not None and hasattr(self.plugin, command.command):
+            cmd = getattr(self.plugin, command.command)
+            if isinstance(command.attribute, list):
+                cmd(*command.attribute)
+            elif isinstance(command.attribute, dict):
+                cmd(**command.attribute)
+            else:
+                cmd(command.attribute)
+
+    def close_hardware(self):
+        status = self.close()
+        self.status_sig.emit(ThreadCommand(ThreadStatus.CLOSE, [status]))
+
+    def close(self):
+        raise NotImplementedError
+
+    def queue_command(self, command) -> bool:
+        """Handle commands shared by all hardware workers.
+
+        Returns True if the command was consumed, False so the subclass
+        can handle its own commands.
+        """
+        if command.command == ControlToHardware.INI_HARDWARE:
+            status = self.ini_hardware(*command.attribute)
+            self.status_sig.emit(ThreadCommand(ThreadStatus.INI_HARDWARE, status))
+        elif command.command == ControlToHardware.CLOSE:
+            self.close_hardware()
+        else:
+            return False
+        return True
 
 
-class ControllerStatus(StrEnum):
-    MASTER = 'Master'
-    SLAVE = 'Slave'
+
+class QThreadProxy:
+    """ Proxy around Qthread to attach/memorize hardware added to it
+
+    Could not use inheritance as sometime, we have to use the main thread where methods cannot
+    be added. Here inherits from Generic to let the type checker believe we are faced with a real QThread
+    """
+    def __init__(self, thread: QThread = None, parent=None):
+        super().__init__()
+        self.thread: QThread = thread if thread is not None else QThread(parent)
+
+        self._hardwares = {}
+        if thread.__doc__:
+            self.__doc__ = f"{QThreadProxy.__doc__}\n\n=== Proxied Object Docs ===\n{thread.__doc__}"
 
 
+    def __getattr__(self, name: str):
+        # Safely extract the thread reference from __dict__ to avoid any recursion risks
+        thread = self.__dict__.get("thread")
+        if thread is None:
+            raise AttributeError(f"'ThreadProxy' object has no attribute '{name}'")
 
+        # Delegate lookups (methods, signals, properties) to the underlying QThread
+        try:
+            attr = getattr(thread, name)
+            if isinstance(attr, SignalInstance):
+                return attr
+
+            if callable(attr):
+                # copy the docstring signature of the inner method to the returned attribute
+                @functools.wraps(attr)
+                def wrapper(*args, **kwargs):
+                    return attr(*args, **kwargs)
+                return wrapper
+            return attr
+
+        except AttributeError:
+            raise AttributeError(f"'QThread' object has no attribute '{name}'")
+
+    def __dir__(self):
+        """ Listing all attributes including the proxied Qthread."""
+        thread = self.__dict__.get("_thread")
+        proxy_attrs = set(self.__dict__.keys())
+        if thread is not None:
+            return sorted(proxy_attrs | set(dir(thread)))
+        return sorted(proxy_attrs)
+
+
+    def start(self):
+        """Convenience method"""
+        self.thread.start()
+
+    def add_hardware(self, name: str, worker: HardwareWorkerBase):
+            self._hardwares[name] = worker
+
+    def remove_hardware(self, name) -> HardwareWorkerBase:
+        return self._hardwares.pop(name, None)
+
+    @property
+    def hardware_names(self) -> list[str]:
+        return list(self._hardwares.keys())
 
 
 def create_controller_param(axis_name: str = None, axis_names: Optional[list[str]] = None) -> dict:
@@ -60,31 +205,19 @@ def create_controller_param(axis_name: str = None, axis_names: Optional[list[str
                                              'value': axis_name,
                                              VALID_FOR_CONFIGURATION: False})
     return controller_param
-
-
 def create_remote_connection_params() -> list[dict]:
-    """Create common remote connection parameter definitions (TCP/IP and LECO)
+    """Create common remote connection parameter definitions (LECO)
 
     These parameters are shared between DAQ_Move and DAQ_Viewer control modules
-    and provide the settings for connecting to remote TCP/IP servers or LECO instances.
+    and provide the settings for connecting to LECO instances.
 
     Returns
     -------
     list of dict
-        Parameter definitions for TCP/IP and LECO remote connections
+        Parameter definitions for LECO remote connections
     """
     return [
-        {'title': 'TCP/IP options:', 'name': 'tcpip', 'type': 'group', 'visible': True,
-         'expanded': False, 'children': [
-            {'title': 'Connect to server:', 'name': 'connect_server', 'type': 'bool_push',
-             'label': 'Connect', 'value': False},
-            {'title': 'Connected?:', 'name': 'tcp_connected', 'type': 'led', 'value': False,
-             VALID_FOR_CONFIGURATION: False, 'readonly': True},
-            {'title': 'IP address:', 'name': 'ip_address', 'type': 'str',
-             'value': config('utils', 'network', 'tcp-server', 'ip')},
-            {'title': 'Port:', 'name': 'port', 'type': 'int',
-             'value': config('utils', 'network', 'tcp-server', 'port')},
-        ]},
+
         {'title': 'LECO options:', 'name': 'leco', 'type': 'group', 'visible': True,
          'expanded': False, 'children': [
             {'title': 'Connect:', 'name': 'connect_leco_server', 'type': 'bool_push',
@@ -100,6 +233,18 @@ def create_remote_connection_params() -> list[dict]:
     ]
 
 
+@dataclasses.dataclass
+class ControllerAndThread:
+    """ Container for the control module worker thread and hardware plugin "controller" object and some related status
+     """
+    name: str = ''
+    thread: QThreadProxy | QThread | None = None  # the thread shared by a master and its slaves
+    # (should not be a Qthread but a proxy QThreadProxy (or None), here typing is added to cheat
+    # the IDE autocompletion tool!
+    controller: Any = None  # the controller shared by a master and its slaves
+    is_master: bool = True
+    id: int = None  # integer as defined in the ExperimentManager (One Master and multiple Slaves share it)
+    initialized: bool = False
 
 
 class ControlModule(QObject):
@@ -111,37 +256,51 @@ class ControlModule(QObject):
         This signal is emitted when the chosen hardware is correctly initialized
     command_hardware : Signal[ThreadCommand]
         This signal is used to communicate with the instrument plugin within a separate thread
-    command_tcpip : Signal[ThreadCommand]
-        This signal is used to communicate through the TCP/IP Network
     quit_signal : Signal[]
         This signal is emitted when the user requested to stop the module
     """
     init_signal = Signal(bool)
     command_hardware = Signal(ThreadCommand)
-    _command_tcpip = Signal(ThreadCommand)
     quit_signal = Signal()
     _update_settings_signal = Signal(edict)
     status_sig = Signal(str)
     custom_sig = Signal(ThreadCommand)
+    instrument_changed = Signal() # emitted when an instrument change finished doing things on the ui
+    timeout_signal = Signal(str)
     ui = None
 
-    def __init__(self):
-        super().__init__()
-        self._title = ""
-        self.config = config
+    def __init__(self, title: str = ''):
+        QObject.__init__(self)
+
+        self.ui: Union['DAQMoveUI', 'DAQ_Viewer_UI'] = None
+
+        self._title = title
+
+        self._controller_and_thread = ControllerAndThread(name=self._title)
         # the hardware controller instance set after initialization and to be used by other modules if they share the
         # same controller
-        self.controller = None
-        self._initialized_state = False
-        self._send_to_tcpip = False
-        self._tcpclient_thread = None
-        self._hardware_thread = None
+
+        self.config = config
+        # Fallback logger; subclasses should set self.logger before calling super().__init__()
+        # so that log messages carry the instance title.
+        if not hasattr(self, 'logger'):
+            self.logger = logger
+
+        self._send_to_leco = False
 
         self._h5saver: Optional[H5Saver] = None
         self._module_and_data_saver = None
 
     def __repr__(self):
         return f'{self.__class__.__name__}: {self.title}'
+
+    def get_color_from_status(self):
+        if not self._controller_and_thread.initialized:
+            return get_theme().text
+        elif self._controller_and_thread.is_master:
+            return get_theme().green
+        else:
+            return get_theme().magenta
 
     def create_new_file(self, new_file: bool):
         if new_file:
@@ -181,12 +340,15 @@ class ControlModule(QObject):
     def custom_command(self, command: str, **kwargs):
         self.command_hardware.emit(ThreadCommand(command, kwargs))
 
-    def thread_status(self, status: ThreadCommand, control_module_type='detector'):
+    def raise_timeout(self):
+        """Handle a timeout event: display a status message."""
+        self.update_status("Timeout occurred")
+        self.timeout_signal.emit(self.title)
+
+    def thread_status(self, status: ThreadCommand):
         """Get back info (using the ThreadCommand object) from the hardware
 
         And re-emit this ThreadCommand using the custom_sig signal if it should be used in a higher level module
-
-
         Parameters
         ----------
         status: ThreadCommand
@@ -213,59 +375,18 @@ class ControlModule(QObject):
             self.update_status(status.attribute)
 
         elif status.command == ThreadStatus.CLOSE:
+            # Thread teardown is now handled synchronously in _close_hardware() via
+            # wait().  This handler just updates state and UI.
             try:
                 self.update_status(status.attribute[0])
-                self._hardware_thread.quit()
-                terminated = self._hardware_thread.wait(5000)
-                if not terminated:
-                    self._hardware_thread.terminate()
-                    self._hardware_thread.wait()
-                    self.update_status('thread is locked?!', 'log')
             except Exception as e:
-                logger.exception(f'Wrong call to the "close" command: \n{str(e)}')
+                self.logger.exception(f'Wrong call to the "close" command: \n{str(e)}')
 
-            self._initialized_state = False
-            self.init_signal.emit(self._initialized_state)
-
-        elif status.command == ThreadStatus.UPDATE_MAIN_SETTINGS:
-            # this is a way for the plugins to update main settings of the ui (solely values, limits and options)
-            try:
-                if status.attribute[2] == 'value':
-                    self.settings.child('main_settings', *status.attribute[0]).setValue(status.attribute[1])
-                elif status.attribute[2] == 'limits':
-                    self.settings.child('main_settings', *status.attribute[0]).setLimits(status.attribute[1])
-                elif status.attribute[2] == 'options':
-                    self.settings.child('main_settings', *status.attribute[0]).setOpts(**status.attribute[1])
-            except Exception as e:
-                logger.exception(f'Wrong call to the "update_main_settings" command: \n{str(e)}')
-
-        elif status.command == ThreadStatus.UPDATE_SETTINGS:
-            # using this the settings shown in the UI for the plugin reflects the real plugin settings
-            try:
-                self.settings.sigTreeStateChanged.disconnect(
-                    self.parameter_tree_changed)  # any changes on the detcetor settings will update accordingly the gui
-            except Exception as e:
-                logger.exception(str(e))
-            try:
-                if status.attribute[2] == 'value':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setValue(status.attribute[1])
-                elif status.attribute[2] == 'limits':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setLimits(status.attribute[1])
-
-                elif status.attribute[2] == 'options':
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).setOpts(**status.attribute[1])
-                elif status.attribute[2] == 'childAdded':
-                    child = Parameter.create(name='tmp')
-                    child.restoreState(status.attribute[1][0])
-                    self.settings.child(f'{control_module_type}_settings',
-                                        *status.attribute[0]).addChild(status.attribute[1][0])
-
-            except Exception as e:
-                logger.exception(f'Wrong call to the "update_settings" command: \n{str(e)}')
-            self.settings.sigTreeStateChanged.connect(self.parameter_tree_changed)
+            self.thread_status(
+                ThreadCommand(
+                    ThreadStatus.INI_HARDWARE,
+                    attribute={'initialized': False,
+                               'info': 'Hardware has been closed'}))
 
         elif status.command == ThreadStatus.UPDATE_UI:
             try:
@@ -274,20 +395,10 @@ class ControlModule(QObject):
                         getattr(self.ui, status.attribute)(*status.args,
                                                            **status.kwargs)
             except Exception as e:
-                logger.info(f'Wrong call to the "update_ui" command: \n{str(e)}')
+                self.logger.info(f'Wrong call to the "update_ui" command: \n{str(e)}')
 
         elif status.command == ThreadStatus.RAISE_TIMEOUT:
             self.raise_timeout()
-
-        elif status.command == ThreadStatus.SHOW_SPLASH:
-            self.settings_tree.setEnabled(False)
-            self.splash_sc.show()
-            self.splash_sc.raise_()
-            self.splash_sc.showMessage(status.attribute, color=Qt.white)
-
-        elif status.command == ThreadStatus.CLOSE_SPLASH:
-            self.splash_sc.close()
-            self.settings_tree.setEnabled(True)
 
         self.custom_sig.emit(status)  # to be used if needed in custom application connected to this module
 
@@ -299,7 +410,7 @@ class ControlModule(QObject):
     @property
     def initialized_state(self):
         """bool: Check if the module is initialized"""
-        return self._initialized_state
+        return self._controller_and_thread.initialized
 
     @property
     def title(self):
@@ -308,6 +419,10 @@ class ControlModule(QObject):
 
     def grab(self):
         """Programmatic entry to grab data from detectors or current value from actuator"""
+        raise NotImplementedError
+
+    def stop_module(self):
+        """ Programmatic entry to stop the Control module either moving, polling or grabbing"""
         raise NotImplementedError
 
     def stop_grab(self):
@@ -367,10 +482,10 @@ class ControlModule(QObject):
             if True, log the message in the logger
         """
         if self.ui is not None:
-            self.ui.display_status(txt)
+            self.ui.update_status(txt)
         self.status_sig.emit(txt)
         if log:
-            logger.info(txt)
+            self.logger.info(txt)
 
     def manage_ui_actions(self, action_name: str, attribute: str, value):
         """Method to manage actions for the UI (if any).
@@ -398,19 +513,93 @@ class ControlModule(QObject):
                         attr(value)
                     else:
                         attr = value
-
-
-class ParameterControlModule(ParameterManager, ControlModule):
+class ParameterControlModule(ParameterManager, LECOComponentMixin, ControlModule):
     """Base class for a control module with parameters."""
 
     _update_settings_signal = Signal(edict)
+    do_init_hardware_signal = Signal(bool)
 
-    listener_class: Type[ActorListener] = ActorListener
+    # Subclasses set _hw_kind to the short module kind name (e.g. 'actuator', 'detector').
+    # The full settings key is derived automatically as "<kind>_settings".
+    _hw_kind: str = ''
 
-    def __init__(self, **kwargs):
-        action_list = kwargs.get("action_list", ("search", "save", "update"))
-        ParameterManager.__init__(self, action_list=action_list)
-        ControlModule.__init__(self)
+    @property
+    def _hw_settings_name(self) -> str:
+        return f"{self._hw_kind}_settings"
+
+    @property
+    def _ui_init_attr(self) -> str:
+        return f"{self._hw_kind}_init"
+
+    def __init__(self, listener_class = Type[ActorListener],
+                 title: str = '', **kwargs):
+        ParameterManager.__init__(self, action_list=kwargs.get("action_list", ("search", "save", "update")))
+        LECOComponentMixin.__init__(self, listener_class)
+        ControlModule.__init__(self, title=title)
+
+        self.do_init_hardware_signal.connect(self.init_hardware)
+
+
+    def thread_status(self, status: ThreadCommand):
+        """Extend base thread_status with parameter-tree commands.
+
+        Handles UPDATE_MAIN_SETTINGS, UPDATE_SETTINGS, SHOW_SPLASH and CLOSE_SPLASH
+        which require access to ParameterManager attributes (settings, settings_tree, splash_sc).
+        All other commands are forwarded to the base implementation.
+        """
+        if status.command == ThreadStatus.UPDATE_MAIN_SETTINGS:
+            # this is a way for the plugins to update main settings of the ui (solely values, limits and options)
+            try:
+                if status.attribute[2] == 'value':
+                    self.settings.child('main_settings', *status.attribute[0]).setValue(status.attribute[1])
+                elif status.attribute[2] == 'limits':
+                    self.settings.child('main_settings', *status.attribute[0]).setLimits(status.attribute[1])
+                elif status.attribute[2] == 'options':
+                    self.settings.child('main_settings', *status.attribute[0]).setOpts(**status.attribute[1])
+            except Exception as e:
+                self.logger.exception(f'Wrong call to the "update_main_settings" command: \n{str(e)}')
+            self.custom_sig.emit(status)
+
+        elif status.command == ThreadStatus.UPDATE_SETTINGS:
+            # using this the settings shown in the UI for the plugin reflects the real plugin settings
+            try:
+                self.settings.sigTreeStateChanged.disconnect(self.parameter_tree_changed)
+            except Exception as e:
+                self.logger.exception(str(e))
+            try:
+                if status.attribute[2] == 'value':
+                    self.settings.child(self._hw_settings_name,
+                                        *status.attribute[0]).setValue(status.attribute[1])
+                elif status.attribute[2] == 'limits':
+                    self.settings.child(self._hw_settings_name,
+                                        *status.attribute[0]).setLimits(status.attribute[1])
+                elif status.attribute[2] == 'options':
+                    self.settings.child(self._hw_settings_name,
+                                        *status.attribute[0]).setOpts(**status.attribute[1])
+                elif status.attribute[2] == 'childAdded':
+                    child = Parameter.create(name='tmp')
+                    child.restoreState(status.attribute[1][0])
+                    self.settings.child(self._hw_settings_name,
+                                        *status.attribute[0]).addChild(status.attribute[1][0])
+            except Exception as e:
+                self.logger.exception(f'Wrong call to the "update_settings" command: \n{str(e)}')
+            self.settings.sigTreeStateChanged.connect(self.parameter_tree_changed)
+            self.custom_sig.emit(status)
+
+        elif status.command == ThreadStatus.SHOW_SPLASH:
+            self.settings_tree.setEnabled(False)
+            self.splash_sc.show()
+            self.splash_sc.raise_()
+            self.splash_sc.showMessage(status.attribute, color=Qt.white)
+            self.custom_sig.emit(status)
+
+        elif status.command == ThreadStatus.CLOSE_SPLASH:
+            self.splash_sc.close()
+            self.settings_tree.setEnabled(True)
+            self.custom_sig.emit(status)
+
+        else:
+            super().thread_status(status)
 
     def apply_controller_parameters(self, controller_param: Parameter):
         """Apply controller parameters (Master/Slave, ID, eventually axes) to the ControlModule instance
@@ -421,176 +610,331 @@ class ParameterControlModule(ParameterManager, ControlModule):
             Parameter object containing the controller parameters
         """
         try:
-            if self.module_type == ControleModuleType.DAQ_VIEWER:
-                controller_settings = self.settings.child('detector_settings', 'controller')
-            elif self.module_type == ControleModuleType.DAQ_MOVE:
-                controller_settings = self.settings.child('move_settings', 'controller')
-            else:
-                raise TypeError('Unknown ControlModuleType')
+            controller_settings = self.settings.child(self._hw_settings_name, 'controller')
             controller_settings.restoreState(controller_param.saveState())
-
         except Exception as e:
-            logger.exception(f'Error applying controller parameters: {str(e)}')
+            self.logger.exception(f'Error applying controller parameters: {str(e)}')
 
-    def value_changed(self, param: Parameter) -> Optional[Parameter]:
-        """ParameterManager subclassed method. Process events from value changed by user in the UI Settings
+    def value_changed(self, param: Parameter):
+        """Handle any settings value change.
+
+        Template method that runs in three steps:
+
+        1. Handle parameters common to all control modules (LECO connection).
+        2. Call :meth:`_module_value_changed` so subclasses can handle their
+           own parameters without overriding this method.
+        3. Propagate non-``main_settings`` changes to the hardware thread via
+           ``_update_settings_signal`` and, when LECO is connected, via
+           ``_leco_commands_signal``.
+        """
+        if param.name() == 'connect_leco_server':
+            self.connect_leco(param.value())
+        elif param.name() == "name":
+            try:
+                self._leco_client.name = param.value()
+            except AttributeError:
+                pass
+        elif param.name() in ('controller_status', 'controller_ID'):
+            self.controller_and_thread.is_master = (
+                    self.settings[self._hw_settings_name, 'controller', 'controller_status'] == ControllerStatus.MASTER)
+            self.controller_and_thread.id = self.settings[self._hw_settings_name, 'controller', 'controller_ID']
+
+        self._module_value_changed(param)
+
+        path = self.settings.childPath(param)
+        if (path is not None and
+                'main_settings' not in path and
+                'saver_settings' not in path):
+            self._update_settings_signal.emit(edict(path=path, param=param, change='value'))
+            if self.settings.child('main_settings', 'leco', 'leco_connected').value():
+                self._leco_commands_signal.emit(
+                    ThreadCommand(LECOCommands.SEND_INFO, ParameterWithPath(param, path)))
+
+    def _module_value_changed(self, param: Parameter):
+        """Override in subclasses to handle module-specific parameter changes.
+
+        Called from :meth:`value_changed` after LECO params are handled and
+        before hardware-thread propagation.  Do *not* call ``super()`` or
+        emit ``_update_settings_signal`` for non-``main_settings`` params —
+        the base :meth:`value_changed` does that automatically.
+        """
+        pass
+
+    def quit_fun(self):
+        """Programmatic quitting: deinit hardware, emit quit signal, run cleanup hook, close UI."""
+        if self._controller_and_thread.initialized:
+            self.init_hardware(False)
+            # The hardware worker emits status_sig(CLOSE) just before self-exiting.
+            # That signal is queued on the main thread.  Flush it now so that
+            # thread_status(CLOSE) (which calls update_status / display_status)
+            # fires while the UI is still alive, not later when it may be closed.
+            QtWidgets.QApplication.processEvents()
+
+        self._quit_cleanup()
+        self.disconnect_tree()
+        try:
+            if self.ui is not None:
+                self.ui.close()
+        except Exception as e:
+            self.logger.exception(str(e))
+        self.quit_signal.emit()
+
+    def _quit_cleanup(self):
+        """Override in subclasses to add module-specific teardown before UI close."""
+        pass
+
+    def _pre_close_hardware(self):
+        """Called at the very start of :meth:`_close_hardware` before the close command is sent.
+
+        Override in subclasses to stop timers or other activity that could race
+        with hardware shutdown (e.g. DAQ_Move stops its refresh timer here).
+        """
+        pass
+
+    def _close_hardware(self):
+        """Send CLOSE to the hardware thread and block until it stops.
+
+        Calls quit() on the thread (from the main thread) then wait(), making
+        quit_fun() synchronous with respect to hardware-thread teardown and
+        eliminating the race condition where a new preset was loaded before the
+        old thread had fully stopped.  
+        """
+        self._pre_close_hardware()
+        # Disconnect LECO *before* processEvents().  connect_leco(False) calls
+        # Listener.stop_listen() which joins the zmq listener thread.
+        self.connect_leco(False)
+        try:
+            self.command_hardware.emit(ThreadCommand(ControlToHardware.CLOSE))
+            #terminate worker actions
+            QtWidgets.QApplication.processEvents()
+            hardware = self.controller_and_thread.thread.remove_hardware(self.title)
+            #remove the handle onto the hardware worker even if slave
+            hardware.status_sig.disconnect()
+
+            if (self.controller_and_thread.is_master and self.controller_and_thread.thread is not None and
+                    self.controller_and_thread.thread.isRunning()):
+                for hardware_name in self.controller_and_thread.thread.hardware_names:
+                    hardware = self.controller_and_thread.thread.remove_hardware(hardware_name)
+                    hardware.close_hardware()
+                    hardware.status_sig.disconnect()
+
+                QtWidgets.QApplication.processEvents()
+                self.controller_and_thread.thread.quit()
+
+
+                if not self.controller_and_thread.thread.wait(5000):
+                    self.controller_and_thread.thread.terminate()
+                    self.controller_and_thread.thread.wait()
+                    self.logger.warning('Hardware thread did not stop cleanly; terminated.')
+                self.controller_and_thread.thread = None
+
+            if self.ui is not None and self._ui_init_attr:
+                setattr(self.ui, self._ui_init_attr, False)
+                self.ui.set_init_color(get_theme().text)
+        except Exception as e:
+            self.logger.exception(str(e))
+
+    # ------------------------------------------------------------------
+    # init_hardware template method
+    # ------------------------------------------------------------------
+
+    #: The ThreadCommand name sent to the hardware thread to initialise it.
+    #: Subclasses must set this to the appropriate enum value, e.g.
+    #: ``ControlToHardwareMove.INI_STAGE`` or ``ControlToHardwareViewer.INI_DETECTOR``.
+    _ini_hw_cmd: str = ''
+
+    def init_hardware(self, do_init=True):
+        """Init or deinit the selected instrument plugin.
+
+        The deinit path is handled by :meth:`_close_hardware`.
+        The init path follows a template:
+
+        1. :meth:`_create_hardware` — instantiate the hardware worker (abstract)
+        2. :meth:`_setup_hardware_thread` — move worker to thread and start it
+        3. connect common signals (``command_hardware``, ``status_sig``, ``_update_settings_signal``)
+        4. :meth:`_connect_hardware_signals` — connect module-specific extra signals
+        5. emit the ini command via :meth:`_ini_hardware_command`
+        6. :meth:`_post_hardware_init` — any post-init UI work
+        7. ``connect_leco(True)``
+        """
+        if not do_init:
+            self._close_hardware()
+            return
+        try:
+            hardware = self._create_hardware()
+            if self.controller_and_thread.is_master:
+                self.controller_and_thread.thread = QThreadProxy(parent=self)
+            else:
+                if self.controller_and_thread.thread is None or not self.controller_and_thread.thread.isRunning():
+                    if self.ui is not None:
+                        self.ui.init_action.setChecked(False)
+                        self.ui.set_init_color(get_theme().red)
+                    raise ValueError("You set this module as slave but no Master Controller is set")
+
+            self._setup_hardware_thread(hardware)
+
+            self.command_hardware[ThreadCommand].connect(hardware.queue_command)
+            hardware.status_sig[ThreadCommand].connect(self.thread_status)
+            self._update_settings_signal[edict].connect(hardware.update_settings)
+            self._connect_hardware_signals(hardware)
+            self.controller_and_thread.thread.add_hardware(self.title, hardware) # to hold a reference
+
+
+            self.command_hardware.emit(self._ini_hardware_command())
+            self._post_hardware_init()
+        except Exception as e:
+            self.logger.exception(str(e))
+            if self.ui is not None:
+                self.ui.init_action.setChecked(False)
+                self.ui.set_init_color(get_theme().red)
+
+    @property
+    def controller_and_thread(self) -> ControllerAndThread | None:
+        return self._controller_and_thread
+
+    @controller_and_thread.setter
+    def controller_and_thread(self, controller: ControllerAndThread | None) -> None:
+        self._controller_and_thread = controller
+
+    def _create_hardware(self):
+        """Instantiate and return the hardware worker object. Must be overridden."""
+        raise NotImplementedError
+
+    def _setup_hardware_thread(self, hardware):
+        """Move *hardware* to the thread and start it.
+
+        Default: always move and start. Override when the move/start should be
+        conditional (e.g. DAQ_Viewer's ``viewer_in_thread`` config option).
+        """
+        hardware.moveToThread(self.controller_and_thread.thread.thread)
+        self.controller_and_thread.thread.finished.connect(hardware.deleteLater)
+        if self.controller_and_thread.is_master:
+            self.controller_and_thread.thread.start()
+
+    def _connect_hardware_signals(self, hardware):
+        """Connect module-specific signals from *hardware*. Default: no-op."""
+        pass
+
+    def _ini_hardware_command(self) -> ThreadCommand:
+        """Return the ThreadCommand that triggers hardware initialisation.
+
+        Default uses :attr:`_ini_hw_cmd` as the command name and
+        ``[hw_settings.saveState(), self.controller]`` as the attribute.
+        Override if the attribute structure differs.
+        """
+        return ThreadCommand(
+            self._ini_hw_cmd,
+            attribute=[self.settings.child(self._hw_settings_name).saveState(),
+                       self._controller_and_thread.controller],
+        )
+
+    def _post_hardware_init(self):
+        """Called after the ini command is emitted. Default: no-op."""
+        pass
+
+    @property
+    def master(self) -> bool:
+        """Get/Set programmatically the Master/Slave status of the module's controller."""
+        return self._controller_and_thread.is_master
+
+    @master.setter
+    def master(self, is_master: bool):
+        self.settings.child(self._hw_settings_name, 'controller', 'controller_status').setValue(
+            ControllerStatus.MASTER if is_master else ControllerStatus.SLAVE)
+        self.controller_and_thread.is_master = is_master
+
+    @property
+    def id(self) -> int:
+        """Get/Set programmatically the id value of the module's controller."""
+        return self._controller_and_thread.id
+
+    @id.setter
+    def id(self, id_value: int):
+        self.settings.child(self._hw_settings_name, 'controller', 'controller_ID').setValue(id_value)
+        self.controller_and_thread.id = id_value
+
+    def param_deleted(self, param):
+        """Propagate parameter deletion to the hardware thread."""
+        if param.name() not in putils.iter_children(self.settings.child('main_settings'), []):
+            self._update_settings_signal.emit(
+                edict(path=[self._hw_settings_name], param=param, change='parent')
+            )
+
+    def child_added(self, param, data):
+        """Propagate child addition to the hardware thread."""
+        path = self.settings.childPath(param)
+        if path is not None and 'main_settings' not in path:
+            self._update_settings_signal.emit(
+                edict(path=path, param=data[0], change='childAdded')
+            )
+
+    def _load_plugin_params(self) -> Optional[Parameter]:
+        """Return the plugin-specific Parameter tree to populate the hw settings subtree.
+
+        Override in subclasses to return the Parameter loaded from the plugin class.
+        The base implementation returns None (no children added).
+        """
+        return None
+
+    def _reload_plugin_settings(self):
+        """Clear the hw settings subtree and repopulate it from the current plugin.
+
+        Sets ``main_settings/module_name``, clears all children of the
+        ``_hw_settings_name`` group, then calls :meth:`_load_plugin_params` and
+        adds the returned Parameter's children.
+        """
+        self.settings.child('main_settings', 'module_name').setValue(self._title)
+        try:
+            for child in self.settings.child(self._hw_settings_name).children():
+                child.remove()
+            plugin_params = self._load_plugin_params()
+            if plugin_params is not None:
+                self.settings.child(self._hw_settings_name).addChildren(plugin_params.children())
+        except Exception as e:
+            self.logger.exception(str(e))
+
+    def get_leco_name(self) -> str:
+        name = (self.settings["main_settings", "leco", "leco_name"] or
+                self.settings["main_settings", "module_name"] or
+                f"viewer_{randint(0, 10000)}"
+                )
+        self.settings.child("main_settings", "leco", "leco_name").setValue(name)
+        return name
+
+    def get_leco_host_port(self) -> tuple[str, int]:
+        host = (self.settings["main_settings", "leco", "host"] or 'localhost')
+        port = (self.settings["main_settings", "leco", "port"] or 12300)
+
+        return host, port
+    @Slot(ThreadCommand)
+    def process_leco_commands(self, status: ThreadCommand) -> Optional[ThreadCommand]:
+        """Process LECO commands common to all control modules.
 
         Parameters
         ----------
-        param: Parameter
-            a given parameter whose value has been changed by user
+        status: ThreadCommand
+            Possible commands are:
+
+            * :attr:`LECOClientCommands.LECO_CONNECTED`: mark the LECO connection as active in the settings.
+            * :attr:`LECOClientCommands.LECO_DISCONNECTED`: mark the LECO connection as inactive in the settings.
+            * :attr:`LECOCommands.GET_SETTINGS`: send the module settings back to the Director as an XML string.
+        Returns
+        -------
+        Optional[ThreadCommand]
+            ``None`` if the command was handled, or the original command object if it is not recognized by this
+             implementation (so subclasses can continue processing it).
         """
-        if param.name() == 'connect_server':
-            if param.value():
-                self.connect_tcp_ip()
-            else:
-                self._command_tcpip.emit(ThreadCommand('quit', ))
-
-        elif param.name() == 'ip_address' or param.name == 'port':
-            self._command_tcpip.emit(
-                ThreadCommand('update_connection',
-                              dict(ipaddress=self.settings['main_settings', 'tcpip', 'ip_address'],
-                                   port=self.settings['main_settings', 'tcpip', 'port'])))
-
-        elif param.name() == 'connect_leco_server':
-            self.connect_leco(param.value())
-
-        elif param.name() == "name":
-            name = param.value()
-            try:
-                self._leco_client.name = name
-            except AttributeError:
-                pass
-
-        else:
-            # not handled
-            return param
-
-    def _update_settings(self, param: Parameter):
-        # I do not understand what it does
-        path = self.settings.childPath(param)
-        if path is not None:
-            if 'main_settings' not in path:
-                self._update_settings_signal.emit(edict(path=path, param=param, change='value'))
-                if self.settings.child('main_settings', 'tcpip', 'tcp_connected').value():
-                    self._command_tcpip.emit(ThreadCommand('send_info', dict(path=path, param=param)))
-                if self.settings.child('main_settings', 'leco', 'leco_connected').value():
-                    self._command_tcpip.emit(
-                        ThreadCommand(LECOCommands.SEND_INFO,
-                                      ParameterWithPath(param, path)))
-
-    def connect_tcp_ip(self, params_state=None, client_type: str = "GRABBER") -> None:
-        """Init a TCPClient in a separated thread to communicate with a distant TCp/IP Server
-
-        Use the settings: ip_address and port to specify the connection
-
-        See Also
-        --------
-        TCPServer
-        """
-        if self.settings.child('main_settings', 'tcpip', 'connect_server').value():
-            self._tcpclient_thread = QThread()
-
-            tcpclient = TCPClient(self.settings.child('main_settings', 'tcpip', 'ip_address').value(),
-                                  self.settings.child('main_settings', 'tcpip', 'port').value(),
-                                  params_state=params_state,
-                                  client_type=client_type)
-            tcpclient.moveToThread(self._tcpclient_thread)
-            self._tcpclient_thread.tcpclient = tcpclient
-            tcpclient.cmd_signal.connect(self.process_tcpip_cmds)
-
-            self._command_tcpip[ThreadCommand].connect(tcpclient.queue_command)
-            self._tcpclient_thread.started.connect(tcpclient.init_connection)
-
-            self._tcpclient_thread.start()
-
-    def get_leco_name(self) -> str:
-        name = self.settings["main_settings", "leco", "leco_name"]
-        if name == '':
-            # take the module name as alternative
-            name = self.settings["main_settings", "module_name"]
-        if name == '':
-            # a name is required, invent one
-            name = f"viewer_{randint(0, 10000)}"
-            name = self.settings.child("main_settings", "leco", "leco_name").setValue(name)
-        return name
-
-    def get_leco_host_port(self) -> tuple:
-        host = self.settings["main_settings", "leco", "host"]
-        port = self.settings["main_settings", "leco", "port"]
-        if host == '':
-            # take the localhost as default
-            host = 'localhost'
-        if port == '':
-            # take the default port as 12300
-            port = 12300
-        return (host, port)    
-
-    def connect_leco(self, connect: bool) -> None:
-        if connect:
-            name = self.get_leco_name()
-            host, port = self.get_leco_host_port()
-            try:
-                self._leco_client.name = name
-            except AttributeError:
-                self._leco_client = self.listener_class(name=name, host=host, port=port)
-                self._leco_client.cmd_signal.connect(self.process_tcpip_cmds)
-            self._command_tcpip[ThreadCommand].connect(self._leco_client.queue_command)
-            self._leco_client.start_listen()
-            # self._leco_client.cmd_signal.emit(ThreadCommand(LECOCommands.SET_INFO, attribute=["detector_settings", ""]))
-        else:
-            self._command_tcpip.emit(ThreadCommand(LECOCommands.QUIT, ))
-            try:
-                self._command_tcpip[ThreadCommand].disconnect(self._leco_client.queue_command)
-            except TypeError:
-                pass  # already disconnected
-
-    @Slot(ThreadCommand)
-    def process_tcpip_cmds(self, status: ThreadCommand) -> Optional[ThreadCommand]:
-        if status.command == 'connected':
-            self.settings.child('main_settings', 'tcpip', 'tcp_connected').setValue(True)
-
-        elif status.command == 'disconnected':
-            self.settings.child('main_settings', 'tcpip', 'tcp_connected').setValue(False)
-
-        elif status.command == LECOClientCommands.LECO_CONNECTED:
+        if status.command == LECOClientCommands.LECO_CONNECTED:
             self.settings.child('main_settings', 'leco', 'leco_connected').setValue(True)
-
         elif status.command == LECOClientCommands.LECO_DISCONNECTED:
             self.settings.child('main_settings', 'leco', 'leco_connected').setValue(False)
-
-        elif status.command == 'Update_Status':
-            self.thread_status(status)
-
-        elif status.command == 'set_info':
-            """ The Director sent a parameter to be updated"""
-            path_in_settings = status.attribute.path
-            if 'move' in self.__class__.__name__.lower():
-                common_param = 'move_settings'
-            else:
-                common_param = 'detector_settings'
-            if common_param in path_in_settings:
-                param = self.settings.child(*path_in_settings)
-            elif 'settings_client' in path_in_settings:
-                param = self.settings.child(common_param, *path_in_settings[1:])
-            else:
-                param = self.settings.child(common_param, *path_in_settings)
-
-            param.setValue(status.attribute.parameter.value())
-
         elif status.command == LECOCommands.GET_SETTINGS:
             """ The Director requested the content of the actuator settings"""
-            if 'move' in self.__class__.__name__.lower():
-                common_param = 'move_settings'
-            else:
-                common_param = 'detector_settings'
-            self._command_tcpip.emit(
-                ThreadCommand(LECOCommands.SET_DIRECTOR_SETTINGS,
-                              ioxml.parameter_to_xml_string(
-                                  self.settings.child(common_param))))
-
+            settings_xml = ioxml.parameter_to_xml_string(self.settings.child(self._hw_settings_name))
+            self._leco_commands_signal.emit(ThreadCommand(LECOCommands.SET_DIRECTOR_SETTINGS, settings_xml))
         else:
             # not handled
             return status
+        return None
 
 

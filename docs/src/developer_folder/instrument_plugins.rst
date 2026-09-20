@@ -241,7 +241,7 @@ where ``dte`` stands for DataToExport, see :ref:`datatoexport`.
 
 They both *emit* the same type of signal but will trigger different behaviour from the viewer module. The first is to be
 used to send temporary data to update the plotting but without triggering anything else (so that the DAQ_Scan still awaits
-for data completion before moving on). It is also used in the initialisation of the plugin in order to preset the type
+for data completion before moving on). It is also used in the initialisation of the plugin in order to set the type
 and number of data viewers displayed by the viewer module. The second signal is to be used once data are fully ready to
 be send back to the user interface
 and further processed by DAQ_Scan or DAQ_Viewer instances. The code below is an example of emission of data:
@@ -710,7 +710,9 @@ Specifics commands for the :py:class:`DAQ_Viewer<pymodaq.control_modules.daq_vie
 * grab_stopped: emit grab_status(False)
 * init_lcd: display a LCD panel. the attribute argument should be a dictionnary  directly passed as named arguments
   to the LCD object
-* lcd: display on the LCD panel. the attribute argument should be a list of numpy arrays of shape (1,)
+* lcd: display on the LCD panel. the attribute argument should be a dict mapping the argument of the LCD setvalues method:
+  * values: list of numpy arrays of shape (1,)
+  * show_graph: boolean, optional tell if graph should be displayed
 * stop: stop the grab
 
 The interesting bit is the possibility to display a
@@ -718,9 +720,10 @@ The interesting bit is the possibility to display a
 0D Data also emitted using the ``dte_signal`` but could also be any values). You should first init the LCD screen
 using the command: ``init_lcd`` with an attribute being a dictionary with keys either:
 
-* digits: an integer specifying the number of digits to display
+* digits: an integer specifying the number of digits to display, default is 3
 * Nvals: the number of numerical values to be displayed
 * labels: the name/label of each value
+* show_graph: boolean, optional. set the graph visibility, default is True
 
 For instance, in the 0D Mock viewer plugin:
 
@@ -730,7 +733,7 @@ For instance, in the 0D Mock viewer plugin:
         self.emit_status(ThreadCommand('init_lcd', dict(labels=['dat0', 'data1'], Nvals=2, digits=6)))
         QtWidgets.QApplication.processEvents()
         self.lcd_init = True
-    self.emit_status(ThreadCommand('lcd', data_tot))
+    self.emit_status(ThreadCommand('lcd', dict(values=data_tot,
+                                               show_graph=False)))
 
-Where the lcd is first initialized, then data are sent using the ``lcd`` command taking as attribute a list of 0D
-numpy arrays
+

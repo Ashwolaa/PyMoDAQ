@@ -15,7 +15,7 @@ from pymodaq_gui.messenger import messagebox
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 
 from pymodaq_data.data import DataToExport
-
+from utils import CustomApp
 
 from .db_logger_models import (Base, Data0D, Data1D, Data2D, LogInfo,
                                Configuration, ControlModule)
@@ -215,7 +215,7 @@ class DbLogger:
 class DbLoggerGUI(DbLogger, ParameterManager):
     params = [
         {'title': 'Database:', 'name': 'database_type', 'type': 'list', 'value': 'PostgreSQL',
-            'limits': ['PostgreSQL', ]},
+            'limits': ['PostgreSQL']},
         {'title': 'Server IP:', 'name': 'server_ip', 'type': 'str',
             'value': config('utils', 'network', 'logging', 'sql', 'ip'),
          'tip':'Either localhost if the database server is on the same computer or the IP address of the server'},
@@ -252,7 +252,8 @@ class DbLoggerGUI(DbLogger, ParameterManager):
 
 
 class DataBaseLogger(AbstractLogger):
-    def __init__(self, database_name):
+    def __init__(self, database_name, app: CustomApp):
+        self.app = app
         self.dblogger = DbLoggerGUI(database_name)
 
     @property
@@ -295,6 +296,6 @@ class DataBaseLogger(AbstractLogger):
 
 
 if __name__ == '__main__':
-    db = DbLogger('preset_default')
+    db = DbLogger('default')
     db.connect_db()
     pass

@@ -50,10 +50,9 @@ class GroupParameterItem(GroupParameterItem):
         if hasattr(self.param.opts, 'addText'):
             self.addWidget.setText(self.param.opts['addText'])
 
+
 class GroupParameter(GroupParameter):
-    
     itemClass = GroupParameterItem
 
     def __init__(self, **opts):
         super().__init__(**opts)
-   

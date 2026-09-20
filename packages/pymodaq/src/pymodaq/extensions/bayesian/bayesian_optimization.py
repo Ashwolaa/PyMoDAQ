@@ -22,7 +22,7 @@ PREDICTION_NAMES = GenericAcquisitionFunctionFactory.usual_names()
 PREDICTION_SHORT_NAMES = GenericAcquisitionFunctionFactory.short_names()
 PREDICTION_PARAMS = ([{'title': 'Kind', 'name': 'kind', 'type': 'list',
                       'value': PREDICTION_NAMES[0],
-                      'limits': {name: short_name for name, short_name in zip(PREDICTION_NAMES, PREDICTION_SHORT_NAMES)}}
+                      'limits': {name: short_name for name, short_name in zip(PREDICTION_NAMES, PREDICTION_SHORT_NAMES)}},
                      ] +
                      [{'title': 'Options', 'name': 'options', 'type': 'group',
                        'children': GenericAcquisitionFunctionFactory.get(PREDICTION_SHORT_NAMES[0]).params}]
@@ -124,16 +124,16 @@ class BayesianOptimization(GenericOptimization):
 def main():
     import sys
     from pymodaq_gui.qt_utils import mkQApp
-    from pymodaq.dashboard import create_load_dashboard
+    from pymodaq.dashboard import load_dashboard_with_arguments
     from pymodaq.utils.gui_utils.loader_utils import create_extension
 
     app = mkQApp('Bayesian Optimizer')
 
-    win, dashboard = create_load_dashboard()
+    win, dashboard, _ = load_dashboard_with_arguments(show_dashboard=False,
+                                                      load_extension=False,
+                                                      )
     win.mainwindow.setVisible(False)
-
-    win_ext, scan = create_extension(dashboard, BayesianOptimization)
-    win_ext.show()
+    win_ext, scan = create_extension(dashboard, BayesianOptimization, show_extension=True)
 
     sys.exit(app.exec())
 

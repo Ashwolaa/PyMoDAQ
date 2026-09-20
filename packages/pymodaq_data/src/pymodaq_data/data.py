@@ -7,8 +7,9 @@ Created the 28/10/2022
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-import numbers
 from copy import deepcopy
+import numbers
+import re
 
 import numpy as np
 from numpy.lib.mixins import NDArrayOperatorsMixin
@@ -27,7 +28,7 @@ from pint.compat import upcast_type_map
 from multipledispatch import dispatch
 
 
-from pymodaq_utils.enums import BaseEnum, enum_checker
+from pymodaq_utils.enums import BaseEnum, enum_checker, StrEnum
 from pymodaq_utils.warnings import deprecation_msg
 from pymodaq_utils.utils import find_objects_in_list_from_attr_name_val
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -46,6 +47,32 @@ plotter_factory = PlotterFactory()
 ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
 
+
+
+
+def parse_quantity(quantity: str) -> Q_:
+    """
+    Converts a string into a Pint Quantity object using
+    a regex to split it in two parts and force usage of
+    Q_(value, unit) constructor as Q_(value_unit_str)
+    induces some errors.
+    Parameters
+    ----------
+    quantity: The string to convert
+
+    Returns
+    -------
+    The Quantity object
+
+    """
+    match = re.match(r'^([+-]?\d*\.?\d*(?:[eE][+-]?\d+)?)\s*(.*)$', quantity.strip())
+    if match:
+        value, unit = float(match.group(1)), match.group(2).strip()
+        value = float(value)
+        unit = unit.strip() or 'dimensionless'
+        return Q_(value, unit)
+    return Q_(quantity)
+
 def dimensionless_aware_reduce_units(q: Type[Q_]) -> Type[Q_]:
     """
     Take a quantity q and converts it to its reduced units.
@@ -59,7 +86,9 @@ def dimensionless_aware_reduce_units(q: Type[Q_]) -> Type[Q_]:
     -------
     The reduced quantity
     """
-
+    # this may fire a pint.errors.UndefinedBehavior warning when the magnitude is a numpy array
+    # but pint https://github.com/hgrecco/pint/issues/2274 fixed this in July 2026
+    # at the moment, it just returns the same quantity layout
     return q.to_compact() if q.dimensionless else q.to_reduced_units()
 
 def check_units(units: str):
@@ -120,6 +149,13 @@ class DataDimError(Exception):
 
 class DataUnitError(Exception):
     pass
+
+
+class Averaging(StrEnum):
+    """ Keywords to describe averaging in Data objects"""
+    AVERAGED = 'averaged'
+    N_AVERAGED = 'n_averaged'
+
 
 
 class DwaType(BaseEnum):
@@ -184,19 +220,18 @@ class DataDistribution(BaseEnum):
 
 def _compute_slices_from_axis(axis: Axis, _slice, *ignored, is_index=True, **ignored_also):
     if not is_index:
-        if isinstance(_slice, numbers.Number) or isinstance(_slice, Q_):
+        if isinstance(_slice, (numbers.Number, Q_)):
             if not is_index:
                 _slice = axis.find_index(_slice)
         elif _slice is Ellipsis:
             return _slice
-        elif isinstance(_slice, slice):
-            if not (_slice.start is None and
-                    _slice.stop is None and _slice.step is None):
-                start = axis.find_index(
-                    _slice.start if _slice.start is not None else axis.get_data()[0])
-                stop = axis.find_index(
-                    _slice.stop if _slice.stop is not None else axis.get_data()[-1])
-                _slice = slice(start, stop)
+        elif isinstance(_slice, slice) and not (_slice.start is None and
+                _slice.stop is None and _slice.step is None):
+            start = axis.find_index(
+                _slice.start if _slice.start is not None else axis.get_data()[0])
+            stop = axis.find_index(
+                _slice.stop if _slice.stop is not None else axis.get_data()[-1])
+            _slice = slice(start, stop)
     return _slice
 
 
@@ -437,8 +472,7 @@ class Axis(SerializableBase):
         ----------
         indexes:
         """
-        if not (isinstance(indexes, np.ndarray) or isinstance(indexes, slice) or
-                isinstance(indexes, int)):
+        if not (isinstance(indexes, (np.ndarray, slice, int))):
             indexes = np.array(indexes)
         return self.get_data()[indexes]
 
@@ -497,6 +531,16 @@ class Axis(SerializableBase):
         if self._data is None:
             self._size = _size
 
+    @property
+    def axis_width(self) -> Q_:
+        """get the width of the axis in axis unit
+
+        That is the difference between the max value and the min value of the axis
+        """
+        if self.scaling is not None:
+            return Q_(self.size * self.scaling, self.units)
+        else:
+            return Q_(self.get_data().max() - self.get_data().min(), self.units)
     @staticmethod
     def _check_index_valid(index: int):
         if not isinstance(index, int):
@@ -621,10 +665,10 @@ class Axis(SerializableBase):
         """find the index of the threshold value within the axis"""
         if isinstance(threshold, Q_):
             threshold = threshold.m_as(self.units)
-        if threshold < self.min():
+        if threshold <= self.min():
             return 0
-        elif threshold > self.max():
-            return len(self) - 1
+        elif threshold >= self.max():
+            return len(self)
         elif self._data is not None:
             return mutils.find_index(self._data, threshold)[0][0]
         else:
@@ -670,7 +714,7 @@ class DataLowLevel:
 
     @name.setter
     def name(self, other_name: str):
-        self._name = other_name
+        self._name = str(other_name)
 
     @property
     def timestamp(self):
@@ -794,6 +838,8 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
         self._units = check_units(units)
         self._errors = None
         self.origin = origin
+        self._averaged = False
+        self._n_averaged = 0
 
         source = enum_checker(DataSource, source)
         self._source = source
@@ -910,6 +956,20 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
             else:
                 return [float(np.mean(data_array)) for data_array in self.data]
 
+    def equal_to(self, other: 'DataBase', epsilon: Union[float, Q_])-> bool:
+        """ Check if two data object are equal within epsilon """
+        if isinstance(epsilon, numbers.Number):
+            epsilon = Q_(epsilon, self.units)
+        try:
+            # using below epsilon - Q_(0, self.units) to handle units with offset/scaling like
+            # °C and °F where the diff produce a derived unit (delta_degree_Celsius) that do
+            # not compare well to epsilon itself. While epsilon - Q_(0, self.units) is not changing
+            # the value but produce similar delta units!
+            return bool(np.all([np.abs(self.quantities[ind] - other.quantities[ind])
+                                <= (epsilon - Q_(0, self.units)) for ind in range(len(self))]))
+        except pint.errors.DimensionalityError as e:
+            return False
+
     def as_dte(self, name: str = 'mydte') -> DataToExport:
         """Convenience method to wrap the DataWithAxes object into a DataToExport"""
         return DataToExport(name, data=[self])
@@ -918,11 +978,11 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
         """ Convenience method to split each ndarray into a DataWithAxes object """
         return DataToExport(name, data=[type(self)(self.labels[ind],
                                                    source=self.source,
-                                                   dim = self.dim,
+                                                   dim=self.dim,
                                                    data=[array],
-                                                   labels = [self.labels[ind]],
-                                                   axes = deepcopy(self.axes),
-                                                   units = self.units,
+                                                   labels=[self.labels[ind]],
+                                                   axes=deepcopy(self.axes),
+                                                   units=self.units,
                                                    ) for ind, array in enumerate(self)])
 
     def add_extra_attribute(self, **kwargs):
@@ -943,6 +1003,17 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
         d0 = DataBase(name='datafromdet0', origin='det0')
         """
         return f'{self.origin}/{self.name}'
+
+    @staticmethod
+    def get_origin_name_from_full_name(full_name: str):
+        """ Standardize the obtention of the origin and name from the full name expression
+
+        Origin is always the first bit before the first '/' character while the name will be the remaining characters
+        """
+        name_bits = full_name.split('/')
+        origin = name_bits[0]
+        name = full_name.split(f'{origin}/')[1]
+        return origin, name
 
     def __repr__(self):
         return (f'{self.__class__.__name__} <{self.name}> '
@@ -1009,7 +1080,7 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
 
     def _comparison_common(self, other, operator='__eq__'):
         if isinstance(other, DataBase):
-            if not (# no more checking for name equality but take care ot the pop/remove methods
+            if not (  # no more checking for name equality but take care ot the pop/remove methods
                     len(self) == len(other) and
                     Unit(self.units).is_compatible_with(other.units)):
                 return False
@@ -1021,7 +1092,7 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
                     eq = False
                     break
                 if operator == '__eq__':
-                    eq = eq and np.allclose(self.quantities[ind], other.quantities[ind])
+                    eq = eq and np.allclose(self.quantities[ind], other.quantities[ind], equal_nan=True)
                 else:
                     eq = eq and np.all(getattr(self.quantities[ind], operator)(other.quantities[ind]))
             # extra attributes are not relevant as they may contain module specific data...
@@ -1058,6 +1129,42 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
     def deepcopy(self):
         return copy.deepcopy(self)
 
+    @property
+    def averaged(self) -> bool:
+        """ Get/Set a boolean depending if self is the result of an average operation
+
+        See Also
+        --------
+        n_averaged
+        average
+        """
+        return self._averaged
+
+    @averaged.setter
+    def averaged(self, status: bool):
+        self._averaged = status
+
+    @property
+    def n_averaged(self) -> int:
+        """ Get/set the number of averaging that resulted in this data
+
+        See Also
+        --------
+        averaged
+        average
+        """
+        return self._n_averaged
+
+    @n_averaged.setter
+    def n_averaged(self, n_data: int):
+        """ Return the number of averaging that resulted in this data
+
+        See Also
+        --------
+        averaged
+        """
+        self._n_averaged = n_data
+
     def average(self, other: 'DataBase', weight: int) -> 'DataBase':
         """ Compute the weighted average between self and other DataBase
 
@@ -1071,7 +1178,11 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
         DataBase: the averaged DataBase object
         """
         if isinstance(other, DataBase) and len(other) == len(self) and isinstance(weight, numbers.Number):
-            return (other * weight + self) / (weight + 1)
+            averaged_data = (other * weight + self) / (weight + 1)
+            averaged_data.name = self.name
+            averaged_data.add_extra_attribute(**{Averaging.AVERAGED: True,
+                                                 Averaging.N_AVERAGED: weight + 1})
+            return averaged_data
         else:
             raise TypeError(f'Could not average a {other.__class__.__name__} or a {self.__class__.__name__} '
                             f'of a different length')
@@ -1211,38 +1322,37 @@ class DataBase(DataLowLevel, NDArrayOperatorsMixin):
         return self.data[index]
 
     def _check_data_type(self, data: List[Union[np.ndarray, Q_]]) -> List[np.ndarray]:
-        """make sure data is a list of nd-arrays"""
-        is_valid = True
+        """Make sure data is a list of non-empty nd-arrays."""
         if data is None:
-            is_valid = False
+            raise TypeError('Data should be a non-empty list of non-empty numpy arrays')
+
+        # Convert single Q_, ndarray, or Number to a list
         if not isinstance(data, list):
-            # try to transform the data to regular type
             if isinstance(data, Q_):
                 self.force_units(str(data.units))
                 data = [data.magnitude]
             elif isinstance(data, np.ndarray):
-                warnings.warn(DataTypeWarning(f'Your data should be a list of numpy arrays not just a single numpy'
-                                              f' array, wrapping them with a list'))
+                warnings.warn(DataTypeWarning('Your data should be a list of numpy arrays, not just a single numpy array. Wrapping it in a list.'))
                 data = [data]
             elif isinstance(data, numbers.Number):
-                warnings.warn(DataTypeWarning(f'Your data should be a list of numpy arrays not just a single numpy'
-                                              f' array, wrapping them with a list'))
+                warnings.warn(DataTypeWarning('Your data should be a list of numpy arrays, not just a single number. Wrapping it in a list.'))
                 data = [np.array([data])]
             else:
-                is_valid = False
-        if isinstance(data, list):
-            if len(data) == 0:
-                is_valid = False
-            elif not (isinstance(data[0], np.ndarray) or
-                             isinstance(data[0], Q_)):
-                is_valid = False
-            elif len(data[0].shape) == 0:
-                is_valid = False
-        if not is_valid:
-            raise TypeError(f'Data should be an non-empty list of non-empty numpy arrays')
+                raise TypeError('Data should be a non-empty list of non-empty numpy arrays')
+
+        # Validate the list
+        if not data or not all(isinstance(item, (np.ndarray, Q_)) for item in data):
+            raise TypeError('Data should be a non-empty list of non-empty numpy arrays')
+
+        # Check for non-empty arrays
+        if any(len(item.shape) == 0 for item in data):
+            raise TypeError('Data should be a non-empty list of non-empty numpy arrays')
+
+        # Convert Q_ to magnitude
         if isinstance(data[0], Q_):
             self.force_units(str(data[0].units))
             data = [array.magnitude for array in data]
+
         return data
 
     def check_shape_from_data(self, data: List[np.ndarray]):
@@ -2043,6 +2153,10 @@ class DataWithAxes(DataBase, SerializableBase):
         dwa.timestamp = timestamp
         return dwa, remaining_bytes
 
+    def get_axes_sizes(self) -> Iterable[Q_]:
+        self.create_missing_axes()
+        return [self.get_axis_from_index(index)[0].axis_width for index in range(len(self.axes))]
+
     def check_axes_linear(self, axes: List[Axis] = None) -> bool:
         """ Check if any axis may be non linear
 
@@ -2151,7 +2265,7 @@ class DataWithAxes(DataBase, SerializableBase):
                 is_equal = is_equal and other.errors is None
             else:
                 for ind_error in range(len(self.errors)):
-                    if not np.allclose(self.errors[ind_error], other.errors[ind_error]):
+                    if not np.allclose(self.errors[ind_error], other.errors[ind_error], equal_nan=True):
                         return False
         return is_equal
 
@@ -2265,7 +2379,7 @@ class DataWithAxes(DataBase, SerializableBase):
             dat_sum.append(np.atleast_1d(np.sum(dat, axis=axis)))
         return self.deepcopy_with_new_data(dat_sum, remove_axes_index=axis)
 
-    def interp(self,  new_axis_data: Union[Axis, np.ndarray], **kwargs) -> DataWithAxes:
+    def interp(self, new_axis_data: Union[Axis, np.ndarray], **kwargs) -> DataWithAxes:
         """Performs linear interpolation for 1D data only.
         
         For more complex ones, see :py:meth:`scipy.interpolate`
@@ -2477,11 +2591,11 @@ class DataWithAxes(DataBase, SerializableBase):
 
             dte.append(DataCalculated(f'{self.labels[ind]}',
                                       data=[self[ind][peaks_indices[-1]],
-                                            peaks_indices[-1]
+                                            peaks_indices[-1],
                                             ],
                                       labels=['peak value', 'peak indexes'],
                                       axes=[Axis('peak position', self.axes[0].units,
-                                                 data=self.axes[0].get_data_at(peaks_indices[-1]))])
+                                                 data=self.axes[0].get_data_at(peaks_indices[-1]))]),
                        )
         return dte
 
@@ -2632,7 +2746,7 @@ class DataWithAxes(DataBase, SerializableBase):
         list(slice): a version as index of the input argument
         """
         _slices_as_index = []
-        if isinstance(slices, numbers.Number) or isinstance(slices, Q_) or isinstance(slices, slice):
+        if isinstance(slices, (numbers.Number, Q_, slice)):
             slices = [slices]
         if is_navigation:
             indexes = self._am.nav_indexes
@@ -2694,13 +2808,17 @@ class DataWithAxes(DataBase, SerializableBase):
             Object of the same type as the initial data, derived from DataWithAxes. But with lower
             data size due to the slicing and with eventually less axes.
         """
-        if isinstance(slices, numbers.Number) or isinstance(slices, slice):
+        if isinstance(slices, (numbers.Number, slice)):
             slices = [slices]
 
         total_slices, slices = self._compute_slices(slices, is_navigation, is_index=is_index)
 
         do_squeeze = self.check_squeeze(total_slices, is_navigation)
         new_arrays_data = [squeeze(dat[total_slices], do_squeeze) for dat in self.data]
+        if self.errors is not None:
+            new_errors_data = [squeeze(dat[total_slices], do_squeeze) for dat in self.errors]
+        else:
+            new_errors_data = None
         tmp_axes = self._am.get_signal_axes() if is_navigation else self._am.get_nav_axes()
         axes_to_append = [copy.deepcopy(axis) for axis in tmp_axes]
 
@@ -2749,17 +2867,22 @@ class DataWithAxes(DataBase, SerializableBase):
         else:
             distribution = DataDistribution.uniform
 
-        data = DataWithAxes(self.name, data=new_arrays_data, nav_indexes=tuple(nav_indexes),
+        data = DataWithAxes(self.name,
+                            data=new_arrays_data,
+                            errors=new_errors_data,
+                            nav_indexes=tuple(nav_indexes),
                             axes=axes,
                             source=DataSource.calculated, origin=self.origin,
                             labels=self.labels[:],
                             distribution=distribution)
         return data
 
-    def deepcopy_with_new_data(self, data: List[np.ndarray] = None,
+    def deepcopy_with_new_data(self,
+                               data: List[np.ndarray] = None,
                                remove_axes_index: Union[int, List[int]] = None,
                                source: DataSource = DataSource.calculated,
-                               keep_dim=False) -> DataWithAxes:
+                               keep_dim=False,
+                               errors: List[np.ndarray] = None,) -> DataWithAxes:
         """deepcopy without copying the initial data (saving memory)
 
         The new data, may have some axes stripped as specified in remove_axes_index
@@ -2774,16 +2897,26 @@ class DataWithAxes(DataBase, SerializableBase):
         keep_dim: bool
             if False (the default) will calculate the new dim based on the data shape
             else keep the same (be aware it could lead to issues)
+        errors: list of numpy ndarray
+            The new errors corresponding to the new data
 
         Returns
         -------
         DataWithAxes
         """
+        def check_errors(data: list[np.ndarray], errors: list[np.ndarray]) -> bool:
+            for data_array, error_array in zip(data, errors):
+                if data_array.shape != error_array.shape:
+                    return False
+            return True
         try:
+            if errors is not None and check_errors(data, errors):
+                errors = None
             old_data = self.data
             self._data = None
             new_data = self.deepcopy()
             new_data._data = data
+            new_data.errors = errors
             new_data.get_dim_from_data(data)
 
             if source is not None:
@@ -2872,7 +3005,7 @@ class DataWithAxes(DataBase, SerializableBase):
         except ImportError:
             raise ImportError(
                 "xarray is required for to_xarray(). "
-                "Install it with: pip install 'pymodaq_data[xarray]'"
+                "Install it with: pip install 'pymodaq_data[xarray]'",
             )
 
         ndim = len(self.shape)
@@ -2971,7 +3104,7 @@ class DataWithAxes(DataBase, SerializableBase):
         except ImportError:
             raise ImportError(
                 "xarray is required for from_xarray(). "
-                "Install it with: pip install 'pymodaq_data[xarray]'"
+                "Install it with: pip install 'pymodaq_data[xarray]'",
             )
 
         if isinstance(ds, xr.DataArray):
@@ -3090,7 +3223,7 @@ class DataRaw(DataWithAxes):
                          axes=axes,
                          nav_indexes=nav_indexes,
                          errors=errors,
-                         **kwargs
+                         **kwargs,
                          )
 
 
@@ -3464,9 +3597,9 @@ class DataToExport(DataLowLevel, SerializableBase):
     def get_data_from_full_name(self, full_name: str, deepcopy=False) -> DataWithAxes:
         """Get the DataWithAxes with matching full name"""
         if deepcopy:
-            data = self.get_data_from_name_origin(full_name.split('/')[1], full_name.split('/')[0]).deepcopy()
+            data = self.get_data_from_name_origin('/'.join(full_name.split('/')[1:]), full_name.split('/')[0]).deepcopy()
         else:
-            data = self.get_data_from_name_origin(full_name.split('/')[1], full_name.split('/')[0])
+            data = self.get_data_from_name_origin('/'.join(full_name.split('/')[1:]), full_name.split('/')[0])
         return data
 
     def get_data_from_full_names(self, full_names: List[str], deepcopy=False) -> DataToExport:
@@ -3630,8 +3763,15 @@ class DataToExport(DataLowLevel, SerializableBase):
         data, _ = find_objects_in_list_from_attr_name_val(self.data, 'name', name, return_first=True)
         return data
 
-    def get_data_from_names(self, names: List[str]) -> DataToExport:
+    def get_data_from_names(self, names: List[str] | str) -> DataToExport:
+        if isinstance(names, str):
+            names = [names]
         return DataToExport(self.name, data=[dwa for dwa in self if dwa.name in names])
+
+    def get_data_from_origins(self, origins: list[str] | str) -> DataToExport:
+        if isinstance(origins, str):
+            origins = [origins]
+        return DataToExport(self.name, data=[dwa for dwa in self if dwa.origin in origins])
 
     def get_data_from_name_origin(self, name: str, origin: str = '') -> DataWithAxes:
         """Get the data matching the given name and the given origin"""
@@ -3654,9 +3794,8 @@ class DataToExport(DataLowLevel, SerializableBase):
                 return ind
         raise ValueError
 
-    def index_from_name_origin(self, name: str, origin: str = '') -> List[DataWithAxes]:
+    def index_from_name_origin(self, name: str, origin: str = '') -> int:
         """Get the index of a given DataWithAxes within the list of data"""
-        """Get the data matching the given name and the given origin"""
         if origin == '':
             _, index = find_objects_in_list_from_attr_name_val(self.data, 'name', name, return_first=True)
         else:
@@ -3763,7 +3902,7 @@ class DataToExport(DataLowLevel, SerializableBase):
         except ImportError:
             raise ImportError(
                 "xarray is required for to_xarray(). "
-                "Install it with: pip install 'pymodaq_data[xarray]'"
+                "Install it with: pip install 'pymodaq_data[xarray]'",
             )
 
         children = {dwa.name: xr.DataTree(dataset=dwa.to_xarray()) for dwa in self}
@@ -3794,7 +3933,7 @@ class DataToExport(DataLowLevel, SerializableBase):
         except ImportError:
             raise ImportError(
                 "xarray is required for from_xarray(). "
-                "Install it with: pip install 'pymodaq_data[xarray]'"
+                "Install it with: pip install 'pymodaq_data[xarray]'",
             )
 
         if isinstance(dt, xr.DataTree):
@@ -3831,7 +3970,7 @@ if __name__ == '__main__':
 
     dat = np.zeros((Nnav, Nsig))
     for ind in range(Nnav):
-        dat[ind] = mutils.gauss1D(x,  50 * (ind -Nnav / 2), 25 / np.sqrt(2))
+        dat[ind] = mutils.gauss1D(x, 50 * (ind -Nnav / 2), 25 / np.sqrt(2))
 
     data = DataRaw('mydata', data=[dat], nav_indexes=(0,),
                    axes=[Axis('nav', data=np.linspace(0, Nnav-1, Nnav), index=0),

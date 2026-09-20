@@ -57,7 +57,7 @@ def test_axis_list_legacy(qtbot, ISMULTI, AXIS_NAMES, EPSILON, UNITS):
 
 @pytest.mark.parametrize("AXIS_NAMES, EPSILONS, UNITS, error",
                          [(['a', 'b', 'c'], 0.1, 'mm', False),
-                          (['a', 'b',], [0.1, 0.65], 'mm', False),
+                          (['a', 'b'], [0.1, 0.65], 'mm', False),
                           (['a', 'c'], 0.1, ['mm', '°'], False),
                           (['a', 'c'], [0.1, 0.001], ['mm', '°'], False),
                           (['a', 'b', 'c'], 0.1, ['mm', '°'], True),
@@ -109,7 +109,7 @@ def test_axis_list(qtbot, AXIS_NAMES, EPSILONS, UNITS, error):
                           ({'a': 0, 'b': 2}, {'a': 0.1, 'b': 0.65}, 'mm', None),
                           ({'a': 0, 'b': 2}, 0.1, {'a': 'mm', 'b': '°'}, None),
                           ({'a': 0, 'b': 2}, {'a': 0.1, 'b': 0.65}, {'a': 'mm', 'b': '°'}, None),
-                          ({'a': 0, 'b': 2}, {'a': 0.1,}, {'a': 'mm', 'b': '°'}, ValueError),
+                          ({'a': 0, 'b': 2}, {'a': 0.1}, {'a': 'mm', 'b': '°'}, ValueError),
                           ({'a': 0, 'b': 2}, {'a': 0.1, 'b': 0.65}, {'b': '°'}, ValueError),
                           ])
 def test_axis_dict(qtbot, AXIS_NAMES, EPSILONS, UNITS, error):
@@ -150,3 +150,20 @@ def test_axis_dict(qtbot, AXIS_NAMES, EPSILONS, UNITS, error):
             else:
                 assert hardware.axis_unit == UNITS[axis_name]
                 assert hardware.axis_units == UNITS
+
+
+def test_settings_legacy_multiaxes_access(qtbot):
+    """Regression test for #1173: old plugin code reading settings using the pre-5.1
+    'multiaxes'/'multi_status' group names should still work after the 'controller'
+    renaming introduced in #1157.
+    """
+    class HardwareWithList(DAQ_Move_base):
+        params = comon_parameters_fun(is_multiaxes=True, axis_names=['a', 'b'])
+
+    hardware = HardwareWithList()
+
+    with pytest.deprecated_call():
+        assert hardware.settings['multiaxes', 'axis'] == hardware.settings['controller', 'axis']
+    with pytest.deprecated_call():
+        assert (hardware.settings['multiaxes', 'multi_status']
+                == hardware.settings['controller', 'controller_status'])

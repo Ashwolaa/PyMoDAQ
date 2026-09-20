@@ -1,4 +1,10 @@
 import numbers
+
+from pymodaq.control_modules.daq_move_ui.utils import UiType
+from pymodaq.control_modules.enums import MoveType
+
+HW_KIND = 'actuator'
+HW_SETTINGS_KEY = f'{HW_KIND}_settings'
 from abc import abstractmethod
 from time import perf_counter
 from typing import Union, List, Dict, TYPE_CHECKING, Optional, TypeVar
@@ -6,36 +12,31 @@ from typing import Union, List, Dict, TYPE_CHECKING, Optional, TypeVar
 
 from easydict import EasyDict as edict
 import numpy as np
-from qtpy import QtWidgets
-from qtpy.QtCore import QObject, Slot, Signal, QTimer
+from qtpy.QtCore import Slot, Signal, QTimer
 from pint.errors import OffsetUnitCalculusError
 
 
 from pymodaq_utils.utils import ThreadCommand, find_keys_from_val
 from pymodaq_utils.config import GlobalConfig as Config
 from pymodaq_utils.logger import set_logger, get_module_name
-from pymodaq_utils.enums import BaseEnum, enum_checker
-from pymodaq_utils.serialize.mysocket import Socket
-from pymodaq_utils.serialize.serializer_legacy import DeSerializer, Serializer
+from pymodaq_utils.enums import BaseEnum
 
 from pymodaq_data.data import DataUnitError, Q_, Unit
 
-import pymodaq_gui.parameter.utils as putils
 from pymodaq_gui.parameter import Parameter
-from pymodaq_gui.parameter import ioxml
 from pymodaq_gui.qt_utils import mkQApp
 
-from pymodaq.utils.tcp_ip.tcp_server_client import TCPServer, tcp_parameters
-from pymodaq.utils.messenger import deprecation_msg
+from pymodaq_utils.warnings import deprecation_msg
+
 from pymodaq.utils.data import DataActuator
 from pymodaq.control_modules.thread_commands import ThreadStatus, ThreadStatusMove
 from pymodaq.control_modules.daq_move_ui.factory import ActuatorUIFactory
-from pymodaq.control_modules.utils import create_controller_param, create_remote_connection_params, ControllerStatus
-from pymodaq_gui.parameter.ioxml import VALID_FOR_CONFIGURATION
-
+from pymodaq.control_modules.utils import (create_controller_param, create_remote_connection_params,
+                                           ControllerStatus)
+from pymodaq.control_modules.plugin_base import PluginBase
 
 if TYPE_CHECKING:
-    from pymodaq.control_modules.daq_move import DAQ_Move_Hardware
+    from pymodaq.control_modules.daq_move import ActuatorWorker
 
 logger = set_logger(get_module_name(__file__))
 
@@ -92,7 +93,7 @@ def comon_parameters(epsilon=config('pymodaq', 'actuator', 'epsilon_default'),
             {'title': 'Bounds:', 'name': 'bounds', 'type': 'group', 'children': [
                 {'title': 'Set Bounds:', 'name': 'is_bounds', 'type': 'bool', 'value': False},
                 {'title': 'Min:', 'name': 'min_bound', 'type': 'float', 'value': 0, 'default': 0},
-                {'title': 'Max:', 'name': 'max_bound', 'type': 'float', 'value': 1, 'default': 1}, ]},
+                {'title': 'Max:', 'name': 'max_bound', 'type': 'float', 'value': 1, 'default': 1}]},
             {'title': 'Scaling:', 'name': 'scaling', 'type': 'group', 'children': [
                 {'title': 'Use scaling:', 'name': 'use_scaling', 'type': 'bool', 'value': False,
                  'default': False},
@@ -100,28 +101,25 @@ def comon_parameters(epsilon=config('pymodaq', 'actuator', 'epsilon_default'),
                 {'title': 'Offset factor:', 'name': 'offset', 'type': 'float', 'value': 0., 'default': 0.}]}]
 
 
-MOVE_COMMANDS = ['abs', 'rel', 'home']
-
-
 class MoveCommand:
     """Utility class to contain a given move type and value
 
     Attributes
     ----------
-    move_type: str
+    move_type: pymodaq.control_modules.enums.MoveType | str
         either:
 
-        * 'abs': performs an absolute action
-        * 'rel': performs a relative action
-        * 'home': find the actuator's home
+        * 'abs' or MoveType.ABS: performs an absolute action
+        * 'rel' or MoveType.REL: performs a relative action
+        * 'home or MoveType.HOME': find the actuator's home
     value: float
         the value the move should reach
 
     """
 
-    def __init__(self, move_type, value=0):
-        if move_type not in MOVE_COMMANDS:
-            raise ValueError(f'The allowed move types fro an actuator are {MOVE_COMMANDS}')
+    def __init__(self, move_type: MoveType | str, value=0):
+        if move_type not in MoveType.names():
+            raise ValueError(f'The allowed move types for an actuator are {MoveType.names()}')
         self.move_type = move_type
         self.value = value
 
@@ -134,29 +132,22 @@ def comon_parameters_fun(is_multiaxes=False, axes_names=None,
 
     Parameters
     ----------
-    is_multiaxes: bool
+    is_multiaxes: bool (deprecated, useless)
         If True, display the particular settings to define which axis the controller is driving
     axes_names: deprecated, use axis_names
-    axis_names: list of str or dictionnary of string as key and integer as value
+    axis_names: (deprecated, useless as the get_class_axis method is used now))
+        list of str or dictionnary of string as key and integer as value
         The string identifier of every axis the controller can drive
-    master: bool
+    master: bool (deprecated useless)
         If True consider this plugin has to init the controller, otherwise use an already initialized instance
     epsilon: float
         deprecated (< 5.0.0) no more used here
 
     """
-    if axes_names is not None and len(axis_names) == 0:
-        if len(axes_names) == 0:
-            axes_names = ['']
-        axis_names = axes_names
+    axis_names = DAQ_Move_base.get_class_axis_names(axis_names, axes_names)
 
-    is_multiaxes = len(axis_names) > 1 or is_multiaxes
     if isinstance(axis_names, list):
-        if len(axis_names) > 0:
-            axis_name = axis_names[0]
-        else:
-            axis_names = ['']
-            axis_name = ''
+        axis_name = axis_names[0]
     elif isinstance(axis_names, dict):
         axis_name = axis_names[list(axis_names.keys())[0]]
     else:
@@ -171,7 +162,7 @@ def comon_parameters_fun(is_multiaxes=False, axes_names=None,
 
 params = [
     {'title': 'Main Settings:', 'name': 'main_settings', 'type': 'group', 'children': [
-        {'title': 'Actuator type:', 'name': 'move_type', 'type': 'str', 'value': '', 'readonly': True,},
+        {'title': 'Actuator type:', 'name': 'move_type', 'type': 'str', 'value': '', 'readonly': True},
         {'title': 'Actuator name:', 'name': 'module_name', 'type': 'str', 'value': '', 'readonly': True},
         {'title': 'UI type:', 'name': 'ui_type', 'type': 'list',
          'value': config('pymodaq', 'actuator', 'ui') if config('pymodaq', 'actuator', 'ui') in ActuatorUIFactory.keys() else
@@ -179,10 +170,15 @@ params = [
          'limits': ActuatorUIFactory.keys()},
         {'title': 'Refresh value (ms):', 'name': 'refresh_timeout', 'type': 'int',
          'value': config('pymodaq', 'actuator', 'refresh_timeout_ms')},
-        {'title': 'Continuous saving:', 'name': 'continuous_saving_opt', 'type': 'bool', 'default': False,
-         'value': False},
+        {'title': 'Value Green:', 'name': 'default_value_green', 'type': 'float',
+         'value': config('pymodaq', 'actuator', 'default_value_green')},
+        {'title': 'Value Red:', 'name': 'default_value_red', 'type': 'float',
+        'value': config('pymodaq', 'actuator', 'default_value_red')},
+        {'title': 'Value Relative:', 'name': 'default_value_relative', 'type': 'float',
+        'value': config('pymodaq', 'actuator', 'default_value_relative')},
+
     ] + create_remote_connection_params()},
-    {'title': 'Actuator Settings:', 'name': 'move_settings', 'type': 'group'}
+    {'title': 'Actuator Settings:', 'name': HW_SETTINGS_KEY, 'type': 'group'}
 ]
 
 
@@ -194,54 +190,28 @@ def main(plugin_file, init=True, title='test'):
 
     """
     import sys
-    from qtpy import QtWidgets
-    from pymodaq.control_modules.daq_move import DAQ_Move
     from pathlib import Path
+    from pymodaq.control_modules.instruments import find_actuator_class_from_name
+    from pymodaq.utils.gui_utils.loader_utils import create_load_daq_move
 
     act = Path(plugin_file).stem.split('daq_move_')[1]
+    class_ = find_actuator_class_from_name(act)
+    if hasattr(class_, 'ui_type'):
+        ui_identifier = class_.ui_type
+    else:
+        ui_identifier = config('pymodaq', 'actuator', 'ui')
 
-    app = mkQApp("PyMoDAQ Viewer")
+    app = mkQApp("PyMoDAQ Move")
+    shared_ui, daq_move = create_load_daq_move(ui_identifier)
 
-    widget = QtWidgets.QWidget()
-    prog = DAQ_Move(widget, title=title, actuator=act)
-    widget.show()
-    prog.actuator = Path(plugin_file).stem[9:]
-    if init:
-        prog.init_hardware_ui()
+    daq_move.actuator = act
 
+    shared_ui.show()
     sys.exit(app.exec())
 
 
-##########################
-# this below is a patch to the Parameter class to enable the use of back-compatible 'multiaxes' Parameter name
 
-from pyqtgraph.parametertree.parameterTypes import GroupParameter, registerParameterType
-
-class GroupParameterPatch(GroupParameter):
-
-    def __getitem__(self, names: Union[str, tuple[str,]]):
-        if isinstance(names, str):
-            names = (names)
-        try:
-            return super().__getitem__(names)
-        except KeyError:
-            if 'multiaxes' in names:
-                names = list(names)
-                names[names.index('multiaxes')] = 'controller'
-                names = tuple(names)
-            if 'multi_status' in names:
-                names = list(names)
-                names[names.index('multi_status')] = 'controller_status'
-                names = tuple(names)
-            return super().__getitem__(names)
-
-
-registerParameterType('group', GroupParameterPatch, override=True)
-###########################################
-
-
-
-class DAQ_Move_base(QObject):
+class DAQ_Move_base(PluginBase):
     """ The base class to be inherited by all actuator modules
 
     This base class implements all necessary parameters and methods for the plugin to communicate with its parent (the
@@ -249,9 +219,9 @@ class DAQ_Move_base(QObject):
 
     Parameters
     ----------
-    parent : DAQ_Move_Hardware
+    parent : ActuatorWorker
     params_state : Parameter
-            pyqtgraph Parameter instance from which the module will get the initial settings (as defined in the preset)
+            pyqtgraph Parameter instance from which the module will get the initial settings (as defined in the experiment)
     Attributes
     ----------
     move_done_signal: Signal
@@ -287,35 +257,49 @@ class DAQ_Move_base(QObject):
 
     params = []
 
-    data_actuator_type = DataActuatorType.float
+    data_actuator_type = DataActuatorType.float  # for backcompatibility, but new plugins should have DataActuatorType.DataActuator
+    ui_type = UiType.NONE  # should precise (force if possible) what should be the ui type to be used with this
+    # actuator. If NONE, PyMoDAQ will use the default ui type (see preferences).
+    has_encoder = True  # tell PyMoDAQ if this actuator is able to set an absolute position and read the controller
+    # value. If False, you should consider having ui_type = UiType.RELATIVE
+
+
     data_shape = (1,)  # expected shape of the underlying actuator's value (in general a float so shape = (1, ))
 
-    def __init__(self, parent: Optional['DAQ_Move_Hardware'] = None,
+    @classmethod
+    def get_class_axis_names(cls, axis_names: list[str] = None,
+                             deprecated_names: list[str] = None) -> list[str]:
+        """ Convenience method to access the declared axis in a given plugin
+
+        Handles some old declaration style and eventual attribute as None or empty string
+        """
+        if axis_names is None:
+            axis_names = cls._axis_names
+        if deprecated_names is None:
+            deprecated_names = cls.stage_names
+
+        _axis_names = None
+        if axis_names is not None and len(deprecated_names) != 0:
+            #check for old and deprecated plugins
+            _axis_names = deprecated_names
+            deprecation_msg("using 'stage_names' class attribute in plugins is deprecated, please use"
+                            "'_axis_names' instead" )
+        if axis_names is not None and len(axis_names) != 0:
+            # this _axis_names attribute has priority hence eventual overwriting of stage_names
+            _axis_names = axis_names
+        else:
+            _axis_names = [''] if (_axis_names is None or _axis_names == []) else _axis_names
+        return _axis_names
+
+    def __init__(self, parent: Optional['ActuatorWorker'] = None,
                  params_state: Optional[dict] = None,
                  **kwargs):
-        QObject.__init__(self)  # to make sure this is the parent class
+        super().__init__(parent, params_state)
+        self._title = self._title if parent is not None else "myactuator"
         self.move_is_done = False
-        self.parent = parent
         self.stage = None
-        self.controller = None
-        self.status = edict(info="", controller=None, stage=None, initialized=False)
-
+        self.status['stage'] = None
         self._ispolling = True
-        self.parent_parameters_path = []  # this is to be added in the send_param_status to take into account when the
-        # current class instance parameter list is a child of some other class
-        self.settings = Parameter.create(name='Settings', type='group', children=self.params)
-        if params_state is not None:
-            if isinstance(params_state, dict):
-                self.settings.restoreState(params_state)
-            elif isinstance(params_state, Parameter):
-                self.settings.restoreState(params_state.saveState())
-
-        self.settings.sigTreeStateChanged.connect(self.send_param_status)
-
-        if parent is not None:
-            self._title = parent.title
-        else:
-            self._title = "myactuator"
 
         self._axis_units: Union[Dict[str, str], List[str]] = None
         if isinstance(self._controller_units, str):
@@ -336,7 +320,6 @@ class DAQ_Move_base(QObject):
 
         self.poll_timer = QTimer(self)
         self.poll_timer.setInterval(config('pymodaq', 'actuator', 'polling_interval_ms'))
-        self._poll_timeout = config('pymodaq', 'actuator', 'polling_timeout_s')
         self.poll_timer.timeout.connect(self.check_target_reached)
 
         self.ini_attributes()
@@ -432,8 +415,8 @@ class DAQ_Move_base(QObject):
 
         The property controller_units is deprecated please use the axis_unit property
         """
-        deprecation_msg('The property controller_units is deprecated please use the'
-                        'axis_unit property.')
+        deprecation_msg(f'The property controller_units is deprecated please use the'
+                        f'axis_unit property.')
         return self.axis_unit
 
     @controller_units.setter
@@ -461,7 +444,6 @@ class DAQ_Move_base(QObject):
                 self.settings.child('controller', 'axis').setValue(name)
             elif isinstance(limits, dict):
                 self.settings.child('controller', 'axis').setValue(limits[name])
-            QtWidgets.QApplication.processEvents()
             self.axis_unit = self.axis_unit
             self.settings.child('epsilon').setValue(self.epsilon)
             if self.controller is not None:
@@ -480,7 +462,6 @@ class DAQ_Move_base(QObject):
     @axis_names.setter
     def axis_names(self, names: Union[List, Dict]):
         self.settings.child('controller', 'axis').setLimits(names)
-        QtWidgets.QApplication.processEvents()
 
     @property
     def axis_value(self) -> int:
@@ -508,8 +489,8 @@ class DAQ_Move_base(QObject):
             return self.axis_name
 
     def ini_attributes(self):
-        """ To be subclassed, in order to init specific attributes needed by the real implementation"""
-        self.controller = None
+        """To be subclassed, in order to init specific attributes needed by the real implementation."""
+        pass
 
     def ini_stage_init(
         self,
@@ -523,7 +504,7 @@ class DAQ_Move_base(QObject):
         Then check whether this stage is controlled by a multiaxe controller (to be defined for each plugin)
             if it is a multiaxes controller then:
             * if it is Master: init the controller here
-            * if it is Slave: use an already initialized controller (defined in the preset of the dashboard)
+            * if it is Slave: use an already initialized controller (defined in the experiment of the dashboard)
 
         Parameters
         ----------
@@ -558,7 +539,7 @@ class DAQ_Move_base(QObject):
 
     @current_value.setter
     def current_value(self, value: Union[float, np.ndarray, DataActuator]):
-        if isinstance(value, numbers.Number) or isinstance(value, np.ndarray):
+        if isinstance(value, (numbers.Number, np.ndarray)):
             self._current_value = DataActuator(self._title, data=value,
                                                units=self.axis_unit)
         else:
@@ -678,15 +659,6 @@ class DAQ_Move_base(QObject):
         else:
             raise NotImplementedError
 
-    def emit_status(self, status: ThreadCommand):
-        """ Emit the status_sig signal with the given status ThreadCommand back to the main GUI.
-        """
-        if self.parent is not None:
-            self.parent.status_sig.emit(status)
-            QtWidgets.QApplication.processEvents()
-        else:
-            print(status)
-
     def emit_value(self, pos: DataActuator):
         """Convenience method to emit the current actuator value back to the UI"""
 
@@ -697,31 +669,20 @@ class DAQ_Move_base(QObject):
           to subclass to transfer parameters to hardware
         """
 
-    def commit_common_settings(self, param):
-        pass
+    def move_done(self, position: Optional[DataActuator] = None):  # the position argument is just there to match some signature of child classes
+        """ Emit a move done signal transmitting the actuator's value to the GUI
 
-    def move_done(self, position: Optional[
-        DataActuator] = None):  # the position argument is just there to match some signature of child classes
-        """
-            | Emit a move done signal transmitting the float position to hardware.
-            | The position argument is just there to match some signature of child classes.
-
-            =============== ========== =============================================================================
-             **Arguments**   **Type**  **Description**
-             *position*      float     The position argument is just there to match some signature of child classes
-            =============== ========== =============================================================================
-
+        The position argument is just there to match some signature of child classes.
         """
         if position is None:
-            if self.data_actuator_type.name == 'float':
+            if self.data_actuator_type == DataActuatorType.float:
                 position = DataActuator(self._title, data=self.get_actuator_value(),
                                         units=self.axis_unit)
             else:
                 position = self.get_actuator_value()
         if position.name != self._title:  # make sure the emitted DataActuator has the name of the real implementation
             #of the plugin
-            position = DataActuator(self._title, data=position.value(self.axis_unit),
-                                    units=self.axis_unit)
+            position.name = self._title
         self.move_done_signal.emit(position)
         self.move_is_done = True
 
@@ -738,22 +699,26 @@ class DAQ_Move_base(QObject):
             if self.ispolling:
                 self.poll_timer.start()
             else:
-                if self.data_actuator_type == DataActuatorType.float:
-                    self._current_value = DataActuator(data=self.get_actuator_value(),
-                                                       units=self.axis_unit)
+                if not self.has_encoder:
+                    self._current_value = self.target_value
                 else:
-                    self._current_value = self.get_actuator_value()
-                    if (not Unit(self.axis_unit).is_compatible_with(
-                            Unit(self._current_value.units)) and
-                            self._current_value.units == ''):
-                        # this happens if the units have not been specified in
-                        # the plugin
-                        self._current_value.force_units(self.axis_unit)
+                    if self.data_actuator_type == DataActuatorType.float:
+                        self._current_value = DataActuator(
+                            data=self.get_actuator_value(),
+                            units=self.axis_unit)
+                    else:
+                        self._current_value = self.get_actuator_value()
+                        if (not Unit(self.axis_unit).is_compatible_with(
+                                Unit(self._current_value.units)) and
+                                self._current_value.units == ''):
+                            # this happens if the units have not been specified in
+                            # the plugin
+                            self._current_value.force_units(self.axis_unit)
 
                 logger.debug(f'Current position: {self._current_value}')
                 self.move_done(self._current_value)
 
-    def _condition_to_reach_target(self, check_absolute_difference=True,) -> bool:
+    def _condition_to_reach_target(self, check_absolute_difference=True) -> bool:
         """Implement the condition for exiting the polling mechanism and specifying that the
         target value has been reached
 
@@ -820,44 +785,26 @@ class DAQ_Move_base(QObject):
 
             logger.debug(f'Check move_is_done: {self.move_is_done}')
             if self.move_is_done:
-                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Move has been stopped', ))
+                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_STATUS, 'Move has been stopped'))
                 logger.info('Move has been stopped')
-            self.current_value = self.get_actuator_value()
+            try:
+                self.current_value = self.get_actuator_value()
+            except Exception as e:
+                logger.error(str(e))
+                self.poll_timer.stop()
+
             self.emit_value(self._current_value)
             logger.debug(f'Current value: {self._current_value}')
 
             if perf_counter() - self.start_time >= self.settings['timeout']:
                 self.poll_timer.stop()
-                self.emit_status(ThreadCommand(ThreadStatus.RAISE_TIMEOUT, ))
+                self.emit_status(ThreadCommand(ThreadStatus.RAISE_TIMEOUT))
                 logger.info('Timeout activated')
         else:
             self.poll_timer.stop()
             self.current_value = self.get_actuator_value()
             logger.debug(f'Current value: {self._current_value}')
             self.move_done(self._current_value)
-
-    def send_param_status(self, param, changes):
-        """ Send changes value updates to the gui to update consequently the User Interface
-
-        The message passing is made via the ThreadCommand "update_settings".
-        """
-
-        for param, change, data in changes:
-            path = self.settings.childPath(param)
-            if change == 'childAdded':
-                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_SETTINGS,
-                                               [self.parent_parameters_path + path, [data[0].saveState(), data[1]],
-                                                change]))  # send parameters values/limits back to the GUI. Send kind of a copy back the GUI otherwise the child reference will be the same in both th eUI and the plugin so one of them will be removed
-            elif change == 'value' or change == 'limits' or change == 'options':
-                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_SETTINGS,
-                                               [self.parent_parameters_path + path, data,
-                                                change]))  # send parameters values/limits back to the GUI
-            elif change == 'parent':
-                pass
-            elif change == 'limits':
-                self.emit_status(ThreadCommand(ThreadStatus.UPDATE_SETTINGS,
-                                               [self.parent_parameters_path + path, data,
-                                                change]))
 
     def get_position_with_scaling(self, pos: DataActuator) -> DataActuator:
         """ Get the current position from the hardware with scaling conversion.
@@ -888,46 +835,22 @@ class DAQ_Move_base(QObject):
         return pos
 
     @Slot(edict)
-    def update_settings(self, settings_parameter_dict):  # settings_parameter_dict=edict(path=path,param=param)
-        """ Receive the settings_parameter signal from the param_tree_changed method and make hardware updates of
-        modified values.
-        """
-        path = settings_parameter_dict['path']
-        param = settings_parameter_dict['param']
-        change = settings_parameter_dict['change']
-        apply_settings = True
-        try:
-            self.settings.sigTreeStateChanged.disconnect(self.send_param_status)
-        except Exception:
-            pass
-        if change == 'value':
-            self.settings.child(*path[1:]).setValue(param.value())  # blocks signal back to main UI
-        elif change == 'childAdded':
-            try:
-                child = Parameter.create(name='tmp')
-                child.restoreState(param)
-                param = child
-                self.settings.child(*path[1:]).addChild(child)  # blocks signal back to main UI
-            except ValueError:
-                apply_settings = False
-        elif change == 'parent':
-            try:
-                children = putils.get_param_from_name(self.settings, param.name())
-
-                if children is not None:
-                    path = putils.get_param_path(children)
-                    self.settings.child(*path[1:-1]).removeChild(children)
-            except IndexError:
-                logger.debug(f'Could not remove children from {param.name()}')
-        self.settings.sigTreeStateChanged.connect(self.send_param_status)
-        if apply_settings:
-            self.commit_common_settings(param)
-            self.commit_settings(param)
-
+    def update_settings(self, settings_parameter_dict):
+        """Apply settings-tree change and handle actuator-specific axis/epsilon side-effects."""
+        super().update_settings(settings_parameter_dict)
+        if settings_parameter_dict['change'] == 'value':
+            param = settings_parameter_dict['param']
             if param.name() == 'axis':
                 self.axis_name = param.value()
             elif param.name() == 'epsilon':
                 self.epsilon = param.value()
+
+    def ini_stage_init(self, old_controller=None, new_controller=None, slave_controller=None):
+        """Deprecated — use ini_controller_init instead."""
+        import warnings
+        warnings.warn("'ini_stage_init' is deprecated, use 'ini_controller_init' instead.",
+                      DeprecationWarning, stacklevel=2)
+        return self.ini_controller_init(old_controller, new_controller, slave_controller)
 
     # abstract methods to be overwritten by the concrete implementations
     @abstractmethod
@@ -952,184 +875,6 @@ class DAQ_Move_base(QObject):
         """Stop the actuator and emit move_done signal."""
         pass
 
-
-class DAQ_Move_TCP_server(DAQ_Move_base, TCPServer):
-    """
-        ================= ==============================
-        **Attributes**      **Type**
-        *command_server*    instance of Signal
-        *x_axis*            1D numpy array
-        *y_axis*            1D numpy array
-        *data*              double precision float array
-        ================= ==============================
-
-        See Also
-        --------
-        utility_classes.DAQ_TCP_server
-    """
-    params_client = []  # parameters of a client grabber
-    command_server = Signal(list)
-    data_actuator_type = DataActuatorType.DataActuator
-
-    message_list = ["Quit", "Status", "Done", "Server Closed", "Info", "Infos", "Info_xml", "move_abs",
-                    'move_home', 'move_rel', 'get_actuator_value', 'stop_motion', 'position_is', 'move_done']
-    socket_types = ["ACTUATOR"]
-    params = comon_parameters_fun() + tcp_parameters
-
-    def __init__(self, parent=None, params_state=None):
-        """
-
-        Parameters
-        ----------
-        parent
-        params_state
-        """
-        self.client_type = "ACTUATOR"
-        DAQ_Move_base.__init__(self, parent, params_state)  # initialize base class with commom attribute and methods
-        self.settings.child('bounds').hide()
-        self.settings.child('scaling').hide()
-        self.settings.child('epsilon').setValue(1)
-
-        TCPServer.__init__(self, self.client_type)
-
-    def command_to_from_client(self, command):
-        sock: Socket = self.find_socket_within_connected_clients(self.client_type)
-        if sock is not None:  # if client 'ACTUATOR' is connected then send it the command
-
-            if command == 'position_is':
-                pos = DeSerializer(sock).dwa_deserialization()
-
-                pos = self.get_position_with_scaling(pos)
-                self._current_value = pos
-                self.emit_status(ThreadCommand(ThreadStatusMove.GET_ACTUATOR_VALUE, pos))
-
-            elif command == 'move_done':
-                pos = DeSerializer(sock).dwa_deserialization()
-                pos = self.get_position_with_scaling(pos)
-                self._current_value = pos
-                self.emit_status(ThreadCommand(ThreadStatusMove.MOVE_DONE, pos))
-            else:
-                self.send_command(sock, command)
-
-    def commit_settings(self, param):
-
-        if param.name() in putils.iter_children(self.settings.child('settings_client'), []):
-            actuator_socket: Socket = \
-            [client['socket'] for client in self.connected_clients if client['type'] == 'ACTUATOR'][0]
-            actuator_socket.check_sended_with_serializer('set_info')
-            path = putils.get_param_path(param)[2:]
-            # get the path of this param as a list starting at parent 'infos'
-
-            actuator_socket.check_sended_with_serializer(path)
-
-            # send value
-            data = ioxml.parameter_to_xml_string(param)
-            actuator_socket.check_sended_with_serializer(data)
-
-    def ini_stage(self, controller=None):
-        """
-            | Initialisation procedure of the detector updating the status dictionary.
-            |
-            | Init axes from image , here returns only None values (to tricky to di it with the server and not really necessary for images anyway)
-
-            See Also
-            --------
-            utility_classes.DAQ_TCP_server.init_server, get_xaxis, get_yaxis
-        """
-        self.settings.child('infos').addChildren(self.params_client)
-
-        self.init_server()
-        self.controller = self.serversocket
-        self.settings.child('units').hide()
-        self.settings.child('epsilon').hide()
-
-        info = 'TCP Server actuator'
-        initialized = True
-        return info, initialized
-
-    def read_infos(self, sock: Socket = None, infos=''):
-        """Reimplemented to get the units"""
-        super().read_infos(sock, infos)
-
-        self.axis_unit = self.settings['settings_client', 'units']
-
-    def close(self):
-        """
-            Should be used to uninitialize hardware.
-
-            See Also
-            --------
-            utility_classes.DAQ_TCP_server.close_server
-        """
-        self.listening = False
-        self.close_server()
-
-    def move_abs(self, position: DataActuator):
-        """
-
-        """
-        position = self.check_bound(position)
-        self.target_value = position
-
-        position = self.set_position_with_scaling(position)
-
-        sock = self.find_socket_within_connected_clients(self.client_type)
-        if sock is not None:  # if client self.client_type is connected then send it the command
-            sock.check_sended_with_serializer('move_abs')
-            sock.check_sended_with_serializer(position)
-
-    def move_rel(self, position: DataActuator):
-        position = self.check_bound(self.current_value + position) - self.current_value
-        self.target_value = position + self.current_value
-
-        position = self.set_position_relative_with_scaling(position)
-        sock = self.find_socket_within_connected_clients(self.client_type)
-        if sock is not None:  # if client self.client_type is connected then send it the command
-            sock.check_sended_with_serializer('move_rel')
-            sock.check_sended_with_serializer(position)
-
-    def move_home(self):
-        """
-            Make the absolute move to original position (0).
-
-            See Also
-            --------
-            move_Abs
-        """
-        sock = self.find_socket_within_connected_clients(self.client_type)
-        if sock is not None:  # if client self.client_type is connected then send it the command
-            sock.check_sended_with_serializer('move_home')
-
-    def get_actuator_value(self):
-        """
-            Get the current hardware position with scaling conversion given by get_position_with_scaling.
-
-            See Also
-            --------
-            daq_move_base.get_position_with_scaling, daq_utils.ThreadCommand
-        """
-        sock = self.find_socket_within_connected_clients(self.client_type)
-        if sock is not None:  # if client self.client_type is connected then send it the command
-            self.send_command(sock, 'get_actuator_value')
-
-        return self._current_value
-
-    def stop_motion(self):
-        """
-            See Also
-            --------
-            daq_move_base.move_done
-        """
-        sock = self.find_socket_within_connected_clients(self.client_type)
-        if sock is not None:  # if client self.client_type is connected then send it the command
-            self.send_command(sock, 'stop_motion')
-
-    def stop(self):
-        """
-            not implemented.
-        """
-        pass
-        return ""
 
 
 if __name__ == '__main__':

@@ -81,7 +81,7 @@ class AdaptiveOptimisation(GenericOptimization):
         if utility:
             try:
                 utility_params = { k : v for k, v in utility.items() \
-                                   if k not in ("kind", "tradeoff_actual", 'lossdim') }
+                                   if k not in ("kind", "tradeoff_actual", 'lossdim')}
                 LossFunctionFactory.create(utility['lossdim'],
                                            utility['kind'], **utility_params)
             except (ValueError, KeyError):
@@ -106,7 +106,7 @@ class AdaptiveOptimisation(GenericOptimization):
         if param.name() == 'lossdim':
             try:
                 self.settings.child('main_settings', 'prediction', 'kind').setLimits(
-                    LossFunctionFactory.keys(param.value())
+                    LossFunctionFactory.keys(param.value()),
                 )
             except Exception as e:
                 logger.debug('Warning: Error while trying to infer the kind of loss, may be because limits just changed')
@@ -137,7 +137,7 @@ class AdaptiveOptimisation(GenericOptimization):
     def update_after_actuators_changed(self, actuators: list[str]):
         """ Actions to do after the actuators have been updated
         """
-        try:#see if there is some registered loss function for the defined type
+        try:  #see if there is some registered loss function for the defined type
             self.settings.child('main_settings', 'prediction',
                                 'lossdim').setValue(LossDim.get_enum_from_dim_as_int(len(actuators)))
             self.update_prediction_function()
@@ -165,16 +165,16 @@ class AdaptiveOptimisation(GenericOptimization):
 def main():
     import sys
     from pymodaq_gui.qt_utils import mkQApp
-    from pymodaq.dashboard import create_load_dashboard
+    from pymodaq.dashboard import load_dashboard_with_arguments
     from pymodaq.utils.gui_utils.loader_utils import create_extension
 
     app = mkQApp('Adaptive Optimizer')
 
-    win, dashboard = create_load_dashboard()
+    win, dashboard, _ = load_dashboard_with_arguments(show_dashboard=False,
+                                                      load_extension=False,
+                                                      )
     win.mainwindow.setVisible(False)
-
-    win_ext, scan = create_extension(dashboard, AdaptiveOptimisation)
-    win_ext.show()
+    win_ext, scan = create_extension(dashboard, AdaptiveOptimisation, show_extension=True)
 
     sys.exit(app.exec())
 

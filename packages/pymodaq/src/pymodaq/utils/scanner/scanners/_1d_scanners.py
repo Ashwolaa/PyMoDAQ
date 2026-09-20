@@ -13,6 +13,8 @@ from pymodaq_utils import math_utils as mutils
 
 from pymodaq_data.data import Axis, DataDistribution
 
+from pymodaq_gui.parameter import Parameter
+
 from pymodaq.utils.scanner.scan_selector import Selector
 
 from ..scan_factory import ScannerFactory, ScannerBase, ScanParameterManager
@@ -31,8 +33,8 @@ class Scan1DBase(ScannerBase):
     n_axes = 1
     distribution = DataDistribution.uniform
 
-    def __init__(self, actuators: List = None, display_units=True, **_ignored):
-        super().__init__(actuators=actuators, display_units=display_units)
+    def __init__(self, actuators: List = None, settings=None, **_ignored):
+        super().__init__(actuators=actuators, settings=settings)
 
     def set_units(self):
         """ Update settings units depending on the scanner type and the display_units boolean"""
@@ -46,7 +48,7 @@ class Scan1DBase(ScannerBase):
                      data=np.squeeze(self.positions))]
 
     def get_scan_shape(self) -> Tuple[int]:
-        return len(self.positions),
+        return (len(self.positions), )
 
     def get_indexes_from_scan_index(self, scan_index: int) -> Tuple[int]:
         """To be reimplemented. Calculations of indexes within the scan"""
@@ -64,14 +66,23 @@ class Scan1DLinear(Scan1DBase):
     params = [
         {'title': 'Start:', 'name': 'start', 'type': 'float', 'value': 0.},
         {'title': 'Stop:', 'name': 'stop', 'type': 'float', 'value': 1.},
-        {'title': 'Step:', 'name': 'step', 'type': 'float', 'value': 0.1}
+        {'title': 'Step:', 'name': 'step', 'type': 'float', 'value': 0.1},
         ]
     n_axes = 1
     distribution = DataDistribution.uniform
 
-    def __init__(self, actuators: List['DAQ_Move'] = None, display_units=True, **_ignored):
-        super().__init__(actuators=actuators, display_units=display_units)
+    def __init__(self, actuators: List['DAQ_Move'] = None, settings=None, **_ignored):
+        super().__init__(actuators=actuators, settings=settings)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {'start': self.settings['start'],
+                'stop': self.settings['stop'],
+                'step': self.settings['step']}
+
+    def from_dict(self, scanner_dict: dict[str, Any]):
+        self.settings['start'] = scanner_dict['start']
+        self.settings['stop'] = scanner_dict['stop']
+        self.settings['step'] = scanner_dict['step']
 
     def set_scan(self):
         self.positions = mutils.linspace_step(self.settings['start'], self.settings['stop'],
@@ -102,8 +113,8 @@ class Scan1DRandom(Scan1DLinear):
 
     scan_subtype = 'Random'
 
-    def __init__(self, actuators: List = None, display_units=True, **_ignored):
-        super().__init__(actuators=actuators, display_units=display_units)
+    def __init__(self, actuators: List = None, settings=None, **_ignored):
+        super().__init__(actuators=actuators, settings=settings)
 
     def set_scan(self):
         self.positions = mutils.linspace_step(self.settings['start'], self.settings['stop'],
@@ -128,15 +139,24 @@ class Scan1DSparse(Scan1DBase):
 
     scan_subtype = 'Sparse'
     params = [
-        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text', 'value': '0:0.1:1', }
+        {'title': 'Parsed string:', 'name': 'parsed_string', 'type': 'text', 'value': '0:0.1:1'},
         ]
     n_axes = 1
     distribution = DataDistribution.uniform  # because in 1D it doesn't matter is spread or
-    # uniform, one can easily plot both types on a regulat 1D plot
+    # uniform, one can easily plot both types on a regular 1D plot
 
-    def __init__(self, actuators: List['DAQ_Move'] = None, display_units=True, **_ignored):
-        super().__init__(actuators=actuators, display_units=display_units)
+    def __init__(self, actuators: List['DAQ_Move'] = None,
+                 settings: Parameter = None, **_ignored):
+        super().__init__(actuators=actuators, settings=settings)
+        settings.child('units_handling', 'display_units').setValue(False)
+        settings.child('units_handling', 'display_units').hide()
         self.settings.child('parsed_string').setOpts(tip=self.__doc__)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {'string': self.settings['parsed_string'],}
+
+    def from_dict(self, scanner_dict: dict[str, Any]):
+        self.settings['parsed_string'] = scanner_dict['string']
 
     def set_scan(self):
         try:

@@ -242,7 +242,7 @@ class Node(object):
         return self.attrs['TITLE']
 
     @property
-    def path(self):
+    def path(self) -> str:
         """return node path
         Parameters
         ----------
@@ -574,6 +574,11 @@ class H5Backend:
         self._swmr_mode = False
         self._swmr_enabled = False
         self.set_backend(backend)
+
+    @property
+    def swmr_mode(self) -> bool:
+        return self._swmr_mode
+
 
     def set_backend(self, backend: str):
         """Switch the active backend, closing any open file first.
@@ -986,21 +991,42 @@ class H5Backend:
             raise NodeError(f'Node {where} (name={name}) does not exist')
 
         if 'CLASS' not in self.get_attr(node):
-            self.set_attr(node, 'CLASS', 'GROUP')
-            return GROUP(node, self.backend)
+            klass = self._infer_class(node)
+            if self.backend == 'tables':
+                node._v_attrs['CLASS'] = klass
+            else:
+                node.attrs['CLASS'] = klass
         else:
-            attr = self.get_attr(node, 'CLASS')
-            if 'ARRAY' not in attr:
-                return GROUP(node, self.backend)
-            elif attr == 'CARRAY':
-                return CARRAY(node, self.backend)
-            elif attr == 'EARRAY':
-                return EARRAY(node, self.backend)
-            elif attr == 'VLARRAY':
-                if self.get_attr(node, 'subdtype') == 'string':
-                    return StringARRAY(node, self.backend)
-                else:
-                    return VLARRAY(node, self.backend)
+            klass = self.get_attr(node, 'CLASS')
+
+        if 'ARRAY' not in klass:
+            return GROUP(node, self.backend)
+        elif klass == 'CARRAY':
+            return CARRAY(node, self.backend)
+        elif klass == 'EARRAY':
+            return EARRAY(node, self.backend)
+        elif klass == 'VLARRAY':
+            if self.get_attr(node, 'subdtype') == 'string':
+                return StringARRAY(node, self.backend)
+            else:
+                return VLARRAY(node, self.backend)
+
+    def _infer_class(self, node) -> str:
+        """Infer the CLASS attribute of a node that is missing it
+
+        PyTables always writes a CLASS attribute on every node, but a node written
+        through h5py/h5pyd can be missing it (for instance an interrupted write).
+        Falling back to 'GROUP' regardless of the actual object type would mislabel
+        datasets and break further tree traversal, so infer the class from the
+        underlying object instead.
+        """
+        if self.backend == 'tables' or isinstance(node, self.h5_library.Group):
+            return 'GROUP'
+        if node.dtype.kind == 'O':
+            return 'VLARRAY'
+        if node.maxshape and node.maxshape[0] is None:
+            return 'EARRAY'
+        return 'CARRAY'
 
     def get_node_name(self, node):
         """return node name
@@ -1041,7 +1067,7 @@ class H5Backend:
         else:
             return self.get_node(node.parent)
 
-    def get_children(self, where):
+    def get_children(self, where) -> dict[str, Node]:
         """Get a dict containing all children node hanging from where with their name as keys and types among Node,
         CARRAY, EARRAY, VLARRAY or StringARRAY
 
@@ -1075,7 +1101,11 @@ class H5Backend:
                 children[child_name] = _cls(child, self.backend)
         else:
             for child_name, child in where.items():
-                klass = get_attr(child, 'CLASS', self.backend)
+                try:
+                    klass = get_attr(child, 'CLASS', self.backend)
+                except KeyError:
+                    klass = self._infer_class(child)
+                    child.attrs['CLASS'] = klass
                 if 'ARRAY' in klass:
                     _cls = getattr(mod, klass)
                 else:
@@ -1083,12 +1113,45 @@ class H5Backend:
                 children[child_name] = _cls(child, self.backend)
         return children
 
-    def walk_nodes(self, where):
+    def walk_nodes(self, where: str| Node, depth: int = None, only_groups=False):
+        """ Node Generator recursively iterating in the tree starting from where down to the specified depth
+        (counted from where).
+
+
+        Parameters
+        ----------
+        where: str | Node
+            The starting node of the iteration
+        depth: int
+            The depth of the iteration in the h5 tree
+        only_groups: bool
+            if False (default) return all nodes otherwise retruns only GROUP instances
+
+        Yields
+        ------
+        Node
+        """
         where = self.get_node(where)  # return a node object in case where is a string
-        yield where
-        for gr in self.walk_groups(where):
-            for child in self.get_children(gr).values():
-                yield child
+        if only_groups and where.attrs['CLASS'] != 'GROUP':
+            pass
+        else:
+            yield where
+
+        if depth == 0:
+            return
+        else:
+            for gr in self.walk_groups(where):
+                for child in self.get_children(gr).values():
+                    node_path = child.path[len(where.path):]
+                    if node_path[0] == '/':
+                        node_path = node_path[1:]
+                    if depth is not None and node_path.count('/') == depth:
+                        return
+                    else:
+                        if only_groups and child.attrs['CLASS'] != 'GROUP':
+                            pass
+                        else:
+                            yield child
 
     def walk_groups(self, where):
         where = self.get_node(where)  # return a node object in case where is a string
@@ -1118,6 +1181,7 @@ class H5Backend:
     def create_carray(self, where, name, obj=None, title=''):
         if isinstance(where, Node):
             where = where.node
+        title = str(title)
         if obj is None:
             raise ValueError('Data to be saved as carray cannot be None')
         dtype = obj.dtype
@@ -1146,6 +1210,7 @@ class H5Backend:
         """
         if isinstance(where, Node):
             where = where.node
+        title = str(title)
         dtype = np.dtype(dtype)
         shape = [0]
         if data_shape is not None:
@@ -1196,6 +1261,7 @@ class H5Backend:
         """
         if isinstance(where, Node):
             where = where.node
+        title = str(title)
         if dtype == 'string':
             dtype = np.dtype(np.uint8)
             subdtype = 'string'

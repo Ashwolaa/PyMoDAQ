@@ -1,14 +1,17 @@
 from importlib import import_module
 from pathlib import Path
 from typing import Union
-
-from qtpy import QtCore, QtWidgets
+import numpy as np
+from qtpy import QtCore, QtWidgets, QtGui
 import qt_themes
 
-from pymodaq_gui.utils import CustomApp
+from pymodaq_gui.managers.action_manager import QAction
+from pymodaq_gui.utils.custom_app import CustomApp
+from pymodaq_gui.utils import Dock
 from pymodaq_gui.utils.widgets import LabelWithFont
 from pymodaq_gui.utils.styling import create_font, create_icon
-
+from pymodaq_gui.plotting.utils.plot_utils import DetachablePanel
+from pymodaq_gui.utils.widgets.widget_with_label_title import WidgetWithLabelTitle
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_utils.config import GlobalConfig as Config
 
@@ -34,14 +37,23 @@ class ControlModuleUI(CustomApp):
     # Common icon name for initialization action
     INIT_ICON = 'cable'
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, title, settings_dock: Dock = None,):
+        super().__init__(parent, title=title)
+        self.settings_dock: Dock = settings_dock
         self.config = config
         self._ini_state = False
 
-    def display_status(self, txt, wait_time=config('utils', 'general', 'message_status_persistence')):
-        if self.statusbar is not None:
-            self.statusbar.showMessage(txt, wait_time)
+        self._settings_widget = WidgetWithLabelTitle(self.title, closable=True, attachable=True)
+        self._settings_widget.sig_close.connect(lambda: self.show_settings(False))
+        self._settings_widget.closeEvent = lambda event: self.set_action_checked('show_settings', False)
+        self._settings_panel = DetachablePanel(
+            self._settings_widget, self.settings_dock, f'{self.title} settings',
+            detached=self.config('pymodaq', 'control_modules', 'settings_as_popup'),
+            layout_config_path=('pymodaq', 'control_modules', 'settings_dock_layout'),
+            is_shown=lambda: self.is_action_checked('show_settings'))
+
+    def add_setting_tree(self, tree):
+        self._settings_widget.insert_widget(tree)
 
     # ---- Common action setup methods ----
 
@@ -57,6 +69,9 @@ class ControlModuleUI(CustomApp):
         self.add_widget('name', LabelWithFont(f'{self.title}', font_name="Tahoma",
                                                 font_size=14, isbold=True, isitalic=True),
                         toolbar=toolbar)
+
+    def set_init_color(self, color: QtGui.QColor):
+        self.get_action('name').widget.set_color(color)
 
     def _setup_init_action(self, toolbar: QtWidgets.QToolBar = None,
                            action_name: str = 'init',
@@ -75,10 +90,15 @@ class ControlModuleUI(CustomApp):
         tip: str
             Tooltip text
         """
+        self._init_action_name = action_name
         self.add_action(action_name, display_name, self.INIT_ICON, checkable=True,
                         tip=tip, icon_color=self.get_theme().red,
                         icon_checked_color=self.get_theme().green,
                         toolbar=toolbar)
+
+    @property
+    def init_action(self) -> QAction:
+        return self.get_action(self._init_action_name)
 
     def _setup_settings_action(self, toolbar: QtWidgets.QToolBar = None) -> None:
         """Add the show settings action to the toolbar
@@ -102,12 +122,48 @@ class ControlModuleUI(CustomApp):
         action_name: str
             The name of the init action
         """
-        if initialized:
-            icon = create_icon(self.INIT_ICON, icon_color=self.get_theme().green)
-        else:
-            icon = create_icon(self.INIT_ICON, icon_color=self.get_theme().red)
         if self.has_action(action_name):
-            self.get_action(action_name).set_icon(icon)
+            self.get_action(action_name).set_icon(self.INIT_ICON, self.get_theme().green if
+            initialized else self.get_theme().red)
+
+    def enable_actions(self, status=True, all_except=()):
+        """Enable or disable all toolbar actions, optionally excluding some.
+
+        Parameters
+        ----------
+        status: bool
+            True to enable, False to disable.
+        all_except: tuple of str
+            Action names to leave unchanged.
+        """
+        for action in self.actions_names:
+            if action not in all_except:
+                self.set_action_enabled(action, status)
+
+    def _show_settings(self, show: bool = True):
+        """Slot connected to the show_settings action."""
+        self._settings_panel.show(show)
+
+    def show_settings(self, show=True):
+        """Programmatically show/hide the settings widget. API entry."""
+        if self.is_action_checked('show_settings') != show:
+            self.get_action('show_settings').trigger()
+
+    def _connect_common_actions(self):
+        """Connect actions that are common to all control module UIs.
+
+        Connects `show_settings` → `_show_settings` and the init action → `send_init`.
+        Subclasses should call this at the start of their `connect_things()`.
+        """
+        if 'show_settings' in self.actions_names:
+            self.connect_action('show_settings', self._show_settings)
+        if hasattr(self, '_init_action_name') and self._init_action_name in self.actions_names:
+            self.connect_action(self._init_action_name, self.send_init)
+
+    def close(self):
+        """Close and clean up the settings widget. Subclasses should call super().close()."""
+        if self._settings_widget is not None:
+            self._settings_widget.close()
 
     def do_init(self, do_init=True):
         """Programmatically press the Init button
@@ -122,6 +178,7 @@ class ControlModuleUI(CustomApp):
     def send_init(self, checked: bool):
         """Should be implemented to send to the main app the fact that someone (un)checked init."""
         raise NotImplementedError
+
 
 
 def register_uis(parent_module_name: str = 'pymodaq.control_modules.daq_move_ui'):

@@ -11,7 +11,7 @@ from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from qtconsole.inprocess import QtInProcessKernelManager
 
 from pymodaq_utils.config import GlobalConfig
-from pymodaq.extensions.custom_ext import CustomExt
+from pymodaq.utils.custom_ext import CustomExt
 
 from pymodaq_utils.utils import get_version
 from pymodaq_gui.utils.dock import DockArea
@@ -83,16 +83,16 @@ class Console(CustomExt):
 
         self.setup_ui()
 
-    def do_things_after_preset_set(self, preset: str):
-        super().do_things_after_preset_set(preset)
+    def do_things_after_experiment_set(self, experiment: str):
+        super().do_things_after_experiment_set(experiment)
 
         self.console.push_variables(
             {'dashboard': self.dashboard,
              'mods': self.modules_manager,
              'np': np})
 
-    def setup_docks(self):
-        self.create_dashboard_toolbar()
+    def setup_docks_and_widgets(self):
+        self.create_dashboard_toolbar(add_break=False)
         self.mainwindow.setCentralWidget(self.console)
 
     def setup_actions(self):
@@ -105,16 +105,18 @@ class Console(CustomExt):
 def main():
     import sys
     from pymodaq_gui.qt_utils import mkQApp
-    from pymodaq.dashboard import create_load_dashboard
+    from pymodaq.dashboard import load_dashboard_with_arguments
     from pymodaq.utils.gui_utils.loader_utils import create_extension
 
     app = mkQApp('Console')
 
-    win, dashboard = create_load_dashboard()
+    win, dashboard, _ = load_dashboard_with_arguments(show_dashboard=False,
+                                                      load_extension=False,
+                                                      )
     win.mainwindow.setVisible(False)
 
-    win_ext, scan = create_extension(dashboard, Console)
-    win_ext.show()
+    win_ext, console = create_extension(dashboard, Console,
+                                        show_extension=True)
 
     sys.exit(app.exec())
 

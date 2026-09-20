@@ -5,11 +5,10 @@ Created the 05/12/2022
 @author: Sebastien Weber
 """
 import pytest
-from qtpy import QtWidgets, QtCore
-from pymodaq_gui.managers.parameter_manager import ParameterManager, ParameterTree
+
 from pymodaq_gui.parameter import Parameter
+from pymodaq.utils.scanner.scanner import Scanner
 from pymodaq.utils.scanner.scan_factory import ScannerFactory
-from pymodaq.utils.parameter import utils as putils
 
 scanner_factory = ScannerFactory()
 
@@ -20,9 +19,13 @@ class MoveMock:
         self.title = f'act_{ind}'
         self.units = units[ind]
 
+settings = Parameter.create(name='settings', type='group',
+                            children=Scanner.params)
+
 actuators = [MoveMock(ind) for ind in range(3)]
 
-config_scanner = dict(actuators=actuators)
+config_scanner = dict(actuators=actuators,
+                      settings=settings)
 
 
 class TestSettings:
@@ -32,9 +35,9 @@ class TestSettings:
                 scanner = scanner_factory.get(scan_type, scan_sub_type, **config_scanner)
                 scanner.evaluate_steps()
                 scanner.set_scan()
-                assert hasattr(scanner,  'axes_unique')
-                assert hasattr(scanner,  'axes_indexes')
-                assert hasattr(scanner,  'positions')
+                assert hasattr(scanner, 'axes_unique')
+                assert hasattr(scanner, 'axes_indexes')
+                assert hasattr(scanner, 'positions')
                 assert hasattr(scanner, 'n_steps')
                 assert hasattr(scanner, 'n_axes')
 

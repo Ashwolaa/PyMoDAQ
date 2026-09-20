@@ -31,7 +31,7 @@ else:
 
 
 logger = logger_module.set_logger(logger_module.get_module_name(__file__))
-
+ser_factory = SerializableFactory()
 config = Config()
 
 
@@ -183,15 +183,15 @@ class ThreadCommand(SerializableBase):
             serialize_factory.get_apply_deserializer(bytes_str=bytes_str, only_object=False),
         )
         attribute, remaining = cast(
-            Tuple[Any, bytes], serialize_factory.get_apply_deserializer(remaining, False)
+            Tuple[Any, bytes], serialize_factory.get_apply_deserializer(remaining, False),
         )
         args, remaining = cast(
             Tuple[list, bytes],
-            serialize_factory.get_apply_deserializer(remaining, False)
+            serialize_factory.get_apply_deserializer(remaining, False),
         )
         kwargs, remaining = cast(
             Tuple[dict, bytes],
-            serialize_factory.get_apply_deserializer(remaining, False)
+            serialize_factory.get_apply_deserializer(remaining, False),
         )
         return ThreadCommand(command, attribute, args=tuple(args), kwargs=kwargs), remaining
 
@@ -359,7 +359,7 @@ def elt_as_first_element_dicts(elt_list, match_word='Mock', key='name'):
     return plugins
 
 
-def find_keys_from_val(dict_tmp: dict, val: object):
+def find_keys_from_val(dict_tmp: dict, val: object) -> list:
     """Returns the keys from a dict if its value is matching val"""
     return [k for k, v in dict_tmp.items() if v == val]
 
@@ -623,6 +623,21 @@ def format_dir_path(path: Path) -> str:
         return f'{path}{dir_trailing_symbol if path.is_dir() else ""}'
 
 
+def read_binary_and_deserialize(fname: Path) -> list[SerializableBase]:
+    if not fname.exists():
+        return []
+    with open(fname, 'rb') as file:
+        lines = file.readlines()
+    all_lines = b''
+    for line in lines:
+        all_lines += line
+    data = []
+    while len(all_lines) > 0:
+        entry, all_lines = ser_factory.get_apply_deserializer(all_lines, only_object=False)
+        data.append(entry)
+    return data
+
+
 if __name__ == '__main__':
 
     #plugins = get_plugins()  # pragma: no cover
@@ -639,7 +654,7 @@ if __name__ == '__main__':
                                          exp="'multiaxes'",
                                          paths=[],
                                          filters=['.git', '.idea', '__pycache__', 'build', 'egg', 'documentation',
-                                                  '.tox',],
+                                                  '.tox'],
                                          replace=False,
                                          replace_str="pymodaq.utils")
 

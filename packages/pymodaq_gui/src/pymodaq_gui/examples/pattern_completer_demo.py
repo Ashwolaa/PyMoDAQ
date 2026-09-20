@@ -89,7 +89,7 @@ def create_multiple_patterns_example():
     text_edit.add_completer("::", symbols)
 
     text_edit.setPlaceholderText(
-        "Try typing:\n  @ for mentions\n  # for hashtags\n  :: for symbols"
+        "Try typing:\n  @ for mentions\n  # for hashtags\n  :: for symbols",
     )
     layout.addWidget(text_edit)
     return widget
@@ -105,7 +105,7 @@ def create_global_config_example():
 
     layout.addWidget(QLabel("<b>Example 3: Global Configuration</b>"))
     layout.addWidget(
-        QLabel("Notice the green border when typing @ (visual indicator enabled)")
+        QLabel("Notice the green border when typing @ (visual indicator enabled)"),
     )
 
     # Initialize with global settings
@@ -157,7 +157,7 @@ def create_per_pattern_config_example():
 
     text_edit.setPlaceholderText(
         "@ mentions are case-insensitive (try '@ali' or '@ALI')\n"
-        ":: keywords are case-sensitive (try '::def' vs '::DEF')"
+        ":: keywords are case-sensitive (try '::def' vs '::DEF')",
     )
     layout.addWidget(text_edit)
 
@@ -181,7 +181,7 @@ def create_word_wrap_example():
         "• <b>word_wrap=False</b> (left): Long items are truncated or need scrolling<br>"
         "• <b>word_wrap=True</b> (right): Long items wrap to multiple lines in popup<br><br>"
         "Type @ in either field to see the difference side-by-side!<br>"
-        "Both popups will appear simultaneously for comparison."
+        "Both popups will appear simultaneously for comparison.",
     )
     layout.addWidget(info_label)
 
@@ -239,7 +239,7 @@ def create_word_wrap_example():
     # Add instruction label
     instruction_label = QLabel(
         "<i>Notice: The first item is automatically highlighted (selected) in both popups.<br>"
-        "Press Tab or Enter to accept the highlighted suggestion!</i>"
+        "Press Tab or Enter to accept the highlighted suggestion!</i>",
     )
     instruction_label.setWordWrap(True)
     layout.addWidget(instruction_label)
@@ -331,7 +331,7 @@ def create_code_editor_example():
     layout.addWidget(QLabel("Python-style completion: :keyword or ::builtin"))
 
     editor = PatternPlainTextEdit(
-        min_width=250, max_width=500, case_sensitive=True, auto_resize=True
+        min_width=250, max_width=500, case_sensitive=True, auto_resize=True,
     )
 
     # Python keywords
@@ -376,7 +376,7 @@ def create_code_editor_example():
         "Python-style completion:\n"
         "  :def → keywords\n"
         "  ::print → built-in functions\n\n"
-        "Try typing ':for' or '::pri'"
+        "Try typing ':for' or '::pri'",
     )
 
     layout.addWidget(editor)

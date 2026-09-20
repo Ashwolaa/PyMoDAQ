@@ -15,11 +15,13 @@ def set_and_check_qt_backend_or_die(config):
     if not backend_found:
         #trying in the remaining backends and taking the first one
         logger.warning(f"{backend} is not available. Trying to find another backend.")
-        other_backends = [backend for backend in available_backends if backend != wanted_backend]
-        if len(other_backends) > 0:
+        other_available = [b for b in available_backends if b != wanted_backend]
+        if len(other_available) > 0:
             backend_found = True
-            backend =  other_backends.pop(0)
-            config['gui', 'qtbackend', 'backend'] = [backend] + other_backends
+            backend = other_available[0]
+            # Reorder full list so the working backend is first; preserve all entries
+            full_list = config('gui', 'qtbackend', 'backend')
+            config['gui', 'qtbackend', 'backend'] = [backend] + [b for b in full_list if b != backend]
 
     if backend_found:
         # environment variable is set
@@ -72,7 +74,7 @@ logger = set_logger('pymodaq_gui', base_logger=False)
 
 
 logger.info('Starting PyMoDAQ GUI modules')
-if not isinstance(config('gui', 'qtbackend', 'backend'), list): #True for old usage
+if not isinstance(config('gui', 'qtbackend', 'backend'), list):  #True for old usage
     logger.error(f"{config('gui', 'qtbackend', 'backend')} is not a list, please delete your actual "
                  f"pymodaq_utils configuration file to "
                  f"reflect this new type")
@@ -84,14 +86,30 @@ set_and_check_qt_backend_or_die(config)
 from pymodaq_gui.qt_utils import setLocale
 
 set_check_style()
+from pyqtgraph import setConfigOptions
+from qt_themes import get_theme
+from pymodaq_data.plotting.utils import PlotColors
+
+theme = get_theme(config('gui', 'style', 'theme')[0])
+colors = config['data', 'plotting', 'plot_colors']
+if theme.is_dark_theme():
+    setConfigOptions(foreground='d', background='k',)
+    foreground_color = (255, 255, 255)
+else:
+    setConfigOptions(foreground='k', background='w', )
+    foreground_color = (0, 0, 0)
+
+colors[0] = foreground_color
+config['data', 'plotting', 'plot_colors'] = colors
+config.save()
+
+
+pc = PlotColors()
 
 from pymodaq_data.plotting.plotter.plotter import register_plotter, PlotterFactory
 
 logger.info(f"Setting Locale to {config('gui', 'style','language')} / {config('gui', 'style', 'country')}")
 setLocale()
-
-
-
 
 
 logger.info(f"Registering PyMoDAQ qt plotters...")

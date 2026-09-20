@@ -1,55 +1,114 @@
-from pathlib import Path
-from pymodaq_gui.utils.dock import DockArea
-from pymodaq.utils.config import Config, get_set_preset_path
-from pytest import fixture, mark
-from pymodaq.utils.conftests import qtbotskip, main_modules_skip
+# -*- coding: utf-8 -*-
+"""Tests for pymodaq.extensions.scan.daq_scan"""
+from unittest.mock import Mock
+from dataclasses import dataclass
+import pytest
+from qtpy import QtCore
+
+from pymodaq_gui.parameter import Parameter
+
+from pymodaq.extensions.scan.daq_scan import DAQScan, DAQScanAcquisition
+from pymodaq.utils.managers.modules import ModulesManager
+from pymodaq_utils.utils import ThreadCommand
 
 
-pytestmark = mark.skipif(qtbotskip, reason='qtbot issues but tested locally')
-
-preset_path = get_set_preset_path()
-config = Config()
-
+@pytest.fixture
+def scan_settings():
+    return Parameter.create(name='settings', type='group', children=DAQScan.params)
 
 
-@fixture
-def init_qt(qtbot):
-    return qtbot
+@pytest.fixture
+def scan_acquisition(qtbot, scan_settings, monkeypatch):
+    scanner = Mock()
+    scanner.get_scan_shape.return_value = []
+    modules_manager = ModulesManager()
+    status_manager = Mock()
+    status_manager.set_permanent_status.return_value = None
 
-@fixture
-def main(qtbot):
-    from qtpy import QtWidgets
-    from pymodaq.dashboard import DashBoard
-    from pymodaq.extensions.scan.daq_scan import DAQScan
-
-    win = QtWidgets.QMainWindow()
-    area = DockArea()
-    win.setCentralWidget(area)
-    win.resize(1000, 500)
-    win.setWindowTitle('PyMoDAQ Dashboard')
-
-    dashboard = DashBoard(area)
-    file = Path(get_set_preset_path()).joinpath(f"{config('presets', 'default_preset_for_scan')}.xml")
-    dashboard.set_preset_mode(file)
-
-    winscan = QtWidgets.QMainWindow()
-    areascan = DockArea()
-    win.setCentralWidget(area)
-    daq_scan = DAQScan(dockarea=areascan, dashboard=dashboard, show_popup=False)
-    daq_scan.status_signal.connect(dashboard.add_status)
-    winscan.show()
-    qtbot.addWidget(win)
-    qtbot.addWidget(winscan)
-    yield dashboard, daq_scan, win
-    win.close()
-    winscan.close()
+    class DAQScan(QtCore.QObject):
+        status_sig = QtCore.Signal(ThreadCommand)
 
 
-@mark.skipif(main_modules_skip, reason='main module heavy qt5 testing')
-class TestGeneral:
+        def __init__(self, settings: Parameter,
+                     scanner: Mock,
+                     modules_manager: ModulesManager,
+                     module_and_data_saver: Mock = None):
+            super().__init__()
+            self.settings = settings
+            self.scanner = scanner
+            self.modules_manager = modules_manager
+            self.module_and_data_saver = module_and_data_saver
+            self.status_manager = status_manager
+            self.has_action = Mock(return_value=False)
 
-    def test_main(self, main):
-        dashboard, daq_scan, win = main
+        def set_action_checked(self, action: str, status: bool):
+            pass
+
+    def terminate_worker(obj):
+        return
 
 
 
+    scan = DAQScan(scan_settings, scanner, modules_manager)
+    monkeypatch.setattr(DAQScanAcquisition, "terminate_worker", terminate_worker)
+
+    return DAQScanAcquisition(daq_scan=scan)
+
+
+class TestTimeout:
+
+    def test_stops_scan_when_stop_on_timeout_enabled(self, qtbot, scan_acquisition, scan_settings):
+        scan_settings.child('scan_options', 'stop_on_timeout').setValue(True)
+        scan_acquisition._running = True
+        scan_acquisition.init_things()
+        scan_acquisition.scan_step_failed_signal.disconnect(scan_acquisition._on_scan_step_failed)
+
+        with qtbot.waitSignal(scan_acquisition._app.status_sig, timeout=500):
+            scan_acquisition.timeout(['Det1'])
+
+        assert scan_acquisition.timeout_scan_flag
+        assert not scan_acquisition.is_running
+
+    def test_does_not_stop_scan_when_stop_on_timeout_disabled(self, qtbot, scan_acquisition,
+                                                                scan_settings):
+        scan_settings.child('scan_options', 'stop_on_timeout').setValue(False)
+        scan_acquisition._running = True
+        scan_acquisition.init_things()
+        scan_acquisition.scan_step_failed_signal.disconnect(scan_acquisition._on_scan_step_failed)
+
+        with qtbot.waitSignal(scan_acquisition._app.status_sig, timeout=500):
+            scan_acquisition.timeout(['Det1'])
+
+        assert scan_acquisition.timeout_scan_flag
+        assert scan_acquisition.is_running
+
+    def test_message_includes_missing_modules(self, qtbot, scan_acquisition):
+        messages = []
+        scan_acquisition.init_things()
+        def append_msg(msg: str):
+            messages.append(msg)
+
+        scan_acquisition._app.status_sig.connect(append_msg)
+
+        with qtbot.waitSignal(scan_acquisition._app.status_sig, timeout=500):
+            scan_acquisition.timeout(['Det1', 'X_axis'])
+
+        timeout_cmds = [cmd for cmd in messages if cmd.command == 'Timeout']
+        assert len(timeout_cmds) == 1
+        assert 'Det1' in timeout_cmds[0].attribute
+        assert 'X_axis' in timeout_cmds[0].attribute
+
+    def test_message_without_missing_modules(self, qtbot, scan_acquisition):
+        messages = []
+        scan_acquisition.init_things()
+        def append_msg(msg: str):
+            messages.append(msg)
+
+        scan_acquisition._app.status_sig.connect(append_msg)
+
+        with qtbot.waitSignal(scan_acquisition._app.status_sig, timeout=500):
+            scan_acquisition.timeout()
+
+        timeout_cmds = [cmd for cmd in messages if cmd.command == 'Timeout']
+        assert len(timeout_cmds) == 1
+        assert timeout_cmds[0].attribute == 'Timeout during acquisition'

@@ -20,13 +20,13 @@ params = [
         {'title': 'Detector type:', 'name': 'detector_type', 'type': 'str', 'value': '', 'readonly': True},
         {'title': 'Nviewers:', 'name': 'Nviewers', 'type': 'int', 'value': 1, 'min': 1, 'default': 1,
          'readonly': True},
-    ]}
+    ]},
 ]
 params1 = [
     {'title': 'Numbers:', 'name': 'numbers', 'type': 'group', 'children': [
         {'title': 'Standard float', 'name': 'afloat', 'type': 'float', 'value': 20., 'min': 1.,
             'tip': 'displays this text as a tooltip','children':
-                [{'title': 'Standard int:', 'name': 'aint', 'type': 'int', 'value': 20,}]},
+                [{'title': 'Standard int:', 'name': 'aint', 'type': 'int', 'value': 20}]},
         ]},
 ]
 # No min for afloat ==) False, True, True
@@ -34,7 +34,7 @@ params2 = [
     {'title': 'Numbers:', 'name': 'numbers', 'type': 'group', 'children': [
         {'title': 'Standard float', 'name': 'afloat', 'type': 'float', 'value': 20.,
             'tip': 'displays this text as a tooltip','children':
-                [{'title': 'Standard int:', 'name': 'aint', 'type': 'int', 'value': 20,}]},
+                [{'title': 'Standard int:', 'name': 'aint', 'type': 'int', 'value': 20}]},
     ]},
 ]
 # No children in afloat ==) False, False, False
@@ -50,16 +50,16 @@ params4 = [
     {'title': 'Numbers:', 'name': 'numbers', 'type': 'group', 'children': [
         {'title': 'Standard float', 'name': 'afloat', 'type': 'float', 'value': 10., 'min': 1.,
             'tip': 'displays this text as a tooltip','children':
-                [{'title': 'Standard int:', 'name': 'aint', 'type': 'int', 'value': 20,}]},
+                [{'title': 'Standard int:', 'name': 'aint', 'type': 'int', 'value': 20}]},
     ]},
 ]    
 
-P1 = Parameter(name='settings1', type='group', children=params1)
-P2 = Parameter(name='settings2', type='group', children=params2)
-P3 = Parameter(name='settings3', type='group', children=params3)
-P4 = Parameter(name='settings4', type='group', children=params4)
-P1_bool = Parameter(name='settings1', type='bool', children=params1)
-P1_noedit = Parameter(name='settings1', type='group', children=params1, editable=False)
+P1 = Parameter.create(name='settings1', type='group', children=params1)
+P2 = Parameter.create(name='settings2', type='group', children=params2)
+P3 = Parameter.create(name='settings3', type='group', children=params3)
+P4 = Parameter.create(name='settings4', type='group', children=params4)
+P1_bool = Parameter.create(name='settings1', type='bool', children=params1)
+P1_noedit = Parameter.create(name='settings1', type='group', children=params1, editable=False)
 
 def test_iter_children_params():
     settings = Parameter.create(name='settings', type='group', children=params)
@@ -147,7 +147,7 @@ def test_compareParameters():
     assert [putils.compareParameters(param1=P1,param2=P1) == True,
             putils.compareParameters(param1=P1,param2=P2) == False,
             putils.compareParameters(param1=P1,param2=P3) == False,
-            putils.compareParameters(param1=P1,param2=P4) == False,        
+            putils.compareParameters(param1=P1,param2=P4) == False, 
             putils.compareParameters(param1=P1,param2=P1_bool) == False,
             putils.compareParameters(param1=P1,param2=P1_bool, with_self=False) == True,
             putils.compareParameters(param1=P1,param2=P1_noedit) == False,
@@ -196,7 +196,7 @@ def test_set_param_from_param(qtbot):
             {'title': 'Detector type:', 'name': 'detector_type', 'type': 'str', 'value': '', 'readonly': True},
             {'title': 'Nviewers:', 'name': 'Nviewers', 'type': 'int', 'value': 1, 'min': 1, 'default': 1,
              'readonly': True},
-        ]}
+        ]},
     ]
     settings = Parameter.create(name='settings', type='group', children=params)
     settings_old = Parameter.create(name='settings', type='group', children=params)

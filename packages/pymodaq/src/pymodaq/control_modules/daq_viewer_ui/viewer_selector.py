@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
 
 from qtpy import QtCore
-from pymodaq.control_modules.instruments import DAQTypesEnum
+from ..enums import DAQTypesEnum
 from ..control_module_selector import ModuleSelector
+
 
 @dataclass
 class SelectedModule:
@@ -16,6 +17,7 @@ class SelectedModule:
 
     def __repr__(self):
         return f'{self.daq_type.name}/{self.module_name}'
+
 
 class ViewerSelector(ModuleSelector):
 
@@ -45,5 +47,5 @@ class ViewerSelector(ModuleSelector):
         # Call the parameter's addNew method with the selected type
         self.add_widget.setText('/'.join((path_tuple[0], path_tuple[-1])))
         self.add_widget.adjustSize()
-        self.selected_module = SelectedModule(DAQTypesEnum[path_tuple[0]], path_tuple[-1], )
+        self.selected_module = SelectedModule(DAQTypesEnum[path_tuple[0]], path_tuple[-1])
         self.module_changed.emit(self.selected_module)

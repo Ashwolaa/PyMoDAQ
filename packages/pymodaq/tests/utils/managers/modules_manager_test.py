@@ -2,14 +2,17 @@
 """Tests for pymodaq.utils.managers.modules_manager"""
 import numpy as np
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, PropertyMock
 
-from qtpy.QtCore import QObject, Signal
+from qtpy.QtCore import QObject, Signal, QThread
 
-from pymodaq_data.data import DataToExport, DataRaw, DataSource
+from pymodaq.control_modules.enums import MoveType
+from pymodaq.control_modules.thread_commands import ControlToHardwareMove, ControlToHardwareViewer
+from pymodaq_data.data import DataToExport, DataRaw, DataSource, DataDim
 
 from pymodaq.utils.data import DataActuator
-from pymodaq.utils.managers.modules_manager import ModulesManager, ModuleType
+from pymodaq.utils.managers.modules import ModulesManager, ModuleType
+from pymodaq_utils.utils import ThreadCommand
 
 
 # ---------------------------------------------------------------------------
@@ -18,7 +21,7 @@ from pymodaq.utils.managers.modules_manager import ModulesManager, ModuleType
 
 class MockDetector(QObject):
     grab_done_signal = Signal(DataToExport)
-    command_hardware = Signal(object)
+    command_hardware = Signal(ThreadCommand)
 
     def __init__(self, title: str, naverage: int = 1):
         super().__init__()
@@ -26,10 +29,32 @@ class MockDetector(QObject):
         self.Naverage = naverage
 
 
+class MockDetectorWithEmission(QObject):
+    grab_done_signal = Signal(DataToExport)
+    command_hardware = Signal(ThreadCommand)
+
+    def __init__(self, title: str, naverage: int = 1):
+        super().__init__()
+        self.title = title
+        self.Naverage = naverage
+        self.do_emission = True  # to be used to block or not emission (test timeout)
+        self.command_hardware.connect(self._queue_command)
+
+    def _queue_command(self, cmd: ThreadCommand):
+        if cmd.command == ControlToHardwareViewer.SINGLE:
+            if self.do_emission:
+                self.grab_done_signal.emit(
+                    DataToExport(self.title,
+                                 data=[
+                                     DataRaw('mydata', data=[np.zeros((10,))],
+                                             origin=self.title)
+                                 ]))
+
+
 class MockActuator(QObject):
     move_done_signal = Signal(DataActuator)
     current_value_signal = Signal(DataActuator)
-    command_hardware = Signal(object)
+    command_hardware = Signal(ThreadCommand)
 
     def __init__(self, title: str, current_value: float = 0.0):
         super().__init__()
@@ -37,18 +62,51 @@ class MockActuator(QObject):
         self._current_value = DataActuator(title, data=current_value)
 
 
+class MockActuatorWithEmission(QObject):
+    move_done_signal = Signal(DataActuator)
+    current_value_signal = Signal(DataActuator)
+    command_hardware = Signal(ThreadCommand)
+
+    def __init__(self, title: str, current_value: float = 0.0):
+        super().__init__()
+        self.title = title
+        self._current_value = DataActuator(title, data=current_value)
+        self.do_emission = True  # to be used to block or not emission (test timeout)
+        self.command_hardware.connect(self._queue_command)
+
+    def _queue_command(self, cmd: ThreadCommand):
+        if cmd.command == ControlToHardwareMove.MOVE_ABS:
+            dwa = cmd.attribute[0]
+            dwa.origin = self.title
+            if self.do_emission:
+                self.move_done_signal.emit(dwa)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def detectors():
-    return [MockDetector('Det1'), MockDetector('Det2'), MockDetector('Det3')]
+def detectors(qtbot):
+    return [MockDetector('Det1'),
+            MockDetector('Det2'),
+            MockDetector('Det3')]
+
+@pytest.fixture
+def detectors_with_emission(qtbot):
+    return [MockDetectorWithEmission('Det1'),
+            MockDetectorWithEmission('Det2'),
+            MockDetectorWithEmission('Det3')]
 
 
 @pytest.fixture
-def actuators():
+def actuators(qtbot):
     return [MockActuator('X_axis', 0.0), MockActuator('Y_axis', 1.0)]
+
+@pytest.fixture
+def actuators_with_emission(qtbot):
+    return [MockActuatorWithEmission('X_axis', 0.0),
+            MockActuatorWithEmission('Y_axis', 1.0)]
 
 
 @pytest.fixture
@@ -61,14 +119,30 @@ def manager(detectors, actuators):
     )
     yield mm
 
+@pytest.fixture
+def manager_with_emission(detectors_with_emission, actuators_with_emission):
+    mm = ModulesManager(
+        detectors=detectors_with_emission,
+        actuators=actuators_with_emission,
+        selected_detectors=[detectors_with_emission[0]],
+        selected_actuators=[actuators_with_emission[0]],
+    )
+    yield mm
 
 # ---------------------------------------------------------------------------
 # Helpers to build controlled DataToExport for tree-building tests
 # ---------------------------------------------------------------------------
 
-def make_raw_dte(det_title: str, channel_name: str = 'CH0') -> DataToExport:
+def make_actuator_response(title: str, value: float) -> DataActuator:
+    """DataActuator as emitted by a real DAQ_Move: origin stamped with the module title."""
+    dact = DataActuator(title, data=value)
+    dact.origin = title
+    return dact
+
+
+def make_raw_dte(det_title: str, dwa_name: str = 'DWA_NANE') -> DataToExport:
     """DTE with a single raw 1D channel from a detector."""
-    raw = DataRaw(channel_name, data=[np.zeros(10)])
+    raw = DataRaw(dwa_name, data=[np.zeros(10)])
     raw.origin = det_title
     dte = DataToExport('test', control_module='DAQ_Viewer')
     dte.append(raw)
@@ -104,7 +178,7 @@ def make_dte_with_roi(det_title: str, channel_name: str = 'CH0',
 
 class TestInit:
 
-    def test_empty_init(self):
+    def test_empty_init(self, qtbot):
         mm = ModulesManager()
         assert mm.detectors_all == []
         assert mm.actuators_all == []
@@ -270,27 +344,129 @@ class TestMoveDone:
     def test_flag_set_when_all_received(self, manager):
         self._init_move(manager, ['X_axis', 'Y_axis'])
 
-        manager.move_done(DataActuator('X_axis', data=1.0))
+        manager.move_done(make_actuator_response('X_axis', 1.0))
         assert not manager.move_done_flag
 
-        manager.move_done(DataActuator('Y_axis', data=2.0))
+        manager.move_done(make_actuator_response('Y_axis', 2.0))
         assert manager.move_done_flag
 
     def test_positions_accumulated(self, manager):
         self._init_move(manager, ['X_axis', 'Y_axis'])
 
-        manager.move_done(DataActuator('X_axis', data=1.0))
-        manager.move_done(DataActuator('Y_axis', data=2.0))
+        manager.move_done(make_actuator_response('X_axis', 1.0))
+        manager.move_done(make_actuator_response('Y_axis', 2.0))
         assert len(manager.move_done_positions) == 2
 
     def test_duplicate_ignored(self, manager):
         self._init_move(manager, ['X_axis', 'Y_axis'])
 
-        manager.move_done(DataActuator('X_axis', data=1.0))
-        manager.move_done(DataActuator('X_axis', data=9.0))  # duplicate
+        manager.move_done(make_actuator_response('X_axis', 1.0))
+        manager.move_done(make_actuator_response('X_axis', 9.0))  # duplicate
         assert len(manager.move_done_positions) == 1
         assert not manager.move_done_flag
 
+class TestMoveActuatorsWithCallback:
+    def test_callback_called_when_done(self, qtbot, manager_with_emission):
+        """."""
+        manager_with_emission.selected_actuators_name = ['X_axis', 'Y_axis']
+        self.dte_back = DataToExport('None')
+
+        move_dte = DataToExport('move_dte', data=[
+            DataActuator(name='X_axis', data=[np.atleast_1d(1.0)]),
+            DataActuator(name='Y_axis', data=[np.atleast_1d(2.0)])
+        ])
+        self.move_done = False
+
+        def callback(dte: DataToExport):
+            self.move_done = True
+            self.dte_back = dte
+
+        with qtbot.waitSignal(manager_with_emission.move_done_signal, timeout=5000):
+            manager_with_emission.move_actuators_with_callback(move_dte,
+                                                               mode=MoveType.ABS,
+                                                               callback=callback)
+        manager_with_emission.forget_callback(callback)
+        assert self.move_done
+        assert self.dte_back[0] in move_dte
+        assert self.dte_back[1] in move_dte
+
+
+    @pytest.mark.parametrize('timeout_acts', [['X_axis', 'Y_axis'], ['X_axis'], ['Y_axis']])
+    def test_timeout(self, qtbot, manager_with_emission, timeout_acts):
+        """."""
+        manager_with_emission.selected_actuators_name = ['X_axis', 'Y_axis']
+        self.dte_back = DataToExport('None')
+
+        move_dte = DataToExport('move_dte', data=[
+            DataActuator(name='X_axis', data=[np.atleast_1d(1.0)]),
+            DataActuator(name='Y_axis', data=[np.atleast_1d(2.0)])
+        ])
+        for act_name in timeout_acts:
+            act = manager_with_emission.get_mod_from_name(act_name, mod=ModuleType.Actuator)
+            act.do_emission = False
+
+        def callback(dte: DataToExport):
+            self.move_done = True
+            self.dte_back = dte
+
+        with patch.object(type(manager_with_emission), 'actuator_timeout', new_callable=PropertyMock,
+                          return_value=1):
+
+            with qtbot.waitSignal(manager_with_emission.timeout_signal, timeout=5000) as blocker:
+                manager_with_emission.move_actuators_with_callback(move_dte,
+                                                                   mode=MoveType.ABS,
+                                                                   callback=callback)
+            for act in timeout_acts:
+                assert act in blocker.args[0]
+            for act in blocker.args[0]:
+                assert act in timeout_acts
+
+class TestGrabData:
+    def test_callback_called_when_done(self, qtbot, manager_with_emission):
+        """."""
+        manager_with_emission.selected_detectors_name = ['Det1', 'Det3']
+        self.dte_back = DataToExport('None')
+
+        self.grab_done = False
+
+        def callback(dte: DataToExport):
+            self.grab_done = True
+            self.dte_back = dte
+
+        with qtbot.waitSignal(manager_with_emission.det_done_signal, timeout=5000):
+            manager_with_emission.grab_data_with_callback(callback=callback)
+
+        manager_with_emission.forget_callback(callback, module_type=ModuleType.Detector)
+        assert self.grab_done
+        assert 'Det1' in self.dte_back.get_origins()
+        assert 'Det3' in self.dte_back.get_origins()
+        assert 'Det2' not in self.dte_back.get_origins()
+
+    @pytest.mark.parametrize('timeout_dets', [['Det1', 'Det3'], ['Det1'], ['Det3']])
+    def test_timeout(self, qtbot, manager_with_emission, timeout_dets):
+        """."""
+        manager_with_emission.selected_detectors_name = ['Det1', 'Det3']
+        self.dte_back = DataToExport('None')
+
+        self.grab_done = False
+
+        def callback(dte: DataToExport):
+            self.grab_done = True
+            self.dte_back = dte
+
+        for det_name in timeout_dets:
+            det = manager_with_emission.get_mod_from_name(det_name, mod=ModuleType.Detector)
+            det.do_emission = False
+
+        with patch.object(type(manager_with_emission), 'detector_timeout', new_callable=PropertyMock,
+                          return_value=1):
+            with qtbot.waitSignal(manager_with_emission.timeout_signal, timeout=5000) as blocker:
+                manager_with_emission.grab_data_with_callback(callback=callback)
+
+        for det in timeout_dets:
+            assert det in blocker.args[0]
+        for det in blocker.args[0]:
+            assert det in timeout_dets
 
 class TestGetDetDataList:
 
@@ -302,51 +478,24 @@ class TestGetDetDataList:
 
     def test_raw_channel_in_tree(self, manager):
         manager.selected_detectors_name = ['Det1']
-        dte = make_raw_dte('Det1', 'CH0')
+        dte = make_raw_dte('dte')
         with patch.object(manager, 'grab_data', return_value=dte):
             manager.get_det_data_list()
 
         det_param = manager.settings.child('probe_data').children()[0]
-        assert det_param.name() == 'Det1'
-        ch_param = det_param.children()[0]
-        assert ch_param.name() == 'CH0'
-        assert ch_param.opts['full_name'] == 'Det1/CH0'
+        assert det_param.name() in DataDim.names()
 
     def test_tree_cleared_on_repopulate(self, manager):
         manager.selected_detectors_name = ['Det1']
-        dte = make_raw_dte('Det1', 'CH0')
+        dte = make_raw_dte('dte')
         with patch.object(manager, 'grab_data', return_value=dte):
             manager.get_det_data_list()
             manager.get_det_data_list()  # second call must not duplicate
 
-        assert len(manager.settings.child('probe_data').children()) == 1
-
-    def test_roi_nested_under_raw_channel(self, manager):
-        manager.selected_detectors_name = ['Det1']
-        dte = make_dte_with_roi('Det1', 'CH0', 'ROI_00')
-        with patch.object(manager, 'grab_data', return_value=dte):
-            manager.get_det_data_list()
-
-        ch_param = manager.settings.child('probe_data').children()[0].children()[0]
-        roi_groups = [p for p in ch_param.children() if p.type() == 'group']
-        assert len(roi_groups) == 1
-        assert roi_groups[0].name() == 'ROI_00'
-        roi_child_names = {p.name() for p in roi_groups[0].children()}
-        assert {'hor', 'int'}.issubset(roi_child_names)
-
-    def test_multiple_rois_nested_under_same_channel(self, manager):
-        manager.selected_detectors_name = ['Det1']
-        dte = make_dte_with_roi('Det1', 'CH0', 'ROI_00')
-        for dwa in make_dte_with_roi('Det1', 'CH0', 'ROI_01').data:
-            if dwa.origin != 'Det1':
-                dte.append(dwa)
-
-        with patch.object(manager, 'grab_data', return_value=dte):
-            manager.get_det_data_list()
-
-        ch_param = manager.settings.child('probe_data').children()[0].children()[0]
-        roi_groups = [p for p in ch_param.children() if p.type() == 'group']
-        assert {g.name() for g in roi_groups} == {'ROI_00', 'ROI_01'}
+        for dim in DataDim.names():
+            for dwa in dte.get_data_from_dim(dim):
+                assert dwa.get_full_name() in [child.name() for child in
+                                           manager.settings.child('probe_data', dim).children()]
 
     def test_connect_detectors_released_on_exception(self, manager):
         """connect_detectors(False) must be called via finally even if grab_data raises."""
@@ -356,33 +505,6 @@ class TestGetDetDataList:
                 with pytest.raises(RuntimeError):
                     manager.get_det_data_list()
         mock_connect.assert_any_call(False)
-
-
-class TestGetProbedDataChannels:
-
-    def _populate(self, manager):
-        manager.selected_detectors_name = ['Det1']
-        dte = make_dte_with_roi('Det1', 'CH0', 'ROI_00')
-        with patch.object(manager, 'grab_data', return_value=dte):
-            manager.get_det_data_list()
-
-    def test_returns_raw_channel(self, manager):
-        self._populate(manager)
-        assert 'Det1/CH0' in manager.get_probed_data_channels()
-
-    def test_returns_roi_outputs(self, manager):
-        self._populate(manager)
-        names = manager.get_probed_data_channels()
-        assert 'Det1 - ROI_00/hor' in names
-        assert 'Det1 - ROI_00/int' in names
-
-    def test_dim_filter(self, manager):
-        self._populate(manager)
-        # 'DataND' should match nothing in our simple 0D/1D test data
-        assert manager.get_probed_data_channels(dim='DataND') == []
-
-    def test_empty_before_probe(self, manager):
-        assert manager.get_probed_data_channels() == []
 
 
 class TestShowOnlyControlModules:
@@ -418,7 +540,7 @@ class TestTestActuatorTree:
         for dact in manager.move_done_positions:
             test_act.addChild(
                 {'title': dact.name, 'name': dact.name.replace(' ', '_'),
-                 'type': 'float', 'value': dact.value(), 'readonly': True}
+                 'type': 'float', 'value': dact.value(), 'readonly': True},
             )
 
         children = {p.name(): p.value() for p in test_act.children()}
@@ -431,13 +553,70 @@ class TestTestActuatorTree:
         """A second move replaces the previous children."""
         test_act = manager.settings.child('test_actuator')
         test_act.addChild(
-            {'title': 'X_axis', 'name': 'X_axis', 'type': 'float', 'value': 0.0, 'readonly': True}
+            {'title': 'X_axis', 'name': 'X_axis', 'type': 'float', 'value': 0.0, 'readonly': True},
         )
         assert len(test_act.children()) == 1
 
         test_act.clearChildren()
         test_act.addChild(
-            {'title': 'X_axis', 'name': 'X_axis', 'type': 'float', 'value': 5.0, 'readonly': True}
+            {'title': 'X_axis', 'name': 'X_axis', 'type': 'float', 'value': 5.0, 'readonly': True},
         )
         assert len(test_act.children()) == 1
         assert test_act.children()[0].value() == 5.0
+
+
+class TestTimeout:
+
+    def test_grab_data_timeout_reports_missing_detectors(self, qtbot, manager, detectors):
+        """If no detector answers, timeout_signal carries all selected detector names."""
+        manager.selected_detectors_name = ['Det1', 'Det2']
+        manager.connect_detectors(True)
+
+        with patch.object(type(manager), 'detector_timeout', new_callable=PropertyMock,
+                          return_value=1):
+            with qtbot.waitSignal(manager.timeout_signal, timeout=2000) as blocker:
+                manager.grab_data()
+
+        assert set(blocker.args[0]) == {'Det1', 'Det2'}
+
+    def test_grab_data_timeout_reports_only_missing_detector(self, qtbot, manager, detectors):
+        """If one detector answered, timeout_signal only lists the one still missing."""
+        manager.selected_detectors_name = ['Det1', 'Det2']
+        manager.connect_detectors(True)
+
+        def respond_det1(_cmd):
+            dte = DataToExport('a', control_module='DAQ_Viewer')
+            raw = DataRaw('CH0', data=[np.array([1.0])])
+            raw.origin = 'Det1'
+            dte.append(raw)
+            detectors[0].grab_done_signal.emit(dte)
+
+        detectors[0].command_hardware.connect(respond_det1)
+
+        with patch.object(type(manager), 'detector_timeout', new_callable=PropertyMock,
+                          return_value=1):
+            with qtbot.waitSignal(manager.timeout_signal, timeout=2000) as blocker:
+                manager.grab_data()
+
+        assert blocker.args[0] == ['Det2']
+
+    def test_move_actuators_timeout_reports_missing_actuator(self, qtbot, manager, actuators):
+        """If only one actuator answers move_done, timeout_signal lists the other one."""
+        manager.selected_actuators_name = ['X_axis', 'Y_axis']
+        manager.connect_actuators(True)
+
+        def respond_x(_cmd):
+            actuators[0].move_done_signal.emit(make_actuator_response('X_axis', 1.0))
+
+        actuators[0].command_hardware.connect(respond_x)
+
+        dte_act = DataToExport('Actuators', control_module='DAQ_Move')
+        dte_act.append(DataActuator('X_axis', data=1.0))
+        dte_act.append(DataActuator('Y_axis', data=2.0))
+
+        with patch.object(type(manager), 'actuator_timeout', new_callable=PropertyMock,
+                          return_value=1):
+            with qtbot.waitSignal(manager.timeout_signal, timeout=2000) as blocker:
+                manager.move_actuators(dte_act, polling=True)
+
+        assert blocker.args[0] == ['Y_axis']
