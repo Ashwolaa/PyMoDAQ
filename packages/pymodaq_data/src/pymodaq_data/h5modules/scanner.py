@@ -289,6 +289,40 @@ class H5FileScanner:
         return dwa.to_xarray()
 
 
+# ── strip_error_vars ────────────────────────────────────────────────────────
+
+def strip_error_vars(ds):
+    """Return *ds* with its paired error/uncertainty variables removed.
+
+    Formula evaluation contexts should use this, not the raw Dataset:
+    ``xr.Dataset`` arithmetic aligns operands by variable name, so two
+    operands that happen to share a channel label (e.g. both auto-labelled
+    ``CH00``) would silently sum their ``CH00_error`` variables too — which is
+    a plain sum, not how uncertainties actually propagate (quadrature for a
+    sum, etc.). Stripping error vars before they enter eval() avoids that
+    silently-wrong result; the original Dataset (with errors intact) should
+    still be used for storage/display.
+
+    Parameters
+    ----------
+    ds :
+        Anything; only ``xr.Dataset``-like objects (with ``.attrs`` and
+        ``.drop_vars``) are affected. Anything else, or a Dataset with no
+        recorded error vars, is returned unchanged.
+
+    Returns
+    -------
+    The input unchanged, or with ``pymodaq_error_vars`` dropped.
+    """
+    try:
+        error_vars = ds.attrs.get('pymodaq_error_vars', [])
+    except AttributeError:
+        return ds
+    if not error_vars:
+        return ds
+    return ds.drop_vars(error_vars, errors='ignore')
+
+
 # ── wrap_result ───────────────────────────────────────────────────────────────
 
 def wrap_result(result, name: str):
@@ -329,23 +363,20 @@ def wrap_result(result, name: str):
     try:
         import xarray as xr
         if isinstance(result, xr.Dataset):
-            # Dataset arithmetic may reorder Dataset-level dims differently from
-            # the individual data-variable dim order, which breaks from_xarray's
-            # axis reconstruction.  Extracting the DataArray from single-variable
-            # Datasets avoids this.  Also drops inherited pymodaq_* attrs so
-            # from_xarray uses clean defaults.
-            if len(result.data_vars) == 1:
-                var_name = list(result.data_vars)[0]
-                da = result[var_name]
-                dwa = DataWithAxes.from_xarray(da.to_dataset(name=var_name))
-            else:
-                dwa = DataWithAxes.from_xarray(result.drop_attrs())
+            # from_xarray() derives dim order from a data variable's own
+            # .dims rather than the Dataset-level dim listing, so it no
+            # longer matters whether arithmetic reordered them relative to
+            # each other.
+            dwa = DataWithAxes.from_xarray(result)
             dwa.name = name
             return dwa
         if isinstance(result, xr.DataArray):
-            # DataArrays carry no pymodaq attrs; just promote to Dataset.
+            # promote_attrs=True carries the DataArray's own pymodaq_* attrs
+            # (stamped by to_xarray() on every data variable) up to the
+            # Dataset level, so from_xarray() finds pymodaq_nav_dims etc.
+            # without needing its variable-level fallback.
             var_name = result.name or name
-            dwa = DataWithAxes.from_xarray(result.to_dataset(name=var_name))
+            dwa = DataWithAxes.from_xarray(result.to_dataset(name=var_name, promote_attrs=True))
             dwa.name = name
             return dwa
     except ImportError:

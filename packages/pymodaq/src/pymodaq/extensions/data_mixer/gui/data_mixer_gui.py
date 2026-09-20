@@ -21,7 +21,7 @@ from qtpy.QtWidgets import (
 )
 
 from pymodaq_data.h5modules.saving import H5SaverLowLevel
-from pymodaq_data.h5modules import H5FileScanner, wrap_result
+from pymodaq_data.h5modules import H5FileScanner, wrap_result, strip_error_vars
 from pymodaq_data.data import DataWithAxes
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.config import GlobalConfig as Config
@@ -818,7 +818,14 @@ class DataMixerGUI(CustomExt):
             except Exception as exc:
                 logger.warning(f'Cannot pre-load formula deps: {exc}')
 
+        # xr_ctx keeps full-fidelity Datasets (with error vars) for storage and
+        # display; xr_ctx_eval is what formulas actually see. Error vars are
+        # stripped from the latter because Dataset arithmetic aligns by
+        # variable name, so two operands sharing a channel label would
+        # silently sum their *_error variables too, which is not how errors
+        # propagate.
         xr_ctx: dict = {**self._h5_snapshot, **self._xr_ctx_computed}
+        xr_ctx_eval: dict = {k: strip_error_vars(v) for k, v in xr_ctx.items()}
         computed_names = set(self._xr_ctx_computed)
 
         for name, formula in self._formula_for.items():
@@ -830,11 +837,12 @@ class DataMixerGUI(CustomExt):
                 formula_eval, _ = replace_names_in_formula_xr(
                     formula, computed_names=computed_names,
                 )
-                result = eval(formula_eval, {'np': np, 'xr': xr, '_xr': xr_ctx})
+                with xr.set_options(keep_attrs=True):
+                    result = eval(formula_eval, {'np': np, 'xr': xr, '_xr': xr_ctx_eval})
                 dwa = wrap_result(result, name)
 
                 if isinstance(result, xr.DataArray):
-                    ds_result = result.to_dataset(name=name)
+                    ds_result = result.to_dataset(name=name, promote_attrs=True)
                 elif isinstance(result, xr.Dataset):
                     ds_result = result
                 else:
@@ -843,6 +851,7 @@ class DataMixerGUI(CustomExt):
                 self._xr_ctx_computed[name] = ds_result
                 self._console.update_computed_live(name, ds_result)
                 xr_ctx[name] = ds_result
+                xr_ctx_eval[name] = strip_error_vars(ds_result)
                 changed.add(name)
 
                 self._browser.update_computed_info(name, ds_result)

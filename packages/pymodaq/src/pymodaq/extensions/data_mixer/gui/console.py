@@ -45,7 +45,7 @@ from pymodaq.extensions.data_mixer.parser import (
 from pymodaq.extensions.data_mixer.gui.formatters import (
     _format_xr_html, _format_xr_lazy_html,
 )
-from pymodaq_data.h5modules import wrap_result
+from pymodaq_data.h5modules import wrap_result, strip_error_vars
 from pymodaq_data.data import DataToExport
 from pymodaq_utils.logger import set_logger, get_module_name
 
@@ -965,10 +965,17 @@ class FormulaConsole(QWidget):
         except ImportError:
             xr = None
 
-        # In lazy mode, chunk all inputs so operations build a dask graph
+        # xr_ctx keeps full-fidelity Datasets (with error vars) for display and
+        # for _computed/_h5_ctx storage; xr_ctx_eval is what formulas actually
+        # see. Error vars are stripped from the latter because Dataset
+        # arithmetic aligns by variable name, so two operands sharing a
+        # channel label would silently sum their *_error variables too.
+        #
+        # In lazy mode, chunk all inputs so operations build a dask graph.
         if self._lazy_mode and _DASK and xr is not None:
             xr_ctx_eval: dict = {}
             for k, v in xr_ctx.items():
+                v = strip_error_vars(v)
                 if hasattr(v, 'chunk'):
                     try:
                         xr_ctx_eval[k] = v.chunk()
@@ -977,7 +984,7 @@ class FormulaConsole(QWidget):
                 else:
                     xr_ctx_eval[k] = v
         else:
-            xr_ctx_eval = xr_ctx
+            xr_ctx_eval = {k: strip_error_vars(v) for k, v in xr_ctx.items()}
 
         for name, expr in pairs:
             try:
@@ -987,12 +994,16 @@ class FormulaConsole(QWidget):
                 if xr is not None:
                     ns['xr'] = xr
 
-                result = eval(formula_eval, ns)
+                if xr is not None:
+                    with xr.set_options(keep_attrs=True):
+                        result = eval(formula_eval, ns)
+                else:
+                    result = eval(formula_eval, ns)
 
                 # Convert to xr.Dataset for storage.  Keep everything in xarray
                 # to avoid materialising dask arrays through DataWithAxes.
                 if xr is not None and isinstance(result, xr.DataArray):
-                    ds = result.to_dataset(name=name)
+                    ds = result.to_dataset(name=name, promote_attrs=True)
                     da_computed_names.add(name)   # auto-deref safe for this name
                 elif xr is not None and isinstance(result, xr.Dataset):
                     ds = result
@@ -1020,7 +1031,7 @@ class FormulaConsole(QWidget):
 
                 if ds is not None:
                     xr_ctx[name] = ds
-                    xr_ctx_eval[name] = ds
+                    xr_ctx_eval[name] = strip_error_vars(ds)
                     computed_names.add(name)
                     self._computed[name] = ds
                     self._computed_formulas[name] = expr

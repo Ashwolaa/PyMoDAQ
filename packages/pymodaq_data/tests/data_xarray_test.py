@@ -38,7 +38,7 @@ class TestXarrayConversion:
         assert ds.attrs['pymodaq_name'] == 'test'
         assert ds.attrs['pymodaq_units'] == 'mm'
         assert ds.attrs['pymodaq_source'] == 'raw'
-        assert list(ds.attrs['pymodaq_nav_indexes']) == [0]
+        assert list(ds.attrs['pymodaq_nav_dims']) == ['dim_0']
 
     def test_round_trip_1d(self):
         arr = np.linspace(1, 10, 20)
@@ -95,6 +95,80 @@ class TestXarrayConversion:
         assert len(dt.children) == 2
         assert 'a' in dt.children
         assert 'b' in dt.children
+
+    def test_nav_dims_survive_arithmetic(self):
+        """pymodaq_nav_dims (dimension names) must survive xarray arithmetic
+        when evaluated under keep_attrs=True, unlike positional indices which
+        would go stale the moment dims are reordered."""
+        arr = np.arange(12, dtype=float).reshape(3, 4)
+        nav_axis = data_mod.Axis('nav', units='m', data=np.array([0., 1., 2.]), index=0)
+        sig_axis = data_mod.Axis('sig', units='Hz', data=np.array([10., 20., 30., 40.]), index=1)
+        dwa = data_mod.DataRaw(
+            'nd', data=[arr], nav_indexes=(0,), axes=[nav_axis, sig_axis],
+        )
+        ds = dwa.to_xarray()
+        with xr.set_options(keep_attrs=True):
+            result = ds + ds
+        dwa2 = data_mod.DataWithAxes.from_xarray(result)
+        assert tuple(dwa2.nav_indexes) == (0,)
+        assert np.allclose(dwa2[0], arr * 2)
+
+    def test_nav_dims_survive_extracted_dataarray(self):
+        """A DataArray pulled out of a Dataset (ds['var']) does not inherit
+        the parent Dataset's attrs, only the variable's own — to_xarray()
+        stamps pymodaq_nav_dims on every data variable for exactly this
+        reason."""
+        arr = np.arange(12, dtype=float).reshape(3, 4)
+        nav_axis = data_mod.Axis('nav', units='m', data=np.array([0., 1., 2.]), index=0)
+        sig_axis = data_mod.Axis('sig', units='Hz', data=np.array([10., 20., 30., 40.]), index=1)
+        dwa = data_mod.DataRaw(
+            'nd', data=[arr], labels=['ch0'], nav_indexes=(0,), axes=[nav_axis, sig_axis],
+        )
+        ds = dwa.to_xarray()
+        da = ds['ch0']
+        assert list(da.attrs.get('pymodaq_nav_dims', [])) == ['nav']
+        dwa2 = data_mod.DataWithAxes.from_xarray(da.to_dataset(name='ch0', promote_attrs=True))
+        assert tuple(dwa2.nav_indexes) == (0,)
+
+    def test_nav_dims_dropped_on_reduction(self):
+        """Reducing along the nav dim by name removes it from ds.dims
+        entirely, which correctly drops it from nav_indexes with no
+        positional guessing required."""
+        arr = np.arange(12, dtype=float).reshape(3, 4)
+        nav_axis = data_mod.Axis('nav', units='m', data=np.array([0., 1., 2.]), index=0)
+        sig_axis = data_mod.Axis('sig', units='Hz', data=np.array([10., 20., 30., 40.]), index=1)
+        dwa = data_mod.DataRaw(
+            'nd', data=[arr], nav_indexes=(0,), axes=[nav_axis, sig_axis],
+        )
+        ds = dwa.to_xarray()
+        with xr.set_options(keep_attrs=True):
+            result = ds.mean('nav')
+        dwa2 = data_mod.DataWithAxes.from_xarray(result)
+        assert tuple(dwa2.nav_indexes) == ()
+        assert np.allclose(dwa2[0], arr.mean(axis=0))
+
+    def test_strip_error_vars(self):
+        """Formula-eval contexts must not see paired error variables: Dataset
+        arithmetic aligns by name, so two operands sharing a label would
+        otherwise silently sum their *_error variables as if that were valid
+        uncertainty propagation."""
+        from pymodaq_data.h5modules.scanner import strip_error_vars
+
+        arr = np.arange(5, dtype=float)
+        err = arr * 0.1
+        dwa = data_mod.DataRaw('errs', data=[arr], labels=['ch0'], errors=[err])
+        ds = dwa.to_xarray()
+        assert 'ch0_error' in ds.data_vars
+
+        stripped = strip_error_vars(ds)
+        assert 'ch0_error' not in stripped.data_vars
+        assert 'ch0' in stripped.data_vars
+
+        # Dataset with no errors, and non-Dataset input, pass through unchanged
+        dwa_plain = data_mod.DataRaw('plain', data=[arr])
+        ds_plain = dwa_plain.to_xarray()
+        assert strip_error_vars(ds_plain) is ds_plain
+        assert strip_error_vars('not a dataset') == 'not a dataset'
 
     def test_dte_round_trip(self):
         dwa1 = data_mod.DataRaw('ch1', data=[np.arange(8, dtype=float)])

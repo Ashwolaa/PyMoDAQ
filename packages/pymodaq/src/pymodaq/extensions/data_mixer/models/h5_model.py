@@ -10,7 +10,7 @@ from pymodaq.extensions.data_mixer.parser import (
 
 from pymodaq_data.h5modules.data_saving import DataLoader
 from pymodaq_data.h5modules.saving import H5SaverLowLevel
-from pymodaq_data.h5modules import H5FileScanner, wrap_result
+from pymodaq_data.h5modules import H5FileScanner, wrap_result, strip_error_vars
 from pymodaq_data.data import DataToExport, DataWithAxes, DataSource
 
 
@@ -179,10 +179,14 @@ class DataMixerModelH5(DataMixerModel):
             if _xarray_available:
                 # Build xarray context dict keyed by full name (e.g. 'test/Mock2D_0').
                 # Each value is an xr.Dataset so formulas can use sel/isel/mean etc.
+                # Error vars are stripped here, at the point of ingestion, so
+                # they never enter any formula's arithmetic (Dataset addition
+                # aligns by variable name and would otherwise silently sum
+                # two operands' *_error variables together).
                 xr_ctx = {}
                 for full_name in dte_from_h5.get_full_names():
                     dwa = dte_from_h5.get_data_from_full_name(full_name)
-                    xr_ctx[full_name] = dwa.to_xarray()
+                    xr_ctx[full_name] = strip_error_vars(dwa.to_xarray())
 
                 for name, formula in formulae:
                     try:
@@ -221,33 +225,38 @@ class DataMixerModelH5(DataMixerModel):
         ``name`` so later formula lines can reference it via ``{name}``.
         For DataArray results the data variable is named ``name`` so that
         ``{name}["name"]`` works intuitively (no need to remember the original
-        channel label).  The raw xarray object is stored directly — never
-        round-tripped through DataWithAxes — to avoid spurious size/spread errors
-        caused by pymodaq metadata attrs inherited from the source Dataset.
+        channel label).
+
+        The evaluation runs under ``xr.set_options(keep_attrs=True)`` so that
+        ``pymodaq_nav_dims`` (and other ``pymodaq_*`` metadata) on the operands
+        survives arithmetic and reductions instead of being dropped by xarray's
+        default behaviour — navigation axes are tracked by dimension *name*
+        (see ``DataWithAxes.to_xarray``), so they stay correct even when an
+        operation reorders dims, and a reduction that consumes a nav dim
+        correctly removes it rather than requiring any positional guesswork.
         """
         formula_to_eval, _ = replace_names_in_formula_xr(formula)
-        result = eval(formula_to_eval, {'np': np, 'xr': xr, '_xr': xr_ctx})
+        with xr.set_options(keep_attrs=True):
+            result = eval(formula_to_eval, {'np': np, 'xr': xr, '_xr': xr_ctx})
         dwa = wrap_result(result, name)
 
         # Update xr_ctx so subsequent formulas can reference this result.
-        # Store the xarray object directly to skip the DWA→xarray round-trip:
-        # round-tripping can fail when pymodaq spread/nav attrs from the source
-        # dataset are inherited by the arithmetic result.
+        # Store the xarray object directly to skip the DWA→xarray round-trip.
         if isinstance(result, xr.DataArray):
             # Name the data variable after the formula output so users write
-            # {name}["name"] consistently regardless of the original channel label.
-            xr_ctx[name] = result.to_dataset(name=name)
+            # {name}["name"] consistently regardless of the original channel
+            # label. promote_attrs carries pymodaq_nav_dims etc. up to the
+            # Dataset level for the benefit of later formula lines.
+            xr_ctx[name] = result.to_dataset(name=name, promote_attrs=True)
         elif isinstance(result, xr.Dataset):
             xr_ctx[name] = result
         else:
-            # ndarray / scalar / DataWithAxes — strip pymodaq attrs before
-            # storing so we don't inherit spread/nav metadata that may no longer
-            # apply to the computed result.
+            # ndarray / scalar / DataWithAxes — dwa already carries correct
+            # (possibly empty) nav info. A DataWithAxes result may carry its
+            # own errors (e.g. a user-built one); strip them for the same
+            # reason as the initial H5 ingestion above.
             try:
-                ds = dwa.to_xarray()
-                xr_ctx[name] = ds.assign_attrs(
-                    {k: v for k, v in ds.attrs.items()
-                     if not k.startswith('pymodaq_')})
+                xr_ctx[name] = strip_error_vars(dwa.to_xarray())
             except Exception:
                 pass  # cross-referencing this result won't be available
 

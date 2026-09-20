@@ -21,6 +21,9 @@ from qtpy.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 from pymodaq_data.data import DataWithAxes
 from pymodaq_gui.plotting.data_viewers.base import ViewersEnum
 from pymodaq_gui.plotting.data_viewers.viewer import viewer_factory
+from pymodaq_utils.logger import set_logger, get_module_name
+
+logger = set_logger(get_module_name(__file__))
 
 
 class DataViewerWindow(QWidget):
@@ -117,18 +120,27 @@ class DataViewerWindow(QWidget):
     def _normalize_nav_indexes(dwa: DataWithAxes) -> DataWithAxes:
         """Ensure the DWA has at most 2 signal dimensions.
 
-        All viewers enforce ``len(sig_indexes) ≤ 2``.  Formula results often
-        lose their ``nav_indexes`` because xarray operations strip Dataset
-        attrs (where PyMoDAQ stores ``pymodaq_nav_indexes``).  When the DWA
-        arrives with empty ``nav_indexes`` and total ``ndim > 2``, promote the
-        leading ``ndim - 2`` dims to navigation so the constraint is met.
-
-        For a typical PyMoDAQ scan the leading dims are always navigation
-        (scan-axis dims), so this heuristic produces the expected viewer layout
-        without any user interaction.
+        All viewers enforce ``len(sig_indexes) <= 2``.  ``nav_indexes`` is now
+        tracked by dimension name through xarray operations (see
+        ``DataWithAxes.to_xarray``/``from_xarray``), so a formula result should
+        normally already carry correct navigation info.  If a DWA still
+        arrives with more than 2 signal dims and no navigation at all, it
+        genuinely has none — e.g. a formula built a fresh array with
+        ``np.zeros(...)`` with no axis metadata to inherit — so promoting
+        leading dims to navigation here is a last-resort fallback to avoid a
+        hard crash, not an expected code path. Log it so it stays visible.
         """
         if len(dwa.sig_indexes) <= 2:
             return dwa
+        if len(dwa.nav_indexes) != 0:
+            # nav_indexes is set but still leaves >2 signal dims: this is
+            # genuinely >2D signal data, not a lost-metadata case. Don't
+            # clobber correct info with a guess; let the viewer lookup fail
+            # honestly instead.
+            return dwa
+        logger.warning(
+            f'{dwa.name!r} has {len(dwa.shape)} dims with no navigation info; '
+            f'guessing the leading dims are navigation so it can be displayed.')
         ndim = len(dwa.shape)
         n_nav = ndim - 2          # keep exactly 2 signal dims
         dwa.nav_indexes = tuple(range(n_nav))
