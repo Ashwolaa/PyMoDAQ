@@ -915,6 +915,36 @@ class TestNavIndexes:
         data.nav_indexes = ()
         assert data.sig_indexes == (0, 1, 2)
 
+    def test_dim_names(self):
+        data, shape = init_dataND()
+        assert data.dim_names == ['myaxis0', 'myaxis1', 'myaxis2']
+        assert data.nav_dim_names == ('myaxis0', 'myaxis1')
+        assert data.sig_dim_names == ('myaxis2',)
+
+    def test_dim_names_deduplicates_repeated_labels(self):
+        axis0 = data_mod.Axis(label='pos', data=np.linspace(0, 4, 5), index=0)
+        axis1 = data_mod.Axis(label='pos', data=np.linspace(0, 3, 4), index=1)
+        data = data_mod.DataWithAxes('mydata', source='raw',
+                                     data=[np.zeros((5, 4))], axes=[axis0, axis1])
+        assert data.dim_names == ['pos', 'pos_1']
+
+    def test_dim_names_fallback_for_unlabeled_dim(self):
+        data, shape = init_data(), DATA2D.shape
+        assert data.dim_names == ['dim_0', 'dim_1']
+
+    def test_set_nav_dim_names(self):
+        data, shape = init_dataND()
+
+        data.nav_dim_names = ('myaxis1',)
+        assert data.nav_indexes == (1,)
+        assert data.sig_indexes == (0, 2)
+        assert data.sig_dim_names == ('myaxis0', 'myaxis2')
+
+    def test_set_nav_dim_names_ignores_unknown_name(self):
+        data, shape = init_dataND()
+        data.nav_dim_names = ('myaxis0', 'not_a_dim')
+        assert data.nav_indexes == (0,)
+
 
 class TestDataWithAxesSpread:
     def test_init_data(self, init_data_spread):

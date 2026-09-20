@@ -2658,6 +2658,65 @@ class DataWithAxes(DataBase, SerializableBase):
         self.set_axes_manager(self.shape, axes=self.axes, nav_indexes=indexes)
         self.get_dim_from_data_axes()
 
+    @property
+    def dim_names(self) -> List[str]:
+        """Canonical per-dimension name: the corresponding axis label, or
+        ``dim_{i}`` for a dimension with no axis / no label. Labels shared by
+        more than one dimension are de-duplicated with a numeric suffix
+        (``label``, ``label_1``, ``label_2``, ...) so every dimension gets a
+        unique name.
+
+        This is the naming scheme :meth:`to_xarray` uses for xarray dimension
+        names, exposed here so navigation/signal axes can be resolved by name
+        instead of position from any code path, not just the xarray bridge.
+        """
+        names = []
+        seen = {}
+        for i in range(len(self.shape)):
+            axes_at_i = self.get_axis_from_index(i)
+            if axes_at_i and axes_at_i[0] is not None and axes_at_i[0].label:
+                base = axes_at_i[0].label
+            else:
+                base = f'dim_{i}'
+            if base in seen:
+                seen[base] += 1
+                name = f'{base}_{seen[base]}'
+            else:
+                seen[base] = 0
+                name = base
+            names.append(name)
+        return names
+
+    @property
+    def nav_dim_names(self) -> Tuple[str, ...]:
+        """Names of the navigation dimensions, see :attr:`dim_names`"""
+        dim_names = self.dim_names
+        return tuple(dim_names[i] for i in self.nav_indexes)
+
+    @nav_dim_names.setter
+    def nav_dim_names(self, names: IterableType[str]):
+        """Set navigation axes by dimension name rather than positional index.
+
+        Unknown names are ignored with a warning rather than raising, since a
+        name may legitimately no longer exist (e.g. it named a dimension a
+        reduction has since removed).
+        """
+        dim_names = self.dim_names
+        indexes = []
+        for dim_name in names:
+            if dim_name not in dim_names:
+                logger.warning(
+                    f'{dim_name!r} is not a known dimension name in {dim_names}; ignoring it')
+                continue
+            indexes.append(dim_names.index(dim_name))
+        self.nav_indexes = tuple(indexes)
+
+    @property
+    def sig_dim_names(self) -> Tuple[str, ...]:
+        """Names of the signal dimensions, see :attr:`dim_names`"""
+        dim_names = self.dim_names
+        return tuple(dim_names[i] for i in self.sig_indexes)
+
     def get_nav_axes(self) -> List[Axis]:
         return self._am.get_nav_axes()
 
@@ -3008,29 +3067,10 @@ class DataWithAxes(DataBase, SerializableBase):
                 "Install it with: pip install 'pymodaq_data[xarray]'",
             )
 
-        ndim = len(self.shape)
-
-        # --- build dim names (one per shape dimension) ---
-        dim_names = []
-        seen_dim_names = {}
-        for i in range(ndim):
-            axes_at_i = self.get_axis_from_index(i)
-            if axes_at_i and axes_at_i[0] is not None and axes_at_i[0].label:
-                base = axes_at_i[0].label
-            else:
-                base = f'dim_{i}'
-            # deduplicate
-            if base in seen_dim_names:
-                seen_dim_names[base] += 1
-                name = f'{base}_{seen_dim_names[base]}'
-            else:
-                seen_dim_names[base] = 0
-                name = base
-            dim_names.append(name)
+        dim_names = self.dim_names
 
         # --- build coordinates ---
         coords = {}
-        spread_dim_names = []
         for axis in self.axes:
             dim_name = dim_names[axis.index]
             axis_data = axis.get_data()
@@ -3043,8 +3083,6 @@ class DataWithAxes(DataBase, SerializableBase):
                     'pymodaq_label': axis.label,
                     'spread_order': axis.spread_order,
                 }
-                if dim_name not in spread_dim_names:
-                    spread_dim_names.append(dim_name)
             else:
                 coord_name = axis.label if axis.label else dim_name
                 coord_attrs = {
@@ -3053,32 +3091,40 @@ class DataWithAxes(DataBase, SerializableBase):
                 }
             coords[coord_name] = xr.Variable(dim_name, axis_data, attrs=coord_attrs)
 
-        # --- build data variables ---
-        data_vars = {}
-        label_list = list(self.labels)
-        error_var_names = []
-        for i, (array, label) in enumerate(zip(self.data, label_list)):
-            var_name = label if label else f'data_{i}'
-            data_vars[var_name] = xr.Variable(dim_names, array)
-            if self.errors is not None:
-                err_name = f'{var_name}_error'
-                data_vars[err_name] = xr.Variable(dim_names, self.errors[i])
-                error_var_names.append(err_name)
-
         # --- dataset attrs ---
+        # Navigation axes are identified by dimension *name*, not positional
+        # index: names survive xarray operations (arithmetic, reductions,
+        # transpose) that reorder or drop dimensions, whereas positional
+        # indices silently go stale.
+        label_list = list(self.labels)
         attrs = {
             'pymodaq_name': self.name,
             'pymodaq_origin': self.origin,
             'pymodaq_source': self.source.name,
             'pymodaq_distribution': self.distribution.name,
             'pymodaq_units': self.units,
-            'pymodaq_nav_indexes': list(self.nav_indexes),
+            'pymodaq_nav_dims': list(self.nav_dim_names),
             'pymodaq_labels': label_list,
         }
+
+        # --- build data variables ---
+        # The same attrs are also stamped on every data Variable (not just the
+        # Dataset), so nav-dim info survives when a formula pulls out a single
+        # DataArray (e.g. ds['channel']) rather than operating on the whole
+        # Dataset — Dataset-level attrs are not inherited by an extracted
+        # variable.
+        data_vars = {}
+        error_var_names = []
+        for i, (array, label) in enumerate(zip(self.data, label_list)):
+            var_name = label if label else f'data_{i}'
+            data_vars[var_name] = xr.Variable(dim_names, array, attrs=attrs)
+            if self.errors is not None:
+                err_name = f'{var_name}_error'
+                data_vars[err_name] = xr.Variable(dim_names, self.errors[i], attrs=attrs)
+                error_var_names.append(err_name)
+
         if error_var_names:
             attrs['pymodaq_error_vars'] = error_var_names
-        if spread_dim_names:
-            attrs['pymodaq_spread_dim_names'] = spread_dim_names
 
         return xr.Dataset(data_vars, coords=coords, attrs=attrs)
 
@@ -3111,19 +3157,44 @@ class DataWithAxes(DataBase, SerializableBase):
             var_name = ds.name if ds.name else 'data'
             ds = ds.to_dataset(name=var_name)
 
-        attrs = ds.attrs
+        # Dataset-level attrs win when present, but fall back to the first
+        # data variable's own attrs: a variable pulled out of a Dataset (e.g.
+        # ds['channel']) does not inherit the parent Dataset's attrs, only its
+        # own — which to_xarray() stamps with the same pymodaq_* metadata for
+        # exactly this reason.
+        attrs = dict(ds.attrs)
+        if 'pymodaq_nav_dims' not in attrs:
+            for var in ds.data_vars.values():
+                if var.attrs:
+                    attrs = {**var.attrs, **attrs}
+                    break
+
         name = attrs.get('pymodaq_name', 'from_xarray')
         origin = attrs.get('pymodaq_origin', '')
         source_str = attrs.get('pymodaq_source', 'raw')
         distribution_str = attrs.get('pymodaq_distribution', 'uniform')
         units = attrs.get('pymodaq_units', '')
-        nav_indexes = tuple(attrs.get('pymodaq_nav_indexes', []))
+        nav_dim_names = list(attrs.get('pymodaq_nav_dims', []))
         stored_labels = list(attrs.get('pymodaq_labels', []))
         error_var_names = list(attrs.get('pymodaq_error_vars', []))
 
         # separate error vars from regular data vars
         regular_vars = {k: v for k, v in ds.data_vars.items() if k not in error_var_names}
         error_vars = {k: v for k, v in ds.data_vars.items() if k in error_var_names}
+
+        # Dimension order is taken from an actual data variable's own .dims,
+        # not the Dataset-level ds.dims mapping: the latter's iteration order
+        # is not guaranteed to match a given variable's storage order (e.g.
+        # after arithmetic between differently-ordered operands), which would
+        # otherwise silently mislabel axes.
+        if regular_vars:
+            dim_names = list(next(iter(regular_vars.values())).dims)
+        else:
+            dim_names = list(ds.dims)
+
+        # nav dims that survived (a reduction may have dropped one entirely,
+        # which correctly removes it from navigation with no guessing needed)
+        nav_indexes = tuple(dim_names.index(d) for d in nav_dim_names if d in dim_names)
 
         # reconstruct data arrays and labels
         data_arrays = []
@@ -3139,7 +3210,6 @@ class DataWithAxes(DataBase, SerializableBase):
             errors = [error_vars[err_name].values for err_name in error_var_names]
 
         # reconstruct Axis objects from dims and coords
-        dim_names = list(ds.dims)
         axes = []
         for i, dim_name in enumerate(dim_names):
             # find coords that live on this dimension
