@@ -1005,20 +1005,54 @@ class TestNavIndexes:
         assert data.nav_dim_names == ('myaxis0', 'myaxis1')
         assert data.sig_dim_names == ('myaxis2',)
 
-    def test_dim_names_deduplicates_repeated_labels(self):
+    def test_duplicate_axis_names_are_renamed(self):
         axis0 = data_mod.Axis(label='pos', data=np.linspace(0, 4, 5), index=0)
         axis1 = data_mod.Axis(label='pos', data=np.linspace(0, 3, 4), index=1)
-        data = data_mod.DataWithAxes('mydata', source='raw',
-                                     data=[np.zeros((5, 4))], axes=[axis0, axis1])
+        with pytest.warns(data_mod.AxisNameWarning):
+            data = data_mod.DataWithAxes('mydata', source='raw',
+                                         data=[np.zeros((5, 4))], axes=[axis0, axis1])
         assert data.dim_names == ['pos', 'pos_1']
+        renamed = data.get_axis_from_index(1)[0]
+        assert (renamed.name, renamed.label) == ('pos_1', 'pos')  # displayed label kept
+        assert axis1.name == 'pos'  # the caller's Axis object is not modified
+        assert renamed.iaxis[1:3].name == 'pos_1'  # slicers bound to the renamed copy
 
-    def test_dim_names_suffix_never_collides(self):
-        """A real label keeps its exact name, only the repeated one gets the next free suffix"""
+    def test_duplicate_rename_never_collides(self):
+        """A real name is kept as is, only the repeated one gets the next free suffix"""
         axes = [data_mod.Axis('x', data=np.arange(2.), index=0),
                 data_mod.Axis('x', data=np.arange(3.), index=1),
                 data_mod.Axis('x_1', data=np.arange(4.), index=2)]
-        data = data_mod.DataRaw('d', data=[np.zeros((2, 3, 4))], axes=axes)
+        with pytest.warns(data_mod.AxisNameWarning):
+            data = data_mod.DataRaw('d', data=[np.zeros((2, 3, 4))], axes=axes)
         assert data.dim_names == ['x', 'x_2', 'x_1']
+
+    def test_append_duplicate_axis_is_renamed(self):
+        data = data_mod.DataRaw('d', data=[np.zeros((2, 3))],
+                                axes=[data_mod.Axis('x', data=np.arange(2.), index=0)])
+        with pytest.warns(data_mod.AxisNameWarning):
+            data.axes_manager.append_axis(data_mod.Axis('x', data=np.arange(3.), index=1))
+        assert data.dim_names == ['x', 'x_1']
+
+    def test_append_axis_keeps_existing_axes(self):
+        data = data_mod.DataRaw('d', data=[np.zeros((2, 3))],
+                                axes=[data_mod.Axis('x', data=np.arange(2.), index=0)])
+        data.axes_manager.append_axis(data_mod.Axis('y', data=np.arange(3.), index=1))
+        assert [axis.name for axis in data.axes] == ['x', 'y']
+
+    def test_unnamed_axes_get_dim_names(self):
+        axis = data_mod.Axis(data=np.arange(3.), index=1)
+        data = data_mod.DataRaw('d', data=[np.zeros((2, 3))], axes=[axis])
+        named = data.get_axis_from_index(1)[0]
+        assert (named.name, named.label) == ('dim_1', '')  # still displayed blank
+        data.create_missing_axes()
+        created = data.get_axis_from_index(0)[0]
+        assert (created.name, created.label) == ('dim_0', '')
+        assert data.dim_names == ['dim_0', 'dim_1']
+
+    def test_generated_dim_name_avoids_axis_names(self):
+        axis = data_mod.Axis('dim_1', data=np.arange(2.), index=0)
+        data = data_mod.DataRaw('d', data=[np.zeros((2, 3))], axes=[axis])
+        assert data.dim_names == ['dim_1', 'dim_1_1']
 
     def test_dim_names_fallback_for_unlabeled_dim(self):
         data, shape = init_data(), DATA2D.shape
@@ -1029,15 +1063,26 @@ class TestNavIndexes:
         assert data.dim_names == ['dim_0', 'dim_1']
         assert not [w for w in recwarn if issubclass(w.category, data_mod.DataIndexWarning)]
 
-    def test_dim_names_spread_uses_lowest_spread_order(self):
+    def test_dim_names_spread_navigation_is_points(self):
+        """The spread navigation dimension holds the scattered points, its axes are coordinates
+        along it: none of them names it"""
         npts = 5
         axes = [data_mod.Axis('b', data=np.random.rand(npts), index=0, spread_order=1),
                 data_mod.Axis('a', data=np.random.rand(npts), index=0, spread_order=0),
                 data_mod.Axis('t', data=np.arange(4.), index=1)]
         data = data_mod.DataRaw('s', distribution='spread', data=[np.random.rand(npts, 4)],
                                 axes=axes, nav_indexes=(0,))
-        assert data.dim_names == ['a', 't']
-        assert data.nav_dim_names == ('a',)
+        assert data.dim_names == [data_mod.SPREAD_DIM_NAME, 't']
+        assert data.nav_dim_names == ('points',)
+        assert data.get_axis_from_name('a').spread_order == 0
+
+    def test_dim_names_spread_avoids_axis_named_points(self):
+        npts = 5
+        axes = [data_mod.Axis('points', data=np.random.rand(npts), index=0, spread_order=0),
+                data_mod.Axis('t', data=np.arange(4.), index=1)]
+        data = data_mod.DataRaw('s', distribution='spread', data=[np.random.rand(npts, 4)],
+                                axes=axes, nav_indexes=(0,))
+        assert data.dim_names == ['points_1', 't']
 
     def test_set_nav_dim_names(self):
         data, shape = init_dataND()

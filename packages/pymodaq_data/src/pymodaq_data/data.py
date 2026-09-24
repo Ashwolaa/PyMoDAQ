@@ -111,6 +111,11 @@ def _unique_name(base: str, taken: IterableType[str]) -> str:
     return name
 
 
+SPREAD_DIM_NAME = 'points'
+"""Name of the navigation dimension of spread data, holding the scattered points: its axes
+(one per spread_order) are coordinates along it, none of them names it"""
+
+
 def squeeze(data_array: np.ndarray, do_squeeze=True, squeeze_indexes: Tuple[int]=None) -> np.ndarray:
     """ Squeeze numpy arrays return at least 1D arrays except if do_squeeze is False"""
     if do_squeeze:
@@ -128,6 +133,10 @@ class DataTypeWarning(Warning):
 
 
 class DataDimWarning(Warning):
+    pass
+
+
+class AxisNameWarning(Warning):
     pass
 
 
@@ -1491,6 +1500,7 @@ class AxesManagerBase:
 
         self._check_axis(self._axes)
         self._manage_named_axes(self._axes, **kwargs)
+        self._ensure_unique_names()
 
     @property
     def axes(self):
@@ -1500,6 +1510,36 @@ class AxesManagerBase:
     def axes(self, axes: List[Axis]):
         self._axes = axes[:]
         self._check_axis(self._axes)
+        self._ensure_unique_names()
+
+    def _ensure_unique_names(self):
+        """Make axis names unique identifiers of the axes
+
+        An axis without name is named ``dim_{index}`` (keeping an empty displayed label). A name
+        already used by a previous axis is changed to the first free ``name_1``, ``name_2``...
+        with an AxisNameWarning, its displayed label being kept. Renamed axes are copies: an Axis
+        object shared with other data is left untouched.
+        """
+        taken = {axis.name for axis in self._axes if axis.name}
+        seen = set()
+        for ind, axis in enumerate(self._axes):
+            if not axis.name:
+                new_name = _unique_name(f'dim_{axis.index}', taken)
+            elif axis.name in seen:
+                new_name = _unique_name(axis.name, taken)
+                warnings.warn(AxisNameWarning(
+                    f'Axis name {axis.name!r} is used by several axes, renaming one of them '
+                    f'{new_name!r} (its label {axis.label!r} is kept)'))
+            else:
+                seen.add(axis.name)
+                continue
+            label = axis.label
+            axis = copy.deepcopy(axis)  # a shallow copy would keep iaxis/vaxis bound to the original
+            axis.name = new_name
+            axis.label = label
+            self._axes[ind] = axis
+            taken.add(new_name)
+            seen.add(new_name)
 
     @abstractmethod
     def _check_axis(self, axes):
@@ -1614,7 +1654,9 @@ class AxesManagerBase:
 
     def append_axis(self, axis: Axis):
         self._axes.append(axis)
-        self._check_axis([axis])
+        # the whole list: the uniform _check_axis stores the list it is given as self._axes
+        self._check_axis(self._axes)
+        self._ensure_unique_names()
 
     @property
     def nav_indexes(self) -> IterableType[int]:
@@ -1800,7 +1842,7 @@ class AxesManagerUniform(AxesManagerBase):
             if create:
                 warnings.warn(DataIndexWarning(f'The axis requested with index {index} is not present, '
                                                f'creating a linear one...'))
-                axis = Axis(index=index, offset=0, scaling=1)
+                axis = Axis(f'dim_{index}', index=index, offset=0, scaling=1, label='')
                 axis.size = self.get_shape_from_index(index)
             else:
                 warnings.warn(DataIndexWarning(f'The axis requested with index {index} is not present, returning None'))
@@ -1954,7 +1996,7 @@ class AxesManagerSpread(AxesManagerBase):
                 if create:
                     warnings.warn(DataIndexWarning(f'The axis requested with index {index} is not present, '
                                                    f'creating a linear one...'))
-                    axis = Axis(index=index, offset=0, scaling=1)
+                    axis = Axis(f'dim_{index}', index=index, offset=0, scaling=1, label='')
                     axis.size = self.get_shape_from_index(index)
                 else:
                     warnings.warn(DataIndexWarning(f'The axis requested with index {index} is not present, returning None'))
@@ -2717,41 +2759,27 @@ class DataWithAxes(DataBase, SerializableBase):
 
     @property
     def dim_names(self) -> List[str]:
-        """Canonical per-dimension name: the corresponding axis name, or
-        ``dim_{i}`` for a dimension with no axis / no name. A name shared by
-        more than one dimension keeps its exact name on its first dimension, the
-        next ones get the first free numeric suffix (``label_1``, ``label_2``...,
-        skipping names already used by another dimension) so every dimension gets
-        a unique name. For a spread navigation dimension, the name comes from the
-        axis with the lowest ``spread_order``.
+        """Canonical per-dimension name, used to address dimensions by name rather than position:
 
-        This is the naming scheme :meth:`to_xarray` uses for xarray dimension
-        names, exposed here so navigation/signal axes can be resolved by name
-        instead of position from any code path, not just the xarray bridge.
+        * the name of the dimension's axis (axis names are unique, see Axis.name),
+        * ``dim_{i}`` for a dimension without axis,
+        * SPREAD_DIM_NAME ('points') for the navigation dimension of spread data, which holds
+          scattered points: its axes are coordinates along it (one per spread_order).
+
+        A generated name taken by an axis of another dimension gets the first free numeric suffix.
         """
-        bases = []
-        for i in range(len(self.shape)):
-            primary = self._primary_axis(i)
-            bases.append(primary.name if primary is not None and primary.name else f'dim_{i}')
-        # every distinct name is kept as is, only repeats get the next free suffix:
-        # ['x', 'x', 'x_1'] -> ['x', 'x_2', 'x_1']
-        taken = set(bases)
+        axis_names = {axis.name for axis in self.axes}
+        spread_nav = self.distribution == DataDistribution.spread and len(self.nav_indexes) > 0
         names = []
-        for i, base in enumerate(bases):
-            if base in bases[:i]:
-                base = _unique_name(base, taken)
-                taken.add(base)
-            names.append(base)
+        for i in range(len(self.shape)):
+            if spread_nav and i in self.nav_indexes:
+                name = _unique_name(SPREAD_DIM_NAME, axis_names | set(names))
+            else:
+                axes_at_index = [axis for axis in self.axes if axis.index == i]
+                name = axes_at_index[0].name if axes_at_index \
+                    else _unique_name(f'dim_{i}', axis_names | set(names))
+            names.append(name)
         return names
-
-    def _primary_axis(self, index: int) -> Union[Axis, None]:
-        """The axis naming dimension ``index``: the one with the lowest spread_order (only
-        spread navigation dimensions carry several axes). Reads self.axes directly rather than
-        get_axis_from_index, which warns for every dimension without an axis."""
-        axes_at_index = [axis for axis in self.axes if axis.index == index]
-        if not axes_at_index:
-            return None
-        return min(axes_at_index, key=lambda axis: axis.spread_order)
 
     @property
     def nav_dim_names(self) -> Tuple[str, ...]:
