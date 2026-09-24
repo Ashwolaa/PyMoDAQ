@@ -142,9 +142,9 @@ class StatusPaletteWidget(QtWidgets.QWidget):
             grid.addWidget(lbl, 0, col)
 
         states = StatusPalette.as_states()
-        for row, (name, color) in enumerate(states, start=1):
+        for row, (name, color) in enumerate(states.items(), start=1):
             # LED fixed to its own state for visual reference
-            led = MultistateLED(states=[(name, color)], size=24)
+            led = MultistateLED(states={name: color}, size=24)
             led.set_state(name)
             grid.addWidget(led, row, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
 

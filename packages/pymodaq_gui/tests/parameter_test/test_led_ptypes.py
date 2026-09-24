@@ -79,7 +79,7 @@ class TestLedPushParameter:
 
 class TestMultistateLedParameter:
 
-    STATES = [('idle', '#888888'), ('running', '#00b400'), ('error', '#c80000')]
+    STATES = {'idle': '#888888', 'running': '#00b400', 'error': '#c80000'}
 
     def test_default_two_state(self, tree):
         p = Parameter.create(name='ms', type='multistate_led', value='false')
@@ -156,7 +156,7 @@ class TestActionLedParameter:
             widget.button.click()
 
     def test_custom_states(self, tree):
-        states = [('idle', '#888888'), ('running', '#00b400'), ('error', '#c80000')]
+        states = {'idle': '#888888', 'running': '#00b400', 'error': '#c80000'}
         p = Parameter.create(name='act', type='action_led', value='idle', states=states)
         tree.setParameters(p, showTop=False)
         p.setValue('running')

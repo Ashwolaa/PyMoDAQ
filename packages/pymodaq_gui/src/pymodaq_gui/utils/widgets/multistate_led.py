@@ -16,10 +16,10 @@ class LedState(StrEnum):
 
 
 # Default two-state set — visually matches QLED
-DEFAULT_STATES = [
-    (LedState.FALSE, '#c80000'),
-    (LedState.TRUE,  '#00b400'),
-]
+DEFAULT_STATES = {
+    LedState.FALSE: '#c80000',
+    LedState.TRUE:  '#00b400',
+}
 
 
 class MultistateLED(QtWidgets.QWidget):
@@ -32,9 +32,10 @@ class MultistateLED(QtWidgets.QWidget):
     Parameters
     ----------
     parent : QWidget, optional
-    states : list of (str, str | QColor), optional
-        Ordered ``[(name, color), ...]`` pairs.  *name* can be a plain
-        string or a :class:`~pymodaq_utils.enums.StrEnum` member (e.g.
+    states : dict of {str: str | QColor}, optional
+        Ordered ``{name: color}`` mapping — this is what
+        :mod:`pymodaq_gui.parameter.ioxml` serializes.  *name* can be a
+        plain string or a :class:`~pymodaq_utils.enums.StrEnum` member (e.g.
         :class:`LedState` or
         :class:`~pymodaq_gui.utils.status_palette.Status`) — both compare
         equal to their string value, so mixing the two is safe.  *color*
@@ -87,7 +88,7 @@ class MultistateLED(QtWidgets.QWidget):
         self._shape = shape
 
         states = states if states is not None else DEFAULT_STATES
-        for name, color in states:
+        for name, color in states.items():
             self._states.append(
                 (name, color if isinstance(color, QtGui.QColor) else QtGui.QColor(color))
             )
@@ -123,13 +124,13 @@ class MultistateLED(QtWidgets.QWidget):
         """Return the ordered list of state names."""
         return [n for n, _ in self._states]
 
-    def set_states(self, states: list):
+    def set_states(self, states):
         """Replace the full state list.  Current state is reset to index 0."""
         if not states:
             raise ValueError("states must contain at least one entry")
         self._states = [
             (name, color if isinstance(color, QtGui.QColor) else QtGui.QColor(color))
-            for name, color in states
+            for name, color in states.items()
         ]
         self._index = 0
         self.update()

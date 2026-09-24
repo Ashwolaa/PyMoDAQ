@@ -464,12 +464,12 @@ class GenericOptimization(CustomExt):
         self._optimizing_step.setToolTip('Current Optimizing step')
 
         self._optimizing_done_LED = MultistateLED(
-            states=[
-                (OptimizerLedState.IDLE,     StatusPalette.color(Status.OFF)),
-                (OptimizerLedState.RUNNING,  StatusPalette.color(Status.RUNNING)),
-                (OptimizerLedState.COMPLETE, StatusPalette.color(Status.IDLE)),
-                (OptimizerLedState.ERROR,    StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                OptimizerLedState.IDLE:     StatusPalette.color(Status.OFF),
+                OptimizerLedState.RUNNING:  StatusPalette.color(Status.RUNNING),
+                OptimizerLedState.COMPLETE: StatusPalette.color(Status.IDLE),
+                OptimizerLedState.ERROR:    StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         )
         self._optimizing_done_LED.setToolTip('Optimisation state: idle / running / complete / error')
@@ -570,11 +570,11 @@ class GenericOptimization(CustomExt):
         self.add_widget(OptimizerAction.MODELS, combo_model, tip='List of available models')
         self.add_action(OptimizerAction.INI_MODEL, 'Init Model', 'ini')
         self.add_widget('model_led', MultistateLED(
-            states=[
-                (ModelLedState.UNINITIALIZED, StatusPalette.color(Status.OFF)),
-                (ModelLedState.READY,         StatusPalette.color(Status.IDLE)),
-                (ModelLedState.ERROR,         StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                ModelLedState.UNINITIALIZED: StatusPalette.color(Status.OFF),
+                ModelLedState.READY:         StatusPalette.color(Status.IDLE),
+                ModelLedState.ERROR:         StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         ), toolbar=self.toolbar)
         self.add_action(OptimizerAction.SAVE, 'Save?', 'SaveAs', tip='If checked, data will be saved',
@@ -582,11 +582,11 @@ class GenericOptimization(CustomExt):
         self.add_action(OptimizerAction.INI_RUNNER, 'Init the Optimisation Algorithm', 'ini', checkable=True,
                         enabled=False)
         self.add_widget('runner_led', MultistateLED(
-            states=[
-                (ModelLedState.UNINITIALIZED, StatusPalette.color(Status.OFF)),
-                (ModelLedState.READY,         StatusPalette.color(Status.IDLE)),
-                (ModelLedState.ERROR,         StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                ModelLedState.UNINITIALIZED: StatusPalette.color(Status.OFF),
+                ModelLedState.READY:         StatusPalette.color(Status.IDLE),
+                ModelLedState.ERROR:         StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         ), toolbar=self.toolbar)
         self.add_action(OptimizerAction.RUN, 'Run Optimisation', 'run2', checkable=True, enabled=False)

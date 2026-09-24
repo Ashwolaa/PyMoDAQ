@@ -10,7 +10,7 @@ class TestLedState:
     def test_led_state_equals_plain_strings(self):
         assert LedState.FALSE == 'false'
         assert LedState.TRUE == 'true'
-        assert [n for n, _ in DEFAULT_STATES] == ['false', 'true']
+        assert list(DEFAULT_STATES) == ['false', 'true']
 
     def test_status_equals_plain_strings(self):
         assert list(Status) == ['off', 'idle', 'running', 'warning', 'error', 'critical']
@@ -36,3 +36,14 @@ class TestMultistateLEDEnumInterop:
         assert led.state_names() == ['off', 'idle', 'error']
         led.set_state(Status.IDLE)
         assert led.get_state() == 'idle'
+
+    def test_custom_states_dict(self, qapp):
+        led = MultistateLED(states={'idle': '#888888', 'running': '#00b400', 'error': '#c80000'})
+        assert led.state_names() == ['idle', 'running', 'error']
+        led.set_state('running')
+        assert led.get_state() == 'running'
+
+    def test_set_states_replaces_states(self, qapp):
+        led = MultistateLED()
+        led.set_states({'a': '#111111', 'b': '#222222'})
+        assert led.state_names() == ['a', 'b']

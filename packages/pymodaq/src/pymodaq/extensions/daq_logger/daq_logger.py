@@ -98,11 +98,11 @@ class LoggerStatusBarManager:
         self.statusbar.addPermanentWidget(self._start_log_time)
 
         self._logging_state = MultistateLED(
-            states=[
-                (LoggerLedState.IDLE,    StatusPalette.color(Status.OFF)),
-                (LoggerLedState.RUNNING, StatusPalette.color(Status.RUNNING)),
-                (LoggerLedState.ERROR,   StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                LoggerLedState.IDLE:    StatusPalette.color(Status.OFF),
+                LoggerLedState.RUNNING: StatusPalette.color(Status.RUNNING),
+                LoggerLedState.ERROR:   StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         )
         self._logging_state.setToolTip('Logging state: idle / running / error')

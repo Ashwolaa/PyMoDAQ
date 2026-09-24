@@ -114,12 +114,12 @@ class ScanStatusBarManager:
         self._indice_average_sb.setToolTip('Current average value')
 
         self._scan_done_LED = MultistateLED(
-            states=[
-                (ScanLedState.IDLE,     StatusPalette.color(Status.OFF)),
-                (ScanLedState.RUNNING,  StatusPalette.color(Status.RUNNING)),
-                (ScanLedState.COMPLETE, StatusPalette.color(Status.IDLE)),
-                (ScanLedState.ERROR,    StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                ScanLedState.IDLE:     StatusPalette.color(Status.OFF),
+                ScanLedState.RUNNING:  StatusPalette.color(Status.RUNNING),
+                ScanLedState.COMPLETE: StatusPalette.color(Status.IDLE),
+                ScanLedState.ERROR:    StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         )
         self._scan_done_LED.setToolTip('Scan state: idle / running / complete / error')

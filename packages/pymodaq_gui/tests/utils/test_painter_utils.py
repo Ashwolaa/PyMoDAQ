@@ -156,7 +156,7 @@ class TestMultistateLEDShape:
 class TestMultistateLEDDisabled:
 
     def test_enabled_color_is_saturated(self, qapp, qtbot):
-        led = MultistateLED(states=[('on', '#00b400')], size=40)
+        led = MultistateLED(states={'on': '#00b400'}, size=40)
         qtbot.addWidget(led)
         led.show()
         led.setEnabled(True)
@@ -166,7 +166,7 @@ class TestMultistateLEDDisabled:
         assert QtGui.QColor(center).saturation() > 0
 
     def test_disabled_color_is_desaturated(self, qapp, qtbot):
-        led = MultistateLED(states=[('on', '#00b400')], size=40)
+        led = MultistateLED(states={'on': '#00b400'}, size=40)
         qtbot.addWidget(led)
         led.show()
         led.setEnabled(False)

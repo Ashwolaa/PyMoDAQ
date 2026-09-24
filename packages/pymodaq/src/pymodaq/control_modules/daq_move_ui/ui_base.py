@@ -190,12 +190,12 @@ class DAQMoveUI(ControlModuleUI):
 
         self.abs_value_sb_bis = QSpinBoxWithShortcut(step=0.1, dec=True, siPrefix=config('pymodaq', 'actuator', 'siprefix'))
         self.status_led = MultistateLED(
-            states=[
-                (MoveLedState.UNINITIALIZED, StatusPalette.color(Status.OFF)),
-                (MoveLedState.IDLE,          StatusPalette.color(Status.IDLE)),
-                (MoveLedState.MOVING,        StatusPalette.color(Status.RUNNING)),
-                (MoveLedState.ERROR,         StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                MoveLedState.UNINITIALIZED: StatusPalette.color(Status.OFF),
+                MoveLedState.IDLE:          StatusPalette.color(Status.IDLE),
+                MoveLedState.MOVING:        StatusPalette.color(Status.RUNNING),
+                MoveLedState.ERROR:         StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         )
         self.current_value_sb = QSpinBox_ro(font_size=10, min_height=20,

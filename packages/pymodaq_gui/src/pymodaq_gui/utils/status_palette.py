@@ -141,20 +141,19 @@ class StatusPalette:
     """Standard status color definitions for PyMoDAQ.
 
     Colors are drawn from the active ``qt_themes`` theme so they adapt
-    to dark / light modes.  Each entry resolves to a
-    ``(name, QColor)`` pair compatible with
-    :class:`~pymodaq_gui.utils.widgets.multistate_led.MultistateLED`.
+    to dark / light modes.  Returns a ``{name: QColor}`` mapping compatible
+    with :class:`~pymodaq_gui.utils.widgets.multistate_led.MultistateLED`.
 
     The states are ordered from *least active* to *most severe*.
     """
 
     @classmethod
-    def as_states(cls) -> list[tuple[str, QtGui.QColor]]:
+    def as_states(cls) -> dict[str, QtGui.QColor]:
         """Return all five states with theme-resolved colors."""
-        return [(name, _resolve(attr, fb)) for name, attr, fb in _DEFINITIONS]
+        return {name: _resolve(attr, fb) for name, attr, fb in _DEFINITIONS}
 
     @classmethod
-    def subset(cls, *names: str) -> list[tuple[str, QtGui.QColor]]:
+    def subset(cls, *names: str) -> dict[str, QtGui.QColor]:
         """Return a subset of states in canonical order with theme-resolved colors.
 
         Parameters
@@ -171,7 +170,7 @@ class StatusPalette:
         Example
         -------
         >>> StatusPalette.subset('off', 'idle', 'error')
-        [('off', QColor(...)), ('idle', QColor(...)), ('error', QColor(...))]
+        {'off': QColor(...), 'idle': QColor(...), 'error': QColor(...)}
         """
         known = {name: (attr, fb) for name, attr, fb in _DEFINITIONS}
         unknown = set(names) - known.keys()
@@ -180,7 +179,7 @@ class StatusPalette:
                 f"Unknown state(s): {sorted(unknown)}. "
                 f"Valid states: {list(known)}"
             )
-        return [(n, _resolve(*known[n])) for n in names if n in known]
+        return {n: _resolve(*known[n]) for n in names if n in known}
 
     @classmethod
     def color(cls, name: str) -> QtGui.QColor:

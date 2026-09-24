@@ -134,7 +134,10 @@ def add_text_to_elt(elt, param):
     """
     param_type = str(param.type())
     param_val = param.value()
-    if 'bool' in param_type or 'led' in param_type:
+    if param_type in ('multistate_led', 'action_led'):
+        # value is a state-name string, not a bool — 'led' would otherwise match below
+        text = str(param_val)
+    elif 'bool' in param_type or 'led' in param_type:
         if param_val:
             text = '1'
         else:
@@ -220,15 +223,18 @@ def dict_from_param(param: Parameter):
         if eval_option in param_opts:
             opts[eval_option] = str(param_opts.get(eval_option))
 
-    if 'limits' in param_opts:
-        limits_opt = param_opts.get('limits')
-        if isinstance(limits_opt, dict):
-            limits = {}
-            for key in limits_opt:
-                limits[key] = basic_serialization(limits_opt[key], within_dict=True)
-        else:
-            limits = str(limits_opt)
-        opts.update(dict(limits=limits))
+    # 'states' (multistate_led/action_led) is a name -> color mapping, serialized
+    # the same way as a dict-valued 'limits' — no dedicated branch needed.
+    for dict_like_opt in ('limits', 'states'):
+        if dict_like_opt in param_opts:
+            opt_val = param_opts.get(dict_like_opt)
+            if isinstance(opt_val, dict):
+                serialized = {}
+                for key in opt_val:
+                    serialized[key] = basic_serialization(opt_val[key], within_dict=True)
+            else:
+                serialized = str(opt_val)
+            opts.update({dict_like_opt: serialized})
 
     return opts
 
@@ -268,18 +274,21 @@ def elt_to_dict(el):
             except Exception as e:
                 logger.warning(f'could not restore setting option {attribute}')
 
-    if 'limits' in el.attrib.keys():
-        try:
-            limits = eval(el.get('limits'))
-            if isinstance(limits, dict):
-                for key, val in limits.items():
-                    try:
-                        limits[key] = eval(val)
-                    except NameError:
-                        limits[key] = val
-            param.update(dict(limits=limits))
-        except Exception as e:
-            logger.exception(e)
+    for dict_like_opt in ('limits', 'states'):
+        if dict_like_opt in el.attrib.keys():
+            try:
+                opt_val = eval(el.get(dict_like_opt))
+                if isinstance(opt_val, dict):
+                    for key, val in opt_val.items():
+                        try:
+                            opt_val[key] = eval(val)
+                        except Exception:
+                            # e.g. hex colors ('#888888') aren't valid Python
+                            # expressions (NameError-only used to miss those)
+                            opt_val[key] = val
+                param.update({dict_like_opt: opt_val})
+            except Exception as e:
+                logger.exception(e)
 
     return param
 
@@ -432,6 +441,8 @@ def set_txt_from_elt(el, param_dict):
                 param_value = dict(all_items=[], selected=[])
             else:
                 param_value = dict(all_items=eval(el.get('all_items', val_text)), selected=eval(val_text))
+        elif param_type in ('multistate_led', 'action_led'):
+            param_value = val_text
         elif 'bool' in param_type or 'led' in param_type:  # covers 'bool' 'bool_push',  'led' and 'led_push'types
             param_value = bool(int(val_text))
         elif param_type == 'date_time':

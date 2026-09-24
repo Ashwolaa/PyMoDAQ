@@ -65,7 +65,7 @@ class ActionLedParameter(SimpleParameter):
     -------
     label : str, optional
         Text shown on the push button. Defaults to ``'▶'``.
-    states : list of (str, str | QColor), optional
+    states : dict of {str: str | QColor}, optional
         Forwarded to :class:`~pymodaq_gui.utils.widgets.MultistateLED`.
         Defaults to the two-state red/green set.
     """

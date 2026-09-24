@@ -108,6 +108,34 @@ class TestListParameter:
             assert param_back.opts['removable'] == settings.child('dict_param').opts['removable']
 
 
+class TestMultistateLedXML:
+    """Regression: multistate_led/action_led value is a state-name string, not a bool,
+    and 'states' (a {name: color} dict) must survive an XML round-trip."""
+
+    states = {'idle': '#888888', 'running': '#00b400', 'error': '#c80000'}
+
+    @pytest.fixture
+    def ini_parameter(self, qtbot):
+        params = [{'name': 'ms', 'type': 'multistate_led', 'value': 'idle', 'states': self.states},
+                  {'name': 'act', 'type': 'action_led', 'value': 'idle', 'states': self.states}]
+        settings = Parameter.create(name='settings', children=params)
+        tree = ParameterTree()
+        qtbot.addWidget(tree)
+        tree.setParameters(settings, showTop=False)
+        yield settings, tree
+        tree.close()
+
+    @pytest.mark.parametrize('child_name', ['ms', 'act'])
+    def test_value_and_states_roundtrip(self, ini_parameter, child_name):
+        settings, tree = ini_parameter
+        settings.child(child_name).setValue('running')
+        xml_string = ioxml.parameter_to_xml_string(settings.child(child_name))
+
+        param_back = ioxml.XML_string_to_pobject(xml_string).child(child_name)
+        assert param_back.value() == 'running'
+        assert param_back.opts['states'] == self.states
+
+
 class TestXMLbackForth():
 
     params = ParameterEx.params

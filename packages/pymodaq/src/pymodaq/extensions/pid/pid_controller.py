@@ -470,11 +470,11 @@ class DAQ_PID(CustomExt):
         self.add_action("ini_model", "Init Model", "ini",
             tip="Initialize the selected model: algo/data conversion")
         self.add_widget("model_led", MultistateLED(
-            states=[
-                (ModelLedState.UNINITIALIZED, StatusPalette.color(Status.OFF)),
-                (ModelLedState.READY,         StatusPalette.color(Status.IDLE)),
-                (ModelLedState.ERROR,         StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                ModelLedState.UNINITIALIZED: StatusPalette.color(Status.OFF),
+                ModelLedState.READY:         StatusPalette.color(Status.IDLE),
+                ModelLedState.ERROR:         StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         ), toolbar=self.toolbar)
         self.add_action("create_setp_actuators", "Create SetPoint Actuators", "Add_Step",
@@ -484,11 +484,11 @@ class DAQ_PID(CustomExt):
         self.add_action("ini_pid", "Init the PID loop", "ini",
             tip="Init the PID thread", checkable=True)
         self.add_widget("pid_led", MultistateLED(
-            states=[
-                (PidLedState.IDLE,    StatusPalette.color(Status.OFF)),
-                (PidLedState.RUNNING, StatusPalette.color(Status.RUNNING)),
-                (PidLedState.ERROR,   StatusPalette.color(Status.CRITICAL)),
-            ],
+            states={
+                PidLedState.IDLE:    StatusPalette.color(Status.OFF),
+                PidLedState.RUNNING: StatusPalette.color(Status.RUNNING),
+                PidLedState.ERROR:   StatusPalette.color(Status.CRITICAL),
+            },
             readonly=True,
         ), toolbar=self.toolbar)
         self.add_action( "run", "Run The PID loop", "run2",
