@@ -7,22 +7,17 @@ Contains all objects related to the DAQScan module, to do automated scans, savin
 """
 
 from __future__ import annotations
-import dataclasses
 import logging
-import os
 from pathlib import Path
 import tempfile
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
 from qtpy import QtWidgets, QtCore
 from qtpy.QtWidgets import QDialogButtonBox
-from qtpy.QtCore import QObject, QThread, Signal, QDateTime, QDate, QTime, QTimer
+from qtpy.QtCore import Signal, QDateTime, QDate, QTime, QTimer
 
-from pymodaq_gui.managers.h5manager import FileAction, H5Manager
-from pymodaq_gui.managers.runner_thread_manager import WorkerThreadManager
-from pymodaq_gui.managers.settings.settings_manager import SettingsManager
-from pymodaq_gui.plotting.data_viewers import ViewerDispatcher
+from pymodaq_gui.managers.h5manager import FileAction
 from pymodaq.control_modules.enums import MoveType
 from pymodaq.utils.custom_ext import CustomExt
 from pymodaq.utils.managers.modules import ModuleType
@@ -42,11 +37,11 @@ from pymodaq_gui.plotting.navigator import Navigator
 from pymodaq_gui.messenger import messagebox
 from pymodaq_gui import utils as gutils
 from pymodaq_gui.h5modules.saving import H5Saver
+from pymodaq_data.h5modules.data_saving import DataBundle
 from pymodaq_gui.utils.enums import MenuToolbarNames
 
 from pymodaq.utils.scanner.scanner import Scanner
 from pymodaq.utils.managers.batchscan_manager import BatchScanner
-from pymodaq.utils.managers.modules.modules_manager import ModulesManager
 from pymodaq.post_treatment.load_and_plot import LoaderPlotter
 
 from pymodaq.utils.h5modules import module_saving
@@ -54,9 +49,12 @@ from pymodaq.utils.scanner.scan_selector import ScanSelector, SelectorItem
 from pymodaq.utils.data import DataActuator
 from pymodaq.extensions.scan.manager.scan_manager import ScanManager
 from pymodaq_gui.utils.widgets.spinbox import QSpinBox_ro
-from pymodaq_gui.utils.widgets import QLED
-from pymodaq_gui.utils.custom_app import CustomApp, WorkFlowActions
-from pymodaq.extensions.extension_worker import DataBundle, ExtensionWorker
+
+from pymodaq_gui.utils.app_worker import ExtensionWorker, SaverWorker
+from pymodaq_gui.utils.widgets import MultistateLED, StatusPalette, Status
+from pymodaq_utils.enums import StrEnum
+from pymodaq_gui.utils.custom_app import WorkFlowActions
+
 
 if TYPE_CHECKING:
     from pymodaq.dashboard import DashBoard
@@ -76,6 +74,14 @@ class ScanStepError(Exception):
     """Raised when an error occurs during a scan step"""
 
 
+class ScanLedState(StrEnum):
+    """States of the DAQ_Scan scan-progress LED."""
+    IDLE = 'idle'
+    RUNNING = 'running'
+    COMPLETE = 'complete'
+    ERROR = 'error'
+
+
 class ScanStatusBarManager:
 
     def __init__(self, scan: DAQScan):
@@ -85,7 +91,7 @@ class ScanStatusBarManager:
         self._indice_scan_sb: QSpinBox_ro = None
         self._indice_average_sb: QSpinBox_ro = None
 
-        self._scan_done_LED: QLED = None
+        self._scan_done_LED: MultistateLED = None
 
     @property
     def statusbar(self):
@@ -104,10 +110,16 @@ class ScanStatusBarManager:
         self._indice_average_sb = QSpinBox_ro()
         self._indice_average_sb.setToolTip('Current average value')
 
-        self._scan_done_LED = QLED()
-        self._scan_done_LED.set_as_false()
-        self._scan_done_LED.clickable = False
-        self._scan_done_LED.setToolTip('Scan done state')
+        self._scan_done_LED = MultistateLED(
+            states=[
+                (ScanLedState.IDLE,     StatusPalette.color(Status.OFF)),
+                (ScanLedState.RUNNING,  StatusPalette.color(Status.RUNNING)),
+                (ScanLedState.COMPLETE, StatusPalette.color(Status.IDLE)),
+                (ScanLedState.ERROR,    StatusPalette.color(Status.CRITICAL)),
+            ],
+            readonly=True,
+        )
+        self._scan_done_LED.setToolTip('Scan state: idle / running / complete / error')
 
         self.statusbar.insertPermanentWidget(1, self._n_scan_steps_sb) # 1 because there is already the permanent label
         self.statusbar.insertPermanentWidget(2, self._indice_scan_sb)
@@ -132,8 +144,13 @@ class ScanStatusBarManager:
     def set_scan_step_average(self, step_ind: int):
         self._indice_average_sb.setValue(step_ind)
 
+    def set_scan_state(self, state: Union[ScanLedState, str]):
+        """Set the scan LED to a named state (see :class:`ScanLedState`)."""
+        self._scan_done_LED.set_state(state)
+
     def set_scan_done(self, done=True):
-        self._scan_done_LED.set_as(done)
+        """Compatibility shim: True → COMPLETE, False → RUNNING."""
+        self._scan_done_LED.set_state(ScanLedState.COMPLETE if done else ScanLedState.RUNNING)
 
 
 class DAQScan(CustomExt):
@@ -186,7 +203,7 @@ class DAQScan(CustomExt):
             {'title': 'Refresh Plots (ms)', 'name': 'refresh_live', 'type': 'int',
              'value': 1000, 'visible': False},
             ]},
-    ] + ExtensionWorker.params
+    ] + SaverWorker.params
 
     def __init__(self, dockarea: gutils.DockArea = None, dashboard: DashBoard = None):
         """
@@ -269,7 +286,7 @@ class DAQScan(CustomExt):
                                                     menu=self.get_menu('scan_manager'))
 
         if self.dashboard.experiment_manager.entry_applied:
-            self.enable_workflow_actions(True)
+            self.enable_workflow_actions(True, other_actions='ini_positions')
             self.ini_scan_manager()
 
         logger.info('DAQScan Initialized')
@@ -424,7 +441,10 @@ class DAQScan(CustomExt):
         # set the module saver type and applies its h5saver to submodules
         self._module_and_data_saver = module_saving.ScanSaver(self)
 
-        self.enable_workflow_actions(True)
+        try:
+            self.enable_workflow_actions(True, other_actions='ini_positions')
+        except KeyError: #actions may not yet be activated
+            pass
 
         if hasattr(self, 'scan_manager'):
             self.ini_scan_manager()
@@ -456,7 +476,7 @@ class DAQScan(CustomExt):
             messagebox(title='Running',
                        text='The Acquisition is running, first stop it')
             return False
-        elif self.settings['worker', 'worker_tasks'] > 0:
+        elif self.settings[SaverWorker.worker_setting_name, 'worker_tasks'] > 0:
             messagebox(title='Running',
                        text='The Saver is finishing the savings')
             self.scan_acquisition.stop("User prompted a quit of the Application, Stopping the Acquisition")
@@ -1110,10 +1130,6 @@ class DAQScan(CustomExt):
                 interval = self.h5saver.settings['backend', 'swmr_options', 'flush_interval']
                 self.h5saver.set_swmr_flush_interval(interval)
 
-            self.enable_workflow_actions(False,
-                                         excepted=WorkFlowActions.PAUSE,
-                                         other_actions='ini_positions')
-
             self.status_manager.set_scan_done(False)
             if not self.settings['plot_options', 'plot_at_each_step']:
                 self.live_timer.start(self.settings['plot_options', 'refresh_live'])
@@ -1183,9 +1199,7 @@ class DAQScan(CustomExt):
         self.update_status(status)
         self.status_manager.set_permanent_status('')
 
-        self.enable_workflow_actions(True,
-                                     other_actions='ini_positions',
-                                     opposite=WorkFlowActions.PAUSE)
+
 
     def pause_scan(self):
         """Toggle pause on the running acquisition."""
@@ -1215,7 +1229,6 @@ class DAQScanAcquisition(ExtensionWorker):
 
     """
     scan_data_tmp = Signal(DataBundle)
-    h5_data_array_ready_signal = Signal()
     scan_step_failed_signal = Signal(ScanStepError)
 
     def __init__(self, daq_scan: DAQScan, parent=None):
@@ -1238,6 +1251,10 @@ class DAQScanAcquisition(ExtensionWorker):
 
         self._current_dte_to_be_plotted: DataToExport = None
         self._current_indexes: tuple[int] = None
+
+    @property
+    def app(self) -> DAQScan:
+        return self._app
 
     @property
     def scanner(self) -> Scanner:
@@ -1264,6 +1281,10 @@ class DAQScanAcquisition(ExtensionWorker):
             self.modules_manager.move_actuators(command.attribute, polling=False)
 
     def _start(self):
+        self.app.enable_workflow_actions(False,
+                                         excepted=(WorkFlowActions.PAUSE,
+                                                   WorkFlowActions.STOP),
+                                         other_actions='ini_positions')
         self.set_ini_positions()
 
     def _pause(self, do_pause: bool = True):
@@ -1286,6 +1307,9 @@ class DAQScanAcquisition(ExtensionWorker):
         self._app.status_sig.emit(utils.ThreadCommand("Scan_done"))
         if msg is not None:
             self._app.status_manager.set_permanent_status(msg)
+        self.app.enable_workflow_actions(True,
+                                         other_actions='ini_positions',
+                                         opposite=WorkFlowActions.PAUSE)
 
     def _update_status(self, msg: str):
         """ convenience method to update the status signal """
@@ -1449,7 +1473,7 @@ class DAQScanAcquisition(ExtensionWorker):
                 distribution=self.scanner.distribution,
                 save_index=self._ind_scan,
                 dte=dte_grabbed,))
-        self._n_emitted += 1
+        self.thread_manager.n_jobs[SaverWorker.name] += 1
 
         self.scan_data_tmp.emit(
             DataBundle(dte=self._current_dte_to_be_plotted,
@@ -1494,7 +1518,6 @@ class DAQScanAcquisition(ExtensionWorker):
 
     def _on_scan_step_failed(self, exception: ScanStepError):
         logger.warning(exception)
-        self._app.status_sig.emit(utils.ThreadCommand("Scan_done"))
         self.stop(msg=f'Scan stopped due to a failure during a step')
 
 
