@@ -111,6 +111,8 @@ def _unique_name(base: str, taken: IterableType[str]) -> str:
     return name
 
 
+XARRAY_SCHEMA_VERSION = 1
+
 SPREAD_DIM_NAME = 'points'
 """Name of the navigation dimension of spread data, holding the scattered points: its axes
 (one per spread_order) are coordinates along it, none of them names it"""
@@ -3156,9 +3158,23 @@ class DataWithAxes(DataBase, SerializableBase):
     def to_xarray(self):
         """Convert this DataWithAxes to an xarray.Dataset.
 
-        Each array in self.data becomes a data variable (keyed by its label).
-        Each Axis becomes a coordinate on the corresponding dimension.
-        Error arrays (if present) are stored as ``<label>_error`` data variables.
+        Metadata is stored where xarray itself keeps it through computations:
+
+        * dimensions are named after :attr:`dim_names`; each axis becomes a coordinate named
+          after the axis name, with its label as CF ``long_name`` (shown by xarray plots) and its
+          ``units``. The axes of the spread navigation dimension ('points') are non-index
+          coordinates along it;
+        * every dimension has a coordinate (a plain index one if the dimension has no axis)
+          whose ``pymodaq_role`` attribute ('nav' or 'sig') marks navigation vs signal. Coordinate
+          attributes survive arithmetic, reductions and transposes whatever the ``keep_attrs``
+          option, and a reduced dimension takes its role away with it;
+        * each array in self.data becomes a data variable named after its label (also its
+          ``long_name``), carrying its CF ``units`` attribute (use ``ds.pmd.quantify()`` to have
+          units computed by pint-xarray);
+        * errors become ``<label>_error`` variables, linked through the CF ``ancillary_variables``
+          attribute;
+        * provenance (name, origin, source, distribution, timestamp, simple extra attributes)
+          goes in the Dataset attributes only.
 
         Returns
         -------
@@ -3171,6 +3187,7 @@ class DataWithAxes(DataBase, SerializableBase):
         """
         try:
             import xarray as xr
+            import pymodaq_data.xarray_ext  # noqa: F401, registers the .pmd accessor
         except ImportError:
             raise ImportError(
                 "xarray is required for to_xarray(). "
@@ -3178,68 +3195,85 @@ class DataWithAxes(DataBase, SerializableBase):
             )
 
         dim_names = self.dim_names
+        taken = set(dim_names)
 
-        # --- build coordinates ---
+        # --- coordinates: one per axis, named after it (axis names are unique), plus an index
+        # coordinate for a dimension without axis, all carrying the dimension's nav/sig role ---
         coords = {}
-        spread_dim_names = []
-        for axis in self.axes:
-            dim_name = dim_names[axis.index]
-            axis_data = axis.get_data()
-            if axis_data is None:
-                continue
-            if axis.spread_order > 0:
-                coord_name = f'{axis.label}_{axis.spread_order}' if axis.label else f'{dim_name}_{axis.spread_order}'
-                coord_attrs = {
-                    'units': axis.units,
-                    'pymodaq_label': axis.label,
-                    'spread_order': axis.spread_order,
-                }
-                if dim_name not in spread_dim_names:
-                    spread_dim_names.append(dim_name)
-            else:
-                coord_name = axis.label if axis.label else dim_name
-                coord_attrs = {
-                    'units': axis.units,
-                    'pymodaq_label': axis.label,
-                }
-            coords[coord_name] = xr.Variable(dim_name, axis_data, attrs=coord_attrs)
+        for index, dim_name in enumerate(dim_names):
+            role = 'nav' if index in self.nav_indexes else 'sig'
+            axes_at_index = sorted((axis for axis in self.axes if axis.index == index),
+                                   key=lambda axis: axis.spread_order)
+            for axis in axes_at_index:
+                axis_data = axis.get_data()
+                if axis_data is None:
+                    continue
+                taken.add(axis.name)
+                coord_attrs = {'pymodaq_role': role, 'long_name': axis.label,
+                               'spread_order': axis.spread_order}
+                if axis.units:
+                    coord_attrs['units'] = axis.units
+                coords[axis.name] = xr.Variable(dim_name, axis_data, attrs=coord_attrs)
+            if not any(coord.dims == (dim_name,) for coord in coords.values()):
+                coords[dim_name] = xr.Variable(dim_name, np.arange(self.shape[index]),
+                                               attrs={'pymodaq_role': role,
+                                                      'pymodaq_synthetic': True})
 
-        # --- build data variables ---
+        # --- data variables, one per channel, plus linked error variables ---
         data_vars = {}
-        label_list = list(self.labels)
-        error_var_names = []
-        for i, (array, label) in enumerate(zip(self.data, label_list)):
-            var_name = label if label else f'data_{i}'
-            data_vars[var_name] = xr.Variable(dim_names, array)
+        for ind, (array, label) in enumerate(zip(self.data, self.labels)):
+            var_name = _unique_name(label if label else f'data_{ind}', taken)
+            taken.add(var_name)
+            var_attrs = {'long_name': label}
+            if self.units:
+                var_attrs['units'] = self.units
             if self.errors is not None:
-                err_name = f'{var_name}_error'
-                data_vars[err_name] = xr.Variable(dim_names, self.errors[i])
-                error_var_names.append(err_name)
+                err_name = _unique_name(f'{var_name}_error', taken)
+                taken.add(err_name)
+                var_attrs['ancillary_variables'] = err_name
+                err_attrs = {'pymodaq_error_of': var_name}
+                if self.units:
+                    err_attrs['units'] = self.units
+                data_vars[err_name] = xr.Variable(dim_names, self.errors[ind], attrs=err_attrs)
+            data_vars[var_name] = xr.Variable(dim_names, array, attrs=var_attrs)
 
-        # --- dataset attrs ---
+        # --- provenance ---
         attrs = {
+            'pymodaq_schema': XARRAY_SCHEMA_VERSION,
             'pymodaq_name': self.name,
             'pymodaq_origin': self.origin,
             'pymodaq_source': self.source.name,
             'pymodaq_distribution': self.distribution.name,
-            'pymodaq_units': self.units,
-            'pymodaq_nav_indexes': list(self.nav_indexes),
-            'pymodaq_labels': label_list,
+            'pymodaq_timestamp': self.timestamp,
         }
-        if error_var_names:
-            attrs['pymodaq_error_vars'] = error_var_names
-        if spread_dim_names:
-            attrs['pymodaq_spread_dim_names'] = spread_dim_names
+        for attribute in self.extra_attributes:
+            value = getattr(self, attribute, None)
+            if isinstance(value, (str, numbers.Number, np.ndarray)):
+                attrs[f'pymodaq_extra_{attribute}'] = value
+            else:
+                logger.debug(f'Extra attribute {attribute!r} of type {type(value)} is not '
+                             f'representable as an xarray attribute, skipping it')
 
         return xr.Dataset(data_vars, coords=coords, attrs=attrs)
 
     @classmethod
-    def from_xarray(cls, ds) -> 'DataWithAxes':
+    def from_xarray(cls, ds, name: str = None, source: Union[DataSource, str] = None,
+                    nav: IterableType[str] = None) -> 'DataWithAxes':
         """Construct a DataWithAxes from an xarray Dataset (or DataArray).
+
+        The result always has pymodaq's canonical layout: navigation dimensions first, then
+        signal dimensions, every channel (and error) transposed/broadcast to the same order.
 
         Parameters
         ----------
         ds : xr.Dataset or xr.DataArray
+            May be pint-quantified (see ``ds.pmd.quantify()``), it is dequantified here.
+        name : str, optional
+            Overrides the stored ``pymodaq_name``. A computed result should get its own name.
+        source : DataSource or str, optional
+            Overrides the stored ``pymodaq_source``. A computed result should be 'calculated'.
+        nav : iterable of str, optional
+            Navigation dimension names, overriding the ``pymodaq_role`` of the coordinates.
 
         Returns
         -------
@@ -3249,9 +3283,12 @@ class DataWithAxes(DataBase, SerializableBase):
         ------
         ImportError
             If xarray is not installed.
+        ValueError
+            If there is no data variable, or ``nav`` names an unknown dimension.
         """
         try:
             import xarray as xr
+            from pymodaq_data.xarray_ext import dequantify_if_needed, dim_role, axes_for_dim
         except ImportError:
             raise ImportError(
                 "xarray is required for from_xarray(). "
@@ -3259,93 +3296,128 @@ class DataWithAxes(DataBase, SerializableBase):
             )
 
         if isinstance(ds, xr.DataArray):
-            var_name = ds.name if ds.name else 'data'
-            ds = ds.to_dataset(name=var_name)
-
+            ds = ds.to_dataset(name=ds.name if ds.name is not None else 'data')
+        ds = dequantify_if_needed(ds)
         attrs = ds.attrs
-        name = attrs.get('pymodaq_name', 'from_xarray')
-        origin = attrs.get('pymodaq_origin', '')
-        source_str = attrs.get('pymodaq_source', 'raw')
-        distribution_str = attrs.get('pymodaq_distribution', 'uniform')
-        units = attrs.get('pymodaq_units', '')
-        nav_indexes = tuple(attrs.get('pymodaq_nav_indexes', []))
-        stored_labels = list(attrs.get('pymodaq_labels', []))
-        error_var_names = list(attrs.get('pymodaq_error_vars', []))
 
-        # separate error vars from regular data vars
-        regular_vars = {k: v for k, v in ds.data_vars.items() if k not in error_var_names}
-        error_vars = {k: v for k, v in ds.data_vars.items() if k in error_var_names}
+        error_names = set(attrs.get('pymodaq_error_vars', []))  # schema < 1
+        for var_name, var in ds.data_vars.items():
+            if 'pymodaq_error_of' in var.attrs:
+                error_names.add(var_name)
+            if 'ancillary_variables' in var.attrs:
+                error_names.update(str(var.attrs['ancillary_variables']).split())
+        regular_names = [var_name for var_name in ds.data_vars if var_name not in error_names]
+        if not regular_names:
+            raise ValueError('The xarray object holds no data variable to convert')
 
-        # reconstruct data arrays and labels
-        data_arrays = []
+        # Broadcast every channel to a common set of dimensions (xarray semantics), then pick the
+        # canonical order: navigation dimensions first, signal dimensions after
+        arrays = xr.broadcast(*[ds[var_name] for var_name in regular_names])
+        ref_dims = list(arrays[0].dims)
+        if nav is not None:
+            nav_dims = list(nav)
+            unknown = [dim for dim in nav_dims if dim not in ref_dims]
+            if unknown:
+                raise ValueError(f'Navigation dimensions {unknown} are not in {ref_dims}')
+        elif 'pymodaq_schema' not in attrs and ('pymodaq_nav_indexes' in attrs
+                                                 or 'pymodaq_nav_dims' in attrs):
+            nav_dims = cls._legacy_nav_dims(ds, regular_names, ref_dims)
+        else:
+            nav_dims = [dim for dim in ref_dims if dim_role(ds, dim) == 'nav']
+        order = nav_dims + [dim for dim in ref_dims if dim not in nav_dims]
+
+        data_arrays = [array.transpose(*order).values for array in arrays]
+
         labels = []
-        for i, (var_name, var) in enumerate(regular_vars.items()):
-            data_arrays.append(var.values)
-            label = stored_labels[i] if i < len(stored_labels) else var_name
-            labels.append(label)
-
-        # reconstruct error arrays (matched by position in error_var_names)
-        errors = None
-        if error_vars:
-            errors = [error_vars[err_name].values for err_name in error_var_names]
-
-        # reconstruct Axis objects from dims and coords
-        dim_names = list(ds.dims)
-        axes = []
-        for i, dim_name in enumerate(dim_names):
-            # find coords that live on this dimension
-            dim_coords = [
-                (cname, cvar) for cname, cvar in ds.coords.items()
-                if list(cvar.dims) == [dim_name]
-            ]
-            if dim_coords:
-                # primary coord: spread_order == 0 (or missing) comes first
-                primary = None
-                secondary = []
-                for cname, cvar in dim_coords:
-                    spread_order = int(cvar.attrs.get('spread_order', 0))
-                    axis_label = cvar.attrs.get('pymodaq_label', cname)
-                    axis_units = cvar.attrs.get('units', '')
-                    axis = Axis(
-                        label=axis_label,
-                        units=axis_units,
-                        data=cvar.values,
-                        index=i,
-                        spread_order=spread_order,
-                    )
-                    if spread_order == 0:
-                        primary = axis
-                    else:
-                        secondary.append(axis)
-                if primary is not None:
-                    axes.append(primary)
-                axes.extend(secondary)
+        stored_labels = list(attrs.get('pymodaq_labels', []))  # schema < 1
+        for ind, var_name in enumerate(regular_names):
+            var_attrs = ds[var_name].attrs
+            if 'long_name' in var_attrs:
+                labels.append(var_attrs['long_name'] or var_name)
+            elif 'pymodaq_label' in var_attrs:  # written before long_name was used
+                labels.append(var_attrs['pymodaq_label'] or var_name)
+            elif len(stored_labels) == len(regular_names):
+                labels.append(stored_labels[ind])
             else:
-                # no coord: create size-only axis
-                dim_size = ds.sizes[dim_name]
-                axes.append(Axis(label=dim_name, index=i, size=dim_size))
+                labels.append(var_name)
 
+        errors = cls._errors_from_xarray(ds, regular_names, error_names, arrays[0], order)
+        units = cls._units_from_xarray(ds, regular_names)
+
+        distribution = DataDistribution.uniform
+        if attrs.get('pymodaq_distribution') in DataDistribution.names():
+            distribution = DataDistribution[attrs['pymodaq_distribution']]
+        axes = []
+        for index, dim in enumerate(order):
+            axes.extend(axes_for_dim(ds, dim, index, is_nav=dim in nav_dims,
+                                         spread=distribution == DataDistribution.spread))
+
+        if source is None:
+            source = attrs.get('pymodaq_source', 'raw')
         try:
-            source = DataSource[source_str]
-        except KeyError:
+            source = enum_checker(DataSource, source)
+        except (ValueError, KeyError):
             source = DataSource.raw
-        try:
-            distribution = DataDistribution[distribution_str]
-        except KeyError:
-            distribution = DataDistribution.uniform
 
-        return cls(
-            name=name,
+        dwa = cls(
+            name=name if name is not None else attrs.get('pymodaq_name', 'from_xarray'),
             source=source,
             distribution=distribution,
             data=data_arrays,
             labels=labels,
             units=units,
             axes=axes,
-            nav_indexes=nav_indexes,
-            origin=origin,
+            nav_indexes=tuple(range(len(nav_dims))),
+            origin=attrs.get('pymodaq_origin', ''),
             errors=errors,
         )
+        if 'pymodaq_timestamp' in attrs:
+            dwa.timestamp = float(attrs['pymodaq_timestamp'])
+        prefix = 'pymodaq_extra_'
+        dwa.add_extra_attribute(**{key[len(prefix):]: value for key, value in attrs.items()
+                                   if key.startswith(prefix)})
+        return dwa
+
+    @staticmethod
+    def _legacy_nav_dims(ds, regular_names: List[str], ref_dims: List[str]) -> List[str]:
+        """Navigation dimensions of an xarray object written before the pymodaq_schema attribute:
+        positional ``pymodaq_nav_indexes`` (or names in ``pymodaq_nav_dims``)"""
+        if 'pymodaq_nav_dims' in ds.attrs:
+            return [dim for dim in ds.attrs['pymodaq_nav_dims'] if dim in ref_dims]
+        stored_dims = list(ds[regular_names[0]].dims)
+        return [stored_dims[ind] for ind in ds.attrs['pymodaq_nav_indexes']
+                if ind < len(stored_dims) and stored_dims[ind] in ref_dims]
+
+    @staticmethod
+    def _errors_from_xarray(ds, regular_names: List[str], error_names: set, reference,
+                            order: List[str]) -> Union[List[np.ndarray], None]:
+        """Error arrays matching each channel, or None unless every channel has one"""
+        if not error_names:
+            return None
+        errors = []
+        for var_name in regular_names:
+            err_name = ds[var_name].attrs.get('ancillary_variables')
+            if err_name is None:
+                err_name = next((name for name in error_names
+                                 if ds[name].attrs.get('pymodaq_error_of') == var_name),
+                                f'{var_name}_error')
+            if err_name not in ds.data_vars:
+                logger.warning(f'No error variable for channel {var_name!r}, dropping all errors')
+                return None
+            errors.append(ds[err_name].broadcast_like(reference).transpose(*order).values)
+        return errors
+
+    @staticmethod
+    def _units_from_xarray(ds, regular_names: List[str]) -> str:
+        """The single units string of a DataWithAxes, from its channels' CF units attributes"""
+        units = [str(ds[var_name].attrs.get('units', ds.attrs.get('pymodaq_units', '')))
+                 for var_name in regular_names]
+        from pymodaq_data.xarray_ext import short_units
+        units = [short_units(unit) for unit in units]  # pint-xarray writes 'volt', not 'V'
+        if len(set(units)) > 1:
+            logger.warning(f'Channels have different units {units}, a DataWithAxes holds a '
+                           f'single one: using {units[0]!r}')
+        return units[0]
 
 
 @ser_factory.register_decorator()
