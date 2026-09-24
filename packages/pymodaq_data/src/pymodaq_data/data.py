@@ -101,6 +101,16 @@ def check_units(units: str):
     return ''
 
 
+def _unique_name(base: str, taken: IterableType[str]) -> str:
+    """Return ``base``, or ``base_1``, ``base_2``... : the first one not in ``taken``"""
+    name = base
+    suffix = 0
+    while name in taken:
+        suffix += 1
+        name = f'{base}_{suffix}'
+    return name
+
+
 def squeeze(data_array: np.ndarray, do_squeeze=True, squeeze_indexes: Tuple[int]=None) -> np.ndarray:
     """ Squeeze numpy arrays return at least 1D arrays except if do_squeeze is False"""
     if do_squeeze:
@@ -2658,6 +2668,74 @@ class DataWithAxes(DataBase, SerializableBase):
         self.set_axes_manager(self.shape, axes=self.axes, nav_indexes=indexes)
         self.get_dim_from_data_axes()
 
+    @property
+    def dim_names(self) -> List[str]:
+        """Canonical per-dimension name: the corresponding axis label, or
+        ``dim_{i}`` for a dimension with no axis / no label. A label shared by
+        more than one dimension keeps its exact name on its first dimension, the
+        next ones get the first free numeric suffix (``label_1``, ``label_2``...,
+        skipping names already used by another dimension) so every dimension gets
+        a unique name. For a spread navigation dimension, the name comes from the
+        axis with the lowest ``spread_order``.
+
+        This is the naming scheme :meth:`to_xarray` uses for xarray dimension
+        names, exposed here so navigation/signal axes can be resolved by name
+        instead of position from any code path, not just the xarray bridge.
+        """
+        bases = []
+        for i in range(len(self.shape)):
+            primary = self._primary_axis(i)
+            bases.append(primary.label if primary is not None and primary.label else f'dim_{i}')
+        # every distinct label keeps its exact name, only repeats get the next free suffix:
+        # ['x', 'x', 'x_1'] -> ['x', 'x_2', 'x_1']
+        taken = set(bases)
+        names = []
+        for i, base in enumerate(bases):
+            if base in bases[:i]:
+                base = _unique_name(base, taken)
+                taken.add(base)
+            names.append(base)
+        return names
+
+    def _primary_axis(self, index: int) -> Union[Axis, None]:
+        """The axis naming dimension ``index``: the one with the lowest spread_order (only
+        spread navigation dimensions carry several axes). Reads self.axes directly rather than
+        get_axis_from_index, which warns for every dimension without an axis."""
+        axes_at_index = [axis for axis in self.axes if axis.index == index]
+        if not axes_at_index:
+            return None
+        return min(axes_at_index, key=lambda axis: axis.spread_order)
+
+    @property
+    def nav_dim_names(self) -> Tuple[str, ...]:
+        """Names of the navigation dimensions, see :attr:`dim_names`"""
+        dim_names = self.dim_names
+        return tuple(dim_names[i] for i in self.nav_indexes)
+
+    @nav_dim_names.setter
+    def nav_dim_names(self, names: IterableType[str]):
+        """Set navigation axes by dimension name rather than positional index.
+
+        Unknown names are ignored with a warning rather than raising, since a
+        name may legitimately no longer exist (e.g. it named a dimension a
+        reduction has since removed).
+        """
+        dim_names = self.dim_names
+        indexes = []
+        for dim_name in names:
+            if dim_name not in dim_names:
+                logger.warning(
+                    f'{dim_name!r} is not a known dimension name in {dim_names}; ignoring it')
+                continue
+            indexes.append(dim_names.index(dim_name))
+        self.nav_indexes = tuple(indexes)
+
+    @property
+    def sig_dim_names(self) -> Tuple[str, ...]:
+        """Names of the signal dimensions, see :attr:`dim_names`"""
+        dim_names = self.dim_names
+        return tuple(dim_names[i] for i in self.sig_indexes)
+
     def get_nav_axes(self) -> List[Axis]:
         return self._am.get_nav_axes()
 
@@ -3008,25 +3086,7 @@ class DataWithAxes(DataBase, SerializableBase):
                 "Install it with: pip install 'pymodaq_data[xarray]'",
             )
 
-        ndim = len(self.shape)
-
-        # --- build dim names (one per shape dimension) ---
-        dim_names = []
-        seen_dim_names = {}
-        for i in range(ndim):
-            axes_at_i = self.get_axis_from_index(i)
-            if axes_at_i and axes_at_i[0] is not None and axes_at_i[0].label:
-                base = axes_at_i[0].label
-            else:
-                base = f'dim_{i}'
-            # deduplicate
-            if base in seen_dim_names:
-                seen_dim_names[base] += 1
-                name = f'{base}_{seen_dim_names[base]}'
-            else:
-                seen_dim_names[base] = 0
-                name = base
-            dim_names.append(name)
+        dim_names = self.dim_names
 
         # --- build coordinates ---
         coords = {}

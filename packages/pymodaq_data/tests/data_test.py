@@ -915,6 +915,59 @@ class TestNavIndexes:
         data.nav_indexes = ()
         assert data.sig_indexes == (0, 1, 2)
 
+    def test_dim_names(self):
+        data, shape = init_dataND()
+        assert data.dim_names == ['myaxis0', 'myaxis1', 'myaxis2']
+        assert data.nav_dim_names == ('myaxis0', 'myaxis1')
+        assert data.sig_dim_names == ('myaxis2',)
+
+    def test_dim_names_deduplicates_repeated_labels(self):
+        axis0 = data_mod.Axis(label='pos', data=np.linspace(0, 4, 5), index=0)
+        axis1 = data_mod.Axis(label='pos', data=np.linspace(0, 3, 4), index=1)
+        data = data_mod.DataWithAxes('mydata', source='raw',
+                                     data=[np.zeros((5, 4))], axes=[axis0, axis1])
+        assert data.dim_names == ['pos', 'pos_1']
+
+    def test_dim_names_suffix_never_collides(self):
+        """A real label keeps its exact name, only the repeated one gets the next free suffix"""
+        axes = [data_mod.Axis('x', data=np.arange(2.), index=0),
+                data_mod.Axis('x', data=np.arange(3.), index=1),
+                data_mod.Axis('x_1', data=np.arange(4.), index=2)]
+        data = data_mod.DataRaw('d', data=[np.zeros((2, 3, 4))], axes=axes)
+        assert data.dim_names == ['x', 'x_2', 'x_1']
+
+    def test_dim_names_fallback_for_unlabeled_dim(self):
+        data, shape = init_data(), DATA2D.shape
+        assert data.dim_names == ['dim_0', 'dim_1']
+
+    def test_dim_names_do_not_warn(self, recwarn):
+        data = data_mod.DataRaw('d', data=[np.zeros((2, 3))])
+        assert data.dim_names == ['dim_0', 'dim_1']
+        assert not [w for w in recwarn if issubclass(w.category, data_mod.DataIndexWarning)]
+
+    def test_dim_names_spread_uses_lowest_spread_order(self):
+        npts = 5
+        axes = [data_mod.Axis('b', data=np.random.rand(npts), index=0, spread_order=1),
+                data_mod.Axis('a', data=np.random.rand(npts), index=0, spread_order=0),
+                data_mod.Axis('t', data=np.arange(4.), index=1)]
+        data = data_mod.DataRaw('s', distribution='spread', data=[np.random.rand(npts, 4)],
+                                axes=axes, nav_indexes=(0,))
+        assert data.dim_names == ['a', 't']
+        assert data.nav_dim_names == ('a',)
+
+    def test_set_nav_dim_names(self):
+        data, shape = init_dataND()
+
+        data.nav_dim_names = ('myaxis1',)
+        assert data.nav_indexes == (1,)
+        assert data.sig_indexes == (0, 2)
+        assert data.sig_dim_names == ('myaxis0', 'myaxis2')
+
+    def test_set_nav_dim_names_ignores_unknown_name(self):
+        data, shape = init_dataND()
+        data.nav_dim_names = ('myaxis0', 'not_a_dim')
+        assert data.nav_indexes == (0,)
+
 
 class TestDataWithAxesSpread:
     def test_init_data(self, init_data_spread):
