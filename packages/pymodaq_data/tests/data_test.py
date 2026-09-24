@@ -336,6 +336,90 @@ class TestAxis:
         assert np.allclose(axis.get_data_at(INDEXES_array), DATA[INDEXES_array])
         assert np.allclose(axis.get_data_at(SLICE), DATA[SLICE])
 
+class TestAxisNameLabel:
+    """An axis has a name (identifier) and a label (displayed text) defaulting to the name"""
+
+    def test_label_defaults_to_name(self):
+        axis = data_mod.Axis('delay', units='ps', data=np.arange(3.))
+        assert axis.name == 'delay'
+        assert axis.label == 'delay'
+
+    def test_custom_label(self):
+        axis = data_mod.Axis('delay', units='ps', data=np.arange(3.), label='Pump-probe delay')
+        assert axis.name == 'delay'
+        assert axis.label == 'Pump-probe delay'
+        axis.label = None
+        assert axis.label == 'delay'
+
+    def test_label_only_construction_sets_the_name(self):
+        axis = data_mod.Axis(label='time', units='s', data=np.arange(3.))
+        assert axis.name == 'time'
+        assert axis.label == 'time'
+
+    def test_name_and_label_types(self):
+        with pytest.raises(TypeError):
+            data_mod.Axis(12)
+        with pytest.raises(TypeError):
+            data_mod.Axis('x', label=12)
+
+    def test_eq_compares_name_and_label(self):
+        axis = data_mod.Axis('x', data=np.arange(3.))
+        assert axis == data_mod.Axis('x', data=np.arange(3.), label='x')
+        assert axis != data_mod.Axis('y', data=np.arange(3.), label='x')
+        assert axis != data_mod.Axis('x', data=np.arange(3.), label='Position')
+
+    def test_repr(self):
+        assert '<name: x>' in repr(data_mod.Axis('x'))
+        assert '<label:' not in repr(data_mod.Axis('x'))
+        assert '<label: Position>' in repr(data_mod.Axis('x', label='Position'))
+
+    @pytest.mark.parametrize('label', [None, 'Photon energy'])
+    def test_derived_axes_keep_name_and_label(self, label):
+        axis = data_mod.Axis('energy', units='eV', data=np.array([1., 1.5, 2.]), label=label)
+        for derived in (axis.units_as('meV', inplace=False), axis.to_base_units(),
+                        axis.to_reduced_units()):
+            assert derived.name == 'energy'
+            assert derived.label == (label or 'energy')
+
+    def test_from_quantity(self):
+        quantity = data_mod.Q_(np.arange(3.), 'mm')
+        assert data_mod.Axis.from_quantity(quantity).name == 'axis'
+        axis = data_mod.Axis.from_quantity(quantity, 'x', label='Position')
+        assert (axis.name, axis.label, axis.units) == ('x', 'Position', 'mm')
+        assert data_mod.Axis.from_quantity(quantity, label='x').name == 'x'
+
+    def test_ft_renames_the_axis(self):
+        axis = data_mod.Axis('time', units='s', data=np.linspace(0, 1, 16), label='Delay')
+        dwa = data_mod.DataRaw('d', data=[np.random.rand(16)], axes=[axis])
+        ft_axis = dwa.ft().axes[0]
+        assert ft_axis.name == 'ft(time)'
+        assert ft_axis.label == 'ft(Delay)'
+        ft_axis = dwa.ft(axis_label='omega').axes[0]
+        assert (ft_axis.name, ft_axis.label) == ('omega', 'omega')
+
+    @pytest.mark.parametrize('label', [None, 'Position', ''])
+    def test_serialization_keeps_name_and_label(self, label):
+        axis = data_mod.Axis('x', units='mm', data=np.arange(4.), index=1, label=label)
+        axis_back, remaining = data_mod.Axis.deserialize(data_mod.Axis.serialize(axis))
+        assert remaining == b''
+        assert axis_back.name == 'x'
+        assert axis_back.label == (label if label is not None else 'x')
+        assert axis_back == axis
+        # a label following the name still follows it after the round trip
+        axis_back.name = 'y'
+        assert axis_back.label == ('y' if label is None else label)
+
+    def test_dim_names_use_the_name(self):
+        axes = [data_mod.Axis('x', data=np.arange(2.), index=0, label='Position (x)'),
+                data_mod.Axis('t', data=np.arange(3.), index=1, label='Time delay')]
+        dwa = data_mod.DataRaw('d', data=[np.zeros((2, 3))], axes=axes, nav_indexes=(0,))
+        assert dwa.dim_names == ['x', 't']
+        assert dwa.nav_dim_names == ('x',)
+        assert dwa.get_axis_from_name('t') is axes[1]
+        assert dwa.get_axis_from_label('Time delay') is axes[1]
+        assert dwa.get_axis_from_name('Time delay') is None
+
+
 class TestDataLowLevel:
     def test_init(self):
         data = data_mod.DataLowLevel('myData')

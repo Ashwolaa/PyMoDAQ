@@ -255,7 +255,8 @@ class AxisSaverLoader(DataManagement):
         array = self._h5saver.add_array(where, self._get_next_node_name(where), self.data_type, title=axis.label,
                                         array_to_save=axis.get_data(), data_dimension=DataDim['Data1D'],
                                         enlargeable=enlargeable,
-                                        metadata=dict(size=axis.size, label=axis.label, units=axis.units,
+                                        metadata=dict(size=axis.size, axis_name=axis.name,
+                                                      label=axis.label, units=axis.units,
                                                       index=axis.index, offset=axis.offset, scaling=axis.scaling,
                                                       distribution='uniform' if axis.is_axis_linear() else 'spread',
                                                       spread_order=axis.spread_order))
@@ -276,9 +277,14 @@ class AxisSaverLoader(DataManagement):
         axis_node = self._get_node(where)
         if not self._is_node_of_data_type(axis_node):
             raise AxisError(f'Could not create an Axis object from this node: {axis_node}')
-        return Axis(label=axis_node.attrs['label'], units=axis_node.attrs['units'],
+        # files written before axes had a name only store the label, which was the identifier.
+        # Not stored as 'name': load_data forwards node attributes as DataWithAxes keywords
+        label = axis_node.attrs['label']
+        name = axis_node.attrs.get('axis_name', label)
+        return Axis(name, units=axis_node.attrs['units'],
                     data=squeeze(axis_node.read()), index=axis_node.attrs['index'],
-                    spread_order=axis_node.attrs['spread_order'])
+                    spread_order=axis_node.attrs['spread_order'],
+                    label=label if label != name else None)
 
     def get_axes(self, where: Union[Node, str]) -> List[Axis]:
         """Return a list of Axis objects from the Axis Nodes hanging from (or among) a given Node
@@ -485,8 +491,10 @@ class DataSaverLoader(DataManagement):
 
         if 'axis' in self.data_type.name:
             ndarrays = [squeeze(data_node.read()) for data_node in data_nodes]
-            axes = [Axis(label=data_node.attrs['label'], units=data_node.attrs['units'],
-                         data=np.linspace(0, ndarrays[0].size-1, ndarrays[0].size-1))]
+            axes = [Axis(data_node.attrs.get('axis_name', data_node.attrs['label']),
+                         units=data_node.attrs['units'],
+                         data=np.linspace(0, ndarrays[0].size-1, ndarrays[0].size-1),
+                         label=data_node.attrs['label'])]
             error_arrays = None
         else:
             ndarrays = self.get_data_arrays(data_node, with_bkg=with_bkg, load_all=load_all)

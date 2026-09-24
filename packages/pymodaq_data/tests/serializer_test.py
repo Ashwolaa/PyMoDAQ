@@ -73,6 +73,22 @@ def test_axis_serialization_deserialization():
     assert axis_back == axis
 
 
+def test_labelled_axes_in_a_container():
+    """The trailing label field must not shift what follows the axis in a bigger message"""
+    axes = [data_mod.Axis('x', units='mm', data=np.arange(3.), index=0, label='Position'),
+            data_mod.Axis('t', units='s', data=np.arange(4.), index=1)]
+    dwa = data_mod.DataRaw('d', data=[np.random.rand(3, 4)], axes=axes, nav_indexes=(0,),
+                           errors=[np.random.rand(3, 4)])
+    message = [axes[0], 'after', dwa, 12]
+    back = ser_factory.get_apply_deserializer(ser_factory.get_apply_serializer(message))
+    assert back[0].label == 'Position'
+    assert back[1] == 'after'
+    assert back[2] == dwa
+    assert [axis.label for axis in back[2].axes] == ['Position', 't']
+    assert np.allclose(back[2].errors[0], dwa.errors[0])
+    assert back[3] == 12
+
+
 def test_dwa_serialization_deserialization(get_data):
     dte = get_data
 

@@ -251,10 +251,14 @@ class Axis(SerializableBase):
 
     In case the axis's data is linear, store the info as a scale and offset else store the data
 
+    Like a Parameter's name and title, an axis has a name identifying it (used to address the
+    dimension it describes, see DataWithAxes.dim_names) and a label, the text displayed for it.
+    The label defaults to the name.
+
     Parameters
     ----------
-    label: str
-        The label of the axis, for instance 'time' for a temporal axis
+    name: str
+        The name identifying the axis, for instance 'time' for a temporal axis
     units: str
         The units of the data in the object, for instance 's' for seconds
     data: ndarray
@@ -270,10 +274,14 @@ class Axis(SerializableBase):
     spread_order: int
         An integer needed in the case where data has a spread DataDistribution. It refers to the index along the data's
         spread_index dimension
+    label: str, optional
+        The text displayed for the axis, for instance 'Pump-probe delay'. Defaults to the name. If
+        only a label is given (``Axis(label='time')``), it is also used as the name.
 
     Examples
     --------
     >>> axis = Axis('myaxis', units='seconds', data=np.array([1,2,3,4,5]), index=0)
+    >>> axis = Axis('delay', units='ps', data=np.linspace(0, 10, 11), label='Pump-probe delay')
     """
 
     base_type = 'Axis'
@@ -284,8 +292,9 @@ class Axis(SerializableBase):
                                        cls.deserialize)
         return super().__new__(cls)
 
-    def __init__(self, label: str = '', units: str = '', data: np.ndarray = None, index: int = 0,
-                 scaling=None, offset=None, size=None, spread_order: int = 0):
+    def __init__(self, name: str = '', units: str = '', data: np.ndarray = None, index: int = 0,
+                 scaling=None, offset=None, size=None, spread_order: int = 0, *,
+                 label: str = None):
         super().__init__()
 
         self.iaxis: Axis = SpecialSlicersData(self, False)
@@ -294,12 +303,16 @@ class Axis(SerializableBase):
         self._size = size
         self._data = None
         self._index = None
+        self._name = None
         self._label = None
         self._units = None
         self._scaling = scaling
         self._offset = offset
 
         self.units = units
+        if not name and label:  # label-only construction, e.g. Axis(label='time') for backward compatibility
+            name = label
+        self.name = name
         self.label = label
         self.data = data
         self.index = index
@@ -324,21 +337,25 @@ class Axis(SerializableBase):
 
         The bytes sequence is constructed as:
 
-        * serialize the axis label
+        * serialize the axis name (in the slot historically used for the label)
         * serialize the axis units
         * serialize the axis array
         * serialize the axis
         * serialize the axis spread_order
+        * serialize the axis custom label, None if it follows the name
+
+        The trailing label makes this layout incompatible with versions before axes had a name
         """
         if not isinstance(axis, Axis):
             raise TypeError(f'{axis} should be a list, not a {type(axis)}')
 
         bytes_string = b''
-        bytes_string += ser_factory.get_apply_serializer(axis.label)
+        bytes_string += ser_factory.get_apply_serializer(axis.name)
         bytes_string += ser_factory.get_apply_serializer(axis.units)
         bytes_string += ser_factory.get_apply_serializer(axis.get_data())
         bytes_string += ser_factory.get_apply_serializer(axis.index)
         bytes_string += ser_factory.get_apply_serializer(axis.spread_order)
+        bytes_string += ser_factory.get_apply_serializer(axis._label)
         return bytes_string
 
     @staticmethod
@@ -352,21 +369,23 @@ class Axis(SerializableBase):
         Axis: the decoded Axis
         bytes: the remaining bytes string if any
         """
-        axis_label, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        axis_name, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
         axis_units, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         axis_array, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         axis_index, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         axis_spread_order, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes,
                                                                                 False)
+        axis_label, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
 
-        axis = Axis(axis_label, axis_units, data=axis_array, index=axis_index,
-                    spread_order=axis_spread_order)
+        axis = Axis(axis_name, axis_units, data=axis_array, index=axis_index,
+                    spread_order=axis_spread_order, label=axis_label)
         return axis, remaining_bytes
 
     @staticmethod
-    def from_quantity(quantity: Q_[np.ndarray], label='axis', index=0) -> Axis:
-        return Axis(label, str(quantity.units), data=quantity.magnitude,
-                    index=index)
+    def from_quantity(quantity: Q_[np.ndarray], name: str = None, index=0, *,
+                      label: str = None) -> Axis:
+        return Axis(name or label or 'axis', str(quantity.units), data=quantity.magnitude,
+                    index=index, label=label)
 
     def copy(self):
         return copy.copy(self)
@@ -382,13 +401,25 @@ class Axis(SerializableBase):
         return dwa
 
     @property
+    def name(self) -> str:
+        """str: get/set the name identifying this axis"""
+        return self._name
+
+    @name.setter
+    def name(self, name: str):
+        if not isinstance(name, str):
+            raise TypeError('name for the Axis class should be a string')
+        self._name = name
+
+    @property
     def label(self) -> str:
-        """str: get/set the label of this axis"""
-        return self._label
+        """str: get/set the text displayed for this axis, the name unless set. Setting None makes it
+        follow the name again"""
+        return self._label if self._label is not None else self._name
 
     @label.setter
-    def label(self, lab: str):
-        if not isinstance(lab, str):
+    def label(self, lab: Union[str, None]):
+        if lab is not None and not isinstance(lab, str):
             raise TypeError('label for the Axis class should be a string')
         self._label = lab
 
@@ -418,11 +449,12 @@ class Axis(SerializableBase):
             return
         else:
             if context is not None:
-                return Axis(self.label, units,
-                            data=self.get_quantity().to(units, context, **context_kwargs).magnitude)
+                return Axis(self.name, units,
+                            data=self.get_quantity().to(units, context, **context_kwargs).magnitude,
+                            label=self._label)
             else:
-                return Axis(self.label, units,
-                            data=self.get_quantity().to(units))
+                return Axis(self.name, units,
+                            data=self.get_quantity().to(units), label=self._label)
 
     def to_reduced_units(self, inplace=False):
         quantity = dimensionless_aware_reduce_units(self.get_quantity())
@@ -430,8 +462,8 @@ class Axis(SerializableBase):
             self.data = quantity.magnitude
             self.force_units(str(quantity.units))
         else:
-            return Axis(self.label, units=str(quantity.units),
-                        data=quantity.magnitude)
+            return Axis(self.name, units=str(quantity.units),
+                        data=quantity.magnitude, label=self._label)
 
     def to_base_units(self, inplace=False):
         quantity = self.get_quantity().to_base_units()
@@ -439,8 +471,8 @@ class Axis(SerializableBase):
             self.data = quantity.magnitude
             self.force_units(str(quantity.units))
         else:
-            return Axis(self.label, units=str(quantity.units),
-                        data=quantity.magnitude)
+            return Axis(self.name, units=str(quantity.units),
+                        data=quantity.magnitude, label=self._label)
 
     @property
     def index(self) -> int:
@@ -609,7 +641,9 @@ class Axis(SerializableBase):
             return getattr(self, item)
 
     def __repr__(self):
-        return f'{self.__class__.__name__}: <label: {self.label}> - <units: {self.units}> - <index: {self.index}>'
+        label = f' - <label: {self.label}>' if self.label != self.name else ''
+        return (f'{self.__class__.__name__}: <name: {self.name}>{label} - <units: {self.units}> - '
+                f'<index: {self.index}>')
 
     def __mul__(self, scale: numbers.Real):
         if isinstance(scale, numbers.Real):
@@ -632,7 +666,7 @@ class Axis(SerializableBase):
 
     def __eq__(self, other: Axis):
         if isinstance(other, Axis):
-            eq = self.label == other.label
+            eq = self.name == other.name and self.label == other.label
             eq = eq and (Unit(self.units).is_compatible_with(other.units))
             eq = eq and (self.index == other.index)
             if self.data is not None and other.data is not None:
@@ -1533,26 +1567,30 @@ class AxesManagerBase:
             elif len(self._data_shape) == 2 and not self._has_get_axis_from_index(1)[0]:
                 # in case of Data2D the x_axis corresponds to the second data dim (columns)
                 index = 1
-            axes.append(Axis(x_axis.label, x_axis.units, x_axis.data, index=index))
+            axes.append(Axis(x_axis.name, x_axis.units, x_axis.data, index=index,
+                             label=x_axis.label))
 
         if y_axis is not None:
 
             if len(self._data_shape) == 2 and not self._has_get_axis_from_index(0)[0]:
                 modified = True
                 # in case of Data2D the y_axis corresponds to the first data dim (lines)
-                axes.append(Axis(y_axis.label, y_axis.units, y_axis.data, index=0))
+                axes.append(Axis(y_axis.name, y_axis.units, y_axis.data, index=0,
+                                 label=y_axis.label))
 
         if nav_x_axis is not None:
             if len(self.nav_indexes) > 0:
                 modified = True
                 # in case of DataND the y_axis corresponds to the first data dim (lines)
-                axes.append(Axis(nav_x_axis.label, nav_x_axis.units, nav_x_axis.data, index=self._nav_indexes[0]))
+                axes.append(Axis(nav_x_axis.name, nav_x_axis.units, nav_x_axis.data, index=self._nav_indexes[0],
+                                 label=nav_x_axis.label))
 
         if nav_y_axis is not None:
             if len(self.nav_indexes) > 1:
                 modified = True
                 # in case of Data2D the y_axis corresponds to the first data dim (lines)
-                axes.append(Axis(nav_y_axis.label, nav_y_axis.units, nav_y_axis.data, index=self._nav_indexes[1]))
+                axes.append(Axis(nav_y_axis.name, nav_y_axis.units, nav_y_axis.data, index=self._nav_indexes[1],
+                                 label=nav_y_axis.label))
 
         if modified:
             self._check_axis(axes)
@@ -2416,7 +2454,8 @@ class DataWithAxes(DataBase, SerializableBase):
         data_interpolated = []
         axis_obj = self.get_axis_from_index(0)[0]
         if isinstance(new_axis_data, np.ndarray):
-            new_axis_data = Axis(axis_obj.label, axis_obj.units, data=new_axis_data)
+            new_axis_data = Axis(axis_obj.name, axis_obj.units, data=new_axis_data,
+                                 label=axis_obj.label)
 
         for dat in self.data:
             data_interpolated.append(np.interp(new_axis_data.get_data(), axis_obj.get_data(), dat,
@@ -2470,10 +2509,14 @@ class DataWithAxes(DataBase, SerializableBase):
             new_data.labels = labels
         axis_obj = new_data.get_axis_from_index(axis)[0]
         axis_obj.data = omega_grid
+        # the axis now holds another quantity: its identity changes along with its label
         if axis_label is not None:
-            axis_obj.label = axis_label
+            axis_obj.name = axis_label
+            axis_obj.label = None
         else:
-            axis_obj.label = f'ft({axis_obj.label})'
+            axis_obj.name = f'ft({axis_obj.name})'
+            if axis_obj._label is not None:
+                axis_obj.label = f'ft({axis_obj._label})'
         if axis_units is not None:
             axis_obj.force_units(axis_units)
         else:
@@ -2514,10 +2557,14 @@ class DataWithAxes(DataBase, SerializableBase):
             new_data.labels = labels
         axis_obj = new_data.get_axis_from_index(axis)[0]
         axis_obj.data = omega_grid
+        # the axis now holds another quantity: its identity changes along with its label
         if axis_label is not None:
-            axis_obj.label = axis_label
+            axis_obj.name = axis_label
+            axis_obj.label = None
         else:
-            axis_obj.label = f'ift({axis_obj.label})'
+            axis_obj.name = f'ift({axis_obj.name})'
+            if axis_obj._label is not None:
+                axis_obj.label = f'ift({axis_obj._label})'
         if axis_units is not None:
             axis_obj.force_units(axis_units)
         else:
@@ -2670,8 +2717,8 @@ class DataWithAxes(DataBase, SerializableBase):
 
     @property
     def dim_names(self) -> List[str]:
-        """Canonical per-dimension name: the corresponding axis label, or
-        ``dim_{i}`` for a dimension with no axis / no label. A label shared by
+        """Canonical per-dimension name: the corresponding axis name, or
+        ``dim_{i}`` for a dimension with no axis / no name. A name shared by
         more than one dimension keeps its exact name on its first dimension, the
         next ones get the first free numeric suffix (``label_1``, ``label_2``...,
         skipping names already used by another dimension) so every dimension gets
@@ -2685,8 +2732,8 @@ class DataWithAxes(DataBase, SerializableBase):
         bases = []
         for i in range(len(self.shape)):
             primary = self._primary_axis(i)
-            bases.append(primary.label if primary is not None and primary.label else f'dim_{i}')
-        # every distinct label keeps its exact name, only repeats get the next free suffix:
+            bases.append(primary.name if primary is not None and primary.name else f'dim_{i}')
+        # every distinct name is kept as is, only repeats get the next free suffix:
         # ['x', 'x', 'x_1'] -> ['x', 'x_2', 'x_1']
         taken = set(bases)
         names = []
@@ -2760,8 +2807,24 @@ class DataWithAxes(DataBase, SerializableBase):
     def get_axis_from_index_spread(self, index: int, spread: int):
         return self._am.get_axis_from_index_spread(index, spread)
 
+    def get_axis_from_name(self, name: str) -> Axis:
+        """Get the axis identified by a given name
+
+        Parameters
+        ----------
+        name: str
+            The name of the axis
+
+        Returns
+        -------
+        Axis or None: return the axis instance if it has the right name else None
+        """
+        for axis in self.axes:
+            if axis.name == name:
+                return axis
+
     def get_axis_from_label(self, label: str) -> Axis:
-        """Get the axis referred by a given label
+        """Get the axis referred by a given (displayed) label, see also get_axis_from_name
 
         Parameters
         ----------

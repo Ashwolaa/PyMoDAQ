@@ -150,6 +150,36 @@ class TestAxisSaverLoader:
         assert isinstance(axis_back, Axis)
         assert axis_back == axis
 
+    def test_load_axis_name_and_label(self, h5saver_lowlevel):
+        h5saver = h5saver_lowlevel
+        axis_saver = AxisSaverLoader(h5saver)
+        axis = Axis('delay', units='ps', data=np.linspace(0, 1, 5), index=0,
+                    label='Pump-probe delay')
+        axis_node = axis_saver.add_axis(h5saver.raw_group, axis)
+        assert axis_node.attrs['axis_name'] == 'delay'
+        assert axis_node.attrs['label'] == 'Pump-probe delay'
+
+        axis_back = axis_saver.load_axis(axis_node)
+        assert axis_back.name == 'delay'
+        assert axis_back.label == 'Pump-probe delay'
+        assert axis_back == axis
+
+    def test_load_axis_written_without_name(self, h5saver_lowlevel):
+        """Files written before axes had a name only store the label, used as the name"""
+        h5saver = h5saver_lowlevel
+        axis_saver = AxisSaverLoader(h5saver)
+        data = np.linspace(0, 1, 5)
+        axis_node = h5saver.add_array(h5saver.raw_group, axis_saver._get_next_node_name(h5saver.raw_group),
+                                      axis_saver.data_type, title='myaxis', array_to_save=data,
+                                      data_dimension=DataDim['Data1D'],
+                                      metadata=dict(size=5, label='myaxis', units='ms', index=0,
+                                                    offset=0., scaling=0.25,
+                                                    distribution='uniform', spread_order=0))
+        assert 'axis_name' not in axis_node.attrs.to_dict()
+        axis_back = axis_saver.load_axis(axis_node)
+        assert axis_back.name == 'myaxis'
+        assert axis_back.label == 'myaxis'
+
     def test_add_multiple_axis(self, h5saver_lowlevel):
         h5saver = h5saver_lowlevel
         axis_saver = AxisSaverLoader(h5saver)

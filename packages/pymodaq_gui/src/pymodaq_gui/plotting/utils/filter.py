@@ -196,10 +196,12 @@ class Filter2DFromCrosshair(Filter):
         dte = DataToExport('Crosshair')
         if len(hor_data) > 0 and len(hor_axis) > 0:
             dte.append(DataFromRoi(Lineouts.HOR, data=hor_data,
-                                   axes=[Axis(dwa.axes[1].label, dwa.axes[1].units, data=hor_axis)]))
+                                   axes=[Axis(dwa.axes[1].name, dwa.axes[1].units, data=hor_axis,
+                                             label=dwa.axes[1].label)]))
         if len(ver_data) > 0 and len(ver_axis) > 0:
             dte.append(DataFromRoi(Lineouts.VER, data=ver_data,
-                                   axes=[Axis(dwa.axes[0].label, dwa.axes[0].units, data=ver_axis)]))
+                                   axes=[Axis(dwa.axes[0].name, dwa.axes[0].units, data=ver_axis,
+                                             label=dwa.axes[0].label)]))
         if len(int_data) > 0:
             dte.append(DataFromRoi(Lineouts.INT, data=int_data))
 
@@ -343,9 +345,11 @@ class Filter2DFromRois(Filter):
                 int_data = np.array([np.mean(data)])
                 sub_data = None
                 _x_axis = dwa.get_axis_from_index_spread(0, 0)
-                x_axis = Axis(_x_axis.label, _x_axis.units, data=xvals, index=0, spread_order=0)
+                x_axis = Axis(_x_axis.name, _x_axis.units, data=xvals, index=0, spread_order=0,
+                              label=_x_axis.label)
                 _y_axis = dwa.get_axis_from_index_spread(0, 1)
-                y_axis = Axis(_y_axis.label, _y_axis.units, data=yvals, index=0, spread_order=0)
+                y_axis = Axis(_y_axis.name, _y_axis.units, data=yvals, index=0, spread_order=0,
+                              label=_y_axis.label)
                 sub_data_hor = DataFromRoi(Lineouts.HOR, distribution='spread', data=[data_H], axes=[x_axis])
                 sub_data_ver = DataFromRoi(Lineouts.VER, distribution='spread', data=[data_V], axes=[y_axis])
                 math_data = DataFromRoi(Lineouts.INT, data=int_data)
