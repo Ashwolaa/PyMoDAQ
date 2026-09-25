@@ -74,7 +74,7 @@ class ModulesManager(QObject, ParameterManager):
                  selected_actuators: Optional[Sequence['DAQ_Move']] = None,
                  parent_name='',
                  **kwargs):
-
+        self.parent_name = parent_name
         QObject.__init__(self)
         ParameterManager.__init__(self)
         if detectors is None:
@@ -86,7 +86,6 @@ class ModulesManager(QObject, ParameterManager):
         if selected_actuators is None:
             selected_actuators = []
 
-        self.parent_name = parent_name
 
         for mod in selected_actuators:
             assert mod in actuators
@@ -149,7 +148,10 @@ class ModulesManager(QObject, ParameterManager):
             module.ui.toolbar.setEnabled(enable)
 
     def __repr__(self):
-        return f'ModulesManager of "{self.parent_name}" with control modules: {self.get_names(self.modules_all)}'
+        try:
+            return f'ModulesManager of "{self.parent_name}" with control modules: {self.get_names(self.modules_all)}'
+        except AttributeError:
+            return f'ModulesManager of "{self.parent_name}"'
 
     def show_only_control_modules(self, show: True):
         self.settings.child('probe_detectors').show(not show)
