@@ -111,7 +111,6 @@ class TabularScanner(ScannerBase):
          'menu': True},
               ]
     distribution = DataDistribution['spread']
-    n_axes_fixed = False
 
     def __init__(self, actuators: List['DAQ_Move'], settings, **kwargs):
         self.table_model: TableModelTabular = None

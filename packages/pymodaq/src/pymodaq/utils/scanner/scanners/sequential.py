@@ -93,7 +93,6 @@ class SequentialScanner(ScannerBase):
               ]
     distribution = DataDistribution['uniform']
     n_axes = 1
-    n_axes_fixed = False
 
     def __init__(self, actuators: List['DAQ_Move'], settings=None, **_ignored):
 

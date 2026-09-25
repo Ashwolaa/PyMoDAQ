@@ -172,14 +172,9 @@ class Scanner(QObject, ParameterManager):
         return self._scanner.settings
 
     def value_changed(self, param: Parameter):
-        if param.name() in ('scan_type', 'scan_sub_type') and param.value() is None:
-            return  # transient reset fired by setOpts(limits=...); the real value follows right after
         if param.name() == 'scan_type':
-            compatible_sub_types = scanner_factory.compatible_scan_sub_types(
-                param.value(), len(self.actuators))
-            self.settings.child('scan_sub_type').setOpts(limits=compatible_sub_types)
-            if self.settings['scan_sub_type'] not in compatible_sub_types:
-                self.settings.child('scan_sub_type').setValue(compatible_sub_types[0])
+            self.settings.child('scan_sub_type').setOpts(
+                limits=scanner_factory.scan_sub_types(param.value()))
         if param.name() in ['scan_type', 'scan_sub_type']:
             self.settings.child('units_handling', 'display_units').show()
             self.set_scanner()
