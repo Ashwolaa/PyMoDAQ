@@ -50,7 +50,8 @@ from pymodaq.utils.data import DataActuator
 from pymodaq.extensions.scan.manager.scan_manager import ScanManager
 from pymodaq_gui.utils.widgets.spinbox import QSpinBox_ro
 from pymodaq_gui.managers.standard_workflow import (
-    StandardTransitions, StandardStates, standard_workflow, bind_standard_workflow_actions)
+    StandardTransitions, StandardStates, bind_standard_workflow_actions)
+from pymodaq_gui.managers.statemachine_workflow import StandardChart, ChartAdapter
 from pymodaq_gui.utils.app_worker import ExtensionWorker, SaverWorker
 from pymodaq_gui.utils.widgets import MultistateLED, StatusPalette, Status
 from pymodaq_utils.enums import StrEnum
@@ -221,12 +222,10 @@ class DAQScan(CustomExt):
         # Built before super().__init__(): CustomExt.__init__ can call
         # do_things_after_experiment_set() synchronously before the rest of __init__ runs,
         # and that needs self.workflow to already exist.
-        self.workflow = standard_workflow()
-        # 'start' needs set_scan()'s validation first (see start_scan()), but still gets a
-        # guard: no start before an experiment entry is applied.
-        self.workflow.add_transition(
-            StandardTransitions.START, [StandardStates.IDLE], StandardStates.RUNNING,
-            guard=lambda: bool(self.experiment_manager and self.experiment_manager.entry_applied))
+        # guards={'start': self.can_start} -- see ChartAdapter's docstring for why the guard
+        # lives in the adapter, not in StandardChart's `cond=` (there is no dry-run guard
+        # check in python-statemachine, confirmed against the installed package source).
+        self.workflow = ChartAdapter(StandardChart, model=self, guards={'start': self.can_start})
 
         super().__init__(parent=dockarea,
                          dashboard=dashboard,
@@ -414,14 +413,16 @@ class DAQScan(CustomExt):
         # stop_scan() are also called directly elsewhere (do_scan(), stop(),
         # start_scan_batch()), so each stays self-sufficient (calls workflow.trigger() itself)
         # rather than relying on the button wrapper to do it for them. Pause/resume has no
-        # side effects of its own (see _on_pause_triggered/_on_resume_triggered below), so it
-        # uses bind_toggle()'s bare trigger_any() default -- no on_pause_resume needed.
+        # side effects of its own (see after_pause/after_resume below), so it uses
+        # bind_toggle()'s bare trigger_any() default -- no on_pause_resume needed.
+        # after_pause()/after_resume() below are called automatically by StandardChart's
+        # dispatcher (python-statemachine's before_/on_/after_<event> naming convention,
+        # resolved on the model=self passed to ChartAdapter) -- no explicit registration
+        # needed, unlike workflow_manager.Workflow's .on(name, callback).
         bind_standard_workflow_actions(
             self, self.workflow, menu='actions',
             on_start=self.start_scan, on_stop=self.stop_scan,
             start_icon_color=self.get_theme().green, stop_icon_color=self.get_theme().red)
-        self.workflow.on(StandardTransitions.PAUSE, self._on_pause_triggered)
-        self.workflow.on(StandardTransitions.RESUME, self._on_resume_triggered)
 
         self.connect_action('start_batch', self.start_scan_batch)
         self.connect_action('move_at', self.move_to_crosshair)
@@ -1225,11 +1226,22 @@ class DAQScan(CustomExt):
         self.update_status(status)
         self.status_manager.set_permanent_status('')
 
-    def _on_pause_triggered(self, old_state: str, new_state: str):
+    def can_start(self) -> bool:
+        """ START's guard, passed as guards={'start': self.can_start} to ChartAdapter in
+        __init__ (not python-statemachine's `cond=` -- see ChartAdapter's docstring for
+        why). No start before an experiment entry is applied. Re-checked via
+        self.workflow.revalidate() in do_things_after_experiment_set() when entry_applied
+        changes on its own. """
+        return bool(self.experiment_manager and self.experiment_manager.entry_applied)
+
+    def after_pause(self, event, source, target):
+        """ Called automatically by StandardChart's dispatcher when 'pause' fires -- the
+        python-statemachine-native replacement for workflow_manager.Workflow's
+        `.on(PAUSE, callback)` registration (see connect_things()). """
         self.command_daq_signal.emit(utils.ThreadCommand('pause_acquisition', attribute=True))
         self.status_manager.set_permanent_status('Acquisition paused')
 
-    def _on_resume_triggered(self, old_state: str, new_state: str):
+    def after_resume(self, event, source, target):
         self.command_daq_signal.emit(utils.ThreadCommand('pause_acquisition', attribute=False))
         self.status_manager.set_permanent_status('Running acquisition')
 
