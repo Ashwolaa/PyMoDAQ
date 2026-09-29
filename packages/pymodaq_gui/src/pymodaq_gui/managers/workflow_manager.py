@@ -330,8 +330,15 @@ def bind_transition(widget: QtCore.QObject, workflow: Workflow, transition: str,
     else:
         user_slot = click_slot
 
-        def click_slot(*args):
-            if user_slot(*args) is not False:
+        def click_slot(*_):
+            # Called with zero args, deliberately -- *args here is only to accept
+            # whatever Qt hands the OUTER slot (the 'checked' bool from triggered(bool)),
+            # never forwarded to user_slot. PyQt5/PyQt6 pass that bool through to a
+            # *args-accepting slot; PySide6 calls it with zero args instead (confirmed
+            # empirically) -- forwarding it would make user_slot's required signature
+            # backend-dependent. Nothing in this codebase's callbacks (start_scan(self),
+            # etc., no extra params) wants that argument anyway.
+            if user_slot() is not False:
                 workflow.trigger(transition)
 
     def sync_slot(*_):
@@ -359,8 +366,12 @@ def bind_toggle(widget: QtCore.QObject, workflow: Workflow, off_to_on: str, on_t
     can_trigger_any(off_to_on, on_to_off), checked synced to
     can_trigger(on_to_off) -- i.e. checked means "already on, the next
     click turns it back off". """
-    def click_slot(*args):
-        if toggle_slot is None or toggle_slot(*args) is not False:
+    def click_slot(*_):
+        # See bind_transition()'s click_slot for why toggle_slot is called with zero args
+        # rather than forwarding *_ -- PyQt5/PyQt6 vs PySide6 disagree on what a *args
+        # slot receives from a Qt signal, so forwarding would make toggle_slot's
+        # required signature backend-dependent.
+        if toggle_slot is None or toggle_slot() is not False:
             workflow.trigger_any(off_to_on, on_to_off)
 
     if sync_slot is None:
