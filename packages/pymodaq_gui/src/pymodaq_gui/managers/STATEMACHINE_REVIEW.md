@@ -148,12 +148,24 @@ Slightly less code, no explicit wiring step to forget.
 | | `workflow_manager.Workflow` | `python-statemachine` |
 |---|---|---|
 | Dependency | None | New external dependency (already hit one deprecation mid-project: `current_state` → `configuration`) |
-| Runtime graph extension | Yes — `add_transition()` on a live instance (used by `workflow_inspector_example.py` to bolt on an ad hoc `'fail'` transition, 2 lines, no subclass) | No — subclassing to override/extend a transition adds a second, unguarded path instead of replacing it (confirmed empirically) |
-| Guard/UI-enabled-sync query | Built in (`guard=`, checked on demand) | No dry-run API at all; the fix (model as a state) is usually *better* but isn't always applicable |
+| Graph mutable after definition | Partially — `add_transition()` can add a new one, or replace an existing one by re-adding the same name, on a live instance (used by `workflow_inspector_example.py` to bolt on an ad hoc `'fail'` transition, 2 lines, no subclass). No explicit *removal* either. | No, not at all — confirmed both directions empirically: subclassing to override a transition adds a second, unguarded path instead of replacing it, and deleting an inherited transition attribute (`del Subclass.pause`) is purely cosmetic, the transition still fires. The graph is fixed the moment the class body runs. |
 | Compound / parallel states | Not supported | Built in and tested (`State.Compound`, `State.Parallel`) — real, verified fit for something like an independent LOG region, and the actual open need for the sequencer's composite-state design |
 | Transition-scoped hooks | Explicit `.on(name, callback)` registration | `after_<event>` naming convention, zero registration |
 | Debuggability | ~150 lines, all yours, easy to step through | Async-capable engine, dispatcher, callback-priority system underneath — several behaviors in this comparison needed reading the library's source directly, not just its docs, to get right |
-| Maturity here | Already used/tested on `feature/worflow_manager` (92 tests) | Only `daq_scan` ported so far; `daq_move`/`daq_viewer`/`sequencer` untouched |
+
+Deliberately left off this table: a "guard support" row and a "maturity"
+row. Neither held up as a real differentiator once examined —
+
+- **Guards**: `python-statemachine` has no dry-run API for `cond=`/
+  `validators=` (can't check "would this succeed" without attempting it,
+  side effects and all). That looked like a clear point for `Workflow`'s
+  `guard=` — until the actual case (`daq_scan`'s START guard) turned out to
+  be *better* modeled as an explicit `UNINITIALIZED` state than as a guard
+  in either engine. So this isn't "engine A can, engine B can't" — it's "the
+  right answer usually isn't a guard at all," which applies to both.
+- **Maturity**: "only `daq_scan` is ported" is true, but it's a statement
+  about how much of this comparison has been done, not a technical property
+  of either engine — worth knowing, listed under Open Items, not a pro/con.
 
 ## Open items, either way
 
@@ -171,6 +183,10 @@ Slightly less code, no explicit wiring step to forget.
 - **The sequencer's composite-state design** — the one concrete case where
   `python-statemachine`'s real advantage (compound/parallel states) would
   actually be exercised — hasn't been touched by this comparison at all.
+- **Only `daq_scan` has been ported.** `daq_move`/`daq_viewer` were next in
+  line for `Workflow` before this comparison started; neither has been
+  touched against `python-statemachine`. Worth doing before treating this
+  comparison as final.
 
 ## Recommendation
 
