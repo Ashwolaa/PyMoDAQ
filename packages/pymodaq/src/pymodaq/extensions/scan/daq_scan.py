@@ -50,10 +50,10 @@ from pymodaq.utils.data import DataActuator
 from pymodaq.extensions.scan.manager.scan_manager import ScanManager
 from pymodaq_gui.utils.widgets.spinbox import QSpinBox_ro
 from pymodaq_gui.managers.standard_workflow import (
-    StandardTransitions, standard_workflow, bind_standard_workflow_actions)
+    StandardTransitions, StandardStates, standard_workflow, bind_standard_workflow_actions)
+from pymodaq_gui.utils.app_worker import ExtensionWorker, SaverWorker
 from pymodaq_gui.utils.widgets import MultistateLED, StatusPalette, Status
 from pymodaq_utils.enums import StrEnum
-from pymodaq_gui.utils.custom_app import WorkFlowActions
 
 
 if TYPE_CHECKING:
@@ -218,26 +218,15 @@ class DAQScan(CustomExt):
         
         logger.info('Initializing DAQScan')
 
-        # Created before super().__init__(): CustomExt.__init__ (run by super().__init__()
-        # below) can itself call do_things_after_experiment_set() synchronously, before any of
-        # this class's own __init__ body has run, if an experiment entry is already applied on
-        # the dashboard when this extension is opened -- and that method needs self.workflow to
-        # exist (self.workflow.revalidate()). standard_workflow() is a plain, self-contained
-        # QObject with no dependency on CustomApp/ActionManager, so it's safe to build this
-        # early; the guard's lambda only reads self.experiment_manager lazily, the first time
-        # it's actually called, by which point self.dashboard (set a few lines into
-        # CustomExt.__init__, before that early call) is already there.
+        # Built before super().__init__(): CustomExt.__init__ can call
+        # do_things_after_experiment_set() synchronously before the rest of __init__ runs,
+        # and that needs self.workflow to already exist.
         self.workflow = standard_workflow()
-        # 'start' needs real (side-effecting) validation via set_scan(), so its click can't go
-        # straight to workflow.trigger('start') -- see start_scan()/connect_things(). It does,
-        # however, get a guard: a scan can't start before an experiment entry is applied, and
-        # that check is a pure predicate (no side effects), which is exactly what guards are for.
+        # 'start' needs set_scan()'s validation first (see start_scan()), but still gets a
+        # guard: no start before an experiment entry is applied.
         self.workflow.add_transition(
-            StandardTransitions.START, ['IDLE'], 'RUNNING',
+            StandardTransitions.START, [StandardStates.IDLE], StandardStates.RUNNING,
             guard=lambda: bool(self.experiment_manager and self.experiment_manager.entry_applied))
-        # (standard_workflow() already makes 'finished' legal from RUNNING as well as STOPPING
-        # by default -- a scan finishing on its own, e.g. via thread_status's "Scan_done", never
-        # goes through stop_scan()/'stop' at all, so no override needed here.)
 
         super().__init__(parent=dockarea,
                          dashboard=dashboard,
@@ -420,18 +409,12 @@ class DAQScan(CustomExt):
 
         self.connect_action('ini_positions', self.set_ini_positions)
 
-        # Creates AND binds Start/Stop/Pause: bind_standard_workflow_actions() combines both by
-        # design (same as bind_pause_action() alone always did), so it's called here rather than
-        # split across setup_actions()/connect_things() -- 'navigator'/'batch' above are
-        # menu-only (auto_toolbar=False) and nothing else touches self._toolbar afterward, so
-        # this doesn't change the toolbar's visible order either way. on_start/on_stop replace
-        # the bare trigger('start')/trigger('stop') on click, since both need real work first
-        # (set_scan()'s validation, which can veto entering RUNNING; emitting the actual
-        # "stop_acquisition" command) -- see bind_transition()'s click_slot in
-        # workflow_manager.py.
+        # Creates AND binds Start/Stop/Pause. on_start/on_stop replace the bare trigger() on
+        # click, since both need real work first (set_scan()'s validation; the actual
+        # "stop_acquisition" command).
         bind_standard_workflow_actions(
             self, self.workflow, menu='actions',
-            on_start=self.start_scan, on_stop=self.stop_scan,
+            on_start=self.start_scan, on_stop=self.stop_scan, on_pause_resume=self.pause_scan,
             start_icon_color=self.get_theme().green, stop_icon_color=self.get_theme().red)
         self.workflow.on(StandardTransitions.PAUSE, self._on_pause_triggered)
         self.workflow.on(StandardTransitions.RESUME, self._on_resume_triggered)
@@ -1221,6 +1204,9 @@ class DAQScan(CustomExt):
             set_ini_positions
         """
         self.status_manager.set_permanent_status('Stoping acquisition')
+
+        self.workflow.trigger(StandardTransitions.STOP)
+
         self.command_daq_signal.emit(utils.ThreadCommand("stop_acquisition"))
 
         if self.settings['scan_options', 'go_to_ini_positions']:
@@ -1229,15 +1215,6 @@ class DAQScan(CustomExt):
 
         self.update_status(status)
         self.status_manager.set_permanent_status('')
-
-        # -> STOPPING, not IDLE: closes the double-start race where START used to be
-        # re-enabled here, synchronously, before the worker thread had actually confirmed the
-        # scan stopped (via thread_status's "Scan_done" -> FINISHED, below). START stays
-        # disabled until that confirmation arrives -- and so does 'ini_positions' (re-enabled in
-        # thread_status's "Scan_done" branch, not here): it manually commands actuators, and
-        # enabling it before the worker has actually stopped would let a manual move race
-        # whatever the worker is still doing for the current step, same race as START's.
-        self.workflow.trigger(StandardTransitions.STOP)
 
     def _on_pause_triggered(self, old_state: str, new_state: str):
         self.command_daq_signal.emit(utils.ThreadCommand('pause_acquisition', attribute=True))
@@ -1327,10 +1304,6 @@ class DAQScanAcquisition(ExtensionWorker):
             self.modules_manager.move_actuators(command.attribute, polling=False)
 
     def _start(self):
-        self.app.enable_workflow_actions(False,
-                                         excepted=(WorkFlowActions.PAUSE,
-                                                   WorkFlowActions.STOP),
-                                         other_actions='ini_positions')
         self.set_ini_positions()
 
     def _pause(self, do_pause: bool = True):
@@ -1353,9 +1326,6 @@ class DAQScanAcquisition(ExtensionWorker):
         self._app.status_sig.emit(utils.ThreadCommand("Scan_done"))
         if msg is not None:
             self._app.status_manager.set_permanent_status(msg)
-        self.app.enable_workflow_actions(True,
-                                         other_actions='ini_positions',
-                                         opposite=WorkFlowActions.PAUSE)
 
     def _update_status(self, msg: str):
         """ convenience method to update the status signal """

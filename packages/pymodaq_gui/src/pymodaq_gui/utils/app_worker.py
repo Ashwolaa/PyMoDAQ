@@ -152,7 +152,11 @@ class ExtensionWorker(QObject):
         for worker_name in self.thread_manager.n_jobs:
             self.thread_manager.n_jobs[worker_name] = 0
 
-        if self._app.has_action('start'):
+        # Skipped once the app owns a Workflow (e.g. daq_scan): its own bind_transition()
+        # sync already keeps 'start' correctly enabled/disabled from the workflow's state/
+        # guards, and this direct write would just stomp that with a blanket disable. Still
+        # needed for apps not yet ported to Workflow (daq_logger, sequencer).
+        if not hasattr(self._app, 'workflow') and self._app.has_action('start'):
             self._app.set_action_enabled('start', False)
         self._init_saver_worker_and_start_it()
         if self.has_data_processor:
@@ -208,8 +212,13 @@ class ExtensionWorker(QObject):
             self._workers_done.connect(self.terminate_workers)
 
         # 4 update the GUI
-        self._app.enable_workflow_actions(True,
-                                         opposite=WorkFlowActions.PAUSE)
+        # Same bridge as in start(): a Workflow-owning app already gets this from its own
+        # bind_standard_workflow_actions() bindings, correctly (guard-aware), once FINISHED
+        # actually fires -- this blanket enable(True) would stomp that back to disregarding
+        # guards/state entirely.
+        if not hasattr(self._app, 'workflow'):
+            self._app.enable_workflow_actions(True,
+                                             opposite=WorkFlowActions.PAUSE)
         self._update_status(msg)
 
     def _init_saver_worker_and_start_it(self):
