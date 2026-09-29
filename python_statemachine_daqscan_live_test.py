@@ -1,11 +1,16 @@
 """
 Throwaway PoC -- not part of any package, not wired into anything.
 
-Exercises the REAL, committed daq_scan.py methods (DAQScan.can_start, DAQScan.after_pause,
-DAQScan.after_resume) against the real, shared StandardChart/ChartAdapter, rather than a
-reimplementation -- imported directly from
-packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py and
-packages/pymodaq_gui/src/pymodaq_gui/managers/statemachine_workflow.py.
+Exercises the REAL, committed daq_scan.py classes/methods (DaqScanChart, DAQScan.after_pause,
+DAQScan.after_resume) rather than a reimplementation -- imported directly from
+packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py.
+
+DaqScanChart adds an UNINITIALIZED state before IDLE instead of gating START with a guard --
+experiment_manager.entry_applied is monotonic (grep confirms it's only ever set to True,
+never back to False, anywhere in the codebase), so this is a fact about which state the
+workflow is in, not a condition to re-check on every UI resync. 'entry_applied'
+(uninitialized -> idle) fires from do_things_after_experiment_set() in the real code; here
+it's fired directly on the real chart.
 
 Full Dashboard + mock-hardware preset instantiation of the real DAQScan extension is a
 bigger undertaking than a single PoC (docks, toolbars, hardware managers all get built in
@@ -42,29 +47,22 @@ from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.managers.standard_workflow import bind_standard_workflow_actions
 
 # The real thing, imported directly -- not reimplemented.
-from pymodaq.extensions.scan.daq_scan import DAQScan
-from pymodaq_gui.managers.statemachine_workflow import StandardChart, ChartAdapter
-
-
-class FakeExperimentManager:
-    def __init__(self, entry_applied: bool = False):
-        self.entry_applied = entry_applied
+from pymodaq.extensions.scan.daq_scan import DAQScan, DaqScanChart
+from pymodaq_gui.managers.statemachine_workflow import ChartAdapter
 
 
 class RealDAQScanStandIn(QtCore.QObject):
     """ Instantiates DAQScan's actual __init__ logic that this PoC cares about, without
     going through CustomExt.__init__'s full dock/toolbar/hardware setup. Reuses the real
-    can_start/after_pause/after_resume methods via composition + explicit binding, since
-    subclassing DAQScan itself would still need to call super().__init__() (CustomExt). """
+    after_pause/after_resume methods via composition + explicit binding, since subclassing
+    DAQScan itself would still need to call super().__init__() (CustomExt). """
 
     command_daq_signal = QtCore.Signal(object)
 
     def __init__(self):
         super().__init__()
-        self.experiment_manager = FakeExperimentManager(entry_applied=False)
         self.status_manager = type('S', (), {'set_permanent_status': lambda self, s: None})()
         # bind the REAL DAQScan methods onto this stand-in
-        self.can_start = DAQScan.can_start.__get__(self)
         self.after_pause = DAQScan.after_pause.__get__(self)
         self.after_resume = DAQScan.after_resume.__get__(self)
 
@@ -73,8 +71,8 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
     model = RealDAQScanStandIn()
-    # real StandardChart, real ChartAdapter, real DAQScan.can_start as the guard
-    workflow = ChartAdapter(StandardChart, model=model, guards={'start': model.can_start})
+    # real DaqScanChart, real ChartAdapter -- no guards= needed anymore
+    workflow = ChartAdapter(DaqScanChart, model=model)
 
     action_manager = ActionManager(toolbar=QtWidgets.QToolBar())
     bind_standard_workflow_actions(
@@ -83,13 +81,16 @@ if __name__ == '__main__':
     pause_events = []
     model.command_daq_signal.connect(lambda cmd: pause_events.append(cmd))
 
-    assert workflow.state == 'IDLE'
+    assert workflow.state == 'UNINITIALIZED'
     assert not action_manager.is_action_enabled('start'), (
-        "real can_start() guard should refuse: no experiment entry applied yet")
+        "start must be unreachable before entry_applied has fired, by construction")
 
-    model.experiment_manager.entry_applied = True
-    workflow.revalidate()  # same call daq_scan.py's do_things_after_experiment_set() makes
-    assert action_manager.is_action_enabled('start'), "guard should now allow start"
+    workflow.trigger('entry_applied')  # same event do_things_after_experiment_set() fires
+    assert workflow.state == 'IDLE'
+    assert action_manager.is_action_enabled('start'), "start should now be reachable"
+
+    workflow.trigger('entry_applied')  # must be a safe no-op -- entry_applied is monotonic
+    assert workflow.state == 'IDLE'
 
     action_manager.get_action('start').trigger()
     assert workflow.state == 'RUNNING'
@@ -105,6 +106,6 @@ if __name__ == '__main__':
     action_manager.get_action('stop').trigger()
     assert workflow.state == 'STOPPING'
 
-    print('Real StandardChart + real DAQScan.can_start/after_pause/after_resume (guard via '
-         'ChartAdapter, not cond=), driven through unmodified bind_standard_workflow_actions(), '
-         'all correct.')
+    print('Real DaqScanChart (UNINITIALIZED -> IDLE state, not a guard) + real '
+         'DAQScan.after_pause/after_resume, driven through unmodified '
+         'bind_standard_workflow_actions(), all correct.')
