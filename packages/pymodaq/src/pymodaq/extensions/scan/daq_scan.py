@@ -409,12 +409,16 @@ class DAQScan(CustomExt):
 
         self.connect_action('ini_positions', self.set_ini_positions)
 
-        # Creates AND binds Start/Stop/Pause. on_start/on_stop replace the bare trigger() on
-        # click, since both need real work first (set_scan()'s validation; the actual
-        # "stop_acquisition" command).
+        # Creates AND binds Start/Stop/Pause. on_start/on_stop run before the transition fires
+        # automatically on click (see bind_transition()'s docstring) -- start_scan()/
+        # stop_scan() are also called directly elsewhere (do_scan(), stop(),
+        # start_scan_batch()), so each stays self-sufficient (calls workflow.trigger() itself)
+        # rather than relying on the button wrapper to do it for them. Pause/resume has no
+        # side effects of its own (see _on_pause_triggered/_on_resume_triggered below), so it
+        # uses bind_toggle()'s bare trigger_any() default -- no on_pause_resume needed.
         bind_standard_workflow_actions(
             self, self.workflow, menu='actions',
-            on_start=self.start_scan, on_stop=self.stop_scan, on_pause_resume=self.pause_scan,
+            on_start=self.start_scan, on_stop=self.stop_scan,
             start_icon_color=self.get_theme().green, stop_icon_color=self.get_theme().red)
         self.workflow.on(StandardTransitions.PAUSE, self._on_pause_triggered)
         self.workflow.on(StandardTransitions.RESUME, self._on_resume_triggered)
@@ -1150,6 +1154,11 @@ class DAQScan(CustomExt):
             self.command_daq_signal.emit(utils.ThreadCommand('start_acquisition'))
             self.status_manager.set_permanent_status('Running acquisition')
             logger.info('Running acquisition')
+        else:
+            # set_scan() validation failed: tell bind_transition's wrapper (see
+            # connect_things()) not to also call workflow.trigger(START) -- we're still IDLE
+            # and no acquisition was started, so entering RUNNING here would be a lie.
+            return False
 
     def ini_scan_acquisition(self):
         self.scan_acquisition = DAQScanAcquisition(self)
@@ -1223,11 +1232,6 @@ class DAQScan(CustomExt):
     def _on_resume_triggered(self, old_state: str, new_state: str):
         self.command_daq_signal.emit(utils.ThreadCommand('pause_acquisition', attribute=False))
         self.status_manager.set_permanent_status('Running acquisition')
-
-    def pause_scan(self):
-        """Toggle pause on the running acquisition, programmatically."""
-        # Trigger resume if in pause, else trigger pause
-        self.workflow.trigger_any(StandardTransitions.RESUME, StandardTransitions.PAUSE)
 
     def do_scan(self, start_scan=True):
         """Public method to start/stop the scan programmatically.

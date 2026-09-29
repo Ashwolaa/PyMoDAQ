@@ -215,9 +215,9 @@ class TestBindStandardWorkflowActions:
         assert workflow.state == 'RUNNING'
 
     def test_on_pause_resume_runs_then_trigger_any_fires_automatically(self, qtbot, action_manager):
-        """ daq_scan's pause_scan(): same single-implementation-for-button-and-script pattern
-        as on_start/on_stop -- must NOT call trigger_any() itself, since unlike a single
-        trigger() the toggle isn't idempotent (see bind_pause_action's docstring). """
+        """ Same single-implementation-for-button-and-script pattern as on_start/on_stop --
+        must NOT call trigger_any() itself, since unlike a single trigger() the toggle isn't
+        idempotent (see bind_pause_action's docstring). """
         workflow = standard_workflow()
         calls = []
 
