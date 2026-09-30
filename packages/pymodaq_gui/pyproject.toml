@@ -43,6 +43,12 @@ dependencies = [
 
 [project.optional-dependencies]
 
+statemachine = [
+    "python-statemachine",
+]
+statemachine-diagrams = [
+    "python-statemachine[diagrams]",
+]
 editor = [
     "qtmonaco",
 ]

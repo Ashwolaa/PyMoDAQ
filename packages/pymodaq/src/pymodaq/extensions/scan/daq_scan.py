@@ -49,8 +49,11 @@ from pymodaq.utils.scanner.scan_selector import ScanSelector, SelectorItem
 from pymodaq.utils.data import DataActuator
 from pymodaq.extensions.scan.manager.scan_manager import ScanManager
 from pymodaq_gui.utils.widgets.spinbox import QSpinBox_ro
+from statemachine import StateMachine, State
+
 from pymodaq_gui.managers.standard_workflow import (
-    StandardTransitions, StandardStates, standard_workflow, bind_standard_workflow_actions)
+    StandardTransitions, StandardStates, bind_standard_workflow_actions)
+from pymodaq_gui.managers.statemachine_workflow import ChartAdapter
 from pymodaq_gui.utils.app_worker import ExtensionWorker, SaverWorker
 from pymodaq_gui.utils.widgets import MultistateLED, StatusPalette, Status
 from pymodaq_utils.enums import StrEnum
@@ -153,6 +156,27 @@ class ScanStatusBarManager:
         self._scan_done_LED.set_state(ScanLedState.COMPLETE if done else ScanLedState.RUNNING)
 
 
+class DaqScanChart(StateMachine):
+    """ Its own chart, not the shared StandardChart: adds UNINITIALIZED before IDLE for
+    "no start before an experiment entry is applied", instead of a guard on START.
+    experiment_manager.entry_applied is monotonic (only ever set True, never back), so
+    that's a fact about which state the workflow is in, not a condition to keep
+    re-checking. `start` is plain idle.to(running) -- correct by construction, since IDLE
+    is only reachable once `entry_applied` has fired. """
+    uninitialized = State(initial=True, value='UNINITIALIZED')
+    idle = State(value=StandardStates.IDLE)
+    running = State(value=StandardStates.RUNNING)
+    paused = State(value=StandardStates.PAUSED)
+    stopping = State(value=StandardStates.STOPPING)
+
+    entry_applied = uninitialized.to(idle)
+    start = idle.to(running)
+    pause = running.to(paused)
+    resume = paused.to(running)
+    stop = running.to(stopping) | paused.to(stopping)
+    finished = stopping.to(idle) | running.to(idle)
+
+
 class DAQScan(CustomExt):
     """
     Main class initializing a DAQScan module with its dashboard and scanning control panel
@@ -163,6 +187,10 @@ class DAQScan(CustomExt):
 
     command_daq_signal = Signal(utils.ThreadCommand)
     scan_done_signal = QtCore.Signal()
+    # after_pause/after_resume emit through this instead of calling status_manager
+    # directly -- keeps them thread-safe if a future invoke-driven RUNNING ever
+    # dispatches them off the GUI thread (see STATEMACHINE_REVIEW.md).
+    status_message_signal = QtCore.Signal(str)
 
     icon_name = 'qr_code_scanner'
 
@@ -218,21 +246,18 @@ class DAQScan(CustomExt):
         
         logger.info('Initializing DAQScan')
 
-        # Built before super().__init__(): CustomExt.__init__ can call
-        # do_things_after_experiment_set() synchronously before the rest of __init__ runs,
-        # and that needs self.workflow to already exist.
-        self.workflow = standard_workflow()
-        # 'start' needs set_scan()'s validation first (see start_scan()), but still gets a
-        # guard: no start before an experiment entry is applied.
-        self.workflow.add_transition(
-            StandardTransitions.START, [StandardStates.IDLE], StandardStates.RUNNING,
-            guard=lambda: bool(self.experiment_manager and self.experiment_manager.entry_applied))
+        # Built before super().__init__(), like workflow_manager.Workflow() used to be --
+        # ChartAdapter doesn't need a model at construction time (see attach_model() below).
+        self.workflow = ChartAdapter(DaqScanChart)
 
         super().__init__(parent=dockarea,
                          dashboard=dashboard,
                          add_toolbar_break=False,
                          h5_actions_not=(FileAction.SHOW_SETTINGS, FileAction.CLOSE_FILE, FileAction.OPEN_FILE)
         )
+
+        # self is now a fully constructed QObject -- after_pause/after_resume dispatch from here on.
+        self.workflow.attach_model(self)
 
         self.wait_time = 1000
         self._show_popups: bool = SHOW_POPUPS # wether to show or not the popups
@@ -406,22 +431,17 @@ class DAQScan(CustomExt):
 
     def connect_things(self):
         self.scanner.scanner_updated_signal.connect(self.do_things_after_scanner_changed)
+        self.status_message_signal.connect(self.status_manager.set_permanent_status)
 
         self.connect_action('ini_positions', self.set_ini_positions)
 
-        # Creates AND binds Start/Stop/Pause. on_start/on_stop run before the transition fires
-        # automatically on click (see bind_transition()'s docstring) -- start_scan()/
-        # stop_scan() are also called directly elsewhere (do_scan(), stop(),
-        # start_scan_batch()), so each stays self-sufficient (calls workflow.trigger() itself)
-        # rather than relying on the button wrapper to do it for them. Pause/resume has no
-        # side effects of its own (see _on_pause_triggered/_on_resume_triggered below), so it
-        # uses bind_toggle()'s bare trigger_any() default -- no on_pause_resume needed.
+        # Creates AND binds Start/Stop/Pause. start_scan()/stop_scan() call workflow.trigger()
+        # themselves (also called directly from do_scan()/stop()/start_scan_batch()).
+        # Pause/resume -> after_pause()/after_resume() below, dispatched automatically.
         bind_standard_workflow_actions(
             self, self.workflow, menu='actions',
             on_start=self.start_scan, on_stop=self.stop_scan,
             start_icon_color=self.get_theme().green, stop_icon_color=self.get_theme().red)
-        self.workflow.on(StandardTransitions.PAUSE, self._on_pause_triggered)
-        self.workflow.on(StandardTransitions.RESUME, self._on_resume_triggered)
 
         self.connect_action('start_batch', self.start_scan_batch)
         self.connect_action('move_at', self.move_to_crosshair)
@@ -460,8 +480,8 @@ class DAQScan(CustomExt):
         # set the module saver type and applies its h5saver to submodules
         self._module_and_data_saver = module_saving.ScanSaver(self)
 
-        # Check workflow when entry_applied changes
-        self.workflow.revalidate()
+        # UNINITIALIZED -> IDLE (see DaqScanChart). Safe no-op once already IDLE+.
+        self.workflow.trigger('entry_applied')
 
         if hasattr(self, 'scan_manager'):
             self.ini_scan_manager()
@@ -1155,9 +1175,7 @@ class DAQScan(CustomExt):
             self.status_manager.set_permanent_status('Running acquisition')
             logger.info('Running acquisition')
         else:
-            # set_scan() validation failed: tell bind_transition's wrapper (see
-            # connect_things()) not to also call workflow.trigger(START) -- we're still IDLE
-            # and no acquisition was started, so entering RUNNING here would be a lie.
+            # set_scan() validation failed -- still IDLE, nothing was started.
             return False
 
     def ini_scan_acquisition(self):
@@ -1225,13 +1243,15 @@ class DAQScan(CustomExt):
         self.update_status(status)
         self.status_manager.set_permanent_status('')
 
-    def _on_pause_triggered(self, old_state: str, new_state: str):
+    def after_pause(self, event, source, target):
+        """ Dispatched automatically on DaqScanChart's 'pause' -- signals only, no direct
+        widget touches (see status_message_signal). """
         self.command_daq_signal.emit(utils.ThreadCommand('pause_acquisition', attribute=True))
-        self.status_manager.set_permanent_status('Acquisition paused')
+        self.status_message_signal.emit('Acquisition paused')
 
-    def _on_resume_triggered(self, old_state: str, new_state: str):
+    def after_resume(self, event, source, target):
         self.command_daq_signal.emit(utils.ThreadCommand('pause_acquisition', attribute=False))
-        self.status_manager.set_permanent_status('Running acquisition')
+        self.status_message_signal.emit('Running acquisition')
 
     def do_scan(self, start_scan=True):
         """Public method to start/stop the scan programmatically.
