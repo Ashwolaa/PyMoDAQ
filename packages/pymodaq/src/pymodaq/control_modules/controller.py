@@ -44,6 +44,7 @@ class Controller(QObject):
     unsubscribe_requested = Signal(object)     # → thread.unsubscribe
     status = Signal(bool, str)                 # ← thread.hardware_status
     error = Signal(str)                        # ← thread.error: an operation failed, the device is still open
+    written = Signal(str, object)              # ← thread.write_done: (name, value) after a write succeeded
 
     def __init__(self, thread, settings, capabilities: Capabilities, parent: QObject | None = None):
         super().__init__(parent)
@@ -58,6 +59,7 @@ class Controller(QObject):
         self.unsubscribe_requested.connect(thread.unsubscribe)
         thread.hardware_status.connect(self._on_status)
         thread.error.connect(self.error)
+        thread.write_done.connect(self.written)
         thread.capabilities_signal.connect(self._on_instance_capabilities)
 
     @property

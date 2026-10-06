@@ -92,6 +92,28 @@ class TestWrite:
         ctrl.exposure = 20.0
         qtbot.waitUntil(lambda: plugin.written == [('exposure', 20.0)], timeout=2000)
 
+    def test_a_successful_write_emits_written(self, registry, qtbot):
+        key, ctrl = attach(registry)
+        ctrl.thread.ini_hardware()
+        with qtbot.waitSignal(ctrl.written, timeout=2000) as blocker:
+            ctrl.exposure = 20.0
+        assert blocker.args == ['exposure', 20.0]
+
+
+class TestLifecycle:
+
+    def test_attach_poll_write_detach(self, registry, qtbot):
+        key, ctrl = attach(registry)
+        ctrl.thread.ini_hardware()
+        plugin = ctrl.thread._plugin
+        ctrl.poll('spectrum', 20.0)
+        ctrl.exposure = 50.0
+        qtbot.waitUntil(lambda: ctrl.spectrum is not None and len(plugin.written) == 1, timeout=2000)
+        assert list(ctrl.spectrum) == [1.0, 2.0, 3.0, 4.0]
+        assert plugin.written == [('exposure', 50.0)]
+        registry.detach(key)
+        assert not registry.is_known(key)
+
 
 class TestPoll:
 
