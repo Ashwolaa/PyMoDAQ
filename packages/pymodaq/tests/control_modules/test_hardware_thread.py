@@ -290,11 +290,13 @@ class TestOneShotRead:
 
     def test_subscribe_before_ini_is_dropped_and_released(self, qapp):
         thread_obj, plugin = make_thread()
-        released = Collector()
+        released, errors = Collector(), Collector()
+        thread_obj.error.connect(errors)
         sub = Subscription('axis_x', 100.0)
         sub.released.connect(released)
         thread_obj.subscribe(sub)
         assert released.count == 1
+        assert 'not open' in errors.last()[0]
         assert thread_obj._subscribers == {}
         assert thread_obj._timers == {}
 

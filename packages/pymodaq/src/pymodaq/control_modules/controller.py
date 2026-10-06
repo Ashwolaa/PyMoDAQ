@@ -70,14 +70,22 @@ class Controller(QObject):
 
     def _on_status(self, connected: bool, info: str) -> None:
         self._connected = connected
+        if not connected:
+            self._polled.clear()  # the thread released these subscriptions when it closed the device
         self.status.emit(connected, info)
+
+    def _require_open(self, name: str) -> None:
+        if not self._connected:
+            raise RuntimeError(f'cannot access {name!r}: the device is not open')
 
     def poll(self, name: str, period_ms: float) -> Subscription:
         """Read *name* every *period_ms* so that its property stays up to date.
 
         Only the newest value matters, so the subscription uses the 'latest' policy.
         Polling a name again returns the same subscription; a different period raises.
+        Raises RuntimeError if the device is not open.
         """
+        self._require_open(name)
         if name in self._polled:
             existing = self._polled[name]
             if existing.period_ms != period_ms:
@@ -97,6 +105,7 @@ class Controller(QObject):
 
     def read(self, name: str, on_value) -> Subscription:
         """Read *name* once, asynchronously: *on_value(data)* is called when the reading arrives."""
+        self._require_open(name)
         sub = Subscription(name, None)
         sub.data_ready.connect(lambda data, is_temp, t: (sub.acknowledge(), on_value(data)))
         self.subscribe_requested.emit(sub)
@@ -106,8 +115,7 @@ class Controller(QObject):
         """Read *name* once and wait for the value. For scripts only: never call it from the hardware thread."""
         if self.thread.is_device_thread():
             raise RuntimeError('read_blocking would wait on the hardware thread that must answer it')
-        if not self._connected:
-            raise RuntimeError(f'cannot read {name!r}: the device is not open')
+        self._require_open(name)
         done = threading.Event()
         result: dict[str, object] = {}
 

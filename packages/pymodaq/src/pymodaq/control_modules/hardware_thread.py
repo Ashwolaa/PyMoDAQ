@@ -190,7 +190,7 @@ class HardwareThread(QObject):
         reading and is released.  Requests made while the plugin is closed are dropped.
         """
         if self._plugin is None:
-            logger.warning(f'Subscription to {sub.channel!r} dropped: the device is not open')
+            self.error.emit(f'Subscription to {sub.channel!r} dropped: the device is not open')
             sub.released.emit()
             return
         if sub.period_ms is None:
