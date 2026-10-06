@@ -52,7 +52,7 @@ class Controller(QObject):
         self.thread = thread
         self._connected = False
         self._last_values: dict[str, object] = {}
-        self._kept: dict[str, Subscription] = {}
+        self._polled: dict[str, Subscription] = {}
         self.write_requested.connect(thread.request_write)
         self.subscribe_requested.connect(thread.subscribe)
         self.unsubscribe_requested.connect(thread.unsubscribe)
@@ -72,17 +72,28 @@ class Controller(QObject):
         self._connected = connected
         self.status.emit(connected, info)
 
-    def keep(self, name: str, period_ms: float) -> Subscription:
-        """Poll *name* every *period_ms* so that its property stays up to date.
+    def poll(self, name: str, period_ms: float) -> Subscription:
+        """Read *name* every *period_ms* so that its property stays up to date.
 
         Only the newest value matters, so the subscription uses the 'latest' policy.
+        Polling a name again returns the same subscription; a different period raises.
         """
-        if name not in self._kept:
-            sub = Subscription(name, period_ms, policy='latest')
-            sub.data_ready.connect(lambda data, is_temp, t: self._on_reading(name, data, sub))
-            self._kept[name] = sub
-            self.subscribe_requested.emit(sub)
-        return self._kept[name]
+        if name in self._polled:
+            existing = self._polled[name]
+            if existing.period_ms != period_ms:
+                raise ValueError(f'{name!r} is already polled every {existing.period_ms} ms')
+            return existing
+        sub = Subscription(name, period_ms, policy='latest')
+        sub.data_ready.connect(lambda data, is_temp, t: self._on_reading(name, data, sub))
+        self._polled[name] = sub
+        self.subscribe_requested.emit(sub)
+        return sub
+
+    def stop_poll(self, name: str) -> None:
+        """Stop polling *name*. Its property keeps the last value received."""
+        sub = self._polled.pop(name, None)
+        if sub is not None:
+            self.unsubscribe_requested.emit(sub)
 
     def read(self, name: str, on_value) -> Subscription:
         """Read *name* once, asynchronously: *on_value(data)* is called when the reading arrives."""
@@ -114,10 +125,10 @@ class Controller(QObject):
         return result['value']
 
     def close(self) -> None:
-        """Stop the kept polling subscriptions."""
-        for sub in self._kept.values():
+        """Stop every poll."""
+        for sub in self._polled.values():
             self.unsubscribe_requested.emit(sub)
-        self._kept.clear()
+        self._polled.clear()
 
     def _on_reading(self, name: str, data: object, sub: Subscription) -> None:
         self._last_values[name] = data

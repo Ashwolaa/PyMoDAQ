@@ -15,11 +15,13 @@ name; readings go to the subscriptions that asked for them.
 """
 from __future__ import annotations
 
+import copy
 import functools
 import threading
 import time
 from typing import Any, Callable
 
+from pymodaq.control_modules.capabilities import Capabilities
 from pymodaq.control_modules.subscription import Subscription
 from pymodaq_utils.logger import set_logger, get_module_name
 from qtpy.QtCore import QObject, QSignalBlocker, QTimer, Signal, Slot
@@ -88,6 +90,7 @@ class HardwareThread(QObject):
         self._timers: dict[float, QTimer] = {}
         self._subscribers: dict[str, list[Subscription]] = {}
         self._device_ident: int | None = None
+        self._pushed: set[str] = {q.name for q in Capabilities.from_device(plugin_class).measurements if q.push}
         self._push_requested.connect(self._on_push_requested)
 
     # ── Plugin lifecycle ─────────────────────────────────────────────────────
@@ -194,7 +197,8 @@ class HardwareThread(QObject):
             self._read_one_shot(sub)
             return
         self._subscribers.setdefault(sub.channel, []).append(sub)
-        self._ensure_timer(sub.period_ms)
+        if sub.channel not in self._pushed:
+            self._ensure_timer(sub.period_ms)
 
     def _read_one_shot(self, sub: Subscription) -> None:
         try:
@@ -210,15 +214,19 @@ class HardwareThread(QObject):
     def _send(self, sub: Subscription, data: object, read_time: float) -> None:
         if not sub.try_claim():
             return
-        selected = sub.transform(data) if sub.transform is not None else data
+        selected = sub.transform(copy.deepcopy(data)) if sub.transform is not None else data
         sub.data_ready.emit(selected, False, read_time)
 
     @Slot(object)
     def unsubscribe(self, sub: Subscription) -> None:
-        """Stop sending readings to *sub*, then release it so the consumer can delete it."""
+        """Stop sending readings to *sub*, then release it so the consumer can delete it.
+
+        A subscription the thread no longer holds (already released, or dropped while closed) is ignored.
+        """
         subs = self._subscribers.get(sub.channel, [])
-        if sub in subs:
-            subs.remove(sub)
+        if sub not in subs:
+            return
+        subs.remove(sub)
         if not subs:
             self._subscribers.pop(sub.channel, None)
         if not self._subscriptions_at(sub.period_ms):
@@ -261,7 +269,9 @@ class HardwareThread(QObject):
         subs = self._subscriptions_at(period_ms)
         if not subs:
             return
-        channels = sorted({sub.channel for sub in subs})
+        channels = sorted({sub.channel for sub in subs} - self._pushed)
+        if not channels:
+            return
         dte = self._plugin.read(names=channels, fresh=True)
         for channel in channels:
             self._deliver(channel, dte, period_ms)
@@ -274,8 +284,8 @@ class HardwareThread(QObject):
     def _fan_out(self, channel: str, data: object, read_time: float, period_ms: float | None = None) -> None:
         """Send *data* to the subscriptions of *channel*, at *period_ms* when given.
 
-        The data is not copied: the driver must return, or push, a fresh array each time,
-        so a queued reading is never overwritten before its consumer handles it.
+        Subscribers without a transform share the same object, so it must be read-only for them.
+        A transform receives its own copy.
         """
         for sub in list(self._subscribers.get(channel, [])):
             if period_ms is None or sub.period_ms == period_ms:

@@ -93,15 +93,40 @@ class TestWrite:
         qtbot.waitUntil(lambda: plugin.written == [('exposure', 20.0)], timeout=2000)
 
 
-class TestKeep:
+class TestPoll:
 
-    def test_kept_measurement_updates_its_property(self, registry, qtbot):
+    def test_polled_measurement_updates_its_property(self, registry, qtbot):
         key, ctrl = attach(registry)
         ctrl.thread.ini_hardware()
         assert ctrl.spectrum is None
-        ctrl.keep('spectrum', 20.0)
+        ctrl.poll('spectrum', 20.0)
         qtbot.waitUntil(lambda: ctrl.spectrum is not None, timeout=2000)
         assert list(ctrl.spectrum) == [1.0, 2.0, 3.0, 4.0]
+
+    def test_polling_again_with_the_same_period_returns_the_same_subscription(self, registry):
+        key, ctrl = attach(registry)
+        assert ctrl.poll('spectrum', 20.0) is ctrl.poll('spectrum', 20.0)
+
+    def test_polling_again_with_another_period_raises(self, registry):
+        key, ctrl = attach(registry)
+        ctrl.poll('spectrum', 20.0)
+        with pytest.raises(ValueError, match='already polled'):
+            ctrl.poll('spectrum', 50.0)
+
+    def test_stop_poll_keeps_the_last_value(self, registry, qtbot):
+        key, ctrl = attach(registry)
+        ctrl.thread.ini_hardware()
+        ctrl.poll('spectrum', 20.0)
+        qtbot.waitUntil(lambda: ctrl.spectrum is not None, timeout=2000)
+        ctrl.stop_poll('spectrum')
+        last = ctrl.spectrum
+        qtbot.wait(100)
+        assert ctrl.spectrum is last
+        assert 'spectrum' not in ctrl._polled
+
+    def test_stop_poll_of_an_unpolled_name_is_a_noop(self, registry):
+        key, ctrl = attach(registry)
+        ctrl.stop_poll('spectrum')
 
 
 class TestBlockingRead:
