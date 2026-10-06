@@ -7,7 +7,6 @@ from serializall import SerializableFactory
 
 from qtpy import QtCore, QtWidgets
 
-from pymodaq.control_modules.daq_move import DAQ_Move
 from pymodaq.control_modules.enums import MoveType
 from pymodaq.control_modules.units import get_unit_to_display
 from pymodaq.utils.data import DataActuator
@@ -20,9 +19,7 @@ from pymodaq.extensions.sequencer.utilities.element_factory import SeqEltBase, S
 
 from pymodaq.extensions.sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
-from pymodaq.utils.managers.modules_manager import ModulesManager
 
-from pymodaq.control_modules.instruments import ACTUATOR_NAMES, find_actuator_class_from_name
 from pymodaq_utils.categorizing import categorize_items, find_last_index
 
 ser_factory = SerializableFactory()
@@ -33,7 +30,7 @@ class ActuatorScalableParameter(GroupParameter):
     """
 
     def __init__(self, **opts):
-        opts['type'] = 'act_move'
+        opts['type'] = 'act_move_elt'
         opts['addText'] = 'Add'
 
         opts['addMenu'] = categorize_items(opts['actuators'])
@@ -49,11 +46,13 @@ class ActuatorScalableParameter(GroupParameter):
         child = {'title': f'{typ}',
                  'name': f'{typ}',
                  'type': 'float',
+                 'siPrefix': True,
                  'removable': True,
                  }
         self.addChild(child)
 
 registerParameterType('act_move_elt', ActuatorScalableParameter, override=True)
+
 
 @dataclasses.dataclass
 class ValueUnits:
@@ -205,7 +204,7 @@ class MoveElt(SeqEltBase):
             module_type=ModuleType.Actuator,
             disconnect_modules=True)
 
-        self.save_data(dte) # to log the data
+        self.save_data(dte, done=False)  # to log the data, done_signal handled below
         if self._wait_move_done:
             self.done_signal.emit()
 

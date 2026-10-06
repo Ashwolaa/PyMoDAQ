@@ -14,7 +14,8 @@ from pymodaq_utils.enums import BaseEnum, StrEnum
 from pymodaq_gui.h5modules.saving import H5Saver
 from pymodaq_gui.utils import select_file, Dock
 
-from pymodaq_gui.utils.widgets import QLED
+from pymodaq_gui.utils.widgets.multistate_led import MultistateLED
+from pymodaq_gui.utils.status_palette import StatusPalette, Status
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_gui.utils.widgets.statusbar_separator import StatuBarSeparator
 
@@ -47,6 +48,7 @@ class FileAction(StrEnum):
 class H5Manager(QtCore.QObject, ActionManager):
     command_sig = QtCore.Signal(ThreadCommand)
     file_open_signal = QtCore.Signal(bool)
+    file_loaded_signal = QtCore.Signal(Path)
 
     def __init__(self, app: 'CustomApp', parent=None,
                  show_not: Iterable[FileAction] = (FileAction.CLOSE_FILE, FileAction.OPEN_FILE)):
@@ -62,7 +64,7 @@ class H5Manager(QtCore.QObject, ActionManager):
         ActionManager.__init__(self, toolbar=QtWidgets.QToolBar())
         self._show_not_action = show_not
 
-        self._h5saver: H5Saver = H5Saver()
+        self._h5saver: H5Saver = None
         self._app = app
 
         self.main_window = app.mainwindow
@@ -70,8 +72,7 @@ class H5Manager(QtCore.QObject, ActionManager):
 
         self._h5_base_group_name = getattr(app, 'h5_base_group_name', 'Data')
 
-        self._file_open_LED: QLED = None
-        self._swmr_label: QtWidgets.QLabel = None
+        self._file_open_LED: MultistateLED = None
 
         self._show_h5file_statusbar_widgets = getattr(app, '.show_h5file_statusbar_widgets', True)
 
@@ -145,7 +146,7 @@ class H5Manager(QtCore.QObject, ActionManager):
 
 
         self.connect_action(FileAction.SHOW_FILE, self.show_file_content)
-        self.connect_action(FileAction.NEW_FILE, lambda: self.create_new_file(True))
+        self.connect_action(FileAction.NEW_FILE, self.create_new_file)
         self.connect_action(FileAction.NEW_FILE, lambda: self.command_sig.emit(ThreadCommand(FileAction.NEW_FILE)))
 
         self.connect_action(FileAction.LOAD, self.load_file)
@@ -177,18 +178,15 @@ class H5Manager(QtCore.QObject, ActionManager):
         widget.closeEvent = lambda event: self.set_action_checked(FileAction.SHOW_SETTINGS, False)
 
     def insert_h5stuff_status(self):
-        self._file_open_LED = QLED()
-        self._file_open_LED.set_as_false()
-        self._file_open_LED.clickable = False
-        self._file_open_LED.setToolTip('H5 file open and accessible')
+        self._file_open_LED = MultistateLED(
+            states=StatusPalette.subset(Status.OFF, Status.IDLE, Status.RUNNING),
+            readonly=True)
+        self._file_open_LED.set_state(Status.OFF)
+        self._file_open_LED.setToolTip('H5 file closed')
 
-        self._swmr_label = QtWidgets.QLabel('')
-        self._swmr_label.setToolTip('SWMR mode status')
-        self._swmr_label.setVisible(False)
         self.statusbar.addPermanentWidget(StatuBarSeparator())
         self.statusbar.addPermanentWidget(QtWidgets.QLabel('File:'))
         self.statusbar.addPermanentWidget(self._file_open_LED)
-        self.statusbar.addPermanentWidget(self._swmr_label)
 
         self.statusbar.addPermanentWidget(StatuBarSeparator())
 
@@ -205,43 +203,49 @@ class H5Manager(QtCore.QObject, ActionManager):
     @property
     def h5saver(self) -> H5Saver:
         self._init_h5_saver()
-
-        status = self.open_file()
-        if status == FileStatus.NO_FILE:
-            self.create_new_file(True)
+        if not self._h5saver.isopen():
+            status = self.open_file()
+            if status == FileStatus.NO_FILE:
+                self.create_new_file()
         return self._h5saver
 
-    def get_h5saver(self, create_new_file=False) -> H5Saver:
+    def get_h5saver(self, create_new_file=False, mode='a') -> H5Saver:
         """ Return a H5Saver instance with more control than when using the h5saver property, in particular,
         the property will attempt to create a new file if it doesn't exist."""
         self._init_h5_saver()
-        status = self.open_file()
+        status = self.open_file(mode=mode)
 
         if status == FileStatus.NO_FILE and create_new_file:
-            self.create_new_file(True)
+            self.create_new_file()
         return self._h5saver
 
-    @QtCore.Slot(bool)
-    def create_new_file(self, new_file):
-        """ Slot of the New File button in the H5Saver settings Tree and the new file action"""
+    def create_new_file(self):
+        """ Slot of the New File button in the H5Saver settings Tree and the new file action.
 
-        if new_file:
-            self.close_file()
-            # Explicitly create a new file (don't reopen existing)
-            try:
-                self._h5saver.init_file(update_h5=True)
-                logger.info(f"Created new h5 file: {self._h5saver.settings['current_h5_file']}")
-            except Exception as e:
-                logger.error(f"Could not create new h5 file: {e}")
+        Also connected to ``new_file_sig`` (``Signal(bool)``); Qt allows a signal to connect to
+        a slot taking fewer arguments than it emits, so no bool parameter is needed here.
+        """
+        self.close_file()
+        # Explicitly create a new file (don't reopen existing)
+        try:
+            self._h5saver.init_file(update_h5=True)
+            logger.info(f"Created new h5 file: {self._h5saver.settings['current_h5_file']}")
+            self.update_file_status_led()
+        except Exception as e:
+            logger.error(f"Could not create new h5 file: {e}")
+            QtWidgets.QMessageBox.warning(
+                None, 'New File Error',
+                f'Could not create a new h5 file:\n{e}',
+            )
 
-    def open_file(self) -> FileStatus:
+    def open_file(self, mode='a') -> FileStatus:
         """ Try to reopen the current h5 file if it is closed.
         """
         if self._h5saver is not None and not self._h5saver.isopen():
             current_file = self._h5saver.settings['current_h5_file']
             if current_file and Path(current_file).exists():
                 self.current_folder = Path(current_file).parent
-                return self._try_open_existing_file(current_file)
+                return self._try_open_existing_file(current_file, mode=mode)
             else:
                 return FileStatus.NO_FILE
         self.update_file_status_led()
@@ -255,7 +259,7 @@ class H5Manager(QtCore.QObject, ActionManager):
     def flush(self):
         self.h5saver.flush()
 
-    def _try_open_existing_file(self, current_file: str | Path) -> FileStatus:
+    def _try_open_existing_file(self, current_file: str | Path, mode='a') -> FileStatus:
         """Try to open an existing file, asking user what to do if locked.
 
         Return:
@@ -265,7 +269,8 @@ class H5Manager(QtCore.QObject, ActionManager):
         while True:
             try:
                 logger.debug(f"Reopening existing h5 file: {current_file}")
-                self._h5saver.init_file(addhoc_file_path=current_file)
+                self._h5saver.init_file(addhoc_file_path=current_file,
+                                        mode=mode)
                 self.file_open_signal.emit(True)
                 return FileStatus.REOPENED  # Success
             except Exception as e:
@@ -288,7 +293,8 @@ class H5Manager(QtCore.QObject, ActionManager):
                         continue  # Try again
                     elif msg.clickedButton() == new_auto_btn:
                         logger.info("User chose to create new file (auto)")
-                        self._h5saver.init_file(update_h5=True)
+                        self._h5saver.init_file(update_h5=True,
+                                                mode=mode)
                         self.file_open_signal.emit(True)
                         return FileStatus.NEW
                     elif msg.clickedButton() == browse_btn:
@@ -301,7 +307,8 @@ class H5Manager(QtCore.QObject, ActionManager):
                         if file_path:
                             logger.info(f"User selected file: {file_path}")
                             try:
-                                self._h5saver.init_file(addhoc_file_path=file_path)
+                                self._h5saver.init_file(addhoc_file_path=file_path,
+                                                        mode=mode)
                                 self.file_open_signal.emit(True)
                                 return FileStatus.REOPENED_ANOTHER
                             except Exception as e2:
@@ -317,18 +324,21 @@ class H5Manager(QtCore.QObject, ActionManager):
                 else:
                     # Other error - fall back to new file
                     logger.warning(f"Could not reopen h5 file: {e}")
-                    self._h5saver.init_file(update_h5=True)
+                    self._h5saver.init_file(update_h5=True,
+                                            mode=mode)
                     self.file_open_signal.emit(True)
                     return FileStatus.NEW
 
-    def load_file(self):
+    def load_file(self, mode='a'):
         file_path = select_file(self.current_folder, save=False, ext='h5')
         if not (file_path is None or file_path == ''):
             if not isinstance(file_path, Path):
                 file_path = Path(file_path)
             self.current_folder = file_path.parent
-            self._try_open_existing_file(file_path)
+            file_status = self._try_open_existing_file(file_path, mode=mode)
             self.update_file_status_led()
+            if file_status not in (FileStatus.NO_FILE, FileStatus.CLOSED):
+                self.file_loaded_signal.emit(file_path)
 
     def save_file(self):
         Path(self.h5saver.settings['base_path']).mkdir(exist_ok=True)
@@ -336,47 +346,44 @@ class H5Manager(QtCore.QObject, ActionManager):
         self.h5saver.h5_file.copy_file(str(filename), overwrite=True)
 
     def set_file_open(self, is_open: bool):
-        """Update the file-open status LED.
-
-        Parameters
-        ----------
-        is_open:
-            True (green) if the h5 file is open and accessible, False (red) otherwise.
-        """
+        """Update the file-status LED's open/closed state, preserving SWMR state."""
         if self._show_h5file_statusbar_widgets and self._file_open_LED is not None:
-            self._file_open_LED.set_as(is_open)
+            if not is_open:
+                self._file_open_LED.set_state(Status.OFF)
+                self._file_open_LED.setToolTip('H5 file closed')
+            elif self._file_open_LED.get_state() == Status.OFF:
+                self._file_open_LED.set_state(Status.IDLE)
+                self._file_open_LED.setToolTip('H5 file open and accessible')
 
     def show_file_content(self):
          if self._h5saver is not None:
              self._h5saver.show_file_content()
 
     def set_swmr_status(self, active: bool, compatible: bool = False):
-        """Show or hide the SWMR mode indicator in the status bar.
+        """Reflect SWMR state on the file-status LED (only meaningful while the file is open).
 
         Parameters
         ----------
         active:
-            True if SWMR mode is currently active on the file.
+            True if SWMR mode is currently active on the file (shown as 'running').
         compatible:
-            True if the file was created with SWMR support.
+            True if the file was created with SWMR support (informational, tooltip only).
         """
-        if self._show_h5file_statusbar_widgets and self._swmr_label is not None:
-            if active:
-                self._swmr_label.setText('SWMR')
-                self._swmr_label.setToolTip('SWMR mode active')
-                self._swmr_label.setVisible(True)
-            elif compatible:
-                self._swmr_label.setText('SWMR file')
-                self._swmr_label.setToolTip('File created with SWMR support')
-                self._swmr_label.setVisible(True)
-            else:
-                self._swmr_label.setText('')
-                self._swmr_label.setToolTip('SWMR mode status')
-                self._swmr_label.setVisible(False)
+        if not self._show_h5file_statusbar_widgets or self._file_open_LED is None:
+            return
+        if self._file_open_LED.get_state() == Status.OFF:
+            return  # file is closed, nothing to reflect
+        if active:
+            self._file_open_LED.set_state(Status.RUNNING)
+            self._file_open_LED.setToolTip('H5 file open — SWMR mode active')
+        else:
+            self._file_open_LED.set_state(Status.IDLE)
+            tooltip = ('H5 file open — SWMR-compatible' if compatible
+                       else 'H5 file open and accessible')
+            self._file_open_LED.setToolTip(tooltip)
 
     def update_file_status_led(self):
-        """Reflect the current h5 file open/accessible state in the status bar LED
-        and the SWMR mode indicator."""
+        """Reflect the current h5 file open/accessible and SWMR state in the status bar LED."""
 
         is_open = (self._h5saver is not None
                    and self._h5saver.h5_file is not None

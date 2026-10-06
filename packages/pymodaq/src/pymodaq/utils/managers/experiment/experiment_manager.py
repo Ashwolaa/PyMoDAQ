@@ -3,6 +3,7 @@ from typing import Union, TYPE_CHECKING
 from pymodaq.control_modules.enums import DAQTypesEnum
 
 from pathlib import Path
+import shutil
 import sys
 
 from qtpy import QtWidgets
@@ -14,8 +15,9 @@ from pymodaq_gui.messenger import dialog
 from pymodaq_gui.parameter import Parameter
 from pymodaq_gui.parameter import ioxml
 
-from pymodaq.utils.config import get_set_experiment_path, get_set_overshoot_path, get_set_state_path, get_set_remote_path
-from pymodaq_gui.config import get_set_layout_path, get_set_roi_path
+from pymodaq.utils.config import (get_set_experiment_path, get_set_overshoot_path, get_set_state_path,
+                                  get_set_remote_path, get_set_roi_manager_path)
+from pymodaq_gui.config import get_set_layout_path
 from pymodaq_gui.managers.manager_base import ManagerBase
 from pymodaq.utils.managers.modules.utils import ModuleType
 from pymodaq.utils.managers.modules.loader import PluginInfo, ModuleLoader
@@ -33,8 +35,6 @@ logger = set_logger(get_module_name(__file__))
 
 # check if experiment directory exists on the drive
 experiment_path = get_set_experiment_path()
-overshoot_path = get_set_overshoot_path()
-layout_path = get_set_layout_path()
 
 
 class ExperimentManager(ManagerBase):
@@ -137,12 +137,13 @@ class ExperimentManager(ManagerBase):
         self.dashboard.mainwindow.setWindowTitle(f"PyMoDAQ Dashboard: {self.dashboard.title}")
 
 
+
         self.dashboard.update_status(
             f"{self.entry_type.capitalize()} ({self.entry_filepath.name}) has been loaded",
             log_type="log",
         )
-        self.dashboard.actuators_modules = [mod for mod in modules if isinstance(mod, DAQ_Move)]
-        self.dashboard.detector_modules = [mod for mod in modules if isinstance(mod, DAQ_Viewer)]
+
+        self.dashboard.modules_manager.add_modules(modules)  # trigger an update of the master list
 
         self.dashboard.mainwindow.setVisible(True)
         for area in self.dashboard.dockarea.tempAreas:
@@ -179,12 +180,11 @@ class ExperimentManager(ManagerBase):
 
     @staticmethod
     def remove_preset_related_files(preset_name: str):
-        for file in get_set_state_path(preset_name).iterdir():
-            file.unlink(missing_ok=True)
-        get_set_state_path(preset_name).rmdir()
-        get_set_roi_path().joinpath(preset_name).unlink(missing_ok=True)
-        get_set_layout_path().joinpath(preset_name).unlink(missing_ok=True)
-        get_set_overshoot_path().joinpath(preset_name).unlink(missing_ok=True)
+        """Remove the entries of the other managers (and the dock layout) attached to an experiment"""
+        for folder in (get_set_state_path(preset_name), get_set_overshoot_path(preset_name)):
+            shutil.rmtree(folder, ignore_errors=True)
+        get_set_roi_manager_path().joinpath(f'{preset_name}.rois').unlink(missing_ok=True)
+        get_set_layout_path().joinpath(f'{preset_name}.dock').unlink(missing_ok=True)
         get_set_remote_path().joinpath(preset_name).unlink(missing_ok=True)
 
 
@@ -208,6 +208,19 @@ class ExperimentManager(ManagerBase):
 
         for child in (self.settings.child(ModuleType.Actuator.value).children() +
             self.settings.child(ModuleType.Detector.value).children()):
+
+            if 'axis' in [param.name() for param in child.child('controller').children()]:
+                axis_param = child.child("controller", "axis")
+                axis_limits = axis_param.opts['limits']
+                if isinstance(axis_limits, list):
+                    axis_name = axis_param.value()
+                else:
+                    values = list(axis_limits.values())
+                    axis_names = list(axis_limits.keys())
+                    axis_name = axis_names[values.index(axis_param.value())]
+            else:
+                axis_name = None
+
             plugins.append(
                 PluginInfo(
                     id = child['controller', 'controller_ID'],
@@ -221,8 +234,7 @@ class ExperimentManager(ManagerBase):
                     ui = child['info', 'ui'] if 'ui' in [ch.name() for ch in child.child('info').children()] else None,
                     daq_type=DAQTypesEnum[child['info', 'dim']] if 'dim' in [
                         ch.name() for ch in child.child('info').children()] else None,
-                    axis_name=child["controller", "axis"] if 'axis' in [
-                        param.name() for param in child.child('controller').children()] else None,
+                    axis_name=axis_name,
                 )
             )
 

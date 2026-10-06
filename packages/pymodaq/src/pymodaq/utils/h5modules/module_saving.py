@@ -5,7 +5,6 @@ Created the 23/11/2022
 @author: Sebastien Weber
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
 from typing import Union, List, Tuple, TYPE_CHECKING, Iterable
 import time
 import xml.etree.ElementTree as ET
@@ -21,12 +20,11 @@ from pymodaq_data import DataDim, DataWithAxes
 from pymodaq_data.data import Axis, DataToExport, DataDistribution, DataRaw, DataSource
 from pymodaq_data.h5modules.data_saving import (
     DataToExportSaver, DataToExportEnlargeableSaver,
-    DataToExportTimedSaver, DataToExportExtendedSaver)
+    DataToExportTimedSaver, DataToExportExtendedSaver, DataBundle)
 from pymodaq_data.h5modules.backends import GROUP, Node
 
 from pymodaq_gui.h5modules.saving import H5SaverBase
 from pymodaq_gui.parameter import ioxml
-from pymodaq.utils.managers.modules.utils import ModuleType
 
 if TYPE_CHECKING:
     from pymodaq.extensions.scan.daq_scan import DAQScan
@@ -44,18 +42,6 @@ class GroupModuleType(BaseEnum):
     DATALOGGER = 3
     OPTIMIZER = 4
     TIME = 5
-
-
-@dataclass
-class DataBundle:
-    """Convenience class to hold data to be saved or plotted"""
-    dte: DataToExport
-    indexes: list[int] = None  # indexes within an eventual Extended array (see DAQ_Scan)
-    axis_values: list[float | np.ndarray] = None  # axis values within an eventual Enlargeable array (see Optimizers)
-    distribution: DataDistribution = field(
-        default_factory=lambda: DataDistribution.uniform
-    )  # type of data to be saved
-    save_index: int = 0  # an index to know what step in the saving process we're in (see DAQ_Scan)
 
 
 class ModuleSaver(metaclass=ABCMeta):
@@ -460,6 +446,11 @@ class TimeModuleSaver(ModuleSaver):
         # Fixed group name 'Timestamps' — no incremental index
         group = self._h5saver.get_set_group(where, 'Timestamps', title='Timestamps')
         self._h5saver.set_attr(group, 'type', 'time')
+        self._h5saver.set_attr(
+            group, 'description',
+            'Elapsed time (seconds) between scan start and when each scan point '
+            'was saved, measured with a monotonic clock (time.perf_counter). '
+            'Not an absolute/epoch timestamp.')
         settings_xml = ET.Element('All_settings', type='group')
         self._h5saver.set_attr(group, 'settings', ET.tostring(settings_xml))
         return group
@@ -478,6 +469,7 @@ class TimeModuleSaver(ModuleSaver):
             dte = DataToExport('Timestamps', data=[
                 DataRaw('ElapsedTime',
                         data=[np.array([elapsed_time], dtype=np.float32)],
+                        labels=['Elapsed time since scan start'],
                         units='s'),
             ])
             self._datatoexport_saver.add_data(
@@ -658,7 +650,7 @@ class ScanSaver(ExtensionSaver):
 
 
 class LoggerSaver(ExtensionSaver):
-    """Implementation of the ModuleSaver class dedicated to H5Logger module
+    """Implementation of the ModuleSaver class dedicated to Logger module
 
     H5Logger is the special logger to h5file of the DAQ_Logger extension
 
@@ -668,6 +660,7 @@ class LoggerSaver(ExtensionSaver):
     module
     """
     group_type = GroupModuleType.DATALOGGER
+
     def __init__(self, module):
         super().__init__(module)
 

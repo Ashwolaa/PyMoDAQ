@@ -26,7 +26,7 @@ from pymodaq_gui.utils.styling import Font
 logger = set_logger(get_module_name(__file__))
 
 if TYPE_CHECKING:
-    from pymodaq.dashboard import Dashboard
+    from pymodaq.dashboard import DashBoard
     from pymodaq.extensions.sequencer.utilities.sequencer.sequence import Sequence
 
 ser_factory = SerializableFactory()
@@ -119,10 +119,24 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         """ to be reimplemented in elements in order to save it's data (if Any)"""
         pass
 
-    def save_data(self, dte: DataToExport):
+    def save_data(self, dte: DataToExport, done=True):
+        """ By calling this method, data will be logged using the TimeSaver
+
+        Parameters
+        ----------
+        dte: DataToExport
+            data to log and eventually custom save in self._save_data (reimplemented)
+        done: bool
+            if True (default)the done signal is emitted ending this state
+
+        Returns
+        -------
+
+        """
         self._save_data(dte)
         self.data_to_log_signal.emit(dte)
-        self.done_signal.emit()
+        if done:
+            self.done_signal.emit()
 
     @property
     def parent(self) -> 'SeqEltBase':
@@ -243,7 +257,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         return self._dashboard
 
     @dashboard.setter
-    def dashboard(self, value: 'Dashboard'):
+    def dashboard(self, value: 'DashBoard'):
         """ """
         self._dashboard = value
         self.do_things_with_dashboard()
@@ -350,7 +364,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     def to_dict(self) -> dict[str, Any]:
         """ Serialization in a dictionary"""
-        from pymodaq_plugins_sequencer.utilities.elements.button import AddButtonPlaceholder
+        from pymodaq.extensions.sequencer.utilities.elements.button import AddButtonPlaceholder
         dict_config: dict[str, Any] = {'elt_name': self.elt_name,
                                        'id': self.id,}
         dict_config.update(self.to_dict_custom())

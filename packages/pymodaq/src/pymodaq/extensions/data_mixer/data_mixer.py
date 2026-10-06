@@ -38,6 +38,7 @@ CLASS_NAME = 'DataMixer'  # this should be the name of your class defined below
 
 class DataMixer(CustomExt):
     settings_name = 'DataMixerSettings'
+    h5_base_group_name = 'DataMixer'
     models = get_models()
     params = [
         {'title': 'Models', 'name': 'models', 'type': 'group', 'expanded': True, 'visible': True,
@@ -79,8 +80,10 @@ class DataMixer(CustomExt):
         splitter.addWidget(self.modules_manager.settings_tree)
         self.modules_manager.tree.header().setVisible(False)
         self.modules_manager.settings.child('actuators').hide()
-        self.modules_manager.settings.child('probe_data').hide()
-        self.modules_manager.settings.child('test_actuator').hide()
+        self.modules_manager.settings.child('probe_detectors').hide()
+        self.modules_manager.settings.child('probe_actuators').hide()
+        self.modules_manager.settings.child('probe_detectors_results').hide()
+        self.modules_manager.settings.child('probe_actuators_results').hide()
 
         splitter.addWidget(self.settings_tree)
 
@@ -242,9 +245,10 @@ class DataMixer(CustomExt):
             if self.model_class is not None:
                 self.model_class.update_settings(param)
 
-    def quit_fun(self) -> bool:
+    def _quit_fun(self) -> bool:
         self.dashboard.remove_modules(['DataMixer'])
-        return super().quit_fun()
+        return True
+
 
 def main():
     import sys

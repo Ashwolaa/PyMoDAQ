@@ -52,6 +52,7 @@ class DAQ_Logger(CustomExt):
     """
     Main class initializing a DAQ_Logger module
     """
+    h5_base_group_name = 'Logger'
     command_DAQ_signal = Signal(list)
 
     params = [
@@ -161,7 +162,7 @@ class DAQ_Logger(CustomExt):
 
         self.docks['logger_settings'].addWidget(self.logger.settings_tree)
 
-    def quit_fun(self):
+    def _quit_fun(self) -> bool:
         """
             Quit the current instance of DAQ_scan and close on cascade move and detector modules.
 
@@ -174,7 +175,7 @@ class DAQ_Logger(CustomExt):
         except Exception as e:
             logger.exception(str(e))
 
-        super().quit_fun()
+        return True
 
     def set_continuous_save(self):
         """

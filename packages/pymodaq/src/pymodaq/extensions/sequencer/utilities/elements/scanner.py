@@ -1,11 +1,11 @@
 import weakref
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from serializall import SerializableFactory
 
 from qtpy import QtCore, QtWidgets
 
-from pymodaq.control_modules.daq_move import DAQ_Move
+
 from pymodaq.control_modules.enums import MoveType
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq.utils.scanner.scanner import Orientation
@@ -18,6 +18,9 @@ from pymodaq.extensions.sequencer.utilities.widget_with_toolbar import WidgetWit
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
 from pymodaq.utils.scanner import Scanner
+
+if TYPE_CHECKING:
+    from pymodaq.control_modules.daq_move import DAQ_Move
 
 
 ser_factory = SerializableFactory()
@@ -45,7 +48,7 @@ class ScannerElt(SeqEltBase):
 
     def do_things_with_dashboard(self):
         if self._actuators_all_to_restore is not None:
-            act_all_to_restore: list[DAQ_Move] = []
+            act_all_to_restore: list['DAQ_Move'] = []
             for act_name in self._actuators_all_to_restore:
                 if act_name in self.dashboard.modules_manager.actuators_name:
                     act_all_to_restore.append(
@@ -55,7 +58,7 @@ class ScannerElt(SeqEltBase):
         else:
             act_all_to_restore = self.dashboard.modules_manager.actuators_all
 
-        act_selected_to_restore: list[DAQ_Move] = []
+        act_selected_to_restore: list['DAQ_Move'] = []
         if self._actuators_selected_to_restore is not None:
             for act_name in self._actuators_selected_to_restore:
                 if act_name in self.dashboard.modules_manager.actuators_name:
@@ -84,7 +87,12 @@ class ScannerElt(SeqEltBase):
     def _on_editor_closing(self):
         if self.scanner_ref is not None and self.scanner_ref() is not None:
             self.scanner.from_dict(self.scanner_ref().to_dict(use_real_actuators=True))
+            self.scanner.scanner.evaluate_steps()
             self.scanner.save_scanner_settings()
+            index_to_update = self.parent_sequence.model.index_from_element(self)
+            self.parent_sequence.model.dataChanged.emit(index_to_update,
+                                                        index_to_update,
+                                                        [QtCore.Qt.ItemDataRole.DisplayRole])
 
     def _execute(self, dte: DataToExport=None):
         if self._ind_execute == 0:
@@ -100,16 +108,30 @@ class ScannerElt(SeqEltBase):
 
             """ This will execute the children state and its bundled elements n_repeat times"""
             self._ind_execute += 1
+            index_to_update = self.parent_sequence.model.index_from_element(self)
+            self.parent_sequence.model.dataChanged.emit(index_to_update,
+                                                        index_to_update,
+                                                        [QtCore.Qt.ItemDataRole.DisplayRole])
         else:
             self._ind_execute = 0
             self.done_signal.emit()
 
-    def _on_move_done(self):
+    def _on_move_done(self, dte: DataToExport):
+        """ Called once the current step is done
+
+        Parameters
+        ----------
+        dte: DataToExport
+            Contains the actuators dwa at the moment when the move has been set as done
+            (may be slightly different from the actual target dwa due to epsilon)
+        """
         self.dashboard.modules_manager.forget_callback(self._on_move_done,
                                                        module_type = ModuleType.Actuator,
                                                        disconnect_modules = True
                                                        )
-        self.children_signal.emit()
+        self.save_data(self.scanner.positions_at(self._ind_execute), done=False)
+
+        self.children_signal.emit()  # triggers the execution of this elt's first child
 
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
@@ -140,7 +162,7 @@ class ScannerElt(SeqEltBase):
         return self.scanner.to_dict() == other.scanner.to_dict()
 
     def __repr__(self):
-        return f'{super().__repr__()} - {self.scanner}'
+        return f'{super().__repr__()} - {self.scanner} - Step:{self._ind_execute}'
 
     def check_set_is_valid(self):
         """ Check the validity of the element
@@ -153,4 +175,4 @@ class ScannerElt(SeqEltBase):
             raise ElementError(f'Element {self}: at least one scan step required')
 
     def size_hint(self) -> QtCore.QSize:
-        return QtCore.QSize(200, 300)
+        return QtCore.QSize(200, 500)

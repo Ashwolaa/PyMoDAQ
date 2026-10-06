@@ -1,13 +1,12 @@
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import weakref
 
 from serializall import SerializableFactory
 
 from qtpy import QtCore, QtGui
 
-from pymodaq.control_modules.daq_viewer import DAQ_Viewer
-from pymodaq.control_modules.daq_viewer_ui.ui_base import ActionIconNames
-from pymodaq_gui.managers.action_manager import QAction
+from pymodaq.control_modules.enums import ActionIconNames
+
 from pymodaq_utils.enums import StrEnum
 from pymodaq_utils.logger import set_logger, get_module_name
 
@@ -20,6 +19,9 @@ from pymodaq.extensions.sequencer.utilities.widget_with_toolbar import WidgetWit
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
 from pymodaq.utils.managers.modules import ModuleType
+
+if TYPE_CHECKING:
+    from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 
 ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
@@ -148,11 +150,11 @@ class GrabElt(SeqEltBase):
     def clean_signals(self):
         for mod in self.get_selected_detectors():
             try:
-                mod.grab_done_signal.disconnect(self.save_data)
+                mod.grab_done_signal.disconnect(self._save_grabbed_data)
             except TypeError as e:
                 pass
 
-    def get_selected_detectors(self) -> list[DAQ_Viewer]:
+    def get_selected_detectors(self) -> list['DAQ_Viewer']:
         return [self.modules_manager.get_mod_from_name(det, mod=ModuleType.Detector) for det in self.selected]
 
     def _execute(self, dte: DataToExport=None):
@@ -176,8 +178,7 @@ class GrabElt(SeqEltBase):
         else:
             # trigger a grab and immediately move on to the next state!
             for mod in self.get_selected_detectors():
-                mod.grab_done_signal.connect(self.save_data)  # without underscore to trigger whatever is necessary in
-                # base class. You can do specific things in the _save_data reimplemented method
+                mod.grab_done_signal.connect(self._save_grabbed_data)
                 mod.grab()
             self.done_signal.emit()
 
@@ -186,8 +187,16 @@ class GrabElt(SeqEltBase):
                                              module_type=ModuleType.Detector,
                                              disconnect_modules=True)
         dte.name = dte[0].origin
-        self.save_data(dte)
-        self.done_signal.emit()
+        self.save_data(dte)  # emits the done_signal
+
+    def _save_grabbed_data(self, dte: DataToExport):
+        """ Log data of a running grab without emitting the done_signal
+
+        The element is already done (it moved on just after starting the grab). Calls save_data (without
+        underscore) to trigger whatever is necessary in base class. You can do specific things in the
+        _save_data reimplemented method
+        """
+        self.save_data(dte, done=False)
 
     def _save_data(self, dte: DataToExport):
         #todo: do whatever is needed with those data,
