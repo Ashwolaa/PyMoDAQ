@@ -15,6 +15,7 @@ import time
 
 import pytest
 
+from pymodaq.control_modules.capabilities import control
 from pymodaq.control_modules.hardware_thread import HardwareThread
 from pymodaq.control_modules.subscription import Subscription
 
@@ -785,3 +786,61 @@ class TestSettingsChanged:
         thread_obj.update_settings(['gain'], 7.0, 'value')
         assert changed.count == 0
         assert thread_obj._plugin_settings.child('gain').value() == 7.0
+
+
+# ---------------------------------------------------------------------------
+# request_write: a control backed by a plugin setting
+# ---------------------------------------------------------------------------
+
+class TestSettingBackedWrite:
+
+    def _thread_with_exposure(self, qapp):
+        class _ExposurePlugin(MockPlugin):
+            params = [{'name': 'exposure', 'type': 'float', 'value': 1.0}]
+            exposure = control(units='ms', lo=1, hi=1000, setting=True)
+
+        instance = _ExposurePlugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        return thread_obj, instance
+
+    def test_the_plugin_write_method_is_not_called(self, qapp):
+        thread_obj, plugin = self._thread_with_exposure(qapp)
+        thread_obj.request_write('exposure', 50.0)
+        assert plugin.change_calls == []  # write() was not used
+        assert plugin.commit_calls[-1].value() == 50.0
+
+    def test_write_done_is_emitted_and_the_settings_tree_is_updated(self, qapp):
+        thread_obj, plugin = self._thread_with_exposure(qapp)
+        done = Collector()
+        thread_obj.write_done.connect(done)
+        thread_obj.request_write('exposure', 50.0)
+        assert done.last() == ('exposure', 50.0)
+        assert thread_obj._plugin_settings.child('exposure').value() == 50.0
+
+    def test_the_change_is_not_blocked_so_the_gui_tree_can_follow_it(self, qapp):
+        """Unlike a GUI settings-dock edit, this write did not touch the GUI tree already."""
+        thread_obj, plugin = self._thread_with_exposure(qapp)
+        changed = Collector()
+        thread_obj.settings_changed.connect(changed)
+        thread_obj.request_write('exposure', 50.0)
+        assert changed.last() == (['exposure'], 50.0, 'value')
+
+    def test_a_rejected_setting_emits_write_failed_with_the_channel_name(self, qapp):
+        thread_obj, plugin = self._thread_with_exposure(qapp)
+        plugin._change_raises = None
+
+        def _raise(_):
+            raise RuntimeError('rejected')
+
+        plugin.commit_settings = _raise
+        failed = Collector()
+        thread_obj.write_failed.connect(failed)
+        thread_obj.request_write('exposure', 50.0)
+        assert failed.last() == ('exposure', 'rejected')
+
+    def test_a_plain_control_still_goes_through_write(self, qapp):
+        thread_obj, plugin = make_thread()  # no setting-backed quantities declared
+        thread_obj.ini_hardware()
+        thread_obj.request_write('axis_x', 1.0)
+        assert plugin.change_calls == [('axis_x', 1.0)]

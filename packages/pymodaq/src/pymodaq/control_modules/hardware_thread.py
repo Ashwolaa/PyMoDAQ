@@ -93,6 +93,9 @@ class HardwareThread(QObject):
         self._subscribers: dict[str, list[Subscription]] = {}
         self._device_ident: int | None = None
         self._pushed: set[str] = {q.name for q in Capabilities.from_device(plugin_class).measurements if q.push}
+        caps = Capabilities.from_device(plugin_class)
+        # channel name -> the plugin parameter it writes through, instead of write()
+        self._settings_of: dict[str, str] = {q.name: q.setting for q in caps.controls if q.setting}
         self._push_requested.connect(self._on_push_requested)
 
     # ── Plugin lifecycle ─────────────────────────────────────────────────────
@@ -180,9 +183,22 @@ class HardwareThread(QObject):
     @Slot(str, object)
     @_when_open
     def request_write(self, channel: str, value: object) -> None:
-        """Set *channel* to *value* with ``write`` and emit ``write_done``, or ``write_failed`` on error."""
+        """Set *channel* to *value*, with ``write`` or, for a setting-backed control, through ``commit_settings``.
+
+        Emits ``write_done``, or ``write_failed`` on error.
+        """
         try:
-            self._plugin.write(channel, value)
+            setting_name = self._settings_of.get(channel)
+            if setting_name is not None:
+                # Unblocked, unlike update_settings: the GUI settings tree was not touched by this write,
+                # so it needs the settings_changed signal to find out, the same way it hears a plugin's own change.
+                param = self._plugin_settings.child(setting_name)
+                param.setValue(value)
+                commit = getattr(self._plugin, 'commit_settings', None)
+                if commit is not None:
+                    commit(param)
+            else:
+                self._plugin.write(channel, value)
         except Exception as exc:
             logger.exception(f'write of {channel!r} failed')
             self.write_failed.emit(channel, str(exc))

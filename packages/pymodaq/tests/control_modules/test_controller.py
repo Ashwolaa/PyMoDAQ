@@ -228,3 +228,20 @@ class TestDeviceSettingsChanged:
         # the device tree is unaffected a second time: no write was queued back to it
         assert ctrl.thread._plugin_settings.child('gain').value() == 3.0
         assert not ctrl._syncing_from_device
+
+
+class Exposed(Spectrometer):
+    params = [{'name': 'exposure', 'type': 'float', 'value': 1.0, 'limits': (1, 1000)}]
+    exposure = control(units='ms', lo=1, hi=1000, setting=True)
+
+
+class TestSettingBackedControl:
+
+    def test_setting_the_property_commits_the_setting_not_write(self, registry, qtbot):
+        key = HardwareKey(hardware_class=Exposed, controller_id=22)
+        ctrl = registry.attach(key, Exposed)
+        ctrl.thread.ini_hardware()
+        ctrl.exposure = 500.0  # the scan-style write: a plain property assignment
+        qtbot.waitUntil(lambda: ctrl.settings.child('exposure').value() == 500.0, timeout=2000)
+        plugin = ctrl.thread._plugin
+        assert plugin.written == []  # write() was never called for it
