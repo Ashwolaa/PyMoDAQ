@@ -357,6 +357,57 @@ class TestRequestWrite:
 
 
 # ---------------------------------------------------------------------------
+# request_stop
+# ---------------------------------------------------------------------------
+
+class TestRequestStop:
+
+    def _thread_with_stop(self, qapp):
+        calls = []
+
+        class _Plugin(MockPlugin):
+            axis_x = control(lo=0, hi=10, stop=lambda plugin: calls.append('stopped'))
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        return thread_obj, instance, calls
+
+    def test_request_stop_calls_the_declared_callback(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_stop(qapp)
+        thread_obj.request_stop('axis_x')
+        assert calls == ['stopped']
+
+    def test_request_stop_on_a_channel_without_one_is_a_noop(self, qapp):
+        thread_obj, plugin = make_thread()  # axis_x has no stop callback
+        thread_obj.ini_hardware()
+        thread_obj.request_stop('axis_x')  # must not raise
+
+    def test_request_stop_before_ini_is_a_noop(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_stop(qapp)
+        thread_obj._plugin = None  # simulate not open, without re-running ini
+        thread_obj.request_stop('axis_x')
+        assert calls == []
+
+    def test_request_stop_exception_emits_error_not_write_failed(self, qapp):
+        def _raise(plugin):
+            raise RuntimeError('cannot stop')
+
+        class _Plugin(MockPlugin):
+            axis_x = control(lo=0, hi=10, stop=_raise)
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        errors, failed = Collector(), Collector()
+        thread_obj.error.connect(errors)
+        thread_obj.write_failed.connect(failed)
+        thread_obj.request_stop('axis_x')
+        assert errors.last() == ('cannot stop',)
+        assert failed.count == 0
+
+
+# ---------------------------------------------------------------------------
 # start_grab / stop_grab
 # ---------------------------------------------------------------------------
 

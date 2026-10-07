@@ -99,6 +99,7 @@ class HardwareThread(QObject):
         # channel name -> an explicit getter / setter, read()/write() otherwise
         self._get_of: dict[str, Callable] = {q.name: q.get for q in caps.measurements + caps.controls if q.get}
         self._set_of: dict[str, Callable] = {q.name: q.set for q in caps.controls if q.set}
+        self._stop_of: dict[str, Callable] = {q.name: q.stop for q in caps.controls if q.stop}
         self._push_requested.connect(self._on_push_requested)
 
     # ── Plugin lifecycle ─────────────────────────────────────────────────────
@@ -210,6 +211,22 @@ class HardwareThread(QObject):
             self.write_failed.emit(channel, str(exc))
             return
         self.write_done.emit(channel, value)
+
+    @Slot(str)
+    @_when_open
+    def request_stop(self, channel: str) -> None:
+        """Call *channel*'s declared ``stop`` callback, if it has one. A no-op otherwise.
+
+        Errors go through ``error``, not ``write_failed``: stopping is not itself a write.
+        """
+        stopper = self._stop_of.get(channel)
+        if stopper is None:
+            return
+        try:
+            stopper(self._plugin)
+        except Exception as exc:
+            logger.exception(f'stop of {channel!r} failed')
+            self.error.emit(str(exc))
 
     # ── Pushed readings ──────────────────────────────────────────────────────
 

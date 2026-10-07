@@ -100,6 +100,30 @@ class TestWrite:
         assert blocker.args == ['exposure', 20.0]
 
 
+class Stoppable(Spectrometer):
+    axis = control(units='mm', lo=0, hi=10, stop=lambda plugin: plugin.stop_calls.append(True))
+
+    def __init__(self):
+        super().__init__()
+        self.stop_calls = []
+
+
+class TestStop:
+
+    def test_stop_calls_the_declared_callback(self, registry, qtbot):
+        key = HardwareKey(hardware_class=Stoppable, controller_id=23)
+        ctrl = registry.attach(key, Stoppable)
+        ctrl.thread.ini_hardware()
+        plugin = ctrl.thread._plugin
+        ctrl.stop('axis')
+        qtbot.waitUntil(lambda: plugin.stop_calls == [True], timeout=2000)
+
+    def test_stop_before_open_raises(self, registry):
+        key, ctrl = attach(registry)
+        with pytest.raises(RuntimeError, match='not open'):
+            ctrl.stop('exposure')
+
+
 class TestLifecycle:
 
     def test_attach_poll_write_detach(self, registry, qtbot):

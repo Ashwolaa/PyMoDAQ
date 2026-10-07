@@ -40,6 +40,7 @@ class Controller(QObject):
     """
 
     write_requested = Signal(str, object)      # → thread.request_write
+    stop_requested = Signal(str)               # → thread.request_stop
     subscribe_requested = Signal(object)       # → thread.subscribe
     unsubscribe_requested = Signal(object)     # → thread.unsubscribe
     device_status = Signal(bool, str)          # ← thread.hardware_status
@@ -58,6 +59,7 @@ class Controller(QObject):
         self._last_values: dict[str, object] = {}
         self._polled: dict[str, Subscription] = {}
         self.write_requested.connect(thread.request_write)
+        self.stop_requested.connect(thread.request_stop)
         self.subscribe_requested.connect(thread.subscribe)
         self.unsubscribe_requested.connect(thread.unsubscribe)
         thread.hardware_status.connect(self._on_status)
@@ -117,6 +119,11 @@ class Controller(QObject):
         sub = self._polled.pop(name, None)
         if sub is not None:
             self.unsubscribe_requested.emit(sub)
+
+    def stop(self, name: str) -> None:
+        """Call *name*'s declared ``stop`` callback. A no-op if it has none. Raises if the device is closed."""
+        self._require_open(name)
+        self.stop_requested.emit(name)
 
     def read(self, name: str, on_value) -> Subscription:
         """Read *name* once, asynchronously: *on_value(data)* is called when the reading arrives."""
