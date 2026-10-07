@@ -92,10 +92,13 @@ class HardwareThread(QObject):
         self._timers: dict[float, QTimer] = {}
         self._subscribers: dict[str, list[Subscription]] = {}
         self._device_ident: int | None = None
-        self._pushed: set[str] = {q.name for q in Capabilities.from_device(plugin_class).measurements if q.push}
         caps = Capabilities.from_device(plugin_class)
+        self._pushed: set[str] = {q.name for q in caps.measurements if q.push}
         # channel name -> the plugin parameter it writes through, instead of write()
         self._settings_of: dict[str, str] = {q.name: q.setting for q in caps.controls if q.setting}
+        # channel name -> an explicit getter / setter, read()/write() otherwise
+        self._get_of: dict[str, Callable] = {q.name: q.get for q in caps.measurements + caps.controls if q.get}
+        self._set_of: dict[str, Callable] = {q.name: q.set for q in caps.controls if q.set}
         self._push_requested.connect(self._on_push_requested)
 
     # ── Plugin lifecycle ─────────────────────────────────────────────────────
@@ -183,13 +186,16 @@ class HardwareThread(QObject):
     @Slot(str, object)
     @_when_open
     def request_write(self, channel: str, value: object) -> None:
-        """Set *channel* to *value*, with ``write`` or, for a setting-backed control, through ``commit_settings``.
+        """Set *channel* to *value*: its own ``set``, a setting-backed control's ``commit_settings``, or ``write``.
 
         Emits ``write_done``, or ``write_failed`` on error.
         """
         try:
+            setter = self._set_of.get(channel)
             setting_name = self._settings_of.get(channel)
-            if setting_name is not None:
+            if setter is not None:
+                setter(self._plugin, value)
+            elif setting_name is not None:
                 # Unblocked, unlike update_settings: the GUI settings tree was not touched by this write,
                 # so it needs the settings_changed signal to find out, the same way it hears a plugin's own change.
                 param = self._plugin_settings.child(setting_name)
@@ -245,8 +251,15 @@ class HardwareThread(QObject):
 
     @_when_open
     def _read_now(self, sub: Subscription) -> None:
-        dte = self._plugin.read(names=[sub.channel], fresh=True)
-        self._send(sub, dte.get_data_from_name(sub.channel), time.monotonic())
+        self._send(sub, self._read_channel(sub.channel), time.monotonic())
+
+    def _read_channel(self, channel: str) -> object:
+        """One channel's value: its own ``get`` if declared, otherwise a single-channel ``read``."""
+        getter = self._get_of.get(channel)
+        if getter is not None:
+            return getter(self._plugin)
+        dte = self._plugin.read(names=[channel], fresh=True)
+        return dte.get_data_from_name(channel)
 
     def _send(self, sub: Subscription, data: object, read_time: float) -> None:
         if not sub.try_claim():
@@ -303,20 +316,29 @@ class HardwareThread(QObject):
 
     @_when_open
     def _read_period(self, period_ms: float) -> None:
+        """One read for the channels sharing this period.
+
+        One batched ``read`` call answers the channels without their own ``get``. A channel that
+        declares one is read individually instead, since declaring it opts that channel out of
+        the plugin's batching.
+        """
         subs = self._subscriptions_at(period_ms)
         if not subs:
             return
         channels = sorted({sub.channel for sub in subs} - self._pushed)
         if not channels:
             return
-        dte = self._plugin.read(names=channels, fresh=True)
+        batched = [channel for channel in channels if channel not in self._get_of]
+        dte = self._plugin.read(names=batched, fresh=True) if batched else None
         for channel in channels:
-            self._deliver(channel, dte, period_ms)
+            getter = self._get_of.get(channel)
+            data = getter(self._plugin) if getter is not None else dte.get_data_from_name(channel)
+            self._deliver(channel, data, period_ms)
 
-    def _deliver(self, channel: str, dte: object, period_ms: float) -> None:
+    def _deliver(self, channel: str, data: object, period_ms: float) -> None:
         """Send one channel's data to its subscriptions at *period_ms* only."""
         if any(sub.period_ms == period_ms for sub in self._subscribers.get(channel, [])):
-            self._fan_out(channel, dte.get_data_from_name(channel), time.monotonic(), period_ms)
+            self._fan_out(channel, data, time.monotonic(), period_ms)
 
     def _fan_out(self, channel: str, data: object, read_time: float, period_ms: float | None = None) -> None:
         """Send *data* to the subscriptions of *channel*, at *period_ms* when given.

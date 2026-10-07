@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from pymodaq.control_modules.capabilities import control
+from pymodaq.control_modules.capabilities import control, measurement
 from pymodaq.control_modules.hardware_thread import HardwareThread
 from pymodaq.control_modules.subscription import Subscription
 
@@ -844,3 +844,58 @@ class TestSettingBackedWrite:
         thread_obj.ini_hardware()
         thread_obj.request_write('axis_x', 1.0)
         assert plugin.change_calls == [('axis_x', 1.0)]
+
+
+# ---------------------------------------------------------------------------
+# get / set: a quantity that answers its own read or write
+# ---------------------------------------------------------------------------
+
+class TestGetSet:
+
+    def _thread_with_get_set(self, qapp):
+        calls = {'get': [], 'set': []}
+
+        class _Plugin(MockPlugin):
+            fast = measurement(get=lambda plugin: (calls['get'].append('fast'), 7.0)[1])
+            slow = measurement()  # no get: still goes through read(), batched with other such channels
+            level = control(get=lambda plugin: (calls['get'].append('level'), 3.0)[1],
+                            set=lambda plugin, value: calls['set'].append(value))
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        return thread_obj, instance, calls
+
+    def test_a_set_callback_is_used_instead_of_write(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_get_set(qapp)
+        thread_obj.request_write('level', 9.0)
+        assert calls['set'] == [9.0]
+        assert plugin.change_calls == []  # write() was not used
+
+    def test_a_single_channel_read_uses_get(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_get_set(qapp)
+        sub = Subscription('fast', None)
+        got = Collector()
+        sub.data_ready.connect(got)
+        thread_obj.subscribe(sub)
+        assert calls['get'] == ['fast']
+        assert plugin.query_calls == []  # read() was not used
+        assert got.last()[0] == 7.0
+
+    def test_a_periodic_read_batches_channels_without_their_own_get(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_get_set(qapp)
+        got_fast, got_slow = Collector(), Collector()
+        fast_sub = Subscription('fast', 100.0)
+        slow_sub = Subscription('slow', 100.0)
+        fast_sub.data_ready.connect(got_fast)
+        slow_sub.data_ready.connect(got_slow)
+        thread_obj.subscribe(fast_sub)
+        thread_obj.subscribe(slow_sub)
+        thread_obj._on_period_tick(100.0)
+        thread_obj.unsubscribe(fast_sub)
+        thread_obj.unsubscribe(slow_sub)
+        # 'fast' has its own get: answered directly, not through the batched read() call.
+        assert calls['get'] == ['fast']
+        assert plugin.query_calls == [['slow']]
+        assert got_fast.last()[0] == 7.0
+        assert got_slow.last()[0] == ('data', 'slow')
