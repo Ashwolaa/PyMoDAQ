@@ -191,3 +191,40 @@ class TestBlockingRead:
         key, ctrl = attach(registry)
         with pytest.raises(RuntimeError, match='not open'):
             ctrl.read_blocking('spectrum')
+
+
+class TestNewReading:
+
+    def test_each_poll_reading_is_announced(self, registry, qtbot):
+        key, ctrl = attach(registry)
+        ctrl.thread.ini_hardware()
+        with qtbot.waitSignal(ctrl.new_reading, timeout=2000) as blocker:
+            ctrl.poll('spectrum', 20.0)
+        assert blocker.args[0] == 'spectrum'
+        ctrl.stop_poll('spectrum')
+
+
+class Gained(Spectrometer):
+    params = [{'name': 'gain', 'type': 'float', 'value': 1.0}]
+
+
+class TestDeviceSettingsChanged:
+
+    def test_a_plugin_driven_change_updates_the_settings_tree(self, registry, qtbot):
+        key = HardwareKey(hardware_class=Gained, controller_id=20)
+        ctrl = registry.attach(key, Gained)
+        ctrl.thread.ini_hardware()
+        ctrl.thread._plugin_settings.child('gain').setValue(3.0)  # as the plugin would, on its own
+        qtbot.waitUntil(lambda: ctrl.settings.child('gain').value() == 3.0, timeout=2000)
+
+    def test_it_does_not_loop_back_as_a_write_to_the_device_settings(self, registry, qtbot):
+        key = HardwareKey(hardware_class=Gained, controller_id=21)
+        ctrl = registry.attach(key, Gained)
+        ctrl.thread.ini_hardware()
+        calls = []
+        ctrl.settings.sigTreeStateChanged.connect(lambda *_: calls.append(None))
+        ctrl.thread._plugin_settings.child('gain').setValue(3.0)
+        qtbot.waitUntil(lambda: ctrl.settings.child('gain').value() == 3.0, timeout=2000)
+        # the device tree is unaffected a second time: no write was queued back to it
+        assert ctrl.thread._plugin_settings.child('gain').value() == 3.0
+        assert not ctrl._syncing_from_device

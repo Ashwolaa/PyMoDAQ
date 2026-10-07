@@ -42,9 +42,11 @@ class Controller(QObject):
     write_requested = Signal(str, object)      # → thread.request_write
     subscribe_requested = Signal(object)       # → thread.subscribe
     unsubscribe_requested = Signal(object)     # → thread.unsubscribe
-    status = Signal(bool, str)                 # ← thread.hardware_status
-    error = Signal(str)                        # ← thread.error: an operation failed, the device is still open
+    device_status = Signal(bool, str)          # ← thread.hardware_status
+    device_error = Signal(str)                 # ← thread.error: an operation failed, the device is still open
     written = Signal(str, object)              # ← thread.write_done: (name, value) after a write succeeded
+    write_failed = Signal(str, str)            # ← thread.write_failed: (name, message), the device is still open
+    new_reading = Signal(str, object)          # ← a poll's reading: (name, data), also stored in the property
 
     def __init__(self, thread, settings, capabilities: Capabilities, parent: QObject | None = None):
         super().__init__(parent)
@@ -52,15 +54,18 @@ class Controller(QObject):
         self.settings = settings
         self.thread = thread
         self._connected = False
+        self._syncing_from_device = False  # True while applying a setting the plugin changed itself
         self._last_values: dict[str, object] = {}
         self._polled: dict[str, Subscription] = {}
         self.write_requested.connect(thread.request_write)
         self.subscribe_requested.connect(thread.subscribe)
         self.unsubscribe_requested.connect(thread.unsubscribe)
         thread.hardware_status.connect(self._on_status)
-        thread.error.connect(self.error)
+        thread.error.connect(self.device_error)
         thread.write_done.connect(self.written)
+        thread.write_failed.connect(self.write_failed)
         thread.capabilities_signal.connect(self._on_instance_capabilities)
+        thread.settings_changed.connect(self._on_device_settings_changed)
 
     @property
     def connected(self) -> bool:
@@ -70,11 +75,19 @@ class Controller(QObject):
         """Keep the capabilities the plugin reported after open, for introspection. Attributes stay class-level."""
         self.capabilities = capabilities
 
+    def _on_device_settings_changed(self, path: list, data: object, change: str) -> None:
+        """Apply a setting the plugin changed itself. The flag stops it looping back as a GUI edit."""
+        self._syncing_from_device = True
+        try:
+            self.settings.child(*path).setValue(data)
+        finally:
+            self._syncing_from_device = False
+
     def _on_status(self, connected: bool, info: str) -> None:
         self._connected = connected
         if not connected:
             self._polled.clear()  # the thread released these subscriptions when it closed the device
-        self.status.emit(connected, info)
+        self.device_status.emit(connected, info)
 
     def _require_open(self, name: str) -> None:
         if not self._connected:
@@ -143,6 +156,7 @@ class Controller(QObject):
     def _on_reading(self, name: str, data: object, sub: Subscription) -> None:
         self._last_values[name] = data
         sub.acknowledge()
+        self.new_reading.emit(name, data)
 
 
 @functools.lru_cache(maxsize=None)

@@ -80,12 +80,12 @@ class FakeSettings:
 def make_plugin_class(plugin_instance: MockPlugin) -> type:
     """Return a plugin class whose constructor always returns *plugin_instance*.
 
-    Inherits from MockPlugin so ``hasattr(_PluginClass, 'open')`` returns True
-    and the new-style detection in HardwareThread works correctly.
+    Subclasses the instance's own class (MockPlugin by default), so class attributes such as
+    a MockPlugin subclass's ``params`` are kept, and the new-style detection still sees ``open``.
     """
     instance = plugin_instance
 
-    class _PluginClass(MockPlugin):
+    class _PluginClass(type(plugin_instance)):
         def __new__(cls, *args, **kwargs):
             return instance
 
@@ -342,15 +342,15 @@ class TestRequestWrite:
         assert collector.count == 0
         assert plugin.change_calls == []
 
-    def test_request_write_exception_emits_error_and_keeps_plugin_open(self, qapp):
+    def test_request_write_exception_emits_write_failed_and_keeps_plugin_open(self, qapp):
         thread_obj, plugin = make_thread()
         thread_obj.ini_hardware()
         plugin._change_raises = RuntimeError('write failed')
-        errors, statuses = Collector(), Collector()
-        thread_obj.error.connect(errors)
+        failures, statuses = Collector(), Collector()
+        thread_obj.write_failed.connect(failures)
         thread_obj.hardware_status.connect(statuses)
         thread_obj.request_write('axis_x', 0.0)
-        assert 'write failed' in errors.last()[0]
+        assert failures.last() == ('axis_x', 'write failed')
         assert statuses.count == 0
         assert thread_obj._plugin is not None
 
@@ -753,3 +753,35 @@ class TestPushedReadings:
         qtbot.wait(100)
 
         assert got.count == 0
+
+
+# ---------------------------------------------------------------------------
+# settings_changed: the plugin changes its own settings
+# ---------------------------------------------------------------------------
+
+class TestSettingsChanged:
+
+    def _thread_with_gain(self, qapp):
+        class _GainPlugin(MockPlugin):
+            params = [{'name': 'gain', 'type': 'float', 'value': 1.0}]
+
+        instance = _GainPlugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        return thread_obj, instance
+
+    def test_a_change_the_plugin_makes_itself_is_forwarded(self, qapp):
+        thread_obj, plugin = self._thread_with_gain(qapp)
+        changed = Collector()
+        thread_obj.settings_changed.connect(changed)
+        thread_obj._plugin_settings.child('gain').setValue(5.0)  # as the plugin would, on its own
+        assert changed.last() == (['gain'], 5.0, 'value')
+
+    def test_a_gui_driven_change_is_not_forwarded(self, qapp):
+        """update_settings applies it under a QSignalBlocker, so it must not loop back as a device change."""
+        thread_obj, plugin = self._thread_with_gain(qapp)
+        changed = Collector()
+        thread_obj.settings_changed.connect(changed)
+        thread_obj.update_settings(['gain'], 7.0, 'value')
+        assert changed.count == 0
+        assert thread_obj._plugin_settings.child('gain').value() == 7.0

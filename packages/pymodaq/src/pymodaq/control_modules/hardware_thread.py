@@ -76,9 +76,11 @@ class HardwareThread(QObject):
     """
 
     write_done = Signal(str, object)                    # (channel, value)
+    write_failed = Signal(str, str)                     # (channel, message): the plugin's write raised
     hardware_status = Signal(bool, str)                 # (connected, info): open and close only
     capabilities_signal = Signal(object)                # Capabilities the plugin instance sets after open
     error = Signal(str)                                 # a read or write failed; the plugin stays open
+    settings_changed = Signal(list, object, str)        # (path, data, change): the plugin changed its own settings
     _push_requested = Signal(str, object, float)        # (channel, data, read time), from any thread
 
     def __init__(self, plugin_class: type, params_state: dict | None = None) -> None:
@@ -111,6 +113,7 @@ class HardwareThread(QObject):
             return
         try:
             self._plugin_settings = make_plugin_settings(self._plugin_class, self._params_state)
+            self._plugin_settings.sigTreeStateChanged.connect(self._on_plugin_settings_changed)
             plugin = self._plugin_class()
             plugin.push_reading = self._push_reading
             plugin.open(self._plugin_settings)
@@ -159,13 +162,31 @@ class HardwareThread(QObject):
         if commit is not None:
             commit(param)
 
+    def _on_plugin_settings_changed(self, _, changes) -> None:
+        """Forward a settings change the plugin makes itself.
+
+        A GUI-originated change is applied under a ``QSignalBlocker`` in ``update_settings``, so it never
+        reaches here; only the plugin's own changes do.
+        """
+        for param, change, data in changes:
+            if change != 'value':
+                continue
+            path = self._plugin_settings.childPath(param)
+            if path is not None:
+                self.settings_changed.emit(path, data, change)
+
     # ── One-shot requests ────────────────────────────────────────────────────
 
     @Slot(str, object)
     @_when_open
     def request_write(self, channel: str, value: object) -> None:
-        """Set *channel* to *value* with ``write`` and emit ``write_done``."""
-        self._plugin.write(channel, value)
+        """Set *channel* to *value* with ``write`` and emit ``write_done``, or ``write_failed`` on error."""
+        try:
+            self._plugin.write(channel, value)
+        except Exception as exc:
+            logger.exception(f'write of {channel!r} failed')
+            self.write_failed.emit(channel, str(exc))
+            return
         self.write_done.emit(channel, value)
 
     # ── Pushed readings ──────────────────────────────────────────────────────
