@@ -73,14 +73,55 @@ class HardwareThread(QObject):
 
     Signals fire in the GUI thread through Qt's queued delivery.  Slots run in the
     hardware thread's event loop.
+
+    Attributes
+    ----------
+    _plugin_class : type
+        The plugin class to instantiate in :meth:`ini_hardware`.
+    _params_state : dict or None
+        Saved settings state, restored once when the plugin's settings tree is built.
+    _plugin : Any or None
+        The open plugin instance, or ``None`` before open / after close.
+    _plugin_settings : Parameter or None
+        The plugin's settings tree, built by :func:`make_plugin_settings`; ``None`` while closed.
+    _timers : dict[float, QTimer]
+        One single-shot ``QTimer`` per distinct polling period, keyed by ``period_ms``.
+    _subscribers : dict[str, list[Subscription]]
+        Channel name -> the open subscriptions currently reading it.
+    _device_ident : int or None
+        The hardware thread's ``threading.get_ident()``, recorded by :meth:`ini_hardware` and
+        checked by :meth:`is_device_thread`.
+    _pushed : set[str]
+        Names of measurements declared ``push=True``: delivered through :meth:`_push_reading`
+        instead of ever being polled.
+    _settings_of : dict[str, str]
+        Control name -> the plugin settings parameter it writes through, for a
+        ``setting``-backed control (bypasses ``write``).
+    _get_of : dict[str, Callable]
+        Quantity name -> its declared ``get`` callback, used instead of ``read``.
+    _set_of : dict[str, Callable]
+        Control name -> its declared ``set`` callback, used instead of ``write``.
+    _actions_of : dict[str, dict[str, Action]]
+        Quantity name -> {action name: Action}, dispatched by :meth:`request_action`.
     """
 
+    # ── Outcome of a request: one pair per kind, done/failed, always (channel, ...) first ──
     write_done = Signal(str, object)                    # (channel, value)
-    write_failed = Signal(str, str)                     # (channel, message): the plugin's write raised
+    write_failed = Signal(str, str)                      # (channel, message): the plugin's write raised
+    action_done = Signal(str, str, object)                # (channel, action name, result): ran without
+                                                           # error; result is None when the callback, as
+                                                           # most do, reported nothing back
+    action_failed = Signal(str, str, str)                 # (channel, action name, message): the callback raised
+
+    # ── Device status, not tied to one request ──
     hardware_status = Signal(bool, str)                 # (connected, info): open and close only
-    capabilities_signal = Signal(object)                # Capabilities the plugin instance sets after open
-    error = Signal(str)                                 # a read or write failed; the plugin stays open
+    capabilities = Signal(object)                       # Capabilities the plugin instance sets after open
+    error = Signal(str)                                 # a read failed; the plugin stays open. Write and
+                                                         # action failures have their own, channeled signals
+                                                         # above instead - only a read has none of its own.
     settings_changed = Signal(list, object, str)        # (path, data, change): the plugin changed its own settings
+
+    # ── Internal plumbing, not part of the outward signal surface above ──
     _push_requested = Signal(str, object, float)        # (channel, data, read time), from any thread
 
     def __init__(self, plugin_class: type, params_state: dict | None = None) -> None:
@@ -94,12 +135,13 @@ class HardwareThread(QObject):
         self._device_ident: int | None = None
         caps = Capabilities.from_device(plugin_class)
         self._pushed: set[str] = {q.name for q in caps.measurements if q.push}
-        # channel name -> the plugin parameter it writes through, instead of write()
         self._settings_of: dict[str, str] = {q.name: q.setting for q in caps.controls if q.setting}
-        # channel name -> an explicit getter / setter, read()/write() otherwise
         self._get_of: dict[str, Callable] = {q.name: q.get for q in caps.measurements + caps.controls if q.get}
         self._set_of: dict[str, Callable] = {q.name: q.set for q in caps.controls if q.set}
-        self._stop_of: dict[str, Callable] = {q.name: q.stop for q in caps.controls if q.stop}
+        # a measurement's channel can have these too, same as a control's - see request_action
+        self._actions_of: dict[str, dict[str, Any]] = {
+            q.name: dict(q.actions) for q in caps.measurements + caps.controls if q.actions
+        }
         self._push_requested.connect(self._on_push_requested)
 
     # ── Plugin lifecycle ─────────────────────────────────────────────────────
@@ -131,7 +173,7 @@ class HardwareThread(QObject):
             return
         instance_caps = getattr(plugin, 'capabilities', None)
         if instance_caps is not None:
-            self.capabilities_signal.emit(instance_caps)
+            self.capabilities.emit(instance_caps)
         self.hardware_status.emit(True, f'{self._plugin_class.__name__} connected')
 
     @Slot()
@@ -212,21 +254,32 @@ class HardwareThread(QObject):
             return
         self.write_done.emit(channel, value)
 
-    @Slot(str)
+    @Slot(str, str, object)
     @_when_open
-    def request_stop(self, channel: str) -> None:
-        """Call *channel*'s declared ``stop`` callback, if it has one. A no-op otherwise.
+    def request_action(self, channel: str, action_name: str, checked: bool | None = None) -> None:
+        """Call *channel*'s declared *action_name* callback, if it has one. A no-op otherwise.
 
-        Errors go through ``error``, not ``write_failed``: stopping is not itself a write.
+        Mirrors ``request_write``'s done/failed shape: ``action_done(channel, action_name, result)`` on
+        success, ``action_failed(channel, action_name, message)`` if the callback raised. ``result`` is
+        the callback's return value, or ``None`` when it has nothing to report (what most callbacks do).
+        Never treated as a write - no settling of its own.
+
+        *checked* is a ``checkable`` action's new button state, passed to the callback as a second
+        argument (``callback(plugin, checked)``); ``None`` for a plain action.
+
+        See ``device_module_connections.md`` ("Actions") for how the GUI side uses ``action_done`` /
+        ``action_failed`` (e.g. why only ``stop`` clears a row's pending state).
         """
-        stopper = self._stop_of.get(channel)
-        if stopper is None:
+        action = self._actions_of.get(channel, {}).get(action_name)
+        if action is None:
             return
         try:
-            stopper(self._plugin)
+            result = action.callback(self._plugin, checked) if action.checkable else action.callback(self._plugin)
         except Exception as exc:
-            logger.exception(f'stop of {channel!r} failed')
-            self.error.emit(str(exc))
+            logger.exception(f'action {action_name!r} of {channel!r} failed')
+            self.action_failed.emit(channel, action_name, str(exc))
+            return
+        self.action_done.emit(channel, action_name, result)
 
     # ── Pushed readings ──────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from pymodaq.control_modules.capabilities import control, measurement
+from pymodaq.control_modules.capabilities import Action, control, measurement
 from pymodaq.control_modules.hardware_thread import HardwareThread
 from pymodaq.control_modules.subscription import Subscription
 
@@ -161,7 +161,7 @@ class TestIniHardware:
         fake_caps = object()
         plugin._capabilities = fake_caps
         collector = Collector()
-        thread_obj.capabilities_signal.connect(collector)
+        thread_obj.capabilities.connect(collector)
         thread_obj.ini_hardware()
         assert collector.count == 1
         assert collector.last()[0] is fake_caps
@@ -169,7 +169,7 @@ class TestIniHardware:
     def test_ini_emits_no_instance_capabilities_when_none_set(self, qapp):
         thread_obj, plugin = make_thread()
         collector = Collector()
-        thread_obj.capabilities_signal.connect(collector)
+        thread_obj.capabilities.connect(collector)
         thread_obj.ini_hardware()
         assert collector.count == 0
 
@@ -357,10 +357,10 @@ class TestRequestWrite:
 
 
 # ---------------------------------------------------------------------------
-# request_stop
+# request_action
 # ---------------------------------------------------------------------------
 
-class TestRequestStop:
+class TestRequestAction:
 
     def _thread_with_stop(self, qapp):
         calls = []
@@ -373,23 +373,42 @@ class TestRequestStop:
         thread_obj.ini_hardware()
         return thread_obj, instance, calls
 
-    def test_request_stop_calls_the_declared_callback(self, qapp):
+    def test_request_action_calls_the_declared_callback(self, qapp):
         thread_obj, plugin, calls = self._thread_with_stop(qapp)
-        thread_obj.request_stop('axis_x')
+        thread_obj.request_action('axis_x', 'stop')
         assert calls == ['stopped']
 
-    def test_request_stop_on_a_channel_without_one_is_a_noop(self, qapp):
-        thread_obj, plugin = make_thread()  # axis_x has no stop callback
+    def test_request_action_for_a_channel_without_one_is_a_noop(self, qapp):
+        thread_obj, plugin = make_thread()  # axis_x has no actions
         thread_obj.ini_hardware()
-        thread_obj.request_stop('axis_x')  # must not raise
+        thread_obj.request_action('axis_x', 'stop')  # must not raise
 
-    def test_request_stop_before_ini_is_a_noop(self, qapp):
+    def test_request_action_for_an_undeclared_name_is_a_noop(self, qapp):
         thread_obj, plugin, calls = self._thread_with_stop(qapp)
-        thread_obj._plugin = None  # simulate not open, without re-running ini
-        thread_obj.request_stop('axis_x')
+        thread_obj.request_action('axis_x', 'home')  # 'stop' is declared, 'home' is not
         assert calls == []
 
-    def test_request_stop_exception_emits_error_not_write_failed(self, qapp):
+    def test_request_action_before_ini_is_a_noop(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_stop(qapp)
+        thread_obj._plugin = None  # simulate not open, without re-running ini
+        thread_obj.request_action('axis_x', 'stop')
+        assert calls == []
+
+    def test_several_actions_on_one_channel_are_dispatched_by_name(self, qapp):
+        calls = []
+
+        class _Plugin(MockPlugin):
+            axis_x = control(lo=0, hi=10, stop=lambda plugin: calls.append('stopped'),
+                             actions={'home': lambda plugin: calls.append('homed')})
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        thread_obj.request_action('axis_x', 'home')
+        thread_obj.request_action('axis_x', 'stop')
+        assert calls == ['homed', 'stopped']
+
+    def test_request_action_exception_emits_action_failed_not_write_failed_or_action_done(self, qapp):
         def _raise(plugin):
             raise RuntimeError('cannot stop')
 
@@ -399,12 +418,65 @@ class TestRequestStop:
         instance = _Plugin()
         thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
         thread_obj.ini_hardware()
-        errors, failed = Collector(), Collector()
-        thread_obj.error.connect(errors)
-        thread_obj.write_failed.connect(failed)
-        thread_obj.request_stop('axis_x')
-        assert errors.last() == ('cannot stop',)
-        assert failed.count == 0
+        failed_action, failed_write, done = Collector(), Collector(), Collector()
+        thread_obj.action_failed.connect(failed_action)
+        thread_obj.write_failed.connect(failed_write)
+        thread_obj.action_done.connect(done)
+        thread_obj.request_action('axis_x', 'stop')
+        assert failed_action.last() == ('axis_x', 'stop', 'cannot stop')
+        assert failed_write.count == 0
+        assert done.count == 0
+
+    def test_request_action_emits_action_done_with_none_when_the_callback_reports_nothing(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_stop(qapp)  # its stop callback returns nothing
+        done = Collector()
+        thread_obj.action_done.connect(done)
+        thread_obj.request_action('axis_x', 'stop')
+        assert done.last() == ('axis_x', 'stop', None)
+
+    def test_request_action_emits_action_done_with_the_callbacks_return_value(self, qapp):
+        class _Plugin(MockPlugin):
+            axis_x = control(lo=0, hi=10, stop=lambda plugin: 7.5)
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        done = Collector()
+        thread_obj.action_done.connect(done)
+        thread_obj.request_action('axis_x', 'stop')
+        assert done.last() == ('axis_x', 'stop', 7.5)
+
+    def test_a_measurement_can_declare_an_action_too(self, qapp):
+        calls = []
+
+        class _Plugin(MockPlugin):
+            spectrum = measurement(shape=(4,), actions={'take_background': lambda plugin: calls.append('bkg')})
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        thread_obj.request_action('spectrum', 'take_background')
+        assert calls == ['bkg']
+
+    def test_a_checkable_actions_callback_receives_the_checked_state(self, qapp):
+        calls = []
+
+        class _Plugin(MockPlugin):
+            spectrum = measurement(shape=(4,), actions={
+                'subtract_bkg': Action(lambda plugin, checked: calls.append(checked), checkable=True),
+            })
+
+        instance = _Plugin()
+        thread_obj = HardwareThread(plugin_class=make_plugin_class(instance), params_state=None)
+        thread_obj.ini_hardware()
+        thread_obj.request_action('spectrum', 'subtract_bkg', True)
+        thread_obj.request_action('spectrum', 'subtract_bkg', False)
+        assert calls == [True, False]
+
+    def test_a_non_checkable_actions_callback_is_still_called_with_one_argument(self, qapp):
+        thread_obj, plugin, calls = self._thread_with_stop(qapp)
+        thread_obj.request_action('axis_x', 'stop', None)  # explicit None, same as omitting it
+        assert calls == ['stopped']
 
 
 # ---------------------------------------------------------------------------

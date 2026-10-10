@@ -6,7 +6,7 @@ import threading
 import numpy as np
 import pytest
 
-from pymodaq.control_modules.capabilities import control, measurement
+from pymodaq.control_modules.capabilities import Action, control, measurement
 from pymodaq.control_modules.controller import Controller, controller_class
 from pymodaq.control_modules.hardware_registry import HardwareKey, HardwareRegistry
 
@@ -101,11 +101,13 @@ class TestWrite:
 
 
 class Stoppable(Spectrometer):
-    axis = control(units='mm', lo=0, hi=10, stop=lambda plugin: plugin.stop_calls.append(True))
+    axis = control(units='mm', lo=0, hi=10, stop=lambda plugin: plugin.stop_calls.append(True),
+                   actions={'home': lambda plugin: plugin.home_calls.append(True)})
 
     def __init__(self):
         super().__init__()
         self.stop_calls = []
+        self.home_calls = []
 
 
 class TestStop:
@@ -122,6 +124,69 @@ class TestStop:
         key, ctrl = attach(registry)
         with pytest.raises(RuntimeError, match='not open'):
             ctrl.stop('exposure')
+
+    def test_run_action_calls_a_differently_named_declared_callback(self, registry, qtbot):
+        key = HardwareKey(hardware_class=Stoppable, controller_id=24)
+        ctrl = registry.attach(key, Stoppable)
+        ctrl.thread.ini_hardware()
+        plugin = ctrl.thread._plugin
+        ctrl.run_action('axis', 'home')
+        qtbot.waitUntil(lambda: plugin.home_calls == [True], timeout=2000)
+        assert plugin.stop_calls == []  # only 'home' was called, not 'stop'
+
+    def test_run_action_before_open_raises(self, registry):
+        key, ctrl = attach(registry)
+        with pytest.raises(RuntimeError, match='not open'):
+            ctrl.run_action('exposure', 'home')
+
+    def test_a_successful_action_emits_action_done_with_no_result(self, registry, qtbot):
+        key = HardwareKey(hardware_class=Stoppable, controller_id=25)
+        ctrl = registry.attach(key, Stoppable)
+        ctrl.thread.ini_hardware()
+        with qtbot.waitSignal(ctrl.action_done, timeout=2000) as blocker:
+            ctrl.stop('axis')
+        assert blocker.args == ['axis', 'stop', None]  # Stoppable's stop callback reports nothing
+
+    def test_an_action_returning_a_value_is_carried_by_action_done(self, registry, qtbot):
+        class Reporting(Spectrometer):
+            axis = control(units='mm', lo=0, hi=10, stop=lambda plugin: 4.2)
+
+        key = HardwareKey(hardware_class=Reporting, controller_id=26)
+        ctrl = registry.attach(key, Reporting)
+        ctrl.thread.ini_hardware()
+        with qtbot.waitSignal(ctrl.action_done, timeout=2000) as blocker:
+            ctrl.stop('axis')
+        assert blocker.args == ['axis', 'stop', 4.2]
+
+    def test_a_failing_action_emits_action_failed(self, registry, qtbot):
+        class Faulty(Spectrometer):
+            axis = control(units='mm', lo=0, hi=10,
+                           stop=lambda plugin: (_ for _ in ()).throw(RuntimeError('refused')))
+
+        key = HardwareKey(hardware_class=Faulty, controller_id=27)
+        ctrl = registry.attach(key, Faulty)
+        ctrl.thread.ini_hardware()
+        with qtbot.waitSignal(ctrl.action_failed, timeout=2000) as blocker:
+            ctrl.stop('axis')
+        assert blocker.args == ['axis', 'stop', 'refused']
+
+    def test_run_action_forwards_the_checked_state_to_a_checkable_callback(self, registry, qtbot):
+        class WithToggle(Spectrometer):
+            spectrum = measurement(units='counts', shape=(4,), actions={
+                'subtract_bkg': Action(lambda plugin, checked: plugin.toggle_calls.append(checked),
+                                       checkable=True),
+            })
+
+            def __init__(self):
+                super().__init__()
+                self.toggle_calls = []
+
+        key = HardwareKey(hardware_class=WithToggle, controller_id=28)
+        ctrl = registry.attach(key, WithToggle)
+        ctrl.thread.ini_hardware()
+        plugin = ctrl.thread._plugin
+        ctrl.run_action('spectrum', 'subtract_bkg', True)
+        qtbot.waitUntil(lambda: plugin.toggle_calls == [True], timeout=2000)
 
 
 class TestLifecycle:

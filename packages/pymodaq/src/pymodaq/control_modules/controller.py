@@ -40,13 +40,15 @@ class Controller(QObject):
     """
 
     write_requested = Signal(str, object)      # → thread.request_write
-    stop_requested = Signal(str)               # → thread.request_stop
+    action_requested = Signal(str, str, object)  # → thread.request_action: (channel, action name, checked)
     subscribe_requested = Signal(object)       # → thread.subscribe
     unsubscribe_requested = Signal(object)     # → thread.unsubscribe
     device_status = Signal(bool, str)          # ← thread.hardware_status
     device_error = Signal(str)                 # ← thread.error: an operation failed, the device is still open
     written = Signal(str, object)              # ← thread.write_done: (name, value) after a write succeeded
     write_failed = Signal(str, str)            # ← thread.write_failed: (name, message), the device is still open
+    action_done = Signal(str, str, object)     # ← thread.action_done: (name, action name, result or None)
+    action_failed = Signal(str, str, str)      # ← thread.action_failed: (name, action name, message)
     new_reading = Signal(str, object)          # ← a poll's reading: (name, data), also stored in the property
 
     def __init__(self, thread, settings, capabilities: Capabilities, parent: QObject | None = None):
@@ -59,14 +61,16 @@ class Controller(QObject):
         self._last_values: dict[str, object] = {}
         self._polled: dict[str, Subscription] = {}
         self.write_requested.connect(thread.request_write)
-        self.stop_requested.connect(thread.request_stop)
+        self.action_requested.connect(thread.request_action)
         self.subscribe_requested.connect(thread.subscribe)
         self.unsubscribe_requested.connect(thread.unsubscribe)
         thread.hardware_status.connect(self._on_status)
         thread.error.connect(self.device_error)
         thread.write_done.connect(self.written)
         thread.write_failed.connect(self.write_failed)
-        thread.capabilities_signal.connect(self._on_instance_capabilities)
+        thread.action_done.connect(self.action_done)
+        thread.action_failed.connect(self.action_failed)
+        thread.capabilities.connect(self._on_instance_capabilities)
         thread.settings_changed.connect(self._on_device_settings_changed)
 
     @property
@@ -120,10 +124,18 @@ class Controller(QObject):
         if sub is not None:
             self.unsubscribe_requested.emit(sub)
 
-    def stop(self, name: str) -> None:
-        """Call *name*'s declared ``stop`` callback. A no-op if it has none. Raises if the device is closed."""
+    def run_action(self, name: str, action_name: str, checked: bool | None = None) -> None:
+        """Call *name*'s declared *action_name* callback. A no-op if it has none. Raises if closed.
+
+        *checked* is the button's new state for a ``checkable`` action, forwarded to the callback as
+        its second argument; leave it ``None`` for a plain, non-checkable action.
+        """
         self._require_open(name)
-        self.stop_requested.emit(name)
+        self.action_requested.emit(name, action_name, checked)
+
+    def stop(self, name: str) -> None:
+        """Call *name*'s declared ``stop`` action. A no-op if it has none. Raises if the device is closed."""
+        self.run_action(name, 'stop')
 
     def read(self, name: str, on_value) -> Subscription:
         """Read *name* once, asynchronously: *on_value(data)* is called when the reading arrives."""
