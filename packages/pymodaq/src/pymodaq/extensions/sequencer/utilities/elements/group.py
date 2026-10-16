@@ -22,6 +22,13 @@ class GroupElt(SeqEltBase):
         super().__init__(*args, **kwargs)
         self._ind_execute: int = 0
 
+    def initialize_element(self):
+        """ Reset the re-entry counter so a fresh pass starts clean when this element's
+        composite state is entered from outside its normal flow (e.g. a choice jumping
+        straight into it) rather than resuming mid-iteration.
+        """
+        self._ind_execute = 0
+
     def _eq(self, other: 'SeqEltBase'):
         return True
 

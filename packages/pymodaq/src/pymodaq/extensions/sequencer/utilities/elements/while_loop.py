@@ -11,7 +11,8 @@ from pymodaq_gui.utils.widgets.combo import ComboBox
 from pymodaq.utils.managers.modules_manager import ModulesManager
 from pymodaq.extensions.sequencer.utilities.choice_models.model import ChoiceModelBase
 from pymodaq.extensions.sequencer.utilities.choice_models.factory import ChoiceModelFactory
-from pymodaq.extensions.sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq.extensions.sequencer.utilities.element_factory import SeqEltFactory
+from pymodaq.extensions.sequencer.utilities.elements.group import GroupElt
 from pymodaq.extensions.sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
 
@@ -20,17 +21,17 @@ choice_factory = ChoiceModelFactory()
 
 @SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
-class WhileElt(SeqEltBase):
+class WhileElt(GroupElt):
     """ A condition-driven loop: runs its children repeatedly while a condition evaluates True,
     finishes once it evaluates False.
 
-    Sibling to RepeatElt (which loops a fixed number of times) and GroupElt (which never loops)
-    - this is the "while True: repeat this action" primitive. The condition reuses the same
-    pluggable ChoiceModel abstraction as ChoiceElt (true/false/threshold/user_input/composite),
-    just evaluated directly each pass instead of driving a go_to_true/go_to_false branch.
+    A GroupElt whose "run once" becomes "run while this condition holds" - this is the
+    "while True: repeat this action" primitive, sibling to RepeatElt (which counts instead).
+    The condition reuses the same pluggable ChoiceModel abstraction as ChoiceElt
+    (true/false/threshold/user_input/composite), just evaluated directly each pass instead of
+    driving a go_to_true/go_to_false branch.
     """
     elt_name = 'while'
-    children_allowed = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -63,6 +64,7 @@ class WhileElt(SeqEltBase):
         self.choice_model = value
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
+        base_widget = super()._create_widget(base_widget)
         combo = ComboBox()
         with QtCore.QSignalBlocker(combo):
             combo.addItems(choice_factory.models)
@@ -98,7 +100,8 @@ class WhileElt(SeqEltBase):
 
         to be reimplemented
         """
-        dict_config = {'choice_model': self.choice_model.model_name}
+        dict_config = super().to_dict_custom()
+        dict_config['choice_model'] = self.choice_model.model_name
         dict_config.update(self.choice_model.to_dict())
         return dict_config
 
@@ -106,6 +109,7 @@ class WhileElt(SeqEltBase):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
+        super().from_dict_custom(dict_config)
         self.choice_model = dict_config.pop('choice_model')
         self.choice_model.from_dict(dict_config)
 
@@ -113,7 +117,7 @@ class WhileElt(SeqEltBase):
         """ Custom method to reimplement to assert two elements are equals"""
         if not hasattr(other, 'choice_model'):
             return False
-        return self.choice_model == other.choice_model
+        return super()._eq(other) and self.choice_model == other.choice_model
 
     def __repr__(self):
         return f'{super().__repr__()} - while {self.choice_model.model_name}'
@@ -124,4 +128,5 @@ class WhileElt(SeqEltBase):
         Will be called before executing the element. Try to make sure the element is valid or raise
         ElementError if the user may do something!
         """
+        super().check_set_is_valid()
         self.choice_model.check_set_is_valid()
