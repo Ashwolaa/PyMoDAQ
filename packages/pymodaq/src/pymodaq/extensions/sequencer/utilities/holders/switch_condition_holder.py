@@ -23,6 +23,9 @@ class SwitchConditionHolder(ConditionHolderBase):
     """
     factory = switch_factory
     dict_key = 'switch_model'
+    # 'manual' (no detector/dashboard coupling) rather than whichever model happens to be
+    # discovered/registered first - see ConditionHolderBase.default_model_name.
+    default_model_name = 'manual'
 
     def __init__(self, elt: 'SeqEltBase', branches: 'BranchHolder',
                  combo_tooltip: Optional[str] = None):

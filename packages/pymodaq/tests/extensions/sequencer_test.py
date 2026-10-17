@@ -30,6 +30,7 @@ class TestElements:
 
     def test_registered_switch_models(self, ):
         assert 'bands' in switch_factory.models
+        assert 'manual' in switch_factory.models
 
     def test_grab_elt_construction(self, qtbot):
         """ Regression test: GrabElt used to reference ModulesManager settings children
@@ -381,7 +382,9 @@ class TestSwitchElt:
     """ N-way branch: ChoiceElt's True/False generalized to an arbitrary outcome set via
     BranchHolder + SwitchConditionHolder, validated here with the 'bands' SwitchModel (N-1
     boundary values -> N bands, outcomes keyed by stable boundary ids plus a fixed sentinel
-    TOP_BAND_ID for the top band)."""
+    TOP_BAND_ID for the top band). SwitchElt's own default model is 'manual' (see
+    TestManualSwitchModel below), so tests exercising 'bands' opt into it explicitly, the same
+    way TestCompositeChoiceModel opts a ChoiceElt into 'composite'."""
 
     def _make_switch(self, qtbot, parent, boundaries: list[float]) -> SwitchElt:
         elt = SwitchElt(1, parent=parent)
@@ -467,6 +470,93 @@ class TestSwitchElt:
         root = RootElt()
         switch = self._make_switch(qtbot, root, [5.0])
         with pytest.raises(ElementError, match='>= 5'):
+            switch.check_set_is_valid()
+
+
+class TestManualSwitchModel:
+    """ SwitchElt's default model: N user-named outcomes, no detector/dashboard coupling,
+    'selected' decides which one evaluate() returns - the N-way analogue of ChoiceElt's
+    parameter-less true/false defaults."""
+
+    def test_is_the_default_model(self, qtbot):
+        switch = SwitchElt(1)
+        assert switch.switch_model.model_name == 'manual'
+
+    def test_starts_with_two_outcomes(self, qtbot):
+        switch = SwitchElt(1)
+        assert len(switch.switch_model.outcomes) == 2
+        assert len(switch.branches.value_transitions) == 2
+
+    def test_evaluate_returns_selected_outcome(self, qtbot):
+        switch = SwitchElt(1)
+        model = switch.switch_model
+        first_id = next(iter(model.outcomes))
+        assert model.evaluate(DataToExport('test')) == first_id
+
+        other_id = next(i for i in model.outcomes if i != first_id)
+        model.settings['selected'] = other_id
+        assert model.evaluate(DataToExport('test')) == other_id
+
+    def test_add_outcome_fires_outcomes_changed_and_preserves_targets(self, qtbot):
+        root = RootElt()
+        switch = SwitchElt(1, parent=root)
+        waits = [WaitElt(10 + i, parent=root) for i in range(2)]
+        root._children = [switch] + waits
+        model = switch.switch_model
+        ids = list(model.outcomes)
+        for branch, wait in zip(ids, waits):
+            switch.branches.set_go_to(branch, wait.id)
+
+        calls = []
+        model.outcomes_changed.connect(lambda: calls.append(len(model.outcomes)))
+        model.add_outcome('Outcome 3')
+        assert calls == [3]
+        assert switch.branches.value_transitions[ids[0]].targetState() is waits[0].mstate
+        assert switch.branches.value_transitions[ids[1]].targetState() is waits[1].mstate
+
+    def test_remove_outcome_preserves_surviving_targets(self, qtbot):
+        root = RootElt()
+        switch = SwitchElt(1, parent=root)
+        waits = [WaitElt(10 + i, parent=root) for i in range(2)]
+        root._children = [switch] + waits
+        model = switch.switch_model
+        ids = list(model.outcomes)
+        for branch, wait in zip(ids, waits):
+            switch.branches.set_go_to(branch, wait.id)
+
+        row = next(r for r in model.settings.child('outcomes').children()
+                  if r.name() == f'outcome_{ids[0]}')
+        row.remove()
+
+        assert set(switch.branches.value_transitions) == {ids[1]}
+        assert switch.branches.value_transitions[ids[1]].targetState() is waits[1].mstate
+
+    def test_save_load_round_trip(self, qtbot):
+        root = RootElt()
+        switch = SwitchElt(1, parent=root)
+        waits = [WaitElt(10 + i, parent=root) for i in range(2)]
+        root._children = [switch] + waits
+        model = switch.switch_model
+        ids = list(model.outcomes)
+        for branch, wait in zip(ids, waits):
+            switch.branches.set_go_to(branch, wait.id)
+        model.settings['selected'] = ids[1]
+
+        saved = switch.to_dict_custom()
+        reloaded = SwitchElt(1, parent=root)
+        reloaded.from_dict_custom(dict(saved))
+
+        assert reloaded.to_dict_custom() == saved
+        assert reloaded.switch_model.outcomes == model.outcomes
+        assert reloaded.switch_model.settings['selected'] == ids[1]
+        assert reloaded == switch
+
+    def test_check_set_is_valid_requires_at_least_one_outcome(self, qtbot):
+        switch = SwitchElt(1)
+        model = switch.switch_model
+        for row in list(model.settings.child('outcomes').children()):
+            row.remove()
+        with pytest.raises(ElementError, match='no outcome defined'):
             switch.check_set_is_valid()
 
 
