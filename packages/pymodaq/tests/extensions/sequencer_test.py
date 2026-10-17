@@ -7,22 +7,29 @@ from pymodaq_data import DataToExport
 from pymodaq.extensions.sequencer.utilities.element_factory import SeqEltFactory, ElementError
 from pymodaq.extensions.sequencer.utilities.elements.choice import ChoiceElt
 from pymodaq.extensions.sequencer.utilities.elements.root import RootElt
+from pymodaq.extensions.sequencer.utilities.elements.switch import SwitchElt
 from pymodaq.extensions.sequencer.utilities.elements.wait import WaitElt
 from pymodaq.extensions.sequencer.utilities.holders.branch_holder import CONTINUE
 from pymodaq.extensions.sequencer.utilities.holders.modules_manager_binding import ModulesManagerBinding
 from pymodaq.extensions.sequencer.utilities.elements.grab import GrabElt
 from pymodaq.extensions.sequencer.utilities.states import TrackedTransition
 from pymodaq.utils.managers.modules_manager import ModulesManagerParam
+from pymodaq.extensions.sequencer.utilities.switch_models.factory import SwitchModelFactory
 from pymodaq.extensions.sequencer.models.composite_choice_model import CompositeChoiceModel
 
 seq_factory = SeqEltFactory()
+switch_factory = SwitchModelFactory()
 
 
 class TestElements:
 
     def test_registered_elements(self, ):
-        for elt in ('button', 'choice', 'grab', 'move', 'repeat', 'root', 'scanner', 'sequence', 'state', 'wait'):
+        for elt in ('button', 'choice', 'grab', 'move', 'repeat', 'root', 'scanner', 'sequence',
+                   'state', 'switch', 'wait'):
             assert elt in seq_factory.elements
+
+    def test_registered_switch_models(self, ):
+        assert 'bands' in switch_factory.models
 
     def test_grab_elt_construction(self, qtbot):
         """ Regression test: GrabElt used to reference ModulesManager settings children
@@ -368,5 +375,98 @@ class TestCompositeChoiceModel:
 
         assert reloaded.to_dict() == saved
         assert reloaded.evaluate(DataToExport('test')) is True
+
+
+class TestSwitchElt:
+    """ N-way branch: ChoiceElt's True/False generalized to an arbitrary outcome set via
+    BranchHolder + SwitchConditionHolder, validated here with the 'bands' SwitchModel (N-1
+    boundary values -> N bands, outcomes keyed by stable boundary ids plus a fixed sentinel
+    TOP_BAND_ID for the top band)."""
+
+    def _make_switch(self, qtbot, parent, boundaries: list[float]) -> SwitchElt:
+        elt = SwitchElt(1, parent=parent)
+        elt.switch_model = 'bands'
+        for value in boundaries:
+            elt.switch_model.add_boundary(value)
+        return elt
+
+    @pytest.mark.parametrize('n_boundaries,expected_n_outcomes', [(1, 2), (2, 3), (4, 5)])
+    def test_outcome_count(self, qtbot, n_boundaries, expected_n_outcomes):
+        """ 2/3/5-outcome coverage: N-1 boundaries -> N bands (including the top sentinel) """
+        root = RootElt()
+        switch = self._make_switch(qtbot, root, [float(i) for i in range(n_boundaries)])
+        assert len(switch.branches.value_transitions) == expected_n_outcomes
+        assert len(switch.switch_model.outcomes) == expected_n_outcomes
+
+    def test_outcomes_changed_fires_on_add_and_remove(self, qtbot):
+        root = RootElt()
+        switch = self._make_switch(qtbot, root, [])
+        calls = []
+        switch.switch_model.outcomes_changed.connect(lambda: calls.append(len(switch.switch_model.outcomes)))
+
+        switch.switch_model.add_boundary(10.0)
+        switch.switch_model.add_boundary(20.0)
+        assert calls == [2, 3]
+
+        row = next(r for r in switch.switch_model.settings.child('boundaries').children()
+                  if r.name() == 'boundary_0')
+        row.remove()
+        assert calls == [2, 3, 2]
+
+    def test_remove_boundary_preserves_surviving_targets(self, qtbot):
+        root = RootElt()
+        switch = self._make_switch(qtbot, root, [10.0, 20.0, 30.0])
+        waits = [WaitElt(10 + i, parent=root) for i in range(4)]
+        root._children = [switch] + waits
+
+        for branch, wait in zip((0, 1, 2, -1), waits):
+            switch.branches.set_go_to(branch, wait.id)
+
+        row = next(r for r in switch.switch_model.settings.child('boundaries').children()
+                  if r.name() == 'boundary_1')
+        row.remove()
+
+        assert set(switch.branches.value_transitions) == {0, 2, -1}
+        assert switch.branches.value_transitions[0].targetState() is waits[0].mstate
+        assert switch.branches.value_transitions[2].targetState() is waits[2].mstate, \
+            'surviving outcome lost its target when an unrelated boundary was removed'
+        assert switch.branches.value_transitions[-1].targetState() is waits[3].mstate
+
+    def test_band_classification(self, qtbot):
+        root = RootElt()
+        switch = self._make_switch(qtbot, root, [10.0, 20.0, 30.0])
+        model = switch.switch_model
+        assert model._band_for(5.0) == 0
+        assert model._band_for(15.0) == 1
+        assert model._band_for(25.0) == 2
+        assert model._band_for(99.0) == -1
+
+    def test_save_load_round_trip(self, qtbot):
+        root = RootElt()
+        switch = self._make_switch(qtbot, root, [10.0, 20.0, 30.0])
+        waits = [WaitElt(10 + i, parent=root) for i in range(4)]
+        root._children = [switch] + waits
+        for branch, wait in zip((0, 1, 2, -1), waits):
+            switch.branches.set_go_to(branch, wait.id)
+        # remove a boundary before saving, to also cover stable-id preservation through a
+        # save/load cycle (not just within one live session)
+        row = next(r for r in switch.switch_model.settings.child('boundaries').children()
+                  if r.name() == 'boundary_1')
+        row.remove()
+
+        saved = switch.to_dict_custom()
+        reloaded = SwitchElt(1, parent=root)
+        reloaded.from_dict_custom(dict(saved))
+
+        assert reloaded.to_dict_custom() == saved
+        assert reloaded.branches._go_to == switch.branches._go_to
+        assert reloaded.switch_model.outcomes == switch.switch_model.outcomes
+        assert reloaded == switch
+
+    def test_check_set_is_valid_names_the_missing_outcome(self, qtbot):
+        root = RootElt()
+        switch = self._make_switch(qtbot, root, [5.0])
+        with pytest.raises(ElementError, match='>= 5'):
+            switch.check_set_is_valid()
 
 
