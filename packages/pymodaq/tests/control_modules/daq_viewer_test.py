@@ -16,8 +16,10 @@ from pymodaq.control_modules.viewer_utility_classes import HW_SETTINGS_KEY as DE
 from pymodaq.control_modules.utils import ControlModule
 from pymodaq.control_modules.instruments import DET_TYPES, get_viewer_plugins
 from pymodaq.control_modules.enums import DAQTypesEnum
+from pymodaq.control_modules.thread_commands import UiToMainViewer
 from pymodaq.utils.conftests import qtbotskip, main_modules_skip
 from pymodaq.utils.config import GlobalConfig
+from pymodaq_utils.utils import ThreadCommand
 
 from pymodaq_gui.parameter import utils as putils
 
@@ -156,3 +158,55 @@ def test_viewers_roi_select_and_crosshair_forwarding(ini_daq_viewer_ui):
     assert len(commands) == 0
     viewers[2].crosshair_dragged.emit(7., 8.)
     assert commands[-1].attribute == dict(crosshair_info=(7., 8.), ind_viewer=0)
+
+
+def test_continuous_save_toolbar_group_structure(ini_daq_viewer_ui):
+    """The toolbar exposes one grouped button for continuous saving: the (now hidden)
+    settings-tree entries are replaced by a single toolbar entry point."""
+    prog, qtbot, dockarea = ini_daq_viewer_ui
+    ui = prog.ui
+
+    for name in ('do_save', 'new_file', 'show_file', 'custom_name'):
+        assert prog.settings.child('saver_settings', name).opts['visible'] is False
+
+    button = next(child for child in ui.toolbar.findChildren(QtWidgets.QToolButton)
+                  if child.defaultAction() is ui.get_action('continuous_save'))
+    assert [a.text() for a in button.menu().actions()] == ['New file', 'Browse file']
+
+
+def test_background_toolbar_group_structure(ini_daq_viewer_ui):
+    """background_snap/background_subtract are now one grouped toolbar button, with
+    unchanged short names so existing wiring (DO_BKG/TAKE_BKG) keeps working as-is."""
+    prog, qtbot, dockarea = ini_daq_viewer_ui
+    ui = prog.ui
+
+    button = next(child for child in ui.toolbar.findChildren(QtWidgets.QToolButton)
+                  if child.defaultAction() is ui.get_action('background_subtract'))
+    assert [a.text() for a in button.menu().actions()] == ['Snap Background']
+
+
+def test_process_ui_cmds_do_save_save_new_open(ini_daq_viewer_without_ui, tmp_path):
+    """process_ui_cmds routes DO_SAVE/SAVE_NEW/OPEN exactly as the toolbar group's
+    actions emit them (see DAQ_Viewer_UI.connect_things)."""
+    prog, qtbot = ini_daq_viewer_without_ui
+
+    # New file / Browse file are safe no-ops while continuous save is off
+    prog.process_ui_cmds(ThreadCommand(UiToMainViewer.SAVE_NEW))
+    assert prog._h5saver_continuous is None or not prog._h5saver_continuous.isopen()
+    prog.process_ui_cmds(ThreadCommand(UiToMainViewer.OPEN))
+
+    # DO_SAVE drives the exact same backend parameter the settings-tree checkbox used to
+    prog.process_ui_cmds(ThreadCommand(UiToMainViewer.DO_SAVE, True))
+    assert prog.settings['saver_settings', 'do_save'] is True
+    assert prog._h5saver_continuous is not None
+    assert prog._h5saver_continuous.isopen()
+
+    prog._h5saver_continuous.settings.child('base_path').setValue(str(tmp_path))
+    prog.settings.child('saver_settings', 'N_saved').setValue(3)
+    prog.process_ui_cmds(ThreadCommand(UiToMainViewer.SAVE_NEW))
+    assert prog._h5saver_continuous.isopen()
+    assert len(list(tmp_path.rglob('*.h5'))) == 1
+    assert prog.settings['saver_settings', 'N_saved'] == 0
+
+    prog.process_ui_cmds(ThreadCommand(UiToMainViewer.DO_SAVE, False))
+    assert prog.settings['saver_settings', 'do_save'] is False

@@ -179,12 +179,25 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
                         checkable=True, icon_checked='bid_landscape_disabled',
                         icon_color=ThemeColor.GREEN, icon_checked_color=ThemeColor.RED)
         self.add_action('save_current', 'Save Current Data', 'save_as', "Save Current Data")
+        self.add_action_group(
+            'continuous_save', 'Continuous Save', 'save', checkable=True,
+            tip='Toggle continuous saving of grabbed/snapped data',
+            icon_checked_color=ThemeColor.GREEN,
+            secondary_actions=[
+                {'short_name': 'new_file', 'name': 'New file', 'icon_name': 'NewFile',
+                 'tip': 'Start a fresh file for continuous saving'},
+                {'short_name': 'browse_file', 'name': 'Browse file', 'icon_name': 'Open',
+                 'tip': 'Open the current continuous-save file in an H5Browser'},
+            ])
         self.toolbar.addSeparator()
-        self.add_action('background_snap', 'Snap Background', 'background_replace',
-                        tip='Take a snapshot a set it as background')
-        self.add_action('background_subtract', 'Subtract Background', 'texture_minus', checkable=True,
-                        tip='If checked, apply background substraction',
-                        icon_checked_color=ThemeColor.GREEN)
+        self.add_action_group(
+            'background_subtract', 'Subtract Background', 'texture_minus', checkable=True,
+            tip='If checked, apply background substraction',
+            icon_checked_color=ThemeColor.GREEN,
+            secondary_actions=[
+                {'short_name': 'background_snap', 'name': 'Snap Background', 'icon_name': 'background_replace',
+                 'tip': 'Take a snapshot a set it as background'},
+            ])
 
     def connect_things(self):
         self._connect_common_actions()
@@ -193,6 +206,10 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.connect_action('snap', lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.SNAP, )))
         self.connect_action('reset_live', lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.RESET_LIVE)))
         self.connect_action('save_current', lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.SAVE_CURRENT, )))
+        self.connect_action('continuous_save',
+                            lambda checked: self.command_sig.emit(ThreadCommand(UiToMainViewer.DO_SAVE, checked)))
+        self.connect_action('new_file', lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.SAVE_NEW, )))
+        self.connect_action('browse_file', lambda: self.command_sig.emit(ThreadCommand(UiToMainViewer.OPEN, )))
 
         self.selector.module_changed.connect(self._detector_changed)
         self.connect_action('background_subtract',

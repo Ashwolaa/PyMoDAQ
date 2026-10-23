@@ -165,6 +165,12 @@ class DAQ_Viewer(ParameterControlModule):
         self.settings.child('main_settings', 'DAQ_type').setValue(self._detector.daq_type.name)
         self.settings.child('main_settings', 'detector_type').setValue(self._detector.module_name)
 
+        # These are now driven from the toolbar's Continuous Save group (see
+        # DAQ_Viewer_UI.setup_actions): hide the redundant settings-tree entries rather
+        # than leaving two disconnected entry points for the same actions.
+        for name in ('do_save', 'new_file', 'show_file', 'custom_name'):
+            self.settings.child('saver_settings', name).setOpts(visible=False)
+
         self._grabing: bool = False
         self._do_bkg: bool = False
         self._take_bkg: bool = False
@@ -340,6 +346,9 @@ class DAQ_Viewer(ParameterControlModule):
                 * snap
                 * detector_changed
                 * save_current
+                * do_save
+                * save_new
+                * open
                 * do_bkg
                 * take_bkg
                 * viewers_changed
@@ -356,6 +365,12 @@ class DAQ_Viewer(ParameterControlModule):
             self.reset_live_averaging()
         elif cmd.command == UiToMainViewer.SAVE_CURRENT:
             self.save_current()
+        elif cmd.command == UiToMainViewer.DO_SAVE:
+            self.settings.child('saver_settings', 'do_save').setValue(cmd.attribute)
+        elif cmd.command == UiToMainViewer.SAVE_NEW:
+            self.new_continuous_save_file()
+        elif cmd.command == UiToMainViewer.OPEN:
+            self.browse_continuous_save_file()
         elif cmd.command == UiToMainViewer.DETECTOR_CHANGED:
             if isinstance(cmd.attribute, SelectedModule):
                 self.detector_changed_from_ui(cmd.attribute)
@@ -546,6 +561,28 @@ class DAQ_Viewer(ParameterControlModule):
                 self._h5saver_continuous.close()
             except Exception as e:
                 self.logger.exception(str(e))
+
+    def new_continuous_save_file(self):
+        """ Force the continuous-saving pipeline to start a fresh h5 file.
+
+        Triggered from the toolbar's Continuous Save group ('New file' entry).
+        """
+        if self._h5saver_continuous is None or not self._h5saver_continuous.settings['do_save']:
+            self.update_status('Continuous saving is not active: enable it before starting a new file')
+            return
+        self._h5saver_continuous.close_file()
+        self._h5saver_continuous.init_file(update_h5=True)
+        self.settings.child('saver_settings', 'N_saved').setValue(0)
+
+    def browse_continuous_save_file(self):
+        """ Open the continuous-saving h5 file (if any) in an H5Browser.
+
+        Triggered from the toolbar's Continuous Save group ('Browse file' entry).
+        """
+        if self._h5saver_continuous is None:
+            self.update_status('No continuous-save file yet: enable continuous saving first')
+            return
+        self._h5saver_continuous.show_file_content()
 
     def append_data(self, dte: DataToExport = None,
                     where: Union[Node, str] = None,
