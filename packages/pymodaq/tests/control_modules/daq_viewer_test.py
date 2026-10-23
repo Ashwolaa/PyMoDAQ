@@ -1,3 +1,4 @@
+import datetime
 import os
 from collections import OrderedDict
 import numpy as np
@@ -171,7 +172,32 @@ def test_continuous_save_toolbar_group_structure(ini_daq_viewer_ui):
 
     button = next(child for child in ui.toolbar.findChildren(QtWidgets.QToolButton)
                   if child.defaultAction() is ui.get_action('continuous_save'))
-    assert [a.text() for a in button.menu().actions()] == ['New file', 'Browse file']
+    assert [a.text() for a in button.menu().actions()] == [
+        'Save Current Data', 'New file', 'Browse file']
+
+    # Same icons H5Manager uses for these exact actions everywhere else in the app
+    assert not ui.get_action('new_file').icon().isNull()
+    assert not ui.get_action('browse_file').icon().isNull()
+
+
+def test_continuous_save_path_feedback(ini_daq_viewer_without_ui, tmp_path):
+    """Enabling/renewing continuous saving must give visible, lasting confirmation of
+    the current file: synced into the settings-tree 'h5file:' entry, the toolbar
+    button's tooltip, and a status log line - not just silently happen on disk."""
+    prog, qtbot = ini_daq_viewer_without_ui
+
+    assert prog.settings['saver_settings', 'current_h5_file'] == ''
+
+    prog.setup_continuous_saving(init=True)
+    prog._h5saver_continuous.settings.child('base_path').setValue(str(tmp_path))
+    prog._h5saver_continuous.settings.child('do_save').setValue(True)
+
+    current_path = prog.settings['saver_settings', 'current_h5_file']
+    assert current_path != ''
+    assert str(tmp_path) in current_path
+
+    prog._h5saver_continuous.settings.child('do_save').setValue(False)
+    assert prog.settings['saver_settings', 'current_h5_file'] == ''
 
 
 def test_background_toolbar_group_structure(ini_daq_viewer_ui):
@@ -210,3 +236,37 @@ def test_process_ui_cmds_do_save_save_new_open(ini_daq_viewer_without_ui, tmp_pa
 
     prog.process_ui_cmds(ThreadCommand(UiToMainViewer.DO_SAVE, False))
     assert prog.settings['saver_settings', 'do_save'] is False
+
+
+def test_save_current_defaults_to_dated_folder_with_prefilled_name(
+        ini_daq_viewer_without_ui, tmp_path, monkeypatch):
+    """save_current's dialog should default into today's dataset folder (not the bare
+    base path), with a timestamped .h5 name already filled in and the extension enforced."""
+    prog, qtbot = ini_daq_viewer_without_ui
+    prog._data_to_save_export = None
+
+    config['data', 'data_saving', 'h5file', 'save_path'] = str(tmp_path)
+
+    captured = {}
+
+    def fake_select_file(start_path=None, save=True, ext=None, filter=None,
+                         force_save_extension=False):
+        captured.update(start_path=start_path, filter=filter,
+                        force_save_extension=force_save_extension)
+        return ''  # simulate the user cancelling, so no actual save/grab is attempted
+
+    monkeypatch.setattr(daqvm, 'select_file', fake_select_file)
+
+    prog.save_current()
+
+    today = datetime.date.today()
+    expected_dir = tmp_path / str(today.year) / today.strftime('%Y%m%d')
+    assert captured['start_path'].parent == expected_dir
+    assert captured['start_path'].name.startswith('Data_')
+    assert captured['start_path'].suffix == '.h5'
+    assert captured['filter'] == 'HDF5 files (*.h5)'
+    assert captured['force_save_extension'] is True
+    assert expected_dir.is_dir()
+
+    # Cancelling must not leave save-in-progress state set
+    assert prog._do_save_data is False

@@ -178,15 +178,18 @@ class DAQ_Viewer_UI(ControlModuleUI, ViewerDispatcher):
         self.add_action('show_graphs', 'ShowGraphs', 'bid_landscape', 'Show/Hide the Graphs Area',
                         checkable=True, icon_checked='bid_landscape_disabled',
                         icon_color=ThemeColor.GREEN, icon_checked_color=ThemeColor.RED)
-        self.add_action('save_current', 'Save Current Data', 'save_as', "Save Current Data")
         self.add_action_group(
             'continuous_save', 'Continuous Save', 'save', checkable=True,
             tip='Toggle continuous saving of grabbed/snapped data',
             icon_checked_color=ThemeColor.GREEN,
             secondary_actions=[
-                {'short_name': 'new_file', 'name': 'New file', 'icon_name': 'NewFile',
+                {'short_name': 'save_current', 'name': 'Save Current Data', 'icon_name': 'save_as',
+                 'tip': 'Save Current Data'},
+                # Same icons H5Manager uses for these exact actions everywhere else
+                # (DAQScan, DAQ_Logger, Optimizer, Ramping), for visual consistency.
+                {'short_name': 'new_file', 'name': 'New file', 'icon_name': 'add_circle',
                  'tip': 'Start a fresh file for continuous saving'},
-                {'short_name': 'browse_file', 'name': 'Browse file', 'icon_name': 'Open',
+                {'short_name': 'browse_file', 'name': 'Browse file', 'icon_name': 'folder_data',
                  'tip': 'Open the current continuous-save file in an H5Browser'},
             ])
         self.toolbar.addSeparator()

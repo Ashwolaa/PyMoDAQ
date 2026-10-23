@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC
 from importlib import import_module
 
+import datetime
 import os
 from pathlib import Path
 import sys
@@ -526,10 +527,27 @@ class DAQ_Viewer(ParameterControlModule):
         self.update_status("Timeout occurred", log_type="log")
 
     def save_current(self):
-        """Save current data into a h5file"""
+        """Save current data into a h5file.
+
+        Defaults the save dialog to today's dataset folder (``base_path/<year>/<YYYYMMDD>/``,
+        the same dated layout used everywhere else saving happens, instead of the bare
+        base path) with a timestamped filename already filled in, and restricts/forces
+        the .h5 extension.
+        """
         self._do_save_data = True
-        start_path = self._save_file_pathname or config('data', 'data_saving', 'h5file', 'save_path')
-        self._save_file_pathname = select_file(start_path=start_path, save=True, ext='h5')
+        base_path = Path(config('data', 'data_saving', 'h5file', 'save_path'))
+        today = datetime.date.today()
+        year_path = H5Saver.find_part_in_path_and_subpath(base_path, part=str(today.year), create=True)
+        day_path = H5Saver.find_part_in_path_and_subpath(year_path, part=today.strftime('%Y%m%d'), create=True)
+        default_name = datetime.datetime.now().strftime('Data_%Y%m%d_%H_%M_%S.h5')
+
+        pathname = select_file(start_path=day_path / default_name, save=True, ext='h5',
+                               filter='HDF5 files (*.h5)', force_save_extension=True)
+        if not pathname:
+            self._do_save_data = False
+            self.update_status('Save cancelled')
+            return
+        self._save_file_pathname = pathname
 
         self._save_export_data(self._data_to_save_export)
 
@@ -546,6 +564,7 @@ class DAQ_Viewer(ParameterControlModule):
             self.settings.child('saver_settings', 'N_saved').setValue(0)
             self.module_and_data_saver.h5saver = self._h5saver_continuous
             self._h5saver_continuous.init_file(update_h5=True)
+            self._report_continuous_save_file()
 
             self.module_and_data_saver = module_saving.DetectorTimeSaver(self)
             self.module_and_data_saver.h5saver = self._h5saver_continuous
@@ -561,6 +580,7 @@ class DAQ_Viewer(ParameterControlModule):
                 self._h5saver_continuous.close()
             except Exception as e:
                 self.logger.exception(str(e))
+            self._report_continuous_save_file(active=False)
 
     def new_continuous_save_file(self):
         """ Force the continuous-saving pipeline to start a fresh h5 file.
@@ -573,6 +593,7 @@ class DAQ_Viewer(ParameterControlModule):
         self._h5saver_continuous.close_file()
         self._h5saver_continuous.init_file(update_h5=True)
         self.settings.child('saver_settings', 'N_saved').setValue(0)
+        self._report_continuous_save_file()
 
     def browse_continuous_save_file(self):
         """ Open the continuous-saving h5 file (if any) in an H5Browser.
@@ -583,6 +604,28 @@ class DAQ_Viewer(ParameterControlModule):
             self.update_status('No continuous-save file yet: enable continuous saving first')
             return
         self._h5saver_continuous.show_file_content()
+
+    def _report_continuous_save_file(self, active: bool = True):
+        """ Give the user visible, lasting confirmation of what continuous saving is doing.
+
+        Pressing 'do_save'/'New file' gave no feedback at all: the file was created
+        silently, so the only way to tell it had worked was to go hunting on disk. This
+        logs the current path, mirrors it into the (already existing but never synced)
+        'h5file:' settings-tree entry, and keeps it in the toolbar button's tooltip for
+        an at-a-glance check without opening the settings tree.
+        """
+        pathname = (self._h5saver_continuous.settings['current_h5_file']
+                   if active and self._h5saver_continuous is not None else '')
+        self.settings.child('saver_settings', 'current_h5_file').setValue(pathname)
+
+        if active:
+            self.update_status(f'Continuous saving to: {pathname}')
+            tip = f'Toggle continuous saving (current file: {pathname})'
+        else:
+            tip = 'Toggle continuous saving of grabbed/snapped data'
+
+        if self.ui is not None:
+            self.ui.get_action('continuous_save').setToolTip(tip)
 
     def append_data(self, dte: DataToExport = None,
                     where: Union[Node, str] = None,
