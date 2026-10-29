@@ -12,6 +12,80 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 * a modular architecture to easily integrate new instruments in your setup
 * ... and many more features!
 
+.. grid:: 1 2 3 3
+   :gutter: 3
+   :class-container: pmd-landing-grid
+
+   .. grid-item-card:: Get Started
+
+      Install PyMoDAQ and run your first acquisition in a few minutes.
+
+      +++
+
+      .. button-ref:: quick_start
+         :ref-type: ref
+         :color: primary
+         :outline:
+         :expand:
+
+         Quick Start
+
+   .. grid-item-card:: User Guide
+
+      Control modules, viewers, extensions, configuration, scripting, and the data model.
+
+      +++
+
+      .. button-ref:: user_guide
+         :ref-type: ref
+         :color: primary
+         :outline:
+         :expand:
+
+         User's Guide
+
+   .. grid-item-card:: Developer Guide
+
+      Write an instrument plugin or extension, or contribute to PyMoDAQ's core.
+
+      +++
+
+      .. button-ref:: /developer
+         :ref-type: doc
+         :color: primary
+         :outline:
+         :expand:
+
+         Developer's Guide
+
+   .. grid-item-card:: API Reference
+
+      The full API, generated from the source code docstrings.
+
+      +++
+
+      .. button-ref:: library_reference
+         :ref-type: ref
+         :color: primary
+         :outline:
+         :expand:
+
+         API Reference
+
+   .. grid-item-card:: About/Community
+
+      Project info, changelogs, lab stories, and the PyMoDAQ ecosystem.
+
+      +++
+
+      .. button-ref:: about_community
+         :ref-type: ref
+         :color: primary
+         :outline:
+         :expand:
+
+         About/Community
+
 .. raw:: html
 
    <div style="text-align: center">
@@ -25,26 +99,18 @@ French version `here`_
 
 .. _here: https://youtu.be/TrRy6HL3h3c
 
+Community and training
+-----------------------
+
+PyMoDAQ is maintained by a growing community of experimental physicists, and training sessions and
+gatherings of the community are organized every year.
 
 .. figure:: /image/JT_Pymodaq_2025.png
    :alt: Pymodaq days
+   :width: 500
 
-   The 43 people attending the last PyMoDAQ days in Montpellier. This three days workshop allowed multiple discussions
-   on realisations, instrumentations, new and future features! See you in october 2026 for the nex PyMoDAQ Days in Orsay
-
-
-
-   .. _training:
-
-Next training sessions
-----------------------
-
-Training sessions and gathering of the community are organized every year.
-
-.. figure:: /image/flyer_pymodaq.png
-   :alt: Flyer_femto
-
-   Training sessions announcement and PyMoDAQ's days
+   The 43 people attending the last PyMoDAQ days in Montpellier. See you in october 2026 for the next
+   PyMoDAQ Days in Orsay!
 
 .. note::
    * Training session in Gif sur Yvette, France, 3-7 march 2026, `CNRS Formation Entreprise`_
@@ -54,48 +120,6 @@ Training sessions and gathering of the community are organized every year.
 .. _CNRS Formation Entreprise: https://cnrsformation.cnrs.fr/liste-stages-mc-PyMoDAq.html
 
 .. _Registration are open!: https://jt-pymodaq26.sciencesconf.org/index
-
-
-Overview
---------
-
-PyMoDAQ is an advanced user interface to control and synchronize detectors and actuators.
-Each of these have their independent interface called respectively :ref:`DAQ Viewer <DAQ_Viewer_module>` and
-:ref:`DAQ Move <DAQ_Move_module>` *control modules*.
-
-Detectors and actuators can be wrapped together in a :ref:`Dashboard_module` which implements a particular experimental
-setup.
-The Dashboard has functionalities to fully configure
-all its detectors and actuators and
-save their configurations in a :term:`experiment` file that will, at startup, load and initialize all modules.
-
-As soon as the Dashboard has been configured, all the :ref:`Dashboard Extensions <extensions>` can be used to perform
-advanced and
-automated tasks on the detectors and actuators.
-
-* the :ref:`DAQ Scan <DAQ_Scan_module>` is the most common one. It allows to scan one or several actuators while
-  acquiring and saving data from the detectors. A very large class or experiments can be performed with this extension.
-* the :ref:`DAQ Logger <DAQ_Logger_module>` allows to log all the parameters of an experiment.
-* the :ref:`PID extension <PID_module>` allows to lock a parameter of the experiment with a feedback loop on the
-  actuators.
-
-... to introduce a few of them!
-
-.. _overview_submodules:
-
-.. figure:: /image/pymodaq_diagram.png
-   :alt: overview
-
-   PyMoDAQ's Dashboard and its extensions: DAQ Scan for automated acquisitions, DAQ Logger for data logging and many
-   other.
-
-PyMoDAQ is maintained by a growing community of experimental physicists, and already implemented on many experiments.
-
-By contributing to its development, you will learn the cutting edge tools of professional developers and start
-experiencing how efficient it is
-to code in a collaborative way!
-
-Let’s go for a :ref:`quick_start`!
 
 Contact
 -------
@@ -117,29 +141,34 @@ If you would like to get updated with the evolutions of the project, please subs
 .. toctree::
    :maxdepth: 1
    :caption: Get Started
+   :hidden:
 
    quick_start
 
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
+   :hidden:
 
    user
 
 .. toctree::
    :maxdepth: 2
    :caption: Developer Guide
+   :hidden:
 
    developer
 
 .. toctree::
    :maxdepth: 1
    :caption: API Reference
+   :hidden:
 
    api/api_doc
 
 .. toctree::
    :maxdepth: 1
    :caption: About/Community
+   :hidden:
 
    about_community
