@@ -12,11 +12,12 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 * a modular architecture to easily integrate new instruments in your setup
 * ... and many more features!
 
-.. grid:: 1 2 3 3
-   :gutter: 3
+.. grid:: 1 1 2 2
+   :gutter: 4
    :class-container: pmd-landing-grid
 
-   .. grid-item-card:: Get Started
+   .. grid-item-card:: :octicon:`rocket;1.8em;sd-text-primary` Get Started
+      :class-card: sd-p-3
 
       Install PyMoDAQ and run your first acquisition in a few minutes.
 
@@ -30,7 +31,8 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 
          Quick Start
 
-   .. grid-item-card:: User Guide
+   .. grid-item-card:: :octicon:`mortar-board;1.8em;sd-text-primary` User Guide
+      :class-card: sd-p-3
 
       Control modules, viewers, extensions, configuration, scripting, and the data model.
 
@@ -44,7 +46,8 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 
          User's Guide
 
-   .. grid-item-card:: Developer Guide
+   .. grid-item-card:: :octicon:`tools;1.8em;sd-text-primary` Developer Guide
+      :class-card: sd-p-3
 
       Write an instrument plugin or extension, or contribute to PyMoDAQ's core.
 
@@ -58,7 +61,8 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 
          Developer's Guide
 
-   .. grid-item-card:: API Reference
+   .. grid-item-card:: :octicon:`list-unordered;1.8em;sd-text-primary` API Reference
+      :class-card: sd-p-3
 
       The full API, generated from the source code docstrings.
 
@@ -72,7 +76,8 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 
          API Reference
 
-   .. grid-item-card:: About/Community
+   .. grid-item-card:: :octicon:`people;1.8em;sd-text-primary` About/Community
+      :class-card: sd-p-3
 
       Project info, changelogs, lab stories, and the PyMoDAQ ecosystem.
 
