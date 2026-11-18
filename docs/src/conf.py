@@ -193,13 +193,30 @@ html_theme = 'pydata_sphinx_theme'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
+# Version switcher: every published version reads the same switcher.json, the one built from dev, so a new release
+# branch only needs an entry added to docs/src/_static/switcher.json on dev. Local builds read their own copy.
+# On Read the Docs, "latest" builds the dev branch, so it is matched to the dev entry.
+_rtd_version = os.environ.get('READTHEDOCS_VERSION', 'dev')
 html_theme_options = {
     "logo": {
         # same image in both modes for now; swap in a real dark-mode variant later
         "image_light": "splash.png",
         "image_dark": "splash.png",
     },
+    "navbar_start": ["navbar-logo", "version-switcher"],
+    "switcher": {
+        "json_url": ("https://pymodaq.cnrs.fr/en/dev/_static/switcher.json" if os.environ.get('READTHEDOCS')
+                     else "_static/switcher.json"),
+        "version_match": 'dev' if _rtd_version == 'latest' else _rtd_version,
+    },
     "github_url": "https://github.com/PyMoDAQ/PyMoDAQ",
+    "icon_links": [
+        {
+            "name": "Discord",
+            "url": "https://discord.gg/mSrEwARwgm",
+            "icon": "fa-brands fa-discord",
+        },
+    ],
 }
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
