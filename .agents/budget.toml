@@ -1,0 +1,21 @@
+# Edited by a human. Initial values are guesses: set them from the pilot (see ledger.py summary).
+# The reset window of your Claude plan cannot be read from a session: copy it from claude.ai/settings/usage.
+
+[daily]
+cocoordinators = 1
+specialist_runs = 3
+prs_opened = 2
+runs = 1
+rd_share = 0.2            # fraction of the budget reserved for /optimize-research
+
+[plan]
+reset_time_utc = "00:00"  # (assumed) replace with your real reset time
+schedule_after_reset_minutes = 30
+
+[safety]
+disable_after_consecutive_failures = 3
+disable_if_day_over_budget = true
+lower_caps_after_limit_hit = true   # next run uses ceil(cap * 0.7) after an outcome=limit
+
+[pilot]
+mode = "explain"          # explain | run : keep "explain" until the first pilot is reviewed

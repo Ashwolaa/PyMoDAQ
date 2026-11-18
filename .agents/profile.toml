@@ -1,0 +1,55 @@
+# Project profile: the only repo-specific file besides budget.toml.
+# Fields marked (detected) were read from a file; (assumed) are defaults a human should confirm.
+
+[project]
+name = "PyMoDAQ"
+fork = "Ashwolaa/PyMoDAQ"              # (assumed) confirmed by the human in conversation
+upstream = "PyMoDAQ/PyMoDAQ"           # (detected) git remote origin
+base_branch = "dev"                    # (detected) AGENTS.md
+mirror_branch = "dev"                  # mirrors upstream/dev, never receives agent commits
+integration_branch = "dev_agent"       # (assumed) agent PRs land here
+language = "python"                    # (detected)
+has_ui = true                          # (assumed) Qt / pyqtgraph
+
+[scopes]
+# dependency order (detected: AGENTS.md); a package never imports the ones after it
+order = ["pymodaq_utils", "pymodaq_data", "pymodaq_scripting", "pymodaq_gui", "pymodaq"]
+root = "packages"
+src = "packages/{scope}/src/{scope}"
+tests = "packages/{scope}/tests"
+# large scopes are planned slice by slice (detected: folder sizes)
+slices.pymodaq_gui = ["data", "h5modules", "managers", "parameter", "plotting", "utils"]
+slices.pymodaq = ["control_modules", "extensions", "launcher", "utils"]
+
+[checks]
+# run from the package directory, as CI does (detected: AGENTS.md)
+test = "cd packages/{scope} && pytest"
+layering = "pytest packages/pymodaq/tests/layering_test.py"
+lint_blocking = "flake8 packages/{scope} --count --select=E9,F63,F7,F82 --show-source --statistics"
+format_check = "ruff format --check {files}"
+qt_backends = ["pyqt6", "pyside6"]     # run Qt tests under both (QT_API / PYTEST_QT_API)
+qt_headless = "QT_QPA_PLATFORM=offscreen"
+
+[limits]
+pr_max_changed_lines = 300             # (assumed)
+handoff_max_lines = 40
+plan_expiry_days = 14
+
+[tools]
+# scanners agents may call (installed on demand; missing ones are reported, not faked)
+scanners = ["ruff", "vulture", "jscpd", "radon", "mutmut", "coverage", "diff-cover", "import-linter", "pyinstrument"]
+repo_tools = ["check_plugin", "check_extension"]
+
+[specialists]
+enabled = ["hygiene", "test-quality", "refactor", "uiux", "docs"]
+later = ["api-compat", "perf-threading", "backport"]
+
+[hard_rules]
+# from AGENTS.md (detected)
+1 = "Never remove or rename a public name used by external plugins without a shim + deprecation_msg; see docs/src/developer_folder/legacy_to_current.rst"
+2 = "Never delete or weaken a test without a justification and a coverage diff approved by decider-test-change"
+3 = "Never edit generated files directly: README.rst (edit README.rst.tpl), legacy_to_current.rst (run docs/legacy_to_current.py)"
+4 = "Push only to your own agent branch"
+5 = "Do not reformat files you do not otherwise change"
+6 = "Qt only through qtpy; status colours only through StatusPalette; config defaults through pymodaq_utils.config"
+7 = "Code must keep passing packages/pymodaq/tests/layering_test.py"
