@@ -1,0 +1,6 @@
+/* Read the Docs injects its own version menu (the flyout, bottom right) in every hosted page. Pages built with this
+   theme already have the version switcher in the navbar, so hide the flyout here; versions built with the older theme
+   keep it, being their only version menu. */
+readthedocs-flyout {
+  display: none;
+}
