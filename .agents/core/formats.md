@@ -5,7 +5,15 @@
 
 ## ledger.jsonl (append via `scripts/ledger.py add`)
 `run_id, date, command, scope, mode (explain|run), model_tier, tokens_in, tokens_out, specialist_runs, prs_opened,
-outcome (ok|failed|limit|budget), note`. Token figures come from the session; write `null` if unknown, never guess.
+outcome (ok|failed|limit|budget), note`, plus, when logged with `--session current --since <START>`: `session_id,
+started, ended, minutes, tokens_cache_read, requests, tool_calls, out_by_agent` (output tokens per agent type).
+`tokens_in` = uncached input + cache writes. Figures are measured by `scripts/usage.py` from the local transcripts
+(main session and its sub-agents); write `null` if unknown (e.g. cloud runs), never guess.
+
+## Plan quota
+Not readable as a number by a session. `usage.py snapshots` lists the `/usage` readings (session %, week %, reset
+times) and limit hits found in the transcripts; `usage.py calibrate` turns two readings of the same weekly window
+into tokens per week-%. Budget caps in `budget.toml` are set from these figures, not from guesses.
 
 ## plans/<date>-<scope>.md
 Header (scope, base commit, date) then one block per task:

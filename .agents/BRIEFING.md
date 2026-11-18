@@ -49,24 +49,29 @@ plugin for any GitHub repository.
 - Rotation (planning): dependency order utils, data, scripting, gui (6 slices), pymodaq (4 slices).
 
 ## State
-Step 1 (skeleton) is built: 6 commands, 22 agents, `.agents/` core docs, `profile.toml`, `budget.toml`, scripts
-`ledger.py`, `registry.py`, `budget.py`, `sync_branches.sh`, plan/handoff templates. The three Python scripts were
-tested; commands and agents have never been run. `sync_branches.sh` only had a syntax check.
-Nothing has been pushed: the original session could not push (403, no GitHub App access on `PyMoDAQ/PyMoDAQ`, and
-the fork could not be attached because a repo with the same name was already checked out).
+- Step 1 done (2026-11-18): fork `dev` force-reset to `upstream/dev` (it had drifted: merge + README-bot commits);
+  `dev_agent` created from it with the skeleton and pushed; label `agent-made` created. The fork's "Generate
+  README.rst from templates" workflow is disabled (it committed to every pushed branch). Local worktree for
+  `dev_agent`: `../PyMoDAQ-dev-agent`; run `sync_branches.sh` from there.
+- Metrics (owner: "measure first"): `scripts/usage.py` measures tokens from the local transcripts (all projects,
+  sub-agents included, one count per request), lists `/usage` readings and limit hits, and calibrates tokens per
+  week-%. `ledger.py add --session current --since <START>` fills token figures; every command now notes START.
+  `scripts/pr_stats.py` gives PR size vs time-to-merge. Weekly limit resets Sunday 00:00 Europe/Paris (seen in
+  transcripts); only one `/usage` reading exists so far (2026-11-17: week 33%).
+- Commands and agents have still never been run. Cloud runs leave no local transcript (tokens null there).
 
 ## Next (in order)
-1. Make sure this work is on `Ashwolaa/PyMoDAQ` (apply the patch, or re-create from this briefing), on a branch
-   based on `dev`, then create `dev_agent` and the `agent-made` label.
+1. Calibrate: owner runs `/usage`, then the pilot, then `/usage` again, with nothing else using the plan.
 2. Pilot: `/optimize-plan pymodaq_utils --explain`; install missing scanners first (`vulture`, `jscpd`, `radon`,
-   `mutmut`, `import-linter`; ruff/coverage may exist). Record tokens in the ledger only if known.
-3. Review the pilot with the owner, set caps in `budget.toml` (real reset time), then one real hygiene run, then
-   scheduling.
+   `mutmut`, `import-linter`; ruff is not installed in this WSL env). `usage.py calibrate` afterwards.
+3. Review the pilot with the owner, set caps in `budget.toml` from the calibration, then one real hygiene run,
+   then scheduling.
 4. Add API/compat, perf/threading, backport specialists; tool-building track; R&D; committee runs.
 5. Extract the plugin and build `/optimize-init`.
 
 ## Open (ask the owner)
-- Real reset time and desired daily caps (`budget.toml`; the daily `runs = 1` cap prevents a plan and a run on the
+- Desired daily caps, once calibrated (`budget.toml`; the daily `runs = 1` cap prevents a plan and a run on the
   same day).
-- Confirm the assumed fields in `profile.toml` (fork name, `dev_agent`, 300-line cap).
+- PR size cap: owner unsure about 300. Upstream median 89 / p75 262 lines; the owner's own PRs merge in ~1 day
+  below 150 lines and 3-12 days above. Re-measure on `agent-made` PRs with `pr_stats.py --label agent-made`.
 - Whether sub-agents can spawn sub-agents here (unverified; flat execution is the baseline).
