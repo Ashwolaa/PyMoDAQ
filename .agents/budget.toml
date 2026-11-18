@@ -5,7 +5,7 @@
 cocoordinators = 1
 specialist_runs = 3
 prs_opened = 2
-runs = 1
+runs = 999            # exploration: effectively unlimited (was 1)
 rd_share = 0.2            # fraction of the budget reserved for /optimize-research
 
 [plan]

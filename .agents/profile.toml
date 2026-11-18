@@ -20,6 +20,8 @@ tests = "packages/{scope}/tests"
 # large scopes are planned slice by slice (detected: folder sizes)
 slices.pymodaq_gui = ["data", "h5modules", "managers", "parameter", "plotting", "utils"]
 slices.pymodaq = ["control_modules", "extensions", "launcher", "utils"]
+# scopes with Qt UI code: advisor-uxui and spec-uiux only run on these
+ui = ["pymodaq_gui", "pymodaq"]
 
 [checks]
 # run from the package directory, as CI does (detected: AGENTS.md)
@@ -43,6 +45,8 @@ plan_expiry_days = 14
 # scanners agents may call (installed on demand; missing ones are reported, not faked)
 scanners = ["ruff", "vulture", "jscpd", "radon", "mutmut", "coverage", "diff-cover", "import-linter", "pyinstrument"]
 repo_tools = ["check_plugin", "check_extension"]
+# machine-specific: where the scanners live (system python is externally managed; only `python3` exists)
+env = "export PATH=$HOME/.venvs/optimize-agents/bin:$HOME/.npm-global/bin:$PATH"
 
 [specialists]
 enabled = ["hygiene", "test-quality", "refactor", "uiux", "docs"]

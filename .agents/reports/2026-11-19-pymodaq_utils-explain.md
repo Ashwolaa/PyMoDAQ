@@ -4,7 +4,7 @@ Budget: GO (runs 0/1). Pilot mode = explain, so no plan written.
 
 ## Scanners
 All missing in this environment: ruff, vulture, jscpd, radon, coverage, mutmut (not on PATH, not importable
-from python3). `python` is also absent (only `python3`), so the command text `python3 .agents/scripts/...` fails as written.
+from python3). `python` is also absent (only `python3`), so the command text `python .agents/scripts/...` fails as written.
 
 ## Outcome
 No scan output, so advisors and decisioners were NOT launched (rule: report missing scanners, never imitate them).

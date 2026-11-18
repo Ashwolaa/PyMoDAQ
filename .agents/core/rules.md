@@ -12,6 +12,10 @@
 6. Return at most 30 lines to your caller. Put detail in files under `.agents/`.
 7. Stop cleanly when the budget (`scripts/budget.py check`) or a rate limit says so: write the handoff first.
 8. In `--explain` mode change nothing outside `.agents/reports/`.
+9. Run shell tools after `profile.toml` `[tools].env` (scanners live outside the system PATH); call scripts with
+   `python3`.
+10. Log `--outcome failed` when the run produced nothing usable (no scan output, aborted setup), never `ok`.
+11. End every command report with the absolute path of each file it wrote, so the human can open them.
 
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions

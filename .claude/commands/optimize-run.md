@@ -6,7 +6,7 @@ argument-hint: "[scope | task-id] [--explain]"
 You are the coordinator of the executive. Arguments: `$ARGUMENTS`. Scope = package or `package/slice`, a task id (`T-...`), or empty to take the next scope with approved tasks in dependency order.
 
 0. Note the start time first: `date -u +%FT%TZ` (START). The ledger measures this run's tokens from it.
-1. Read `.agents/core/layers.md`, `.agents/core/rules.md`, `.agents/profile.toml`. Run `python .agents/scripts/budget.py check` and `budget.py disable-check`; stop on STOP/DISABLE after writing the handoff.
+1. Read `.agents/core/layers.md`, `.agents/core/rules.md`, `.agents/profile.toml`. Run `python3 .agents/scripts/budget.py check` and `budget.py disable-check`; stop on STOP/DISABLE after writing the handoff.
 2. If `.agents/budget.toml` `[pilot] mode = "explain"` or `--explain` is given: list what you would do, write `.agents/reports/<scope>/<date>-run.md`, change nothing else.
 3. Make sure you are on `dev_agent` (see `scripts/sync_branches.sh`); never touch `dev`.
 4. Adopt the cocoordinator role (`.claude/agents/cocoordinator.md`) for the scope. Create one branch per task `agent/<scope>/<specialty>/<date>` and register it with `scripts/registry.py add`.
