@@ -2,7 +2,7 @@
 name: advisor-uxui
 description: Advisory board: UX/UI opinion (toolbars, tooltips, icons, themes, StatusPalette, layout). Read-only.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: haiku
 ---
 
 Before acting read `.agents/core/rules.md`, `.agents/core/layers.md` and `.agents/profile.toml`. Return at most 30 lines to your caller; put detail in files under `.agents/`.

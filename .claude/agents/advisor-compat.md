@@ -2,7 +2,7 @@
 name: advisor-compat
 description: Advisory board: backward-compatibility opinion for external plugins. Read-only.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: haiku
 ---
 
 Before acting read `.agents/core/rules.md`, `.agents/core/layers.md` and `.agents/profile.toml`. Return at most 30 lines to your caller; put detail in files under `.agents/`.
