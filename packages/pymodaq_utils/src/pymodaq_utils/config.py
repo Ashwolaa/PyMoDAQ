@@ -1,6 +1,5 @@
 import atexit
 import threading
-from abc import abstractproperty
 from collections.abc import Iterable
 
 import copy
@@ -8,9 +7,8 @@ import functools
 from functools import cached_property
 from os import environ
 import sys
-import datetime
 from pathlib import Path
-from typing import Optional, Union, Dict, TypeVar, Any, List, TYPE_CHECKING, Callable, Type
+from typing import Optional, Union, Dict, TypeVar, Any, Callable, Type
 from typing import Iterable as IterableType
 
 from pymodaq_utils import warnings
@@ -19,8 +17,6 @@ from fasteners import ReaderWriterLock
 
 import toml
 import logging
-if TYPE_CHECKING:
-    from pymodaq_gui.parameter import Parameter
 
 
 USER = environ.get('USERNAME' if sys.platform == 'win32' else 'USER', 'unknown_user')
