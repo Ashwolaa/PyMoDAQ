@@ -7,7 +7,7 @@ toml
 numpydoc
 sphinx-datatables
 pyside6
-sphinx-design
+sphinx-design>=0.8  # card-footer directive
 sphinx-llms-txt
 myst-parser
 sphinxcontrib-images

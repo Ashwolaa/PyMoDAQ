@@ -21,75 +21,75 @@ actuator hardware to go straight to the data acquisition of interest. It provide
 
       Install PyMoDAQ and run your first acquisition in a few minutes.
 
-      +++
+      .. card-footer::
 
-      .. button-ref:: quick_start
-         :ref-type: ref
-         :color: primary
-         :outline:
-         :expand:
+         .. button-ref:: quick_start
+            :ref-type: ref
+            :color: primary
+            :outline:
+            :expand:
 
-         Quick Start
+            Quick Start
 
    .. grid-item-card:: :octicon:`mortar-board;1.8em;sd-text-primary` User Guide
       :class-card: sd-p-3
 
       Control modules, viewers, extensions, configuration, scripting, and the data model.
 
-      +++
+      .. card-footer::
 
-      .. button-ref:: user_guide
-         :ref-type: ref
-         :color: primary
-         :outline:
-         :expand:
+         .. button-ref:: user_guide
+            :ref-type: ref
+            :color: primary
+            :outline:
+            :expand:
 
-         User's Guide
+            User's Guide
 
    .. grid-item-card:: :octicon:`tools;1.8em;sd-text-primary` Developer Guide
       :class-card: sd-p-3
 
       Write an instrument plugin or extension, or contribute to PyMoDAQ's core.
 
-      +++
+      .. card-footer::
 
-      .. button-ref:: /developer
-         :ref-type: doc
-         :color: primary
-         :outline:
-         :expand:
+         .. button-ref:: /developer
+            :ref-type: doc
+            :color: primary
+            :outline:
+            :expand:
 
-         Developer's Guide
+            Developer's Guide
 
    .. grid-item-card:: :octicon:`list-unordered;1.8em;sd-text-primary` API Reference
       :class-card: sd-p-3
 
       The full API, generated from the source code docstrings.
 
-      +++
+      .. card-footer::
 
-      .. button-ref:: library_reference
-         :ref-type: ref
-         :color: primary
-         :outline:
-         :expand:
+         .. button-ref:: library_reference
+            :ref-type: ref
+            :color: primary
+            :outline:
+            :expand:
 
-         API Reference
+            API Reference
 
    .. grid-item-card:: :octicon:`people;1.8em;sd-text-primary` About/Community
       :class-card: sd-p-3
 
       Project info, changelogs, lab stories, and the PyMoDAQ ecosystem.
 
-      +++
+      .. card-footer::
 
-      .. button-ref:: about_community
-         :ref-type: ref
-         :color: primary
-         :outline:
-         :expand:
+         .. button-ref:: about_community
+            :ref-type: ref
+            :color: primary
+            :outline:
+            :expand:
 
-         About/Community
+            About/Community
 
 .. raw:: html
 
