@@ -5,6 +5,8 @@
 #
 # Usage: .agents/runner/cycle.sh [--dry-run]        (from anywhere; works in the dev_agent worktree)
 # Env:   STOP_AT=85 (session window %), WEEK_MAX=90 (week %), MAX_STEPS=6, MODEL=sonnet
+# Each step starts only if its expected cost (runner/cost.py: median of measured steps of that kind, seeds until
+# then) keeps the session window under STOP_AT and the week under WEEK_MAX; the real cost is recorded after it.
 # Stops on: worktree not clean / not on dev_agent, a /usage threshold, budget.py STOP or DISABLE, a usage limit,
 #           a step that makes no progress, or a sync conflict. Never pushes anything but dev_agent and agent branches
 #           (the commands' own rules), never touches `dev` except the fast-forward mirror in sync_branches.sh.
@@ -26,9 +28,10 @@ guard() {
   clean || { log "STOP: worktree not clean or not on dev_agent: $(git branch --show-current) $(git status --porcelain | head -3 | tr '\n' ' ')"; return 1; }
   python3 .agents/scripts/budget.py disable-check >/dev/null || { log "STOP: budget.py disable-check: $(python3 .agents/scripts/budget.py disable-check)"; return 1; }
   [ $DRY -eq 1 ] && return 0
-  local u s w; u=$(reading); s=$(pct "$u" session); w=$(pct "$u" week); log "usage: $u"
-  [ -n "$s" ] && [ "$s" -ge "$STOP_AT" ] && { log "STOP: session window $s% >= $STOP_AT%"; return 1; }
-  [ -n "$w" ] && [ "$w" -ge "$WEEK_MAX" ] && { log "STOP: week $w% >= $WEEK_MAX%"; return 1; }
+  local u; u=$(reading); S=$(pct "$u" session); W_=$(pct "$u" week); log "usage: $u"
+  [ -n "$S" ] && [ -n "$W_" ] || { log "STOP: could not read /usage"; return 1; }
+  [ "$S" -ge "$STOP_AT" ] && { log "STOP: session window $S% >= $STOP_AT%"; return 1; }
+  [ "$W_" -ge "$WEEK_MAX" ] && { log "STOP: week $W_% >= $WEEK_MAX%"; return 1; }
   return 0
 }
 publish() {  # regenerate STATUS.md and push it with whatever the step left committed
@@ -56,10 +59,16 @@ for i in $(seq 1 "$MAX_STEPS"); do
     idle)   log "idle: nothing to do"; break ;;
     *)      log "STOP: unknown next step '$next'"; break ;;
   esac
-  [ $DRY -eq 1 ] && { log "dry-run: would run: $prompt"; break; }
+  units=1; [ "$1" = merge ] && units=$(python3 .agents/scripts/status.py pending | wc -l)
+  if [ $DRY -eq 1 ]; then log "dry-run: would run: $prompt (expected cost: $(python3 .agents/runner/cost.py estimate "$1" --units "$units"))"; break; fi
   [ "$i" -gt 1 ] && { guard || break; }
+  fit=$(python3 .agents/runner/cost.py fits "$1" --units "$units" --session "$S" --week "$W_" --stop-at "$STOP_AT" --week-max "$WEEK_MAX"); fok=$?
+  log "  $fit"; [ $fok -eq 0 ] || { log "STOP: next step would not fit the quota"; break; }
+  S0=$S; W0=$W_
   python3 .agents/runner/step.py --model "$MODEL" --out "$LOGDIR/$i-$1.txt" -- "$prompt" >> "$LOGDIR/steps.jsonl"; rc=$?
   log "  exit $rc, log $LOGDIR/$i-$1.txt"
+  u=$(reading); S=$(pct "$u" session); W_=$(pct "$u" week)
+  [ -n "$S" ] && [ -n "$W_" ] && python3 .agents/runner/cost.py record "$1" "$units" "$S0" "$W0" "$S" "$W_" && log "  cost: session +$((S - S0))%, week +$((W_ - W0))% (after: $u)"
   [ $rc -eq 3 ] && { log "STOP: usage limit hit"; publish "$next (limit)"; break; }
   clean || { log "STOP: the step left the worktree dirty or off dev_agent"; break; }
   publish "$next"

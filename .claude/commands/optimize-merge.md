@@ -5,24 +5,33 @@ argument-hint: "[scope | task-id] [--explain]"
 
 You are the merge coordinator. Arguments: `$ARGUMENTS`. Scope = package, a task id (`T-...`), or empty for every candidate.
 A PR is opened only for a branch that pr-reviewer validated. Merges go into `dev_agent` only, never `dev`, never upstream.
+Every step goes through `scripts/merge.py`, which does or verifies it; your own job is to launch `pr-reviewer` and to
+report. Never do a step by hand that the script covers, never work around a refusal (rules.md 16), run everything in
+the foreground (rules.md 17).
 
-0. Note the start time first: `date -u +%FT%TZ` (START). Run id: `<date>-merge-<scope|task-id|all>`.
-1. Read `.agents/core/rules.md`, `.agents/core/layers.md`, `.agents/profile.toml`. Run `budget.py check --kind merge` and `budget.py disable-check`; stop on STOP/DISABLE. (This command launches no specialists: the `specialist_runs` cap does not apply.)
-2. `git switch dev_agent`, `git pull --ff-only origin dev_agent`. The worktree must be clean; if not, stop and say why.
-3. **Sync with GitHub.** For each registry row with status `open`, read `gh pr view <pr> -R <fork> --json state,mergedAt`: a PR the human merged -> `registry.py set-status --status merged` and `plan.py set-status <plan> <task> "done — PR #<n> merged by the human"`; a closed one -> `closed`.
-4. **Candidates**: registry rows with status `pushed` (new flow), or `open` whose PR is still a draft (opened before this command existed), filtered by the argument, oldest first. The task's plan is the file that holds its block (`grep -l "^## <task-id>" .agents/plans/*.md`; for the `pymodaq_utils` merged plan ignore the experiment plans). Skip a task the plan marks `blocked`, except `blocked — CI red` and `blocked — conflicts`: those are retried (CI may have been flaky, `dev_agent` may have moved). With `--explain` or `[pilot] mode = "explain"`: list the candidates and what you would do, write `.agents/reports/<scope>/<date>-merge.md`, change nothing else.
-5. For each candidate, in order (before each review run `budget.py check --kind merge --this-run-reviews <reviews launched so far>`; STOP ends the loop):
-   a. **Rebase** on the current `dev_agent`: `git switch <branch>`, `git rebase dev_agent`. A conflict: `git rebase --abort`, `git switch dev_agent`, `plan.py set-status ... "blocked — conflicts with dev_agent, rerun the task"`, next candidate. Never resolve a conflict by hand. If the head changed: run `[checks]` and the scope's tests once per Qt backend (as optimize-run step 6), then `git push --force-with-lease origin <branch>` (your own agent branch only).
-   b. **CI on the branch**: a draft PR reruns its CI on push: `python3 .agents/scripts/ci.py pr --pr <n> --timeout 540`; a branch without a PR: `python3 .agents/scripts/ci.py run --branch <branch> --timeout 540`. In the foreground; exit 2 = still running: call it again (rules.md 17). Both rerun failed jobs once and compare what still fails with upstream/dev. Exit 0 = green. Exit 4 = green except failures upstream/dev has too: go on as green, run each printed `record:` line on `dev_agent` (it files the failure in `findings.jsonl` for the next `/optimize-plan`) and name the known failures in the plan status and PR body. Exit 1 = red: a failure upstream/dev does not have. Red: `blocked — CI red: <job>: <signature>`, then **go on with the next candidate**. Exit 2 (pending at timeout): leave it for the next run, next candidate.
-   c. `git switch dev_agent`. **Review**: launch the `pr-reviewer` agent with the task id, plan path and branch. It writes `.agents/reports/<scope>/<date>-pr-review-<task-id>-r<N>.md`, N = 1 + the number of existing review reports for that task (older ones may have no `-r` suffix: they count as r1). For N > 1 give it the previous report too, so it checks each listed finding was fixed.
-   d. Verdict `changes`: `plan.py set-status ... "blocked — review: <one line>"` (`/optimize-run <task-id>` reworks it, at most twice); the branch stays (`pushed`, or its draft stays a draft); next. Verdict `reject`: close the draft PR if any (`gh pr close <n> -c "<reason>"`), `registry.py set-status --status closed`, plan `blocked — rejected by review: <one line>`; next.
-   e. Verdict `approve`: for a branch without a PR first run `budget.py check --kind pr --this-run-prs <PRs created so far>`; STOP -> leave it `pushed`, plan `done — branch <b>, review approve, PR cap reached`, next. Otherwise **open the PR** (no draft) against `dev_agent` with the `agent-made` label: `gh pr create -R <fork> --base dev_agent --head <branch> --label agent-made --title "<task-id>: <title>"`, body = task block summary, the review summary line and findings, local test results, branch CI result, and `Agent-Run: <run-id>`. For an old draft: `gh pr ready <n> -R <fork>` and add the same text as a comment. `registry.py set-status --branch <b> --status open --pr <n>`. Wait for the PR's checks (mypy only runs on PRs): `python3 .agents/scripts/ci.py pr --pr <n> --timeout 540` (again on exit 2), same exit codes as in b. Red -> `blocked — PR CI red: <job>`, next.
-   f. **Gate**: `python3 .agents/scripts/merge_gate.py check --branch <b> --plan <plan> --task-id <id> --review <report>`.
-      AUTO-MERGE (exit 0): `gh pr merge <n> -R <fork> --merge` (a merge commit: /optimize-revert uses `git revert -m 1`; never squash or rebase), then `git pull --ff-only origin dev_agent`, `registry.py set-status --status merged`, plan `done — PR #<n> merged (auto: <gate line>)`. If the task block has a `finding:` line, `findings.py set-status --key <key> --status closed --task-id <id>`.
-      HUMAN (exit 1): leave the PR open for review, plan `done — PR #<n> open, awaiting the human: <gate reasons>`.
-   g. On `dev_agent`: `git add .agents && git commit -m "Log /optimize-merge <task-id> (PR #<n>: merged|awaiting human|blocked)"` and `git push origin dev_agent` **before** the next candidate, so the next GitHub merge and `git pull --ff-only` stay fast-forward.
-6. Overwrite `.agents/handoff/<scope>.md` (`<scope>` = the task's package even when the argument is a task id, rules.md 19) (<= 40 lines; Done = merged PRs, Blocked = review/conflict/CI blocks, Next step = the first PR waiting for the human). `ledger.py add --run-id <run-id> --command optimize-merge --scope <scope> --session current --since <START> --prs-opened <PRs created, not drafts made ready> --reviews <pr-reviewer launches> --outcome ok --note "<merged n, awaiting human n, blocked n>"`. Commit and push `dev_agent`.
-7. Report in <= 20 lines: one line per candidate (task, PR, verdict, merged / awaiting human with the reasons / blocked with the reason), then the paths of the files written.
+1. Read `.agents/core/rules.md`, `.agents/core/layers.md`, `.agents/profile.toml`. `budget.py disable-check`; stop on DISABLE.
+   `git switch dev_agent`, `git pull --ff-only origin dev_agent`; the worktree must be clean.
+2. `python3 .agents/scripts/merge.py sync` (PRs the human merged or closed). Then `merge.py candidates <argument>`.
+   With `--explain` or `[pilot] mode = "explain"`: list the candidates, write `.agents/reports/<scope>/<date>-merge.md`, stop.
+3. For each candidate, oldest first:
+   a. `merge.py start --branch <branch>`: budget check, rebase on `dev_agent` (a conflict blocks the task: go to f),
+      push if the head changed. It prints the run id and the review report path.
+   b. Only if start says the head changed: `git switch <branch>`, `task.py checks <run-id>` and
+      `task.py checks <run-id> --backend <b>` for each `[checks].qt_backends`, `git switch dev_agent`. A new failure:
+      stop this candidate (the task needs `/optimize-run` again) and go to f.
+   c. `merge.py ci <run-id>` (exit 2: call again). Red blocks the task: go to f.
+   d. Launch `pr-reviewer` with the task id, its plan, the branch and the report path from start (and the previous
+      report when start names one). Wait for it.
+   e. `merge.py decide <run-id>`: refuses unless the review really happened for this head; acts on the verdict
+      (changes / reject: task blocked or closed; approve: PR opened or the old draft marked ready, with a generated body).
+      If it opened or readied a PR: `merge.py gate <run-id>` (exit 2: call again): PR checks, then `merge_gate.py`:
+      auto-merge with a merge commit, or the PR stays open for the human with the reasons in the plan.
+   f. `merge.py close <run-id>`: ledger line, STATUS.md, commit and push `dev_agent`. Next candidate.
+4. Overwrite `.agents/handoff/<scope>.md` (<= 40 lines, `<scope>` = the package; Done = merged PRs, Blocked = review/
+   conflict/CI blocks, Next step = the first PR waiting for the human), commit it on `dev_agent` and push.
+5. Report in <= 20 lines: one line per candidate (task, PR, verdict, merged / awaiting human with the reasons / blocked
+   with the reason), then the paths of the files written.
 
-Never stop the loop to ask the human: a blocked candidate is recorded and the loop goes on; questions go in the report. Every exit (done, STOP, early stop) runs steps 6 and 7 first.
-Handle a rate-limit error by committing the state written so far on `dev_agent`, writing the handoff, logging `--outcome limit --session current --since <START>` and stopping.
+Never stop the loop to ask the human: a blocked candidate is recorded and the loop goes on; questions go in the report.
+A budget STOP from `merge.py start` ends the loop: write the handoff (step 4) and report.
+Handle a rate-limit error by closing the current run if it has an outcome, writing the handoff and stopping.
