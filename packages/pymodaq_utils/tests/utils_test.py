@@ -399,3 +399,51 @@ class TestArrays:
         stored = json.dumps(dict(module='numpy', type='ndarray', data=data))
 
         assert utils.JsonConverter.json2object(stored) == json.loads(stored)
+
+
+class TestRecursiveFindNoSharedDefault:
+    @staticmethod
+    def _make_tree(tmp_path):
+        (tmp_path / 'sub').mkdir()
+        (tmp_path / 'a.txt').write_text('hello\n')
+        (tmp_path / 'sub' / 'b.txt').write_text('x\nhello\n')
+
+    def test_extension_not_polluted(self, tmp_path):
+        self._make_tree(tmp_path)
+        expected = sorted([str(tmp_path / 'a.txt'), str(tmp_path / 'sub' / 'b.txt')])
+        assert sorted(utils.recursive_find_files_extension(tmp_path, 'txt')) == expected
+        assert sorted(utils.recursive_find_files_extension(tmp_path, 'txt')) == expected
+
+    def test_extension_appends_to_given_list(self, tmp_path):
+        self._make_tree(tmp_path)
+        given = ['start']
+        res = utils.recursive_find_files_extension(tmp_path, 'txt', given)
+        assert res is given
+        assert given[0] == 'start'
+        assert sorted(given[1:]) == sorted([str(tmp_path / 'a.txt'), str(tmp_path / 'sub' / 'b.txt')])
+
+    def test_files_not_polluted(self, tmp_path):
+        self._make_tree(tmp_path)
+        expected = sorted([tmp_path / 'a.txt', tmp_path / 'sub' / 'b.txt'])
+        assert sorted(utils.recursive_find_files(tmp_path, 'a')) == [tmp_path / 'a.txt']
+        assert sorted(utils.recursive_find_files(tmp_path, '')) == expected
+        assert sorted(utils.recursive_find_files(tmp_path, '')) == expected
+
+    def test_files_appends_to_given_list(self, tmp_path):
+        self._make_tree(tmp_path)
+        given = ['start']
+        utils.recursive_find_files(tmp_path, 'b', given)
+        assert given == ['start', tmp_path / 'sub' / 'b.txt']
+
+    def test_expr_not_polluted(self, tmp_path):
+        self._make_tree(tmp_path)
+        expected = sorted([[tmp_path / 'a.txt', 0, 'hello\n'], [tmp_path / 'sub' / 'b.txt', 1, 'hello\n']])
+        assert sorted(utils.recursive_find_expr_in_files(tmp_path, 'hello')) == expected
+        assert sorted(utils.recursive_find_expr_in_files(tmp_path, 'hello')) == expected
+
+    def test_expr_appends_to_given_list(self, tmp_path):
+        self._make_tree(tmp_path)
+        given = ['start']
+        utils.recursive_find_expr_in_files(tmp_path, 'hello', given)
+        assert given[0] == 'start'
+        assert len(given) == 3

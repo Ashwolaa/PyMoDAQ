@@ -441,11 +441,11 @@ def ensure_ndarray(data):
     return data
 
 
-def recursive_find_files_extension(ini_path, ext, paths=[]):
+def recursive_find_files_extension(ini_path, ext, paths=None):
     """Collect the paths of all files with the extension ``ext`` (without dot) below ``ini_path``
-
-    Note that ``paths`` is shared between calls when not given (mutable default): pass a new list.
     """
+    if paths is None:
+        paths = []
     with os.scandir(ini_path) as it:
         for entry in it:
             if os.path.splitext(entry.name)[1][1:] == ext and entry.is_file():
@@ -455,13 +455,14 @@ def recursive_find_files_extension(ini_path, ext, paths=[]):
     return paths
 
 
-def recursive_find_files(ini_path, exp='make_enum', paths=[],
+def recursive_find_files(ini_path, exp='make_enum', paths=None,
                          filters=['build']):
     """Collect the paths of all files below ``ini_path`` whose name (without extension) contains ``exp``
 
-    Paths containing one of the ``filters`` strings are skipped. As in
-    :func:`recursive_find_files_extension`, pass a new list as ``paths``.
+    Paths containing one of the ``filters`` strings are skipped.
     """
+    if paths is None:
+        paths = []
     for child in Path(ini_path).iterdir():
         if child.is_dir():
             recursive_find_files(child, exp, paths, filters)
@@ -472,16 +473,17 @@ def recursive_find_files(ini_path, exp='make_enum', paths=[],
     return paths
 
 
-def recursive_find_expr_in_files(ini_path, exp='make_enum', paths=[],
+def recursive_find_expr_in_files(ini_path, exp='make_enum', paths=None,
                                  filters=['.git', '.idea', '__pycache__', 'build', 'egg', 'documentation', '.tox'],
                                  replace=False, replace_str=''):
     """Search the text ``exp`` in the files below ``ini_path``
 
     Each match is appended to ``paths`` as ``[file path, line index, line]``. Paths containing one of the
     ``filters`` strings are skipped and unreadable files are ignored. If ``replace`` is True the matches
-    are replaced in the files by ``replace_str``. As in :func:`recursive_find_files_extension`, pass a new
-    list as ``paths``.
+    are replaced in the files by ``replace_str``.
     """
+    if paths is None:
+        paths = []
     for child in Path(ini_path).iterdir():
         if not any(filt in str(child) for filt in filters):
             if child.is_dir():
