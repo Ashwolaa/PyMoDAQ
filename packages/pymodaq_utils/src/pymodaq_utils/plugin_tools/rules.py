@@ -114,6 +114,11 @@ def use_color(mode: str = 'auto', stream=None) -> bool:
 
 
 class Severity(str, Enum):
+    """How serious a ``Finding`` is
+
+    ``ERROR`` is something broken, ``WARNING`` something suspicious, ``TODO`` something unfinished such as a
+    template placeholder.
+    """
     ERROR = 'error'
     WARNING = 'warning'
     TODO = 'todo'

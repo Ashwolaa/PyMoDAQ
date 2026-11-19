@@ -146,6 +146,26 @@ def get_set_local_dir(user=False) -> Path:
 
 
 def get_config_file(config_file_name: str, user=False) -> Path:
+    """Get the path of a toml configuration file in the ``config`` folder, creating the folder if needed
+
+    The file itself is neither created nor read. Its extension is replaced by ``.toml``.
+
+    Parameters
+    ----------
+    config_file_name: str
+        The name of the configuration file, with or without extension
+    user: bool
+        if False use the system-wide config folder, otherwise the user one
+
+    Returns
+    -------
+    Path
+        The path of the toml file
+
+    See Also
+    --------
+    get_set_config_dir
+    """
     return get_set_config_dir('config',user=user).joinpath(replace_file_extension(config_file_name, 'toml'))
 
 
@@ -266,7 +286,7 @@ def load_system_config_and_update_from_user(config_file_name: str):
 
 
 class ConfigError(Exception):
-    pass
+    """Raised when a path of keys does not exist in a configuration (see ``BaseConfig.__call__``)"""
 
 
 class ConfigSingleton(Singleton):
@@ -439,6 +459,13 @@ class CacheConfig(BaseConfig):
     _allow_direct_call: bool = True
 
 class GlobalConfig(metaclass=Singleton):
+    """Singleton registry of the configurations (``BaseConfig`` instances), indexed by name
+
+    Config classes are added with the ``register`` decorator. The key of an entry is the ``config_name`` of the
+    class, cut after its last ``config_`` if it contains one. A value is read with ``GlobalConfig()('name', 'section',
+    'entry')`` or ``GlobalConfig()['name', 'section', 'entry']``: the first key is the registered name, the other
+    ones are forwarded to that configuration. An empty key returns all the configurations as a dict.
+    """
     config_name: str = 'global'
     _register_lock: threading.Lock = threading.Lock()
 
