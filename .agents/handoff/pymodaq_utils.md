@@ -1,15 +1,19 @@
-# Handoff pymodaq_utils (optimize-merge 2026-11-19, T-pymodaq_utils-M07)
+# Handoff pymodaq_utils (optimize-run 2026-11-19, T-pymodaq_utils-M08 rework)
 ## Done
-- M07 (PR #9): rebased on dev_agent, branch CI green, pr-reviewer r2 approve, gate AUTO-MERGE, merged (merge commit).
-  Earlier: M09 (#12), M10 (#13) merged.
+- M08 reworked after review r1: six undocumented names removed from :members: (config, enums, logger, plugin_tools .rst).
+  Branch agent/pymodaq_utils/docs-api-pages/2026-11-19 rebased on dev_agent, force-with-lease pushed (7a0cc0008).
+  CI compile-doc.yml green: https://github.com/Ashwolaa/PyMoDAQ/actions/runs/44600195371. Layering 3 passed.
+  Earlier merged: M07 (#9), M09 (#12), M10 (#13).
 ## Blocked
-- M08 (#11): review `changes` (six undocumented members dropped by autodoc), not reworked yet.
+- none
 ## Notes
+- Registry row for M08 already lists PR #11 (status open); not re-added.
+- No package code touched, so Qt backend test runs not applicable (docs only).
+- Docstrings for GlobalConfig, ConfigError, get_config_file, StrEnum, get_base_logger, Severity: product-source task for /optimize-plan.
 - config_test::test_nested_update_from_user fails on dev_agent too (pre-existing).
-- Review nit: Config.__call__ plural->singular KeyError fallback is dead code; candidate for /optimize-plan.
-- Review nit: set_logger can sys.exit(-1), not caught by `except Exception` in __init__ (unverified).
+- Review nit: Config.__call__ plural->singular KeyError fallback is dead code.
+- Review nit: set_logger can sys.exit(-1), not caught by `except Exception` (unverified).
 ## Next step
-- /optimize-run T-pymodaq_utils-M08 (rework), then /optimize-merge T-pymodaq_utils-M08.
+- /optimize-merge T-pymodaq_utils-M08 (pr-reviewer round 2).
 ## Evidence
-- Local after rebase: pyqt6 and pyside6 323 passed, 1 failed (pre-existing), 1 skipped; layering 3 passed; flake8 blocking 0.
-- Review: .agents/reports/pymodaq_utils/2026-11-19-pr-review-T-pymodaq_utils-M07-r2.md
+- Review: .agents/reports/pymodaq_utils/2026-11-19-pr-review-T-pymodaq_utils-M08.md
