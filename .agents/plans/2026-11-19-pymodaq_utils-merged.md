@@ -14,13 +14,13 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - tests: characterisation first; cases: no Instruments + Contributors, no Instruments + no Contributors, last author's final character kept; assert exact lists
 - note: today `posi` stays -1, so `description[posa:-1]` drops the last character. `posi = posa + 50` was vetoed in 4 runs (cuts long author lists). pymodaq_plugin_manager has its own copy (validate.py, unverified).
 - verdicts: decider-compat-risk: approve with the len(description) fix (pilot r2, A2-sonnet r2, A3-sonnet, A3-haiku, B1, B2); decider-test-change: approve, tests only added (pilot, A3-*, B1, B2); A2-haiku: blocked, "owner decides intent"
-- status: done — draft PR #5, CI green (2026-11-19)
+- status: blocked — conflicts with dev_agent, rerun the task
 
 ## T-pymodaq_utils-M02 ThreadCommand loses the deprecated `attributes=` value
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: low   found: 2/8
 - files: utils.py:365-369 (line 369 `self.attribute = attribute` overwrites the value set from `attributes`; make it the `else` branch); new test in tests/utils_test.py expecting the deprecation warning
 - verdicts: decider-compat-risk: approve, restores the documented deprecation path, no in-repo caller passes attributes= (A2-haiku, B1); decider-test-change: approve, test only added (A2-haiku, B1)
-- status: done — draft PR #6, CI green (2026-11-19)
+- status: blocked — conflicts with dev_agent, rerun the task
 
 ## T-pymodaq_utils-M03 check_received_length spins forever when the peer closes
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: medium   found: 1/8
