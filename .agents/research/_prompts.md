@@ -49,3 +49,29 @@ Output: per module killed/survived/timeout counts and the 10 most telling surviv
 test sees it). File each cluster of survivors as `findings.py add --kind run --scope pymodaq_utils` so
 /optimize-plan can turn them into spec-test-quality tasks. Change no product or test file.
 ```
+
+## R4 — upstream-strategy
+```
+/optimize-research upstream-strategy: How should work merged into dev_agent reach PyMoDAQ/PyMoDAQ, in an order and a
+grouping set by its relevance (bug fix, feature, docs, hygiene, tests, refactor, tooling), so that maintainers can
+review it easily and the most useful changes land first?
+Stop when: a written strategy plus a ranked, grouped list of the work merged so far is ready, or after 90 minutes.
+Method (read-only on upstream: no PR, issue, comment or push there; the guard hook blocks it anyway):
+1. How upstream merges today: `python3 .agents/scripts/pr_stats.py` (size vs time-to-merge), plus the last ~100 merged
+   upstream PRs read with `gh` against the fork's mirror data or the PR pages: classify each by kind from its title,
+   labels and files; per kind, median size, time to merge, who merged, review rounds, how often it was split or
+   squashed. Which base branches are used (`dev`, the `5.3.x` stable line) and when a fix also goes to the stable
+   line (backport PRs such as `backport/...`).
+2. The project's own rules: AGENTS.md, the contribution guide in docs/, PR templates, changelog practice
+   (docs/src/changelogs/), the legacy_to_current / deprecation rules for public API.
+3. A relevance score per task, from data already in .agents/ (plan risk, kind, files, review summary, findings
+   it closes): user impact (a bug a user can hit > docs > hygiene), risk, size, dependencies between tasks, and
+   whether the fix also applies to the stable line.
+4. Apply it to every task merged into dev_agent so far (registry `merged`): one line each with kind, score, target
+   branch(es), proposed upstream PR group and order.
+Output: `.agents/research/upstream-strategy.md` (<= 80 lines): the strategy per kind (one PR per bug fix, grouping
+rules for docs and hygiene, backport rule, what waits for an issue first, size limit from the data), the ranked list,
+and the design of an `/optimize-upstream` command that rebuilds a group on upstream/dev and shows the owner the
+branch, the checks and the PR text before anything is opened (owner's standing rule). Propose the command and any
+plan-format change (e.g. a `relevance:` field) as tasks for /optimize-plan; build nothing.
+```

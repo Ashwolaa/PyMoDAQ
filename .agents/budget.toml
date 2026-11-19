@@ -1,12 +1,13 @@
-# Edited by a human. Initial values are guesses: set them from the pilot (see ledger.py summary).
+# Edited by a human. Daily caps are a ceiling for one day of the wheel; the plan quota itself is guarded per step by
+# runner/cost.py (measured cost vs STOP_AT / WEEK_MAX in runner/cycle.sh).
 # The reset window of your Claude plan cannot be read from a session: copy it from claude.ai/settings/usage.
 
 [daily]
 cocoordinators = 1
-specialist_runs = 14       # raised by the owner on 2026-11-19 for the docs reworks (was 10, before that 3)
-prs_opened = 10            # raised by the owner on 2026-11-19 for the merged-plan run (was 2)
-runs = 999            # exploration: effectively unlimited (was 1)
-reviews = 14              # pr-reviewer launches per day (/optimize-merge); owner raised 12 -> 14 on 2026-11-19 ("keep going": M07, M08)
+specialist_runs = 10       # owner 2026-11-19: about one day of the wheel (was 14 for the docs reworks)
+prs_opened = 6             # owner 2026-11-19: about one day of the wheel (was 10)
+runs = 20                  # owner 2026-11-19: about one day of the wheel (was 999 during exploration)
+reviews = 10               # pr-reviewer launches per day; owner 2026-11-19 (was 14)
 rd_share = 0.2            # fraction of the budget reserved for /optimize-research
 
 [plan]
