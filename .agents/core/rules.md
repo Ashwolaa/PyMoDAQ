@@ -19,11 +19,13 @@
 10. Log `--outcome failed` when the run produced nothing usable (no scan output, aborted setup), never `ok`.
 11. End every command report with the absolute path of each file it wrote, so the human can open them.
 12. State (`.agents/`: ledger, registry, plans, handoff, reports, scans) is committed only on `dev_agent`, never on an
-    `agent/*` branch: a PR carries product files only. `ledger.py`, `registry.py` and `plan.py` refuse other branches.
+    `agent/*` branch: a PR carries product files only. `ledger.py`, `registry.py`, `plan.py` and `findings.py` refuse other branches.
 13. Task status in a plan changes only through `scripts/plan.py set-status`. An executed task becomes
     `done — branch <b>, CI <result>, awaiting review`; after /optimize-merge `done — PR #n merged (...)`,
     `done — PR #n open, awaiting the human: ...` or `blocked — <reason>`.
 14. Every `gh` call names the fork: `-R <profile [project].fork>` (the clone's default repo may be upstream).
+15. A CI failure that upstream/dev has too (`ci.py` exit 4, `KNOWN-UPSTREAM`) does not block a branch: it is filed with
+    `findings.py` and becomes a task only through `/optimize-plan`. Any other failure blocks it.
 
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions
