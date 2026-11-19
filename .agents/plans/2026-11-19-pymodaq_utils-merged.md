@@ -27,7 +27,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - files: mysocket.py:85-91 (`recv` returns b'' on a closed peer, so `mess_length` never grows): raise ConnectionError on an empty read; new fake-socket test
 - note: serialize/mysocket.py:29 has its own check_received_length over an in-memory bytes string, not affected (verified).
 - verdicts: decider-compat-risk: approve, ConnectionError is an OSError subclass and only the closed-peer path changes (B1); decider-test-change: approve in round 2, test only added (B1)
-- status: done — draft PR #7, CI green (2026-11-19)
+- status: done — PR #7 open, awaiting the human: medium risk, touches tests (mysocket_test.py)
 
 ## T-pymodaq_utils-M04 Exception hygiene
 - scope: pymodaq_utils   specialty: hygiene   risk: low   found: 8/8
@@ -40,7 +40,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - files: utils.py:444,458,475 (`paths=None`, `if paths is None: paths = []`, recursive calls keep passing paths); remove the stale docstring warnings at ~447,463,482; new tmp_path test in tests/utils_test.py
 - note: only `paths` accumulates; the read-only list defaults (utils.py:459,476,511, array_manipulation.py:151, math_utils.py:616) were dropped by most runs.
 - verdicts: decider-compat-risk: approve in 7 runs; decider-test-change: approve, test only added; B1 approved it outright, B2 deferred it (public signature); every Opus run kept it proposed
-- status: done — draft PR #8, CI green (2026-11-19)
+- status: done — PR #8 open, awaiting the human: reviewer public_api yes (default value change), touches tests (utils_test.py)
 
 ## T-pymodaq_utils-M06 Moved plugin_tools shims never call deprecation_msg
 - scope: pymodaq_utils (+ packages/pymodaq/pyproject.toml)   specialty: refactor (compat)   risk: medium   found: 2/8

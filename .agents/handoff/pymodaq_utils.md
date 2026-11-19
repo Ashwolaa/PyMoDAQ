@@ -1,35 +1,26 @@
-# Handoff: pymodaq_utils — 2026-11-19
+# Handoff pymodaq_utils — /optimize-merge 2026-11-19
 
 ## Done
-- T-pymodaq_utils-001 (unused imports): draft PR Ashwolaa/PyMoDAQ#3 -> dev_agent, label agent-made, 2 commits, +2/-10 lines.
-- Also removed the obsolete layering_test ALLOWED entry for config.py (decider-test-change: approve; not yet written into the plan).
-
-- T-pymodaq_utils-M04 (exception hygiene): draft PR Ashwolaa/PyMoDAQ#4 -> dev_agent, branch agent/pymodaq_utils/hygiene-exceptions/2026-11-19, +4/-4, 3 files. Tests 308 passed/1 skipped/1 pre-existing failure; flake8 0; layering 3 passed.
-- T-pymodaq_utils-M01 (authors bug fix): draft PR Ashwolaa/PyMoDAQ#5 -> dev_agent, branch agent/pymodaq_utils/refactor-authors/2026-11-19, +25/-1, 4 new tests (packages_test.py). Utils 312 passed/1 pre-existing fail; flake8 0; layering 3. Merge after #4. Auditor: PASS.
-- T-pymodaq_utils-M02 (ThreadCommand attributes=): draft PR Ashwolaa/PyMoDAQ#6 -> dev_agent, branch agent/pymodaq_utils/refactor-threadcommand/2026-11-19, +9/-1, 1 new test. Utils 309 passed/1 pre-existing fail; flake8 0; layering 3. Merge before M05 (both edit utils.py). Auditor: PASS.
-- T-pymodaq_utils-M03 (check_received_length hang): draft PR Ashwolaa/PyMoDAQ#7 -> dev_agent, branch agent/pymodaq_utils/refactor-socket/2026-11-19, +52 lines, 4 fake-socket tests (mysocket_test.py). Utils 312 passed/1 pre-existing fail; flake8 0; layering 3. Auditor: scope/rules/size PASS (registry line added afterwards).
-- T-pymodaq_utils-M05 (mutable paths=[] defaults): draft PR Ashwolaa/PyMoDAQ#8 -> dev_agent, branch agent/pymodaq_utils/refactor-mutable-defaults/2026-11-19, +59/-9, 6 tmp_path tests. Utils 314 passed/1 pre-existing fail; flake8 0; layering 3. Merge after #6. Auditor: PASS.
-- T-pymodaq_utils-M07 (docstrings): draft PR Ashwolaa/PyMoDAQ#9 -> dev_agent, branch agent/pymodaq_utils/docs/2026-11-19, +22/-3, docstrings only (config.py, utils.py). Utils 308 passed/1 skipped/1 pre-existing fail on pyqt6 and pyside6; flake8 0; layering 3; CI green. Docstring documents that the plural->singular KeyError fallback in Config.__call__ never fires (BaseConfig raises ConfigError): possible follow-up bug task.
-- T-pymodaq_utils-M08 (API doc pages): draft PR Ashwolaa/PyMoDAQ#11 -> dev_agent, branch agent/pymodaq_utils/docs-api-pages/2026-11-19, +65 lines, 4 new .rst under docs/src/api/utility_api/ + toctree. Utils 308 passed/1 skipped/1 pre-existing fail on pyqt6 and pyside6; flake8 0; layering 3; CI compile-doc green. Auditor: PASS. PR #10 closed (superseded: registry.py BRANCH_RE rejects the `-<topic>` date suffix that run step 4 allows; use a hyphenated specialty instead). Known: logger.set_logger docstring has an RST section-title error (pre-existing).
-- T-pymodaq_utils-M09 (module docstring on import side effects): draft PR Ashwolaa/PyMoDAQ#12 -> dev_agent, branch agent/pymodaq_utils/docs-module-docstring/2026-11-19, +18 lines in __init__.py, docstring only. Utils 308 passed/1 skipped/1 pre-existing fail on pyqt6 and pyside6; flake8 0; layering 3; CI green. Auditor: PASS.
-- T-pymodaq_utils-M10 (release note for plugin_tools move): draft PR Ashwolaa/PyMoDAQ#13 -> dev_agent, branch agent/pymodaq_utils/docs-release-note/2026-11-19, +5 lines in docs/src/changelogs/release_5_3.rst. Utils 308 passed/1 skipped/1 pre-existing fail on pyqt6 and pyside6; flake8 0; layering 3; CI compile-doc green. Auditor: PASS (version claims in the note taken from versionadded/deprecated directives, not independently re-verified). Follow-up: pyproject check_plugin entry point still targets the alias pymodaq_utils.plugin_checks:main.
-
-## Open findings (ranked)
-1. T-pymodaq_utils-002 (exception handling) [risk: low] approved, not run
-2. T-pymodaq_utils-003 (docstrings) [risk: low] approved, not run
-3. T-pymodaq_utils-004 (extract_authors_from_description bug) [risk: medium] proposed
-4. T-pymodaq_utils-005 (mutable defaults) [risk: low] proposed
-5. Complexity refactors (rules.py, utils.py _literal_value) need a staged plan first.
+- Merged: none (the gate sent every approved PR to the human).
+- Approved by pr-reviewer, PRs ready and open on Ashwolaa/PyMoDAQ, CI green, awaiting the human:
+  - #3 T-001 unused imports (touches tests: layering_test.py allowlist; UI scope)
+  - #7 T-M03 Socket.check_received_length ConnectionError (medium risk, touches tests)
+  - #8 T-M05 recursive_find_* paths=None default (public_api yes, touches tests)
 
 ## Blocked
-- `config_test.py::test_nested_update_from_user` fails on dev_agent too (pre-existing, unrelated); needs a human or its own task.
-- PyQt6 not run (PySide6 only).
+- Conflicts with dev_agent (rebase aborted): T-M01 (#5), T-M02 (#6), T-M04 (#4) — rerun the tasks
+  (conflict is on the "Drop .agents/ state from this PR" commit, check before rerun).
+- Review `changes` (drafts stay drafts):
+  - T-M07 (#9) _literal_value docstring incomplete (np.nan, np.True_/False_, tzinfo/fold, date/time forms)
+  - T-M08 (#11) six undocumented members in :members: lists dropped by autodoc
+  - T-M09 (#12) SERIALIZABLE is a type alias not a registry; failure handling misdescribed
+  - T-M10 (#13) extension_checks/check_extension came in 5.3.7, not 5.3.5
+
+## Notes
+- tests/config_test.py::test_nested_update_from_user fails locally on dev_agent too (pre-existing, both Qt backends);
+  not in CI. Worth a task of its own.
+- CI flake: ubuntu 3.12 pyside6 job on PR #3 failed once, green on rerun.
+- Not picked up: M06, M11, M12 (proposed, not executed).
 
 ## Next step
-Human reviews PRs #3-#8; then run T-pymodaq_utils-002 (touches config.py, environment.py: rebase after #3).
-
-## Evidence
-- tests: cd packages/pymodaq_utils && pytest -> 308 passed, 1 skipped, 1 failed (pre-existing)
-- layering_test.py -> 3 passed; flake8 blocking set -> 0
-- env: venv in session scratchpad (optimize-agents venv lacks the project install; consider installing it there)
-- note: another session committed f466483fd on this branch; moved to branch mixed/pymodaq_utils-hygiene-with-f466483fd, PR branch rebuilt clean.
+Review and merge PR #3 (oldest awaiting the human), then #7, #8.
