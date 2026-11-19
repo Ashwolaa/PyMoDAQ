@@ -93,7 +93,7 @@ def get_metadata_from_json(json_as_dict: dict) -> dict:
             metadata['version'] = json_as_dict['info']['version']
             metadata['requirements'] = json_as_dict['info']['requires_dist']
             return metadata
-    except:
+    except Exception:
         pass
 
 

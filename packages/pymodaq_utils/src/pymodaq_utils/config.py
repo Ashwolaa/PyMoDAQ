@@ -111,7 +111,7 @@ def get_set_path(a_base_path: Path, dir_name: str) -> Path:
     if not path_to_get.is_dir():
         try:
             path_to_get.mkdir()
-        except PermissionError as e:
+        except PermissionError:
             logging.warning(f"Cannot create local config folder at this location: {path_to_get}"
                             f", try using admin rights. "
                             f"Changing the not permitted path to a user "
@@ -320,7 +320,7 @@ class BaseConfig(metaclass=ConfigSingleton):
                 ret = getitem_recursive(self._config, *args)
             except KeyError as e:
                 raise ConfigError(f'the path {args} does not exist in your configuration toml'
-                                  f' file, check your config folder')
+                                  f' file, check your config folder') from e
             return ret
 
     def __contains__(self, item):

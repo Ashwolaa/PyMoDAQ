@@ -149,7 +149,7 @@ class PythonEnvironment:
         if self._path.is_file():
             try:
                 return datetime.fromtimestamp(self._path.stat().st_ctime)
-            except:
+            except Exception:
                 pass
         logging.warning(f'{self._path.name} does not exists or has no metadata. Defaulting to now().')
         return datetime.now()
