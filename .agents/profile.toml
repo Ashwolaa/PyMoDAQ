@@ -46,7 +46,8 @@ plan_expiry_days = 14
 scanners = ["ruff", "vulture", "jscpd", "radon", "mutmut", "coverage", "diff-cover", "import-linter", "pyinstrument"]
 repo_tools = ["check_plugin", "check_extension"]
 # machine-specific: where the scanners live (system python is externally managed; only `python3` exists)
-env = "export PATH=$HOME/.venvs/optimize-agents/bin:$HOME/.npm-global/bin:$PATH"
+# Python 3.14 (uv-managed), PyMoDAQ editable from this worktree, scanners, PySide6 + PyQt6
+env = "export PATH=$HOME/.venvs/pymodaq-314/bin:$HOME/.npm-global/bin:$PATH"
 
 [specialists]
 enabled = ["hygiene", "test-quality", "refactor", "uiux", "docs"]
