@@ -19,7 +19,7 @@ Rules
 
 .. automodule:: pymodaq_utils.plugin_tools.rules
    :no-index:
-   :members: Severity, Finding
+   :members: Finding
 
 Checks
 ------
