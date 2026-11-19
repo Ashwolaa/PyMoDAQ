@@ -9,7 +9,7 @@ launches specialists as sub-agents. Sub-agents are not assumed to be able to spa
 | Executive | yes, on agent branches | cocoordinator (role per scope), spec-hygiene, spec-test-quality, spec-refactor, spec-uiux, spec-docs, test-agent (one instance per test folder) |
 | Audit | no | scripted checks (`merge_gate.py lint` before each push, `ci.py`, `merge_gate.py check`); pr-reviewer validates each branch (task match, drift, correctness) before /optimize-merge opens its PR |
 | R&D | prototypes on `agent-rd/*` only | rd-researcher, best-practice |
-| Committee | no | committee-efficiency, committee-outcomes, committee-governance |
+| Committee | no | committee (one agent, three parts: efficiency, outcomes, governance) |
 
 ## Deliberation (advisory board)
 1. Scanners (tools, not LLMs) produce ranked findings. Advisors read only that output and give short opinions.
@@ -21,7 +21,7 @@ launches specialists as sub-agents. Sub-agents are not assumed to be able to spa
 6. decider-arbiter settles two tasks that change the same file; its ruling is binding.
 
 ## Committee
-Independent: reads only `ledger.jsonl`, `registry.jsonl`, `handoff/`, `reports/`, audit blocks; never source.
+Independent: reads only `ledger.jsonl`, `registry.jsonl`, `findings.jsonl`, `handoff/`, `reports/`; never source.
 Cannot be consulted by coordinators. May recommend changes and pause a role (human confirms). Never edits
 `.claude/agents/` or `.claude/commands/` — such changes are `proposed` tasks.
 
