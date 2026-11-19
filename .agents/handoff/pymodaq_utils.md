@@ -7,6 +7,7 @@
 - T-pymodaq_utils-M04 (exception hygiene): draft PR Ashwolaa/PyMoDAQ#4 -> dev_agent, branch agent/pymodaq_utils/hygiene-exceptions/2026-11-19, +4/-4, 3 files. Tests 308 passed/1 skipped/1 pre-existing failure; flake8 0; layering 3 passed.
 - T-pymodaq_utils-M01 (authors bug fix): draft PR Ashwolaa/PyMoDAQ#5 -> dev_agent, branch agent/pymodaq_utils/refactor-authors/2026-11-19, +25/-1, 4 new tests (packages_test.py). Utils 312 passed/1 pre-existing fail; flake8 0; layering 3. Merge after #4. Auditor: PASS.
 - T-pymodaq_utils-M02 (ThreadCommand attributes=): draft PR Ashwolaa/PyMoDAQ#6 -> dev_agent, branch agent/pymodaq_utils/refactor-threadcommand/2026-11-19, +9/-1, 1 new test. Utils 309 passed/1 pre-existing fail; flake8 0; layering 3. Merge before M05 (both edit utils.py). Auditor: PASS.
+- T-pymodaq_utils-M03 (check_received_length hang): draft PR Ashwolaa/PyMoDAQ#7 -> dev_agent, branch agent/pymodaq_utils/refactor-socket/2026-11-19, +52 lines, 4 fake-socket tests (mysocket_test.py). Utils 312 passed/1 pre-existing fail; flake8 0; layering 3. Auditor: scope/rules/size PASS (registry line added afterwards).
 
 ## Open findings (ranked)
 1. T-pymodaq_utils-002 (exception handling) [risk: low] approved, not run
@@ -20,7 +21,7 @@
 - PyQt6 not run (PySide6 only).
 
 ## Next step
-Human reviews PRs #3-#6; then run M03, M05 (M05 after M02 merges); then run T-pymodaq_utils-002 (touches config.py, environment.py: rebase after #3).
+Human reviews PRs #3-#7; then run M05 (M05 after M02 merges); then run T-pymodaq_utils-002 (touches config.py, environment.py: rebase after #3).
 
 ## Evidence
 - tests: cd packages/pymodaq_utils && pytest -> 308 passed, 1 skipped, 1 failed (pre-existing)
