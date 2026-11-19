@@ -33,7 +33,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: hygiene   risk: low   found: 8/8
 - files: environment.py:153 and packages.py:96 (`except:` -> `except Exception:`); config.py:118 (drop unused `e`); config.py:325-326 (keep `as e`, add `raise ... from e`)
 - verdicts: approved in all 8 runs (compat-risk and a second decisioner each time); the only correction, made in 3 runs: do not drop `e` at :325
-- status: done — draft PR #4, CI green (2026-11-19)
+- status: blocked — conflicts with dev_agent, rerun the task
 
 ## T-pymodaq_utils-M05 Shared mutable `paths=[]` default in recursive_find_*
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: low   found: 7/8
