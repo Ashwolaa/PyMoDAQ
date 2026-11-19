@@ -20,7 +20,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: low   found: 2/8
 - files: utils.py:365-369 (line 369 `self.attribute = attribute` overwrites the value set from `attributes`; make it the `else` branch); new test in tests/utils_test.py expecting the deprecation warning
 - verdicts: decider-compat-risk: approve, restores the documented deprecation path, no in-repo caller passes attributes= (A2-haiku, B1); decider-test-change: approve, test only added (A2-haiku, B1)
-- status: blocked — conflicts with dev_agent, rerun the task
+- status: done — PR #6 open, awaiting the human: touches tests (utils_test.py); review approve
 
 ## T-pymodaq_utils-M03 check_received_length spins forever when the peer closes
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: medium   found: 1/8
