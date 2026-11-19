@@ -366,7 +366,8 @@ class ThreadCommand(SerializableBase):
             deprecation_msg('ThreadCommand signature changed, use attribute in place of attributes')
             self.attribute = attributes
             self.attributes = attributes
-        self.attribute = attribute
+        else:
+            self.attribute = attribute
         self.args = args
         self.kwargs = {} if kwargs is None else kwargs
 
