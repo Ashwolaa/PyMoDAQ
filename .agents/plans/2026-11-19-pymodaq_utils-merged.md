@@ -58,7 +58,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: new .rst under docs/src/api/utility_api/ (existing automodule pages there: mathematical, units_conversion, utility_classes; none for config, logger, enums or plugin_tools, verified); never edit legacy_to_current.rst
 - verdicts: decider-compat-risk and decider-triage: approve (A2-sonnet, two tasks merged here)
-- status: approved
+- status: done — draft PR #11, CI green
 
 ## T-pymodaq_utils-M09 Module docstring on import side effects
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
