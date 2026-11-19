@@ -1,12 +1,13 @@
-# Handoff pymodaq_utils (optimize-merge 2026-11-19, T-pymodaq_utils-M10)
+# Handoff pymodaq_utils (optimize-run 2026-11-19, T-pymodaq_utils-M10 rework)
 ## Done
-- Human merged: PR #3, #4 (M04), #5 (M01), #6 (M02), #7, #8 -> synced to registry/plan (this run: #4 #5 #6).
-- This run: no candidate to merge. M10 (PR #13, draft) is blocked on review `changes`, which /optimize-merge does not retry.
+- M10 (PR #13) reworked after review r1: release_5_3.rst range now 5.3.1 to 5.3.7; contract/platforms in 5.3.5,
+  extension_checks/check_extension in 5.3.7. Rebased on dev_agent, pushed with --force-with-lease (head 4ae7c7337).
+- Layering test passes under pyqt6 and pyside6; CI compile-doc.yml green:
+  https://github.com/Ashwolaa/PyMoDAQ/actions/runs/44562977759
 ## Blocked (review, need /optimize-run <id>)
-- M10 (#13): extension_checks/check_extension came in 5.3.7, so the range '5.3.1 to 5.3.5' in release_5_3.rst is wrong.
-- M07 (#9), M08 (#11), M09 (#12): review `changes`.
+- M07 (#9), M08 (#11), M09 (#12): review `changes`, not reworked yet.
 ## Notes
 - config_test::test_nested_update_from_user fails on dev_agent too (known, pre-existing); ruff format --check fails on baseline for touched files (rule 5).
-- /optimize-run stopped on specialist_runs cap 10 (see earlier run); rework not started.
+- Sphinx build only checked via CI compile-doc.
 ## Next step
-- Raise [daily] specialist_runs in budget.toml (human) or wait for the reset, then /optimize-run T-pymodaq_utils-M10 (then M07, M08, M09), then /optimize-merge.
+- /optimize-merge T-pymodaq_utils-M10 (re-review), then /optimize-run for M07, M08, M09.

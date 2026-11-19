@@ -70,7 +70,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: docs/src/changelogs/release_5_3.rst (exists)
 - verdicts: decider-compat-risk and decider-triage: approve (A2-haiku)
-- status: blocked — review: extension_checks/check_extension came in 5.3.7, range '5.3.1 to 5.3.5' is wrong
+- status: done — branch agent/pymodaq_utils/docs-release-note/2026-11-19, CI green, reworked after review r1, awaiting review
 
 ## T-pymodaq_utils-M11 Shared input checks for ft/ift/ft2/ift2
 - scope: pymodaq_utils   specialty: refactor   risk: medium   found: 1/8
