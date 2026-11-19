@@ -19,7 +19,7 @@ from _common import AGENTS_DIR, fail, read_jsonl, require_state_branch, today
 
 FILE = "findings.jsonl"
 STATUSES = ("open", "planned", "closed")
-KINDS = ("ci-upstream", "review", "run")
+KINDS = ("ci-upstream", "review", "run", "plugin")
 
 
 def write(rows):

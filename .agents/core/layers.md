@@ -8,7 +8,7 @@ launches specialists as sub-agents. Sub-agents are not assumed to be able to spa
 | Advisory board | no (writes plans only) | advisor-quality, advisor-uxui, advisor-performance, advisor-docs, advisor-compat -> decider-triage; decider-compat-risk, decider-test-change, decider-arbiter |
 | Executive | yes, on agent branches | cocoordinator (role per scope), spec-hygiene, spec-test-quality, spec-refactor, spec-uiux, spec-docs, test-agent (one instance per test folder) |
 | Audit | no | scripted checks (`merge_gate.py lint` before each push, `ci.py`, `merge_gate.py check`); pr-reviewer validates each branch (task match, drift, correctness) before /optimize-merge opens its PR |
-| R&D | prototypes on `agent-rd/*` only | rd-researcher, best-practice |
+| R&D | prototypes on `agent-rd/*` only | rd-researcher, best-practice; plugins (`/optimize-plugins`): plugin-scout (read-only), spec-plugin-port (ports on the owner's fork only) |
 | Committee | no | committee (one agent, three parts: efficiency, outcomes, governance) |
 
 ## Deliberation (advisory board)

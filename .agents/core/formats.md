@@ -5,7 +5,7 @@
 `pushed` = branch pushed with CI run by `scripts/ci.py`, no PR yet; `open` = PR opened by /optimize-merge (or an old draft).
 
 ## findings.jsonl (via `scripts/findings.py`)
-`key, scope, kind (ci-upstream|review|run), title, evidence [urls], sources [run ids], first_seen, last_seen, seen,
+`key, scope, kind (ci-upstream|review|run|plugin), title, evidence [urls], sources [run ids], first_seen, last_seen, seen,
 status (open|planned|closed), task_id, note`. Problems found outside the scans; the same key is recorded once
 (`seen` counts repeats). `/optimize-plan` gives the open ones of its scope to triage and the decisioners.
 
