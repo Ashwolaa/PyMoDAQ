@@ -14,20 +14,20 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - tests: characterisation first; cases: no Instruments + Contributors, no Instruments + no Contributors, last author's final character kept; assert exact lists
 - note: today `posi` stays -1, so `description[posa:-1]` drops the last character. `posi = posa + 50` was vetoed in 4 runs (cuts long author lists). pymodaq_plugin_manager has its own copy (validate.py, unverified).
 - verdicts: decider-compat-risk: approve with the len(description) fix (pilot r2, A2-sonnet r2, A3-sonnet, A3-haiku, B1, B2); decider-test-change: approve, tests only added (pilot, A3-*, B1, B2); A2-haiku: blocked, "owner decides intent"
-- status: proposed (behaviour change of a public function, touches tests)
+- status: approved (by the human, 2026-11-19)
 
 ## T-pymodaq_utils-M02 ThreadCommand loses the deprecated `attributes=` value
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: low   found: 2/8
 - files: utils.py:365-369 (line 369 `self.attribute = attribute` overwrites the value set from `attributes`; make it the `else` branch); new test in tests/utils_test.py expecting the deprecation warning
 - verdicts: decider-compat-risk: approve, restores the documented deprecation path, no in-repo caller passes attributes= (A2-haiku, B1); decider-test-change: approve, test only added (A2-haiku, B1)
-- status: proposed (touches tests)
+- status: approved (by the human, 2026-11-19)
 
 ## T-pymodaq_utils-M03 check_received_length spins forever when the peer closes
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: medium   found: 1/8
 - files: mysocket.py:85-91 (`recv` returns b'' on a closed peer, so `mess_length` never grows): raise ConnectionError on an empty read; new fake-socket test
 - note: serialize/mysocket.py:29 has its own check_received_length over an in-memory bytes string, not affected (verified).
 - verdicts: decider-compat-risk: approve, ConnectionError is an OSError subclass and only the closed-peer path changes (B1); decider-test-change: approve in round 2, test only added (B1)
-- status: proposed (behaviour change: raises instead of hanging; touches tests)
+- status: approved (by the human, 2026-11-19)
 
 ## T-pymodaq_utils-M04 Exception hygiene
 - scope: pymodaq_utils   specialty: hygiene   risk: low   found: 8/8
@@ -40,7 +40,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - files: utils.py:444,458,475 (`paths=None`, `if paths is None: paths = []`, recursive calls keep passing paths); remove the stale docstring warnings at ~447,463,482; new tmp_path test in tests/utils_test.py
 - note: only `paths` accumulates; the read-only list defaults (utils.py:459,476,511, array_manipulation.py:151, math_utils.py:616) were dropped by most runs.
 - verdicts: decider-compat-risk: approve in 7 runs; decider-test-change: approve, test only added; B1 approved it outright, B2 deferred it (public signature); every Opus run kept it proposed
-- status: proposed (public signature default, touches tests)
+- status: approved (by the human, 2026-11-19)
 
 ## T-pymodaq_utils-M06 Moved plugin_tools shims never call deprecation_msg
 - scope: pymodaq_utils (+ packages/pymodaq/pyproject.toml)   specialty: refactor (compat)   risk: medium   found: 2/8
