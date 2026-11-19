@@ -52,7 +52,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: config.py:549 (new docstring: backend(s), debug_level(s), dynamic(s) singular/plural fallback, any other key forwarded), utils.py:68-75 (_literal_value: list the accepted constants and constructors, raises UnsafeExpressionError otherwise). Docstrings only.
 - verdicts: decider-compat-risk and decider-triage: approve in round 2 (pilot)
-- status: approved
+- status: done — draft PR #9, CI green
 
 ## T-pymodaq_utils-M08 API doc pages for config, logger, enums and plugin_tools
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
