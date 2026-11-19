@@ -14,7 +14,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - tests: characterisation first; cases: no Instruments + Contributors, no Instruments + no Contributors, last author's final character kept; assert exact lists
 - note: today `posi` stays -1, so `description[posa:-1]` drops the last character. `posi = posa + 50` was vetoed in 4 runs (cuts long author lists). pymodaq_plugin_manager has its own copy (validate.py, unverified).
 - verdicts: decider-compat-risk: approve with the len(description) fix (pilot r2, A2-sonnet r2, A3-sonnet, A3-haiku, B1, B2); decider-test-change: approve, tests only added (pilot, A3-*, B1, B2); A2-haiku: blocked, "owner decides intent"
-- status: blocked — conflicts with dev_agent, rerun the task
+- status: done — PR #5 open, awaiting the human: medium risk, decider veto in plan, touches tests; review approve
 
 ## T-pymodaq_utils-M02 ThreadCommand loses the deprecated `attributes=` value
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: low   found: 2/8
@@ -33,7 +33,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: hygiene   risk: low   found: 8/8
 - files: environment.py:153 and packages.py:96 (`except:` -> `except Exception:`); config.py:118 (drop unused `e`); config.py:325-326 (keep `as e`, add `raise ... from e`)
 - verdicts: approved in all 8 runs (compat-risk and a second decisioner each time); the only correction, made in 3 runs: do not drop `e` at :325
-- status: blocked — conflicts with dev_agent, rerun the task
+- status: done — PR #4 open, awaiting the human: only 1 approving decider (2 needed); review approve
 
 ## T-pymodaq_utils-M05 Shared mutable `paths=[]` default in recursive_find_*
 - scope: pymodaq_utils   specialty: refactor (bug fix)   risk: low   found: 7/8
