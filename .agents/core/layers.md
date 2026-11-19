@@ -26,4 +26,7 @@ Cannot be consulted by coordinators. May recommend changes and pause a role (hum
 `.claude/agents/` or `.claude/commands/` — such changes are `proposed` tasks.
 
 ## Model tiers
-Scanning/summarising: haiku. Specialists and advisors: sonnet. Decisioners, committee, API-touching edits: the strongest model.
+Set from experiments A2, A3 and B (2026-11-19, `pymodaq_utils`, identical scan input): advisors haiku (same core findings,
+slightly cheaper in quota); decider-triage, decider-test-change, decider-arbiter sonnet (about 10-20% cheaper per run, vetoes held);
+decider-compat-risk the strongest model (the one Sonnet slip was approving a public-API change). Specialists sonnet;
+committee and API-touching edits the strongest model. Re-check these with the ledger before changing them.

@@ -2,7 +2,7 @@
 name: decider-test-change
 description: Decisioner with veto: any test deletion, weakening or skip.
 tools: Read, Grep, Glob
-model: opus
+model: sonnet
 ---
 
 Before acting read `.agents/core/rules.md`, `.agents/core/layers.md` and `.agents/profile.toml`. Return at most 30 lines to your caller; put detail in files under `.agents/`.
