@@ -1,3 +1,21 @@
+"""Utilities shared by all PyMoDAQ packages.
+
+Importing this package has side effects:
+
+* ``__version__`` is read from the installed ``pymodaq_utils`` distribution
+  (fallback ``'0.0.0dev'`` if it is not installed).
+* The ``pymodaq`` base logger is created with a handler
+  (``set_logger('pymodaq', add_handler=True, base_logger=True)``).
+* ``pymodaq_utils.serialize.serializer`` is imported; it re-exports
+  ``SerializableFactory`` and ``SERIALIZABLE`` from ``serializall``, the registry
+  that classes decorated with ``SerializableFactory.register_decorator()`` join.
+* ``CONFIG = GlobalConfig()`` is instantiated. Importing ``pymodaq_utils.config``
+  registers the ``utils`` config, which loads its toml files and creates them
+  (and their folders) from the template if they are missing.
+
+Failures are not raised: they are logged when the logger exists, otherwise
+printed, and the names defined after the failure are then missing.
+"""
 
 try:
     from pymodaq_utils.logger import set_logger
