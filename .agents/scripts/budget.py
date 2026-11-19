@@ -53,7 +53,8 @@ def cmd_check(a):
         "prs_opened": sum(r.get("prs_opened") or 0 for r in every) + a.this_run_prs,
         "reviews": sum(r.get("reviews") or 0 for r in every) + a.this_run_reviews,
     }
-    keys = {"executive": ("runs", "specialist_runs"),  # optimize-run opens no PR: prs_opened is checked by --kind pr "merge": ("runs", "reviews"),
+    # optimize-run opens no PR: prs_opened is checked by --kind pr, right before gh pr create
+    keys = {"executive": ("runs", "specialist_runs"), "merge": ("runs", "reviews"),
             "pr": ("prs_opened",)}[a.kind]
     used = {k: used[k] for k in keys}
     daily.setdefault("reviews", 12)
