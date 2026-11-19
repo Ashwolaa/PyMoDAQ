@@ -205,9 +205,10 @@ Cleanup and documentation
 * DAQ_Viewer: obsolete *Overshoot* and *Axis* options and dead code removed: #1244
 * Documentation: API build fixed (352 to 2 warnings) #1229, Configuration page rewritten #1232, DAQ_Viewer and data
   viewers #1243, DAQ_Scan and Scan Manager #1246, plus the Sequencer, Ramping and ROI pages listed above
-* Plugin maintenance tools (added after 5.3.0, in 5.3.1 to 5.3.5): ``pymodaq_utils.plugin_checks``,
+* Plugin maintenance tools (added after 5.3.0, in 5.3.1 to 5.3.7): ``pymodaq_utils.plugin_checks``,
   ``plugin_rules`` and ``plugin_scaffold`` moved to ``pymodaq_utils.plugin_tools.checks``, ``rules`` and ``scaffold``
-  (with the new ``contract``, ``extension_checks`` and ``platforms`` modules, ``check_extension`` command). The old
+  (with the new ``contract`` and ``platforms`` modules, added in 5.3.5, and the ``extension_checks`` module with the
+  ``check_extension`` command, added in 5.3.7). The old
   module paths still work as aliases and are deprecated since 5.3.5. ``pymodaq_utils.plugin_testing`` moved to
   ``pymodaq.utils.plugin_testing`` (``PluginPackageChecks``) and is deprecated since 5.3.2.
 * Miscellaneous: #1073, #1074, #1077, #1091, #1101, #1122, #1125, #1126, #1133, #1138, #1146, #1147, #1153, #1155,
