@@ -42,7 +42,7 @@ Sections in this order: Done, Open findings (ranked, `path:line`, risk), Blocked
 (test results, coverage diff, screenshot paths). The next run reads this file first.
 
 ## reports/<folder>/<date>-<kind>.md
-Kinds: run, audit, review (committee), merge, `pr-review-<task-id>` (pr-reviewer; first four lines `verdict:`,
+Kinds: run, audit, review (committee), merge, `pr-review-<task-id>-r<N>` (pr-reviewer, N = review round; first four lines `verdict:`,
 `public_api:`, `behaviour_change:`, `fails_without_fix:`, read by `scripts/merge_gate.py`). Short, factual, numbers from files.
 
 ## practices/<folder>.md

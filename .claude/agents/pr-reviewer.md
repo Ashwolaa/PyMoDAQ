@@ -16,7 +16,8 @@ Check, verifying each point in the code (say "unverified" for anything you could
 4. **Tests**: a bug fix must come with a test that fails without the fix. Check it: copy the branch's test file next to the original as `<name>_review_tmp_test.py` (`git show <branch>:<test path> > ...`), run only it under `[tools].env` against `dev_agent` code, record which tests fail, then delete the file (`git status` must be clean afterwards). Tests must assert exact results, not just "no exception".
 5. **Docs and docstrings**: every factual claim (names, defaults, versions, side effects) matches the code.
 
-Write `.agents/reports/<scope>/<date>-pr-review-<task-id>.md`, starting with exactly these lines:
+When the caller gives you a previous review report, first check each of its findings: fixed, or still open (then it is a finding again).
+Write the report path the caller gives (`.agents/reports/<scope>/<date>-pr-review-<task-id>-r<N>.md`), starting with exactly these lines:
 ```
 verdict: approve|changes|reject
 public_api: yes|no
