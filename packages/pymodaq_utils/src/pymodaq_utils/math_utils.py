@@ -4,7 +4,7 @@ from typing import Union
 
 import numpy as np
 from numbers import Number
-from typing import List, Union, Tuple
+from typing import List, Tuple
 from pymodaq_utils.logger import get_module_name, set_logger
 from collections.abc import Iterable
 from pint import Quantity

@@ -5,7 +5,6 @@ Created the 26/10/2023
 @author: Sebastien Weber
 """
 import socket
-from typing import Union
 
 
 class Socket:

@@ -17,7 +17,6 @@ LAZY = 'imported when called, only if the package above is installed'
 
 # (file relative to packages/<package>/src, imported module) -> why it is accepted
 ALLOWED = {
-    ('pymodaq_utils/config.py', 'pymodaq_gui.parameter'): TYPING,
     ('pymodaq_utils/config.py', 'pymodaq_gui.utils.widgets.tree_toml'): LAZY + ' (config editor)',
     ('pymodaq_utils/config.py', 'pymodaq_gui.parameter.ioxml'): LAZY + ' (config editor)',
     ('pymodaq_utils/plugin_testing.py', 'pymodaq.utils.plugin_testing'): LAZY + ' (moved there, kept for old imports)',
