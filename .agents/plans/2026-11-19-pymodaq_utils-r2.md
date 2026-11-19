@@ -48,7 +48,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils:docstrings|six public names undocumented
 - constraints: docstrings only, written from what the code does (e.g. get_base_logger loops forever if no ancestor is named `pymodaq`: verify before stating); add only docstring lines (rule 5); run last of the code tasks. Once documented, the API pages that M08 trimmed may list them again (separate docs follow-up, not here).
 - verdicts: decider-compat-risk: approve — all six exist without docstring, no __doc__ consumer affected; decider-triage: approve (fresh instance) — about 30-50 lines in 4 files
-- status: approved
+- status: done — branch agent/pymodaq_utils/docs/2026-11-19-docstrings-for-six, CI green, awaiting review
 
 ## T-pymodaq_utils-010 Add the three missing check_plugin codes to the codes table
 - scope: docs   specialty: docs   risk: low
