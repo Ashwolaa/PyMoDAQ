@@ -26,6 +26,15 @@
 14. Every `gh` call names the fork: `-R <profile [project].fork>` (the clone's default repo may be upstream).
 15. A CI failure that upstream/dev has too (`ci.py` exit 4, `KNOWN-UPSTREAM`) does not block a branch: it is filed with
     `findings.py` and becomes a task only through `/optimize-plan`. Any other failure blocks it.
+16. Never skip a command step or do a sub-agent's job yourself to save quota: the caps in `budget.toml` do that.
+    Product files are edited by specialists only, reworks included; the auditor runs on every /optimize-run.
+17. Run every step in the foreground and wait for it. A Bash call lasts at most 10 minutes (`timeout` 600000), so call
+    `ci.py` with `--timeout 540` and call it again on exit 2: it resumes the same runs, it never dispatches twice.
+    A notification that arrives after your final report is not a new invocation: reply `already done (<run id>)`
+    and change nothing.
+18. A problem outside the task (seen by a specialist, the auditor or pr-reviewer) is filed with
+    `findings.py add --kind run|review`; a handoff note alone gets lost when the next run overwrites it.
+19. `<scope>` in state paths (handoff, reports) is always the task's package, also when a command got a task id.
 
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions

@@ -24,7 +24,7 @@ public_api: yes|no
 behaviour_change: yes|no
 fails_without_fix: yes|no|n/a|unverified
 ```
-then the findings, each with `path:line` and one line of reason, and a last line `summary: <one sentence for the PR body>`.
+then the findings, each with `path:line` and one line of reason. A problem you notice outside the diff is not a finding of this review: file it with `python3 .agents/scripts/findings.py add --kind review --scope <package> --key "<path>:<symbol>|<short label>" --title "<one line, say unverified if so>" --evidence <report path>` and list the key at the end of the report. Then and a last line `summary: <one sentence for the PR body>`.
 `approve` = correct and in scope, mergeable as is. `changes` = fixable problems (list exactly what to change). `reject` =
 the approach is wrong or the task should not be done. A `public_api: yes` change is not a reason to reject: it sends the PR to the human.
 Return the four header lines, the summary line and the report path.

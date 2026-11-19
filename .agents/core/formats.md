@@ -28,7 +28,7 @@ radon (rank C or worse), jscpd (duplicate pairs). Footer: sha256 of the content.
 same file, so two runs can be shown to have had identical input. Advisors read this file and nothing else.
 
 ## Run ids
-`<date>-run-<task-id>` for /optimize-run (one per task), `<date>-plan-<scope>` for /optimize-plan,
+`<date>-run-<task-id>` for /optimize-run (one per task; a rework is `<date>-run-<task-id>-r<N>`, N = the review round it answers), `<date>-plan-<scope>` for /optimize-plan,
 `<date>-merge-<scope|task-id|all>` for /optimize-merge, `<date>-<command>-<topic>` for the others. Experiments may append a suffix (`-A2-haiku`).
 
 ## plans/<date>-<scope>.md

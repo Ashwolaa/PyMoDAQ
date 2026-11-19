@@ -28,13 +28,17 @@ ui = ["pymodaq_gui", "pymodaq"]
 test = "cd packages/{scope} && pytest"
 layering = "pytest packages/pymodaq/tests/layering_test.py"
 lint_blocking = "flake8 packages/{scope} --count --select=E9,F63,F7,F82 --show-source --statistics"
-format_check = "ruff format --check {files}"
 # run Qt tests under both: select the binding with PYTEST_QT_API (QT_API alone is ignored by pytest-qt);
 # without it pytest-qt picks PySide6. PySide6 stays pinned < 6.12.
 qt_backends = ["pyqt6", "pyside6"]
 qt_backend_env = "PYTEST_QT_API={backend}"
 qt_pins = { pyside6 = "<6.12" }
 qt_headless = "QT_QPA_PLATFORM=offscreen"
+
+# not a blocking check: the existing files are not ruff-formatted, so this fails on almost any touched file.
+# Hard rule 5 forbids reformatting untouched code. Agents report it, never fix it, never block on it.
+[advisory]
+format_check = "ruff format --check {files}"
 
 [limits]
 pr_max_changed_lines = 300             # (assumed)

@@ -24,7 +24,6 @@ import shlex
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -259,21 +258,29 @@ def cmd_run(a):
     if not names:
         print("no workflow applies to these changes: nothing to run")
         return
-    since = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=60)  # clock skew
-    for name in names:
-        sh("gh", "workflow", "run", name, "-R", fork, "--ref", a.branch)
-    print(f"dispatched on {a.branch} @ {head[:9]}: {', '.join(names)}")
-    deadline = time.time() + a.timeout
-    while True:
-        time.sleep(30)
+    def dispatched():
         runs = json.loads(sh("gh", "run", "list", "-R", fork, "--branch", a.branch, "--event", "workflow_dispatch",
                              "--limit", "50", "--json", "databaseId,workflowName,status,headSha,createdAt"))
         latest = {}
         for r in runs:  # gh lists newest first
             wf = file_of(r["workflowName"])
-            created = datetime.fromisoformat(r["createdAt"].replace("Z", "+00:00"))
-            if r["headSha"] == head and created >= since and wf in names and wf not in latest:
+            if r["headSha"] == head and wf in names and wf not in latest:
                 latest[wf] = r
+        return latest
+
+    # resumable: a second call for the same head waits for the runs already dispatched (rules.md 17)
+    existing = dispatched()
+    missing = [n for n in names if n not in existing]
+    for name in missing:
+        sh("gh", "workflow", "run", name, "-R", fork, "--ref", a.branch)
+    if missing:
+        print(f"dispatched on {a.branch} @ {head[:9]}: {', '.join(missing)}")
+    if existing:
+        print(f"resuming runs already dispatched for {head[:9]}: {', '.join(sorted(existing))}")
+    deadline = time.time() + a.timeout
+    while True:
+        time.sleep(30 if missing or any(r["status"] != "completed" for r in existing.values()) else 0)
+        latest = dispatched()
         if len(latest) == len(names) and all(r["status"] == "completed" for r in latest.values()):
             break
         if time.time() > deadline:

@@ -86,12 +86,14 @@ def requests(session=None, since=None, until=None):
                 if key in seen:
                     # same request, another content block: only collect its tool calls
                     if tools:
-                        yield {"dup": True, "tools": tools, "session": sid, "agent": agent, "model": model, "ts": ts}
+                        yield {"dup": True, "tools": tools, "session": sid, "agent": agent, "model": model, "ts": ts,
+                               "transcript": path.name}
                     continue
                 seen.add(key)
                 u = msg["usage"]
                 yield {
                     "dup": False, "session": sid, "agent": agent, "model": model, "ts": ts, "tools": tools,
+                    "transcript": path.name,
                     "input": u.get("input_tokens") or 0,
                     "cache_write": u.get("cache_creation_input_tokens") or 0,
                     "cache_read": u.get("cache_read_input_tokens") or 0,

@@ -10,7 +10,7 @@ figures are measured from the transcripts by usage.py. Otherwise omit them rathe
 --tokens-in/--tokens-out exist for runs measured elsewhere (cloud).
 """
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import sys
 from pathlib import Path
@@ -30,11 +30,15 @@ def measured(session: str, since):
     if not tot:
         return {}
     by_agent = usage.aggregate(rows, "agent")
+    launches = Counter(agent for agent, _ in {(r["agent"], r["transcript"]) for r in rows if r["agent"] != "main"})
     return {
         "session_id": rows[0]["session"], "started": tot["first"], "ended": tot["last"], "minutes": tot["minutes"],
         "tokens_in": tot["input"] + tot["cache_write"], "tokens_cache_read": tot["cache_read"],
         "tokens_out": tot["output"], "requests": tot["requests"], "tool_calls": tot["tool_calls"],
         "out_by_agent": {k: g["output"] for k, g in by_agent.items()},
+        "launches": dict(launches),  # sub-agent launches by type (one transcript each)
+        "_specialists": sum(n for k, n in launches.items() if k.startswith("spec-") or k == "test-agent"),
+        "_reviews": launches.get("pr-reviewer", 0),
     }
 
 
@@ -49,6 +53,9 @@ def cmd_add(a):
         m = measured(a.session, a.since)
         if not m:
             print("ledger: no requests found for that session/window, token figures left null", file=sys.stderr)
+        # counted, not reported: a run that forgets to pass --specialist-runs/--reviews still uses the budget
+        rec["specialist_runs"] = max(rec["specialist_runs"] or 0, m.pop("_specialists", 0))
+        rec["reviews"] = max(rec["reviews"] or 0, m.pop("_reviews", 0))
         for k, v in m.items():  # explicit --tokens-in/--tokens-out win over measured figures
             if rec.get(k) is None:
                 rec[k] = v
