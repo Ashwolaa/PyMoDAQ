@@ -543,6 +543,28 @@ class Config(BaseConfig):
         return dict(user=dict(name=USER))
 
     def __call__(self, *args):
+        """Get the value at the key path ``args``, accepting singular or plural spelling of some keys
+
+        The path is forwarded to ``BaseConfig.__call__``, which raises ``ConfigError`` if it does not exist.
+        If the path contains ``backend``, ``debug_level`` or ``dynamic`` and the value found is not a list, the
+        plural spelling (``backends``, ``debug_levels``, ``dynamics``) is tried and returned if it exists,
+        otherwise the scalar is returned wrapped in a list. A list found under the singular key is returned
+        as is. If the path contains the plural spelling, the value is returned; the fallback to the singular
+        key only happens on ``KeyError``, which ``BaseConfig.__call__`` does not raise (it raises
+        ``ConfigError``), so a missing plural key raises ``ConfigError``.
+        ``hdf5_backend`` is looked up the same way as the other singular keys but is not renamed, so its value
+        is returned as found (a scalar is not wrapped in a list). Any other path is forwarded unchanged.
+
+        Parameters
+        ----------
+        *args: Any
+            The keys (section names then entry name) leading to the wanted value
+
+        Returns
+        -------
+        Any
+            The value stored in the configuration at this path
+        """
         if 'backends' in args:
             try:
                 return super().__call__(*args)
