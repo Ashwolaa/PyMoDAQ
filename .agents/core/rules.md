@@ -2,7 +2,9 @@
 
 ## Universal
 1. Never push to the default branch (`dev`) or to any branch that is not your own agent branch.
-2. Never open a pull request against upstream. PRs target `dev_agent` on the fork, as drafts.
+2. Never open a pull request against upstream. PRs target `dev_agent` on the fork and are opened only by `/optimize-merge`,
+   after `pr-reviewer` approved the branch. Only `/optimize-merge` merges, with a merge commit, and only what
+   `scripts/merge_gate.py` allows; everything else waits for the human.
 3. Every agent branch is named `agent/<scope>/<specialty>/<YYYY-MM-DD>` (tools: `agent-tool/<name>`,
    research: `agent-rd/<topic>`), carries the `agent-made` label, an `Agent-Run: <run-id>` commit trailer,
    and a line in `registry.jsonl`.
@@ -18,7 +20,10 @@
 11. End every command report with the absolute path of each file it wrote, so the human can open them.
 12. State (`.agents/`: ledger, registry, plans, handoff, reports, scans) is committed only on `dev_agent`, never on an
     `agent/*` branch: a PR carries product files only. `ledger.py`, `registry.py` and `plan.py` refuse other branches.
-13. Task status in a plan changes only through `scripts/plan.py set-status`; an executed task becomes `done — draft PR #n, CI <result>`.
+13. Task status in a plan changes only through `scripts/plan.py set-status`. An executed task becomes
+    `done — branch <b>, CI <result>, awaiting review`; after /optimize-merge `done — PR #n merged (...)`,
+    `done — PR #n open, awaiting the human: ...` or `blocked — <reason>`.
+14. Every `gh` call names the fork: `-R <profile [project].fork>` (the clone's default repo may be upstream).
 
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions

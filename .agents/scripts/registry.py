@@ -2,10 +2,10 @@
 """Branch/PR registry. Usage:
 
   registry.py add --run-id R --scope S --specialty hygiene --branch agent/S/hygiene/2026-11-18 \
-      [--pr N] --risk low|medium|high [--task-id T] [--status open]
-  registry.py set-status --branch B --status merged|reverted|closed|open [--pr N]
+      [--pr N] --risk low|medium|high [--task-id T] [--status pushed|open]
+  registry.py set-status --branch B --status pushed|open|merged|reverted|closed [--pr N]
   registry.py list [--status open]
-Branch names must follow agent/<scope>/<specialty>/<date>, agent-tool/<name> or agent-rd/<topic>.
+Branch names must follow agent/<scope>/<specialty>/<date>[-<topic>], agent-tool/<name> or agent-rd/<topic>.
 """
 import argparse
 import json
@@ -17,8 +17,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import AGENTS_DIR, append_jsonl, fail, read_jsonl, require_state_branch, today
 
-BRANCH_RE = re.compile(r"^(agent/[\w.-]+/[\w-]+/\d{4}-\d{2}-\d{2}|agent-tool/[\w.-]+|agent-rd/[\w.-]+)$")
-STATUSES = ("open", "merged", "reverted", "closed")
+BRANCH_RE = re.compile(r"^(agent/[\w.-]+/[\w-]+/\d{4}-\d{2}-\d{2}(?:-[\w-]+)?|agent-tool/[\w.-]+|agent-rd/[\w.-]+)$")
+STATUSES = ("pushed", "open", "merged", "reverted", "closed")  # pushed = branch with CI, no PR yet
 
 
 def cmd_add(a):

@@ -1,7 +1,8 @@
 # Formats
 
 ## registry.jsonl (one JSON object per line, append via `scripts/registry.py`)
-`run_id, date, scope, specialty, branch, pr (int|null), status (open|merged|reverted|closed), risk (low|medium|high), task_id`
+`run_id, date, scope, specialty, branch, pr (int|null), status (pushed|open|merged|reverted|closed), risk (low|medium|high), task_id`
+`pushed` = branch pushed with CI run by `scripts/ci.py`, no PR yet; `open` = PR opened by /optimize-merge (or an old draft).
 
 ## ledger.jsonl (append via `scripts/ledger.py add`)
 `run_id, date, command, scope, mode (explain|run), model_tier, tokens_in, tokens_out, specialist_runs, prs_opened,
@@ -23,7 +24,7 @@ same file, so two runs can be shown to have had identical input. Advisors read t
 
 ## Run ids
 `<date>-run-<task-id>` for /optimize-run (one per task), `<date>-plan-<scope>` for /optimize-plan,
-`<date>-<command>-<topic>` for the others. Experiments may append a suffix (`-A2-haiku`).
+`<date>-merge-<scope|task-id|all>` for /optimize-merge, `<date>-<command>-<topic>` for the others. Experiments may append a suffix (`-A2-haiku`).
 
 ## plans/<date>-<scope>.md
 Header (scope, base commit, date) then one block per task:
@@ -36,7 +37,8 @@ Sections in this order: Done, Open findings (ranked, `path:line`, risk), Blocked
 (test results, coverage diff, screenshot paths). The next run reads this file first.
 
 ## reports/<folder>/<date>-<kind>.md
-Kinds: run, audit, review. Short, factual, numbers from files.
+Kinds: run, audit, review (committee), merge, `pr-review-<task-id>` (pr-reviewer; first four lines `verdict:`,
+`public_api:`, `behaviour_change:`, `fails_without_fix:`, read by `scripts/merge_gate.py`). Short, factual, numbers from files.
 
 ## practices/<folder>.md
 What worked / was reverted in that folder, written by best-practice; read by specialists before they start.

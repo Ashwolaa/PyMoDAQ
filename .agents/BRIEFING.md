@@ -14,16 +14,18 @@ plugin for any GitHub repository.
 - Project commands in `.claude/commands/`, agents in `.claude/agents/`, state in `.agents/`. Core (generic) and
   profile (repo-specific: `profile.toml`, `budget.toml`) are kept in separate files.
 - Commands: `/optimize-plan [scope]` (advisory board, never edits code), `/optimize-run [scope|task-id]`
-  (executive), `/optimize-status`, `/optimize-revert <run-id>`, `/optimize-research <topic>`, `/optimize-review`
+  (executive, pushes branches, no PR), `/optimize-merge [scope|task-id]` (pr-reviewer validates, then PR + merge gate),
+  `/optimize-status`, `/optimize-revert <run-id>`, `/optimize-research <topic>`, `/optimize-review`
   (committee). All take `--explain` (dry run). Later: `/optimize-init` (drafts a project profile, marking each
   field detected vs assumed, human confirms before anything is written).
 - Branches on the fork: `dev` mirrors `upstream/dev` (fast-forward only, never agent commits); `dev_agent` is the
   integration branch, `dev` merged into it daily; work branches `agent/<scope>/<specialty>/<date>`, tool branches
   `agent-tool/<name>`, research `agent-rd/<topic>`. Every agent branch: label `agent-made`, commit trailer
-  `Agent-Run: <run-id>`, line in `.agents/registry.jsonl`. PRs are drafts against `dev_agent`. NEVER open a PR or
+  `Agent-Run: <run-id>`, line in `.agents/registry.jsonl`. PRs target `dev_agent` and are opened only after pr-reviewer approved the branch. NEVER open a PR or
   push upstream automatically.
 - Merging into `dev_agent`: low-risk tasks that two decisioners both approved may auto-merge; anything touching
-  tests, UI or public API waits for the human.
+  tests, UI or public API waits for the human (2026-11-19: /optimize-merge + scripts/merge_gate.py; merge commits only,
+  so /optimize-revert can `git revert -m 1`; fork CI without a PR via scripts/ci.py, as push triggers miss `agent/...`).
 - Execution is flat (main session = coordinator, adopts a co-coordinator role per scope, launches specialists);
   nested sub-agents are not assumed to work (unverified).
 - Layers: advisory board (5 advisors: quality, uxui, performance, docs, compat -> decider-triage; decisioners

@@ -70,7 +70,7 @@ def main():
     s.add_argument("plan"); s.add_argument("task_id"); s.add_argument("status")
     s.set_defaults(fn=cmd_set_status)
     v = sub.add_parser("show")
-    v.add_argument("plan"); v.add_argument("--status")
+    v.add_argument("plan"); v.add_argument("--status", nargs="?", const=None, default=None)
     v.set_defaults(fn=cmd_show)
     a = ap.parse_args()
     a.fn(a)
