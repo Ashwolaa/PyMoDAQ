@@ -1,5 +1,6 @@
 """Shared helpers for the .agents scripts (standard library only)."""
 import json
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -31,6 +32,18 @@ def append_jsonl(name: str, record: dict) -> None:
 
 def today() -> str:
     return date.today().isoformat()
+
+
+def require_state_branch() -> None:
+    """State files (.agents/) are committed only on the integration branch, never on agent/* branches."""
+    try:
+        branch = subprocess.run(["git", "-C", str(AGENTS_DIR), "branch", "--show-current"],
+                                capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return
+    integration = load_toml("profile.toml").get("project", {}).get("integration_branch", "dev_agent")
+    if branch and branch != integration:
+        fail(f"state files live on {integration!r}, you are on {branch!r}: run `git switch {integration}` first")
 
 
 def fail(msg: str, code: int = 2):

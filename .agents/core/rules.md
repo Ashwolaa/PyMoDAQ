@@ -16,6 +16,9 @@
    `python3`.
 10. Log `--outcome failed` when the run produced nothing usable (no scan output, aborted setup), never `ok`.
 11. End every command report with the absolute path of each file it wrote, so the human can open them.
+12. State (`.agents/`: ledger, registry, plans, handoff, reports, scans) is committed only on `dev_agent`, never on an
+    `agent/*` branch: a PR carries product files only. `ledger.py`, `registry.py` and `plan.py` refuse other branches.
+13. Task status in a plan changes only through `scripts/plan.py set-status`; an executed task becomes `done — draft PR #n, CI <result>`.
 
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions

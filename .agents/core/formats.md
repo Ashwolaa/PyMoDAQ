@@ -21,6 +21,10 @@ simplifications listed with `path:line`; style counted per rule), vulture (>= 80
 radon (rank C or worse), jscpd (duplicate pairs). Footer: sha256 of the content. Same tree + same tool versions =
 same file, so two runs can be shown to have had identical input. Advisors read this file and nothing else.
 
+## Run ids
+`<date>-run-<task-id>` for /optimize-run (one per task), `<date>-plan-<scope>` for /optimize-plan,
+`<date>-<command>-<topic>` for the others. Experiments may append a suffix (`-A2-haiku`).
+
 ## plans/<date>-<scope>.md
 Header (scope, base commit, date) then one block per task:
 `id, title, scope, specialty, risk, files (path:line), verdicts (decider: approve|veto + 1 line), status`

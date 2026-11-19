@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import append_jsonl, read_jsonl, today
+from _common import append_jsonl, read_jsonl, require_state_branch, today
 
 OUTCOMES = ("ok", "failed", "limit", "budget")
 
@@ -39,6 +39,7 @@ def measured(session: str, since):
 
 
 def cmd_add(a):
+    require_state_branch()
     rec = {
         "run_id": a.run_id, "date": a.date or today(), "command": a.command, "scope": a.scope,
         "mode": a.mode, "model_tier": a.model_tier, "tokens_in": a.tokens_in, "tokens_out": a.tokens_out,

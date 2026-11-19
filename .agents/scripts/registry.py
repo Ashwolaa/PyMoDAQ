@@ -15,13 +15,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import AGENTS_DIR, append_jsonl, fail, read_jsonl, today
+from _common import AGENTS_DIR, append_jsonl, fail, read_jsonl, require_state_branch, today
 
 BRANCH_RE = re.compile(r"^(agent/[\w.-]+/[\w-]+/\d{4}-\d{2}-\d{2}|agent-tool/[\w.-]+|agent-rd/[\w.-]+)$")
 STATUSES = ("open", "merged", "reverted", "closed")
 
 
 def cmd_add(a):
+    require_state_branch()
     if not BRANCH_RE.match(a.branch):
         fail(f"invalid branch name: {a.branch}")
     if any(r["branch"] == a.branch for r in read_jsonl("registry.jsonl")):
@@ -34,6 +35,7 @@ def cmd_add(a):
 
 
 def cmd_set_status(a):
+    require_state_branch()
     rows = read_jsonl("registry.jsonl")
     hit = [r for r in rows if r["branch"] == a.branch]
     if not hit:

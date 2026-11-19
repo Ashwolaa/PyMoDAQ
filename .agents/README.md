@@ -7,7 +7,7 @@ Agent-driven optimization of this fork. Nothing here is part of the PyMoDAQ dist
   core/        generic part: rules, layers, formats (reusable on any repo)
   profile.toml project part: scopes, commands, hard rules, specialists
   budget.toml  daily caps and reset time (edited by a human)
-  scripts/     ledger.py, registry.py, budget.py, usage.py (token metrics), scan.py (advisor input), pr_stats.py, sync_branches.sh
+  scripts/     ledger.py, registry.py, budget.py, usage.py (token metrics), scan.py (advisor input), plan.py (task status), pr_stats.py, sync_branches.sh
   plans/       one plan per planning run (advisory board output)
   handoff/     one capped file per package: how to resume
   reports/     readable reports per folder (runs, audits, reviews)
