@@ -52,25 +52,25 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: config.py:549 (new docstring: backend(s), debug_level(s), dynamic(s) singular/plural fallback, any other key forwarded), utils.py:68-75 (_literal_value: list the accepted constants and constructors, raises UnsafeExpressionError otherwise). Docstrings only.
 - verdicts: decider-compat-risk and decider-triage: approve in round 2 (pilot)
-- status: done — draft PR #9, CI green
+- status: blocked — review: _literal_value docstring omits np.nan, np.True_/False_, tzinfo/fold keywords and date/time restriction
 
 ## T-pymodaq_utils-M08 API doc pages for config, logger, enums and plugin_tools
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: new .rst under docs/src/api/utility_api/ (existing automodule pages there: mathematical, units_conversion, utility_classes; none for config, logger, enums or plugin_tools, verified); never edit legacy_to_current.rst
 - verdicts: decider-compat-risk and decider-triage: approve (A2-sonnet, two tasks merged here)
-- status: done — draft PR #11, CI green
+- status: blocked — review: six undocumented members (GlobalConfig, ConfigError, get_base_logger, get_config_file, StrEnum, Severity) are dropped by autodoc; remove from :members:
 
 ## T-pymodaq_utils-M09 Module docstring on import side effects
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: __init__.py (module docstring: what importing pymodaq_utils does, e.g. serializable registration and CONFIG)
 - verdicts: decider-compat-risk: approve, claim verified in code; decider-triage: approve (B2)
-- status: done — draft PR #12, CI green
+- status: blocked — review: docstring calls SERIALIZABLE a registry (it is a type alias) and misdescribes failure handling
 
 ## T-pymodaq_utils-M10 Release note for the plugin_tools move
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: docs/src/changelogs/release_5_3.rst (exists)
 - verdicts: decider-compat-risk and decider-triage: approve (A2-haiku)
-- status: done — draft PR #13, CI green
+- status: blocked — review: extension_checks/check_extension came in 5.3.7, range '5.3.1 to 5.3.5' is wrong
 
 ## T-pymodaq_utils-M11 Shared input checks for ft/ift/ft2/ift2
 - scope: pymodaq_utils   specialty: refactor   risk: medium   found: 1/8
