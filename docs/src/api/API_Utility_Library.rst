@@ -14,6 +14,10 @@ Utility Libraries
    utility_api/mathematical
    utility_api/file_management
    utility_api/data_management
+   utility_api/config
+   utility_api/logger
+   utility_api/enums
+   utility_api/plugin_tools
 
 
 parameter
