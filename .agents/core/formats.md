@@ -15,6 +15,12 @@ Not readable as a number by a session. `usage.py snapshots` lists the `/usage` r
 times) and limit hits found in the transcripts; `usage.py calibrate` turns two readings of the same weekly window
 into tokens per week-%. Budget caps in `budget.toml` are set from these figures, not from guesses.
 
+## scans/<scope>-<tree>.md (written by `scripts/scan.py`)
+Header (scope, path, git tree id of the scanned folder, tool versions), then ruff (bug risk, unused imports and
+simplifications listed with `path:line`; style counted per rule), vulture (>= 80% listed, lower counted per file),
+radon (rank C or worse), jscpd (duplicate pairs). Footer: sha256 of the content. Same tree + same tool versions =
+same file, so two runs can be shown to have had identical input. Advisors read this file and nothing else.
+
 ## plans/<date>-<scope>.md
 Header (scope, base commit, date) then one block per task:
 `id, title, scope, specialty, risk, files (path:line), verdicts (decider: approve|veto + 1 line), status`
