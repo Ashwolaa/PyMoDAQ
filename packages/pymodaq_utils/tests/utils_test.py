@@ -139,6 +139,13 @@ def test_ThreadCommand():
     assert threadcomm.attribute is attributes
 
 
+def test_ThreadCommand_deprecated_attributes():
+    with pytest.warns(DeprecationWarning):
+        threadcomm = utils.ThreadCommand('c', attributes=[1, 2])
+    assert threadcomm.attribute == [1, 2]
+    assert threadcomm.attributes == [1, 2]
+
+
 @pytest.mark.parametrize(
     "other, expected",
     [
