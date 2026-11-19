@@ -64,7 +64,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: __init__.py (module docstring: what importing pymodaq_utils does, e.g. serializable registration and CONFIG)
 - verdicts: decider-compat-risk: approve, claim verified in code; decider-triage: approve (B2)
-- status: approved
+- status: done — draft PR #12, CI green
 
 ## T-pymodaq_utils-M10 Release note for the plugin_tools move
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
