@@ -3,7 +3,7 @@
 
 [daily]
 cocoordinators = 1
-specialist_runs = 10       # raised by the owner on 2026-11-19 for the merged-plan run (was 3)
+specialist_runs = 14       # raised by the owner on 2026-11-19 for the docs reworks (was 10, before that 3)
 prs_opened = 10            # raised by the owner on 2026-11-19 for the merged-plan run (was 2)
 runs = 999            # exploration: effectively unlimited (was 1)
 reviews = 12              # pr-reviewer launches per day (/optimize-merge); owner, 2026-11-19

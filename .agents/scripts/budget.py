@@ -3,7 +3,7 @@
 
   budget.py check [--kind executive|rd|merge|pr] [--this-run-reviews N] [--this-run-prs N]
                                           exit 0 = go, exit 1 = stop (reason printed), exit 2 = error
-  Each kind checks only what that step consumes: executive = runs, specialist_runs, prs_opened; rd = its share of
+  Each kind checks only what that step consumes: executive = runs, specialist_runs (optimize-run opens no PR); rd = its share of
   runs; merge = runs and reviews (pr-reviewer launches); pr = prs_opened (call it right before `gh pr create`).
   --this-run-* add what the current run already used: the ledger line is only written at the end of a run.
   budget.py disable-check                 exit 1 if the schedule should disable itself
@@ -53,7 +53,7 @@ def cmd_check(a):
         "prs_opened": sum(r.get("prs_opened") or 0 for r in every) + a.this_run_prs,
         "reviews": sum(r.get("reviews") or 0 for r in every) + a.this_run_reviews,
     }
-    keys = {"executive": ("runs", "specialist_runs", "prs_opened"), "merge": ("runs", "reviews"),
+    keys = {"executive": ("runs", "specialist_runs"),  # optimize-run opens no PR: prs_opened is checked by --kind pr "merge": ("runs", "reviews"),
             "pr": ("prs_opened",)}[a.kind]
     used = {k: used[k] for k in keys}
     daily.setdefault("reviews", 12)
