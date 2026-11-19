@@ -76,6 +76,13 @@ class Socket:
         Returns
         -------
         bytes
+
+        Raises
+        ------
+        TypeError
+            If length is not an integer
+        ConnectionError
+            If the peer closed the connection before all bytes were received
         """
         if not isinstance(length, int):
             raise TypeError(f'{length} should be an integer, not a {type(length)}')
@@ -87,6 +94,10 @@ class Socket:
                 data_bytes_tmp = self.socket.recv(4096)
             else:
                 data_bytes_tmp = self.socket.recv(length - mess_length)
+            if not data_bytes_tmp:
+                raise ConnectionError(
+                    f'Connection closed by peer after receiving {mess_length} bytes '
+                    f'out of {length} expected')
             mess_length += len(data_bytes_tmp)
             data_bytes += data_bytes_tmp
         # print(data_bytes)
