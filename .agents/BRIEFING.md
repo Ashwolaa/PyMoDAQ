@@ -30,7 +30,7 @@ plugin for any GitHub repository.
   nested sub-agents are not assumed to work (unverified).
 - Layers: advisory board (5 advisors: quality, uxui, performance, docs, compat -> decider-triage; decisioners
   compat-risk (veto), test-change (veto), arbiter (binding)); executive (cocoordinator, specialists hygiene,
-  test-quality, refactor, uiux, docs; one test-agent instance per test folder, 12 today); audit (scripts + auditor);
+  test-quality, refactor, uiux, docs; one test-agent instance per test folder, 12 today); audit (scripts: merge_gate.py lint/check, ci.py; the auditor agent was removed 2026-11-19, pr-reviewer checks drift);
   R&D (rd-researcher, best-practice); committee (efficiency, outcomes, governance; reads only ledger, registry,
   handoffs, reports; may recommend and pause a role, never edits agent definitions).
 - Deliberation: two decisioners must both approve each finding, any single veto stops it; on disagreement each
