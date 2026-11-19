@@ -351,6 +351,7 @@ def cmd_close(a):
     other = [l for l in porcelain.splitlines() if l and not l[3:].startswith(".agents/")]
     if other:
         fail("product files changed on dev_agent: " + ", ".join(other))
+    script("status.py", "--write")  # STATUS.md follows every run
     git("add", ".agents")
     what = "blocked" if rec.get("blocked") else f"branch pushed, CI {ci_word(rec)}"
     git("commit", "-q", "-m", f"Log /optimize-run {rec['task_id']} ({what})\n\nAgent-Run: {rec['run_id']}")

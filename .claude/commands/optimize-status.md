@@ -2,7 +2,7 @@
 description: Show today's budget use, task queue, blocked items and recent agent PRs
 ---
 
-Read-only. Run, from the repository root:
+Read-only. First `python3 .agents/scripts/status.py` (the generated status page: needs-you, in flight, findings, recent runs) and show it. Then run, from the repository root:
 - `python3 .agents/scripts/ledger.py summary`
 - `python3 .agents/scripts/budget.py check` and `budget.py disable-check`
 - `python3 .agents/scripts/registry.py list --status pushed` (branches awaiting /optimize-merge) and `--status open` (PRs awaiting the human)

@@ -11,6 +11,8 @@ git remote get-url origin   >/dev/null 2>&1 || { echo "remote 'origin' missing" 
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 2; }
 
 run git fetch upstream dev
+# tags: the fork's CI computes versions from them (git_describe.py times out without them)
+run git fetch upstream --tags --quiet
 run git fetch origin
 # dev: fast-forward only, never receives agent commits. Updated without a checkout, so the script can run
 # from the dev_agent worktree; a plain (non-force) push refuses anything but a fast-forward on the fork.
@@ -29,3 +31,4 @@ else
 fi
 run git merge --no-edit dev
 run git push -u origin dev_agent
+run git push --quiet origin --tags
