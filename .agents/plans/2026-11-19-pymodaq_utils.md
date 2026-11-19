@@ -1,7 +1,8 @@
 # Plan: pymodaq_utils — 2026-11-19
-base commit: 1aba4217b   mode: explain (written to plans/ at the user's request; nothing executed)
+base commit: 1aba4217b   mode: run (refreshed 2026-11-19 after T-001 execution; scan identical to original, no re-deliberation needed)
 
 Scanners used (venv ~/.venvs/optimize-agents, jscpd via ~/.npm-global): ruff (196 findings), vulture, radon, jscpd (1.81% dup).
+Rebase T2/T3 onto dev_agent after #3 merges (both touch config.py/environment.py).
 Merge order (arbiter, binding): T2, T3, T5, T4, T1. All five stay separate PRs; hunks are far apart, rebases are clean.
 Before each merge: pytest from packages/pymodaq_utils, flake8 blocking set, layering_test, on the rebased branch.
 
@@ -10,7 +11,8 @@ Before each merge: pytest from packages/pymodaq_utils, flake8 blocking set, laye
 - files: config.py:3,11,13,23; environment.py:3 and lambda `l` 193-194; mysocket.py:8; serialize/mysocket.py:1 (TYPE_CHECKING optional); math_utils.py:7 (duplicate Union)
 - note: drops the unused pymodaq_gui TYPE_CHECKING import (config.py:23), helps layering. Edit only those lines; do not re-sort.
 - verdicts: decider-compat-risk: approve — no importer of these names under packages/ and docs/; decider-triage: approve — each name only on its import line
-- status: approved
+- also: obsolete layering_test ALLOWED entry for config.py removed (decider-test-change: approve)
+- status: executed — draft PR Ashwolaa/PyMoDAQ#3 -> dev_agent, awaiting human review
 
 ## T-pymodaq_utils-002 (T3) Exception handling
 - scope: pymodaq_utils   specialty: hygiene   risk: low
@@ -49,4 +51,5 @@ read-only list defaults (utils.py:459,476,511, array_manipulation.py:151, math_u
 Complexity refactors with characterisation tests first, one function per PR: rules.py:685 check_extension_source F(65) (keep rule ids/messages), utils.py:68 _literal_value F(42), rules.py:490 check_plugin_source E(38). Lint config note: ruff reports 196 findings, mostly UP006/I001/UP035/whitespace in files no task touches.
 
 ## Blocked
-none
+- packages/pymodaq_utils/tests/config_test.py::test_nested_update_from_user fails on dev_agent (pre-existing, unrelated to any task): needs the human or its own task.
+- PyQt6 not yet run for the T-001 checks (PySide6 only).
