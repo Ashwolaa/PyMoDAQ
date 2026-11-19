@@ -12,7 +12,7 @@ Before each merge: pytest from packages/pymodaq_utils, flake8 blocking set, laye
 - note: drops the unused pymodaq_gui TYPE_CHECKING import (config.py:23), helps layering. Edit only those lines; do not re-sort.
 - verdicts: decider-compat-risk: approve — no importer of these names under packages/ and docs/; decider-triage: approve — each name only on its import line
 - also: obsolete layering_test ALLOWED entry for config.py removed (decider-test-change: approve)
-- status: done — PR #3 open, awaiting the human: touches tests (layering_test.py allowlist entry), touches a UI scope
+- status: done — PR #3 merged by the human
 
 ## T-pymodaq_utils-002 (T3) Exception handling
 - scope: pymodaq_utils   specialty: hygiene   risk: low
