@@ -1,1 +1,2 @@
 {"branch": "agent/pymodaq_utils/hygiene/2026-11-19", "date": "2026-11-19", "pr": 3, "risk": "low", "run_id": "2026-11-19-run-T-pymodaq_utils-001", "scope": "pymodaq_utils", "specialty": "hygiene", "status": "open", "task_id": "T-pymodaq_utils-001"}
+{"branch": "agent/pymodaq_utils/hygiene-exceptions/2026-11-19", "date": "2026-11-19", "pr": 4, "risk": "low", "run_id": "2026-11-19-run-T-pymodaq_utils-M04", "scope": "pymodaq_utils", "specialty": "hygiene", "status": "open", "task_id": "T-pymodaq_utils-M04"}

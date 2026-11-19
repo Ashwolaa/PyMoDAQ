@@ -4,6 +4,8 @@
 - T-pymodaq_utils-001 (unused imports): draft PR Ashwolaa/PyMoDAQ#3 -> dev_agent, label agent-made, 2 commits, +2/-10 lines.
 - Also removed the obsolete layering_test ALLOWED entry for config.py (decider-test-change: approve; not yet written into the plan).
 
+- T-pymodaq_utils-M04 (exception hygiene): draft PR Ashwolaa/PyMoDAQ#4 -> dev_agent, branch agent/pymodaq_utils/hygiene-exceptions/2026-11-19, +4/-4, 3 files. Tests 308 passed/1 skipped/1 pre-existing failure; flake8 0; layering 3 passed.
+
 ## Open findings (ranked)
 1. T-pymodaq_utils-002 (exception handling) [risk: low] approved, not run
 2. T-pymodaq_utils-003 (docstrings) [risk: low] approved, not run
