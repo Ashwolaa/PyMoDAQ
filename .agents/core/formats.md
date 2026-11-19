@@ -4,6 +4,11 @@
 `run_id, date, scope, specialty, branch, pr (int|null), status (pushed|open|merged|reverted|closed), risk (low|medium|high), task_id`
 `pushed` = branch pushed with CI run by `scripts/ci.py`, no PR yet; `open` = PR opened by /optimize-merge (or an old draft).
 
+## findings.jsonl (via `scripts/findings.py`)
+`key, scope, kind (ci-upstream|review|run), title, evidence [urls], sources [run ids], first_seen, last_seen, seen,
+status (open|planned|closed), task_id, note`. Problems found outside the scans; the same key is recorded once
+(`seen` counts repeats). `/optimize-plan` gives the open ones of its scope to triage and the decisioners.
+
 ## ledger.jsonl (append via `scripts/ledger.py add`)
 `run_id, date, command, scope, mode (explain|run), model_tier, tokens_in, tokens_out, specialist_runs, prs_opened, reviews,
 outcome (ok|failed|limit|budget), note`, plus, when logged with `--session current --since <START>`: `session_id,
