@@ -70,7 +70,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
 - files: docs/src/changelogs/release_5_3.rst (exists)
 - verdicts: decider-compat-risk and decider-triage: approve (A2-haiku)
-- status: done — branch agent/pymodaq_utils/docs-release-note/2026-11-19, CI green, reworked after review r1, awaiting review
+- status: done — PR #13 merged (auto: low risk, reviewer approve, 6 lines, no tests/UI/API)
 
 ## T-pymodaq_utils-M11 Shared input checks for ft/ift/ft2/ift2
 - scope: pymodaq_utils   specialty: refactor   risk: medium   found: 1/8
