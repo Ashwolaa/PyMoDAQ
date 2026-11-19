@@ -165,7 +165,9 @@ def main():
         return
     out = AGENTS_DIR / "scans" / f"{a.scope.replace('/', '__')}-{tree}{'-dirty' if dirty else ''}.md"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(text)
+    hashed = text.rsplit("(scanned at commit", 1)[0]
+    if not (out.exists() and out.read_text().rsplit("(scanned at commit", 1)[0] == hashed):
+        out.write_text(text)  # same source and tools as an existing scan: keep that file untouched
     print(rel(str(out)))
     if not any(tools.values()):
         sys.exit(3)  # nothing could be scanned: the caller logs --outcome failed
