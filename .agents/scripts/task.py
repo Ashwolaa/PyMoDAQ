@@ -347,7 +347,8 @@ def cmd_close(a):
     limit = profile()["limits"].get("handoff_max_lines", 40)
     if lines > limit:
         fail(f"{handoff.name} has {lines} lines > {limit}")
-    other = [l for l in git("status", "--porcelain").splitlines() if not l[3:].startswith(".agents/")]
+    porcelain = sh(["git", "status", "--porcelain"]).stdout  # unstripped: the first line starts with a space
+    other = [l for l in porcelain.splitlines() if l and not l[3:].startswith(".agents/")]
     if other:
         fail("product files changed on dev_agent: " + ", ".join(other))
     git("add", ".agents")
