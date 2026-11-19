@@ -1,11 +1,15 @@
-# Handoff pymodaq_utils (optimize-merge 2026-11-19, T-pymodaq_utils-M09)
+# Handoff pymodaq_utils (optimize-run rework 2026-11-19, T-pymodaq_utils-M07)
 ## Done
-- M10 (PR #13) and M09 (PR #12) merged into dev_agent (auto-merge, merge commits). M09: review r2 approve,
-  branch and PR CI green, tests under pyqt6/pyside6 pass except the known config_test failure.
-## Blocked (review `changes`, need /optimize-run <id>)
-- M07 (#9), M08 (#11): not reworked yet (still draft PRs).
+- M07 (PR #9) reworked after review r1: _literal_value docstring now lists np.nan, np.True_/False_, datetime.* spellings
+  and the tzinfo/fold keywords. Branch agent/pymodaq_utils/docs/2026-11-19 @ 909c4efe2, force-pushed; CI green
+  (compile-doc, tests-utils, typing). Earlier: M09 (#12), M10 (#13) merged.
+## Blocked
+- M08 (#11): review `changes`, not reworked yet (/optimize-run T-pymodaq_utils-M08).
 ## Notes
-- config_test::test_nested_update_from_user fails on dev_agent too (known, pre-existing).
-- Review nit for later: set_logger can sys.exit(-1), which `except Exception` in __init__ does not catch (unverified beyond reviewer).
+- config_test::test_nested_update_from_user fails on dev_agent too (pre-existing; pytest tests/config_test.py::test_nested_update_from_user).
+- Review nit: Config.__call__ plural->singular KeyError fallback is dead code (BaseConfig raises ConfigError); candidate for /optimize-plan.
+- Review nit: set_logger can sys.exit(-1), not caught by `except Exception` in __init__ (unverified).
 ## Next step
-- /optimize-run for M07, M08, then /optimize-merge.
+- /optimize-merge T-pymodaq_utils-M07 (review r2), then rework M08.
+## Evidence
+- tests pyqt6 and pyside6: 323 passed, 1 failed (pre-existing), 1 skipped; layering 3 passed; flake8 blocking 0.
