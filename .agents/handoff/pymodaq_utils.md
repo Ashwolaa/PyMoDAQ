@@ -11,10 +11,10 @@
 2. logger.py set_logger sys.exit(-1) on import path (T-007) [risk: medium]
 
 ## Blocked
-- none
+- /optimize-merge T-009 stopped 2026-11-19: budget.py check --kind merge -> STOP: reviews 14 >= cap 14. No review launched, nothing merged. Branch still `pushed`, no PR.
 
 ## Next step
-- /optimize-merge T-pymodaq_utils-009; then remaining r2 order: T-006, T-011, T-007, T-008 (T-010 independent).
+- /optimize-merge T-pymodaq_utils-009 once the review cap resets (or the human raises it in budget.toml); then remaining r2 order: T-006, T-011, T-007, T-008 (T-010 independent).
 
 ## Evidence
 - checks: flake8 0, layering 3 passed, merge_gate lint OK (51 lines)
