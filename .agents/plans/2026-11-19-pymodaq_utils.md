@@ -19,7 +19,7 @@ Before each merge: pytest from packages/pymodaq_utils, flake8 blocking set, laye
 - files: config.py:118 (drop unused `e`), config.py:325-326 (keep `as e`, add `from e`), environment.py:153, packages.py:96 (bare except -> except Exception)
 - note: keep separate from T2; only changes KeyboardInterrupt/SystemExit handling and traceback chaining. Optional test: __cause__ is KeyError.
 - verdicts: decider-compat-risk: approve — try bodies only raise Exception subclasses, ConfigError unchanged; decider-triage: approve — spec corrected (do not drop `e` at 325)
-- status: approved
+- status: done — as T-pymodaq_utils-M04 of the merged plan, PR #4 merged by the human
 
 ## T-pymodaq_utils-003 (T5) Docstrings
 - scope: pymodaq_utils   specialty: docs   risk: low
@@ -27,7 +27,7 @@ Before each merge: pytest from packages/pymodaq_utils, flake8 blocking set, laye
 - text constraints (from both deciders): Config.__call__ covers backend/backends, debug_level/debug_levels, dynamic/dynamics; plural falls back to singular on KeyError; singular returns the stored list, else the plural key's value, else the singular value wrapped in a list; NO hdf5_backend sentence (it falls under "any other key", forwarded unchanged). _literal_value: add nan/inf, np/numpy.nan, np/numpy.True_/False_, array(...)/np.array(...)/numpy.array(...), tzinfo=datetime.timezone.utc and fold keywords of the safe constructors, raises UnsafeExpressionError otherwise. Docstrings only; leave config.py:554 indentation and :601 whitespace.
 - dropped from original T5: check_extension_source docstring (already accurate)
 - verdicts: decider-compat-risk: approve (round 2); decider-triage: approve (round 2, after veto on text-less original)
-- status: approved
+- status: done — as T-pymodaq_utils-M07 of the merged plan, PR #9 merged (auto)
 
 ## T-pymodaq_utils-004 (T4) Fix no-op in extract_authors_from_description
 - scope: pymodaq_utils   specialty: refactor (bugfix)   risk: medium
@@ -35,14 +35,14 @@ Before each merge: pytest from packages/pymodaq_utils, flake8 blocking set, laye
 - tests: no Instruments + Contributors; no Instruments + no Contributors; last author's final char kept; each asserts the exact list, short authors, no truncation asserted
 - note: public name, no in-repo callers; pymodaq_plugin_manager has its own copy (validate.py:326,392, unverified here). Label as bug fix.
 - verdicts: decider-compat-risk: approve (round 2; first fix posi=posa+50 vetoed: truncates names); decider-test-change: approve — tests only added, fail on old code
-- status: proposed (touches tests, public function)
+- status: done — as T-pymodaq_utils-M01 of the merged plan, PR #5 merged by the human
 
 ## T-pymodaq_utils-005 (T1) Shared mutable defaults
 - scope: pymodaq_utils   specialty: hygiene (bugfix)   risk: low
 - files: utils.py:444,458,475 (paths=None + in-body default); docstring notes at 447,463,482-483 removed; tests/utils_test.py new test
 - tests: tmp_path with known files; second call returns same as first (equal lists); replace stays False; filters=[...] left alone
 - verdicts: decider-compat-risk: approve — only recursive/__main__ callers, keyword paths preserved; decider-test-change: approve — test only added
-- status: proposed (touches tests)
+- status: done — as T-pymodaq_utils-M05 of the merged plan, PR #8 merged by the human
 
 ## Dropped (triage)
 read-only list defaults (utils.py:459,476,511, array_manipulation.py:151, math_utils.py:616); abstract.py:12 abstractmethod (public module); false positives: __init__.py:15, serialize/factory.py:3, serializer.py:3, safe_pickle.py:53 pid, serializer_legacy.py:13; repo-wide autofix (hard rule 5); jscpd duplication (1.81%, likely intentional).

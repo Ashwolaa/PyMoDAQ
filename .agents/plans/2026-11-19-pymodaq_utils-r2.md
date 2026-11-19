@@ -1,6 +1,11 @@
 # Plan: pymodaq_utils — 2026-11-19 (r2, new scan)
 base commit: fff891935   mode: run   scan: .agents/scans/pymodaq_utils-45ab1aceab89.md (sha256 b063d052ec474d0dead456baec8f58bb3c81068f0e52794d89567eac06e03410)
 Complements 2026-11-19-pymodaq_utils.md (T-001..T-005). Re-check every file:line against HEAD before executing (plans expire after 14 days).
+Correction (owner's session, 2026-11-19, after this plan was written): T-002..T-005 of the earlier plan were already
+done as M04, M07, M01, M05 of the merged plan (PRs #4, #9, #5, #8); that plan showed them as open by mistake. So in the
+ruling below T-002 and T-004 are done (drop them from the order), and the T-003 parts are already merged in #9: T-006
+still rewrites the Config.__call__ docstring to match the code after its deletion; T-009 only checks that the
+`_literal_value` docstring merged in #9 is still right. Effective order: T-006, T-011, T-007, T-009, T-008 (T-010 independent).
 Arbiter ruling (binding), merge order, each a separate PR rebased on dev_agent after the previous merge:
 T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - The Config.__call__ docstring part of T-003 is merged into T-006 (T-003's text "plural falls back to singular on KeyError" is false after T-006; re-verify against the code).

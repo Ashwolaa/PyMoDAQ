@@ -1,7 +1,7 @@
 # Plan: pymodaq_utils — 2026-11-19 (merged)
 base commit: bde8dbd11   source tree: 4a0d17e7dcfc (unchanged since the scans)   mode: run
 Merged by the human-side session from 8 plans on identical source: pilot, expA, A2-sonnet, A2-haiku, A3-sonnet,
-A3-haiku, B1, B2 (all in this folder). "found" = how many of the 8 runs proposed it. Status rule: `approved` only if
+A3-haiku, B1, B2 (moved to plans/experiments/). "found" = how many of the 8 runs proposed it. Status rule: `approved` only if
 no run vetoed or blocked it and it touches neither tests nor public API; otherwise `proposed` for the human.
 Re-check every file:line against HEAD before executing (plans expire after 14 days).
 
