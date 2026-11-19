@@ -4,7 +4,8 @@
   ci.py workflows --branch B [--base dev_agent]        list the workflows that apply to the branch's changes
   ci.py run --branch B [--base dev_agent] [--timeout 1500]
       dispatch those workflows on the pushed branch head (workflow_dispatch) and wait for them.
-      exit 0 = all green, 1 = a run failed (failed run ids printed), 2 = still pending at timeout, 3 = error
+      failed jobs are rerun once (--no-rerun to skip); a job that passes on rerun is reported as flaky.
+      exit 0 = all green, 1 = a job failed (twice), 2 = still pending at timeout, 3 = error
 
 Why: the fork's workflows trigger on `push: branches: '*'`, and `*` does not match the `/` in agent/... names, so a
 push alone runs nothing. Each test workflow has `workflow_dispatch`; a workflow applies when it is active on the fork,
@@ -129,20 +130,50 @@ def cmd_run(a):
                 latest[name] = r  # gh lists newest first
         done = {n: r for n, r in latest.items() if r["status"] == "completed"}
         if len(done) == len(names):
-            bad = {n: r for n, r in done.items() if r["conclusion"] not in ("success", "skipped")}
-            for n, r in sorted(done.items()):
-                print(f"  {r['conclusion']:9} {n}  {r['url']}")
-            if bad:
-                print("CI red: " + ", ".join(f"{n} (gh run view {r['databaseId']} --log-failed -R {fork()})"
-                                             for n, r in bad.items()))
-                sys.exit(1)
-            print("CI green")
-            return
+            break
         if time.time() > deadline:
-            waiting = sorted(set(names) - set(done))
-            print(f"CI pending after {a.timeout}s: {', '.join(waiting)}")
+            print(f"CI pending after {a.timeout}s: {', '.join(sorted(set(names) - set(done)))}")
             sys.exit(2)
+    ids = {n: r["databaseId"] for n, r in done.items()}
+    bad = failed_jobs(ids)
+    if bad and a.rerun_failed:
+        # one retry of the failed jobs only: PySide6 suites have known random failures (GC in QThread)
+        print("failed jobs, rerunning them once: " + "; ".join(f"{n}: {', '.join(j)}" for n, j in bad.items()))
+        for n in bad:
+            sh("gh", "run", "rerun", str(ids[n]), "--failed", "-R", fork())
+        while True:
+            time.sleep(30)
+            views = {n: json.loads(sh("gh", "run", "view", str(ids[n]), "-R", fork(), "--json", "status"))
+                     for n in bad}
+            if all(v["status"] == "completed" for v in views.values()):
+                break
+            if time.time() > deadline:
+                print(f"CI pending after {a.timeout}s (rerun): {', '.join(sorted(bad))}")
+                sys.exit(2)
+        flaky = bad
+        bad = failed_jobs({n: ids[n] for n in bad})
+        flaky = {n: j for n, j in flaky.items() if n not in bad}
+        if flaky:
+            print("flaky (failed, then passed on rerun): " + "; ".join(f"{n}: {', '.join(j)}" for n, j in flaky.items()))
+    for n in sorted(ids):
+        print(f"  {'FAILED' if n in bad else 'ok':7} {n}  https://github.com/{fork()}/actions/runs/{ids[n]}")
+    if bad:
+        print("CI red: " + "; ".join(f"{n}: {', '.join(j)} (gh run view {ids[n]} --log-failed -R {fork()})"
+                                     for n, j in bad.items()))
+        sys.exit(1)
+    print("CI green")
 
+
+def failed_jobs(ids: dict) -> dict:
+    """Failed jobs per workflow. Read jobs, not the run conclusion: tests-pymodaq.yml sets continue-on-error on its
+    test jobs, so its run reports success even when a job failed."""
+    out = {}
+    for n, rid in ids.items():
+        jobs = json.loads(sh("gh", "run", "view", str(rid), "-R", fork(), "--json", "jobs"))["jobs"]
+        bad = [j["name"] for j in jobs if j["conclusion"] in ("failure", "cancelled", "timed_out", "startup_failure")]
+        if bad:
+            out[n] = bad
+    return out
 
 def main():
     p = argparse.ArgumentParser()
@@ -153,6 +184,8 @@ def main():
         s.add_argument("--base", default="dev_agent")
         if name == "run":
             s.add_argument("--timeout", type=int, default=1500)
+            s.add_argument("--no-rerun", dest="rerun_failed", action="store_false",
+                           help="do not rerun failed jobs once before reporting red")
         s.set_defaults(fn=fn)
     a = p.parse_args()
     a.fn(a)
