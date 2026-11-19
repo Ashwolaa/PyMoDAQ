@@ -68,9 +68,11 @@ class UnsafeExpressionError(ValueError):
 def _literal_value(node: ast.AST) -> Any:
     """Rebuild a value from the ast of its ``repr`` without ever evaluating code
 
-    Only numbers, strings, bytes, booleans, None, signed and complex numbers, tuples, lists, dicts and sets of
-    these, and the constructors of ``_SAFE_CONSTRUCTORS`` (str, int, float, complex, set, frozenset, Path,
-    datetime, date, time, the numpy scalar types) given plain arguments are accepted.
+    Only numbers, strings, bytes, booleans, None, signed and complex numbers, ``nan``, ``inf``, tuples, lists,
+    dicts and sets of these, numpy arrays of numbers, booleans or strings, and the constructors of
+    ``_SAFE_CONSTRUCTORS`` (str, int, float, complex, set, frozenset, OrderedDict, Path and its Posix/Windows
+    variants, datetime, date, time, the numpy float, int, uint and complex scalar types) given plain arguments
+    are accepted. Anything else raises ``UnsafeExpressionError``.
     """
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (str, bytes, int, float, complex, bool, type(None))):
