@@ -7,14 +7,17 @@ Importing this package has side effects:
 * The ``pymodaq`` base logger is created with a handler
   (``set_logger('pymodaq', add_handler=True, base_logger=True)``).
 * ``pymodaq_utils.serialize.serializer`` is imported; it re-exports
-  ``SerializableFactory`` and ``SERIALIZABLE`` from ``serializall``, the registry
-  that classes decorated with ``SerializableFactory.register_decorator()`` join.
+  ``SerializableFactory`` (whose registry receives the classes decorated with
+  ``SerializableFactory.register_decorator()``) and the ``SERIALIZABLE`` type alias
+  from ``serializall``.
 * ``CONFIG = GlobalConfig()`` is instantiated. Importing ``pymodaq_utils.config``
   registers the ``utils`` config, which loads its toml files and creates them
-  (and their folders) from the template if they are missing.
+  (and their folders) if they are missing: the system file from the template,
+  the user file from ``dict_to_add_to_user()``.
 
-Failures are not raised: they are logged when the logger exists, otherwise
-printed, and the names defined after the failure are then missing.
+A failure in the logger/serializer step prints a message and the import goes on.
+Any other failure is logged (printed if the logger does not exist) and the names
+defined after it are then missing.
 """
 
 try:
