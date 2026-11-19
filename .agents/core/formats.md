@@ -5,7 +5,7 @@
 `pushed` = branch pushed with CI run by `scripts/ci.py`, no PR yet; `open` = PR opened by /optimize-merge (or an old draft).
 
 ## ledger.jsonl (append via `scripts/ledger.py add`)
-`run_id, date, command, scope, mode (explain|run), model_tier, tokens_in, tokens_out, specialist_runs, prs_opened,
+`run_id, date, command, scope, mode (explain|run), model_tier, tokens_in, tokens_out, specialist_runs, prs_opened, reviews,
 outcome (ok|failed|limit|budget), note`, plus, when logged with `--session current --since <START>`: `session_id,
 started, ended, minutes, tokens_cache_read, requests, tool_calls, out_by_agent` (output tokens per agent type).
 `tokens_in` = uncached input + cache writes. Figures are measured by `scripts/usage.py` from the local transcripts

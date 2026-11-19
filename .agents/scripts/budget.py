@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Budget gate. Usage:
 
-  budget.py check [--kind executive|rd]   exit 0 = go, exit 1 = stop (reason printed), exit 2 = error
+  budget.py check [--kind executive|rd|merge|pr] [--this-run-reviews N] [--this-run-prs N]
+                                          exit 0 = go, exit 1 = stop (reason printed), exit 2 = error
+  Each kind checks only what that step consumes: executive = runs, specialist_runs, prs_opened; rd = its share of
+  runs; merge = runs and reviews (pr-reviewer launches); pr = prs_opened (call it right before `gh pr create`).
+  --this-run-* add what the current run already used: the ledger line is only written at the end of a run.
   budget.py disable-check                 exit 1 if the schedule should disable itself
 
 Caps come from budget.toml. They are lowered to ceil(cap * 0.7) when the most recent run ended with
@@ -24,8 +28,9 @@ def caps():
     daily = dict(cfg["daily"])
     rows = read_jsonl("ledger.jsonl")
     if cfg["safety"].get("lower_caps_after_limit_hit") and rows and rows[-1]["outcome"] == "limit":
-        for k in ("cocoordinators", "specialist_runs", "prs_opened", "runs"):
-            daily[k] = max(1, math.ceil(daily[k] * 0.7))
+        for k in ("cocoordinators", "specialist_runs", "prs_opened", "runs", "reviews"):
+            if k in daily:
+                daily[k] = max(1, math.ceil(daily[k] * 0.7))
         print("note: caps lowered after a limit hit", file=sys.stderr)
     return cfg, daily, rows
 
@@ -41,16 +46,22 @@ def cmd_check(a):
             sys.exit(1)
         print("GO")
         return
+    every = [r for r in rows if r["date"] == today()]
     used = {
         "runs": len(day),
         "specialist_runs": sum(r.get("specialist_runs") or 0 for r in day),
-        "prs_opened": sum(r.get("prs_opened") or 0 for r in day),
+        "prs_opened": sum(r.get("prs_opened") or 0 for r in every) + a.this_run_prs,
+        "reviews": sum(r.get("reviews") or 0 for r in every) + a.this_run_reviews,
     }
+    keys = {"executive": ("runs", "specialist_runs", "prs_opened"), "merge": ("runs", "reviews"),
+            "pr": ("prs_opened",)}[a.kind]
+    used = {k: used[k] for k in keys}
+    daily.setdefault("reviews", 12)
     for k, v in used.items():
         if v >= daily[k]:
             print(f"STOP: {k} {v} >= cap {daily[k]}")
             sys.exit(1)
-    print(f"GO: used {used}, caps runs={daily['runs']} specialist_runs={daily['specialist_runs']} prs={daily['prs_opened']}")
+    print(f"GO: used {used}, caps " + " ".join(f"{k}={daily[k]}" for k in keys))
 
 
 def cmd_disable(a):
@@ -72,7 +83,9 @@ def main():
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("check")
-    c.add_argument("--kind", choices=("executive", "rd"), default="executive")
+    c.add_argument("--kind", choices=("executive", "rd", "merge", "pr"), default="executive")
+    c.add_argument("--this-run-reviews", type=int, default=0)
+    c.add_argument("--this-run-prs", type=int, default=0)
     c.set_defaults(fn=cmd_check)
     d = sub.add_parser("disable-check")
     d.set_defaults(fn=cmd_disable)

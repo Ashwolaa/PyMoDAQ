@@ -2,7 +2,7 @@
 """Run ledger. Usage:
 
   ledger.py add --run-id R --command optimize-plan --scope pymodaq_utils --mode explain \
-      [--session current --since START] [--specialist-runs N] [--prs-opened N] \
+      [--session current --since START] [--specialist-runs N] [--prs-opened N] [--reviews N] \
       --outcome ok|failed|limit|budget [--note TXT]
   ledger.py summary [--date YYYY-MM-DD]
 With --session (an id, or `current` = $CLAUDE_CODE_SESSION_ID) and --since (the run's start, ISO UTC) the token
@@ -43,7 +43,7 @@ def cmd_add(a):
     rec = {
         "run_id": a.run_id, "date": a.date or today(), "command": a.command, "scope": a.scope,
         "mode": a.mode, "model_tier": a.model_tier, "tokens_in": a.tokens_in, "tokens_out": a.tokens_out,
-        "specialist_runs": a.specialist_runs, "prs_opened": a.prs_opened, "outcome": a.outcome, "note": a.note,
+        "specialist_runs": a.specialist_runs, "prs_opened": a.prs_opened, "reviews": a.reviews, "outcome": a.outcome, "note": a.note,
     }
     if a.session:
         m = measured(a.session, a.since)
@@ -61,10 +61,10 @@ def cmd_summary(a):
     rows = [r for r in read_jsonl("ledger.jsonl") if r["date"] == day]
     tot = defaultdict(int)
     for r in rows:
-        for k in ("tokens_in", "tokens_cache_read", "tokens_out", "specialist_runs", "prs_opened", "minutes"):
+        for k in ("tokens_in", "tokens_cache_read", "tokens_out", "specialist_runs", "prs_opened", "reviews", "minutes"):
             tot[k] += r.get(k) or 0
     unknown = sum(1 for r in rows if r.get("tokens_in") is None)
-    print(f"{day}: {len(rows)} runs, specialist_runs={tot['specialist_runs']}, prs_opened={tot['prs_opened']}, "
+    print(f"{day}: {len(rows)} runs, specialist_runs={tot['specialist_runs']}, prs_opened={tot['prs_opened']}, reviews={tot['reviews']}, "
           f"tokens_in={tot['tokens_in']}, cache_read={tot['tokens_cache_read']}, tokens_out={tot['tokens_out']}, "
           f"minutes={round(tot['minutes'], 1)} ({unknown} runs without token figures)")
     for o in OUTCOMES:
@@ -86,6 +86,7 @@ def main():
     add.add_argument("--tokens-out", type=int, default=None)
     add.add_argument("--specialist-runs", type=int, default=0)
     add.add_argument("--prs-opened", type=int, default=0)
+    add.add_argument("--reviews", type=int, default=0, help="pr-reviewer launches (/optimize-merge)")
     add.add_argument("--session", default=None, help="session id or 'current': measure tokens from transcripts")
     add.add_argument("--since", default=None, help="run start (ISO UTC), with --session")
     add.add_argument("--outcome", choices=OUTCOMES, required=True)
