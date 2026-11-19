@@ -13,6 +13,8 @@
 ## Blocked
 - /optimize-merge T-009 stopped 2026-11-19: budget.py check --kind merge -> STOP: reviews 14 >= cap 14. No review launched, nothing merged. Branch still `pushed`, no PR.
 
+- /optimize-run T-pymodaq_utils-010 stopped 2026-11-19: budget.py disable-check -> DISABLE: day over budget (check was GO). No task started, nothing changed.
+
 ## Next step
 - /optimize-merge T-pymodaq_utils-009 once the review cap resets (or the human raises it in budget.toml); then remaining r2 order: T-006, T-011, T-007, T-008 (T-010 independent).
 
