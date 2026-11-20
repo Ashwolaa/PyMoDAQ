@@ -92,3 +92,10 @@ def test_guard_upstream(cmd, blocked):
 def test_status_next_is_a_known_step():
     r = script(str(AGENTS / "scripts" / "status.py"), "next")
     assert r.returncode == 0 and r.stdout.split()[0] in ("merge", "run", "plan", "review", "idle")
+
+
+# ---------------------------------------------------------------- docs
+def test_commands_page_is_current():
+    """COMMANDS.md is generated from the commands, agents and scripts; regenerate it after changing any of them."""
+    r = script(str(AGENTS / "scripts" / "docs.py"), "--check")
+    assert r.returncode == 0, r.stdout

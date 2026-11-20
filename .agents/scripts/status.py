@@ -144,6 +144,8 @@ def main():
         text = render()
         if a.write:
             (AGENTS_DIR / "STATUS.md").write_text(text)
+            subprocess.run([sys.executable, str(AGENTS_DIR / "scripts" / "docs.py"), "--write"],
+                           capture_output=True)  # COMMANDS.md follows the tooling
         print(text, end="")
 
 
