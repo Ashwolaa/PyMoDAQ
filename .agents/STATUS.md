@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-20 07:19 by `scripts/status.py`
+# Consortium status — generated 2026-11-20 07:31 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `bab699ae5`; 105 commits ahead of upstream/dev (18 files changed, 271 insertions(+), 28 deletions(-))
-- today: runs 0/20, specialist_runs 0/10, prs_opened 0/6, reviews 0/10; outcomes: none
-- last /usage reading: 2026-11-20T06:05:42.118000+00:00  session 12% (resets Nov 20, 12pm (Europe/Paris))  week 86% (resets Nov 22, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `24fd89b68`; 109 commits ahead of upstream/dev (21 files changed, 321 insertions(+), 29 deletions(-))
+- today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
+- last /usage reading: 2026-11-20T06:24:56.106000+00:00  session 17% (resets Nov 20, 12pm (Europe/Paris))  week 87% (resets Nov 22, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_utils-010 .agents/plans/2026-11-19-pymodaq_utils-r2.md`
 
 ## Needs you
 - approve or drop **T-pymodaq_utils-M06** Moved plugin_tools shims never call deprecation_msg — proposed (public API, touches tests, leaves the scope) (`.agents/plans/2026-11-19-pymodaq_utils-merged.md`)
@@ -18,7 +18,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - approve or drop **T-pymodaq_utils-011** packages.get_entrypoints delegates to utils.get_entrypoints — proposed (public API) (`.agents/plans/2026-11-19-pymodaq_utils-r2.md`)
 
 ## In flight
-- `agent/pymodaq_utils/docs/2026-11-19-docstrings-for-six` (T-pymodaq_utils-009, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-010 Add the three missing check_plugin codes to the codes table — approved
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -27,7 +26,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-19-merge-T-pymodaq_utils-M09-b | optimize-merge | ok | 0.1 | 753 | no candidate: M09 already merged (PR #12); review budget at cap 12/12 |
 | 2026-11-19-run-T-pymodaq_utils-M07 | optimize-run | ok | 13.2 | 4543 | M07 rework after review r1, CI green |
 | 2026-11-19-merge-T-pymodaq_utils-M07 | optimize-merge | ok | 6.4 | 10514 | merged 1, awaiting human 0, blocked 0 |
 | 2026-11-19-run-T-pymodaq_utils-M08 | optimize-run | ok | 4.9 | 4245 | M08 rework after review r1, CI green |
@@ -37,6 +35,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-19-run-T-pymodaq_utils-009 | optimize-run | ok | 6.2 | 8680 | docstrings for six public names; _literal_value checked unchanged; pre |
 | 2026-11-19-merge-T-pymodaq_utils-009 | optimize-merge | budget | 0.2 | 1279 | STOP reviews 14>=14; merged 0, awaiting human 0, blocked 0 (T-009 unto |
 | 2026-11-19-run-T-pymodaq_utils-010 | optimize-run | budget | 0.3 | 1415 | DISABLE: day over budget; T-010 not started |
+| 2026-11-20-merge-T-pymodaq_utils-009-r1 | optimize-merge | ok | 6.0 | 6401 | T-pymodaq_utils-009: done — PR #14 merged (auto: low risk, approved by |
 
 ## Done so far
-- tasks done: 15; PRs merged into dev_agent: 10
+- tasks done: 15; PRs merged into dev_agent: 11
