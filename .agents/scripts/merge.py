@@ -30,6 +30,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import AGENTS_DIR, fail, read_jsonl, today
 import task as T
+import usage
+from agentlib import evidence as ev, gitx, plans, reports
+from datetime import datetime, timezone
 
 REPO = AGENTS_DIR.parent
 RETRY = ("blocked — CI red", "blocked — PR CI red", "blocked — conflicts")
@@ -45,15 +48,13 @@ def gh_json(*args):
 
 
 def plan_of(task_id):
-    for p in sorted((AGENTS_DIR / "plans").glob("*.md")):
-        if re.search(rf"^## {re.escape(task_id)}\b", p.read_text(), re.M):
-            return str(p.relative_to(REPO))
-    return None
+    task = plans.find(task_id)
+    return task.plan_rel if task else None
 
 
 def plan_status(plan, task_id):
-    m = re.search(r"^- status:\s*(.*)$", T.task_block(REPO / plan, task_id), re.M)
-    return m.group(1).strip() if m else ""
+    task = plans.find(task_id, plan)
+    return task.status if task else ""
 
 
 def set_status(rec, text):
@@ -118,8 +119,8 @@ def cmd_start(a):
         fail(f"{a.branch} is not a merge candidate (merge.py candidates)")
     branch, task_id, plan, pr = match[0]
     reg = [r for r in read_jsonl("registry.jsonl") if r["branch"] == branch][-1]
-    scope = reg["scope"]
-    rounds = len(T.review_reports(scope, task_id))
+    scope = plans.package_of(plans.find(task_id, plan))  # the package, even if the registry says `docs` (rules.md 19)
+    rounds = max((reports.round_of(r) for r in T.review_reports(scope, task_id)), default=0)
     run_id = f"{today()}-merge-{task_id}-r{rounds + 1}"
     base = T.git("rev-parse", "HEAD")
     before = T.git("rev-parse", branch)
@@ -156,9 +157,15 @@ def cmd_ci(a):
     rec = T.load(a.run_id)
     head = T.git("rev-parse", rec["branch"])
     args = ["pr", "--pr", str(rec["pr"])] if rec["pr"] else ["run", "--branch", rec["branch"], "--base", rec["base"]]
-    r = T.script("ci.py", *args, "--timeout", "540", check=False)
+    r = T.script("ci.py", *args, "--timeout", str(a.timeout), check=False)
     print(r.stdout.strip())
     rec["ci"] = {"head": head, "rc": r.returncode, "out": r.stdout[-4000:]}
+    if r.returncode == 3:  # CI could not run at all (e.g. Actions disabled on the fork): say so in the plan
+        err = (r.stderr.strip().splitlines() or ["ci.py error"])[-1]
+        set_status(rec, f"blocked — CI unavailable: {err[:150]}")
+        T.save(rec)
+        print(f"CI could not run: {err}\nnext: merge.py close {a.run_id}")
+        sys.exit(3)
     T.save(rec)
     if r.returncode == 2:
         print(f"CI still running: call `merge.py ci {a.run_id}` again")
@@ -173,17 +180,14 @@ def cmd_ci(a):
 
 # ------------------------------------------------------------------ decide / gate
 def review_problems(rec):
-    import usage
     problems = []
     since = usage.parse_ts(rec["started"])
-    rows = list(usage.requests(rec["session"], since))
-    if "pr-reviewer" not in {r["agent"] for r in rows}:
+    if not ev.launches(rec["session"], since).get("pr-reviewer"):
         problems.append("no pr-reviewer was launched in this session since start (rules.md 16)")
     report = REPO / rec["report"]
     if not report.exists():
         problems.append(f"review report {rec['report']} does not exist")
     else:
-        from datetime import datetime, timezone
         if datetime.fromtimestamp(report.stat().st_mtime, timezone.utc) < since:
             problems.append(f"{rec['report']} is older than this run")
     if T.git("rev-parse", rec["branch"]) != rec["head"]:
@@ -200,19 +204,16 @@ def review_problems(rec):
 
 
 def fields(report):
-    text = (REPO / report).read_text()
-    f = {}
-    for m in re.finditer(r"^([a-z_]+):\s*(\S+)", text, re.M):  # first occurrence wins (the header lines)
-        f.setdefault(m.group(1), m.group(2).strip("`* ").lower())
-    summary = re.search(r"^summary:\s*(.*)$", text, re.M)
-    f["summary_text"] = summary.group(1).strip() if summary else ""
-    return f, text
+    path = REPO / report
+    f = dict(reports.header(path))
+    f["summary_text"] = reports.summary(path)
+    return f, path.read_text()
 
 
 def pr_body(rec, text):
     block = T.task_block(REPO / rec["plan"], rec["task_id"])
     title = re.match(rf"## {re.escape(rec['task_id'])}\s+(.*)", block).group(1)
-    findings = [l for l in text.splitlines() if re.match(r"^\s*[-*] .*:\d+", l)][:8]
+    findings = reports.notes(REPO / rec["report"])
     ci = (rec.get("ci") or {}).get("out", "")
     known = [l for l in ci.splitlines() if l.startswith("KNOWN-UPSTREAM")]
     return "\n".join([
@@ -233,6 +234,9 @@ def cmd_decide(a):
     f, text = fields(rec["report"])
     verdict = f.get("verdict")
     rec["verdict"] = verdict
+    for key, title in reports.outside(REPO / rec["report"]):  # rules.md 18: problems outside the change
+        print(T.script("findings.py", "add", "--scope", rec["scope"], "--kind", "review", "--key", key,
+                       "--title", title, "--evidence", rec["report"], "--source", rec["run_id"]).stdout.strip())
     if verdict == "changes":
         set_status(rec, f"blocked — review: {f['summary_text'][:160] or 'changes requested'}")
     elif verdict == "reject":
@@ -270,8 +274,14 @@ def cmd_gate(a):
     rec = T.load(a.run_id)
     if rec.get("verdict") != "approve" or not rec.get("pr"):
         fail("gate needs an approved review and an open PR (merge.py decide)")
-    r = T.script("ci.py", "pr", "--pr", str(rec["pr"]), "--timeout", "540", check=False)
+    r = T.script("ci.py", "pr", "--pr", str(rec["pr"]), "--timeout", str(a.timeout), check=False)
     print(r.stdout.strip())
+    if r.returncode == 3:
+        err = (r.stderr.strip().splitlines() or ["ci.py error"])[-1]
+        set_status(rec, f"blocked — PR CI unavailable: {err[:150]}")
+        T.save(rec)
+        print(f"PR checks could not be read: {err}\nnext: merge.py close {a.run_id}")
+        sys.exit(3)
     if r.returncode == 2:
         print(f"PR checks still running: call `merge.py gate {a.run_id}` again")
         sys.exit(2)
@@ -311,8 +321,7 @@ def cmd_close(a):
         fail("be on dev_agent")
     if not rec.get("outcome_status"):
         fail("nothing decided yet: ci / decide / gate first")
-    porcelain = T.sh(["git", "status", "--porcelain"]).stdout
-    other = [l for l in porcelain.splitlines() if l and not l[3:].startswith(".agents/")]
+    other = [f"{x} {p}" for x, p in gitx.porcelain() if not p.startswith(".agents/")]
     if other:
         fail("product files changed on dev_agent: " + ", ".join(other))
     T.script("ledger.py", "add", "--run-id", rec["run_id"], "--command", "optimize-merge", "--scope", rec["scope"],
@@ -340,6 +349,8 @@ def main():
     for name, fn in (("ci", cmd_ci), ("decide", cmd_decide), ("gate", cmd_gate), ("close", cmd_close)):
         x = sub.add_parser(name)
         x.add_argument("run_id")
+        if name in ("ci", "gate"):
+            x.add_argument("--timeout", type=int, default=540, help="seconds to wait for checks (exit 2 = again)")
         x.set_defaults(fn=fn)
     a = p.parse_args()
     a.fn(a)

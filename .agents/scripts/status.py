@@ -17,24 +17,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import AGENTS_DIR, load_toml, read_jsonl, today
+from agentlib import plans
 
 PLANS = AGENTS_DIR / "plans"
 RETRY = ("blocked — CI red", "blocked — conflicts")
 
 
 def tasks():
-    """(task_id, title, status, plan path, scope) for every task of every plan in plans/*.md (not experiments/)."""
-    out = []
-    for plan in sorted(PLANS.glob("*.md")):
-        if plan.name.startswith("_"):
-            continue
-        text = plan.read_text()
-        for m in re.finditer(r"^## (T-[\w.-]+)\s*(.*?)\n(.*?)(?=^## |\Z)", text, re.M | re.S):
-            st = re.search(r"^- status:\s*(.*)$", m.group(3), re.M)
-            sc = re.search(r"\bscope:\s*([\w.-]+)", m.group(3))
-            out.append((m.group(1), m.group(2).strip(), st.group(1).strip() if st else "?",
-                        str(plan.relative_to(AGENTS_DIR.parent)), sc.group(1) if sc else "?"))
-    return out
+    """(task_id, title, status, plan path, package) for every task of every plan in plans/*.md (not experiments/)."""
+    return [(t.id, t.title, t.status or "?", t.plan_rel, plans.package_of(t)) for t in plans.all_tasks()]
 
 
 def scope_rank(scope):

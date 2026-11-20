@@ -17,30 +17,26 @@ A lint violation (see `lint`), or a review verdict other than approve, is an err
 """
 import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import AGENTS_DIR, fail, load_toml, read_jsonl
 from registry import BRANCH_RE
+from agentlib import gitx, plans, reports
 
 REPO_ROOT = AGENTS_DIR.parent
 
 
 def git(*args: str) -> str:
-    r = subprocess.run(["git", *args], capture_output=True, text=True, cwd=REPO_ROOT)
-    if r.returncode:
-        fail(f"git {' '.join(args)}: {r.stderr.strip()}")
-    return r.stdout
+    return gitx.git(*args)
 
 
-def task_block(plan: Path, task_id: str) -> str:
-    text = plan.read_text()
-    m = re.search(rf"^## {re.escape(task_id)}\b.*?(?=^## |\Z)", text, re.M | re.S)
-    if not m:
+def task_block(plan, task_id: str) -> str:
+    task = plans.find(task_id, plan)
+    if not task:
         fail(f"{task_id} not found in {plan}")
-    return m.group(0)
+    return task.block
 
 
 def approving_deciders(verdicts: str) -> tuple[set, bool]:
@@ -56,13 +52,8 @@ def approving_deciders(verdicts: str) -> tuple[set, bool]:
     return approve, veto
 
 
-def review_fields(path: Path) -> dict:
-    fields = {}
-    for line in path.read_text().splitlines()[:12]:
-        m = re.match(r"^\s*([a-z_]+):\s*(\S+)", line)
-        if m:
-            fields.setdefault(m.group(1), m.group(2).lower().strip("`*"))
-    return fields
+def review_fields(path) -> dict:
+    return reports.header(path)
 
 
 def is_test(path: str) -> bool:
