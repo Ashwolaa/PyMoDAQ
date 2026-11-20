@@ -15,7 +15,7 @@ You are the coordinator of the advisory board. Arguments: `$ARGUMENTS`. Scope = 
 6. For each kept finding launch decider-compat-risk and a second decisioner (decider-test-change for anything touching tests or CI, else a fresh decider-triage) in parallel. Apply the deliberation rule in `.agents/core/layers.md` (second round on disagreement, then `blocked`). Use decider-arbiter for tasks touching the same file.
 7. Write `.agents/plans/<date>-<scope>.md` following `plans/_template.md`: low-risk tasks both decisioners approved are `approved`; tests, UI and public API stay `proposed`. A task born from a finding carries `- finding: <key>`; then `findings.py set-status --key <key> --status planned --task-id <task-id>`. A finding triage dropped: `findings.py set-status --key <key> --status closed --note "<reason>"`.
 8. Record the run: `python3 .agents/scripts/ledger.py add --run-id <id> --command optimize-plan --scope <scope> --mode <explain|run> --session current --since <START> --outcome ok` (tokens are measured, never typed in).
-8b. On `dev_agent` only: `git add .agents && git commit -m "Plan <scope> <date> (<n> tasks: <a> approved, <p> proposed, <b> blocked)"` and `git push origin dev_agent`.
+8b. On `dev_agent` only: `git add .agents && git commit -m "Plan <scope> <date> (<n> tasks: <a> approved, <p> proposed, <b> blocked) [skip ci]"` and `git push origin dev_agent`.
 9. Report in <= 20 lines: tasks by status, blocked items needing the human, scanners that were missing, the scan file and its sha256.
 
 Per `.agents/budget.toml` `[pilot]`, treat every run as `--explain` while `mode = "explain"`.

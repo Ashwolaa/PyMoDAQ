@@ -35,6 +35,8 @@
 18. A problem outside the task (seen by a specialist, the coordinator or pr-reviewer) is filed with
     `findings.py add --kind run|review`; a handoff note alone gets lost when the next run overwrites it.
 19. `<scope>` in state paths (handoff, reports) is always the task's package, also when a command got a task id.
+20. Every commit that changes only `.agents/` or `.claude/` ends its subject with `[skip ci]`: state commits must not
+    start the fork's workflows (72 wasted docs builds on 2026-11-18/19). CI runs once per task, on its PR.
 
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions

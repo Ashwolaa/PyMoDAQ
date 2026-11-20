@@ -29,6 +29,7 @@ if ! git show-ref --verify --quiet refs/heads/dev_agent; then
 else
   run git checkout dev_agent
 fi
-run git merge --no-edit dev
+# [skip ci]: upstream's own CI already ran on these commits
+run git merge --no-edit -m "Merge branch 'dev' into dev_agent [skip ci]" dev
 run git push -u origin dev_agent
 run git push --quiet origin --tags

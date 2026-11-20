@@ -19,7 +19,7 @@ the foreground (rules.md 17).
    b. Only if start says the head changed: `git switch <branch>`, `task.py checks <run-id>` and
       `task.py checks <run-id> --backend <b>` for each `[checks].qt_backends`, `git switch dev_agent`. A new failure:
       stop this candidate (the task needs `/optimize-run` again) and go to f.
-   c. `merge.py ci <run-id>` (exit 2: call again). Red blocks the task: go to f.
+   c. No CI before the review: the PR's checks are the one CI run (step e, `merge.py gate`), rules.md 20.
    d. Launch `pr-reviewer` with the task id, its plan, the branch and the report path from start (and the previous
       report when start names one). Wait for it.
    e. `merge.py decide <run-id>`: refuses unless the review really happened for this head; acts on the verdict
@@ -28,7 +28,7 @@ the foreground (rules.md 17).
       auto-merge with a merge commit, or the PR stays open for the human with the reasons in the plan.
    f. `merge.py close <run-id>`: ledger line, STATUS.md, commit and push `dev_agent`. Next candidate.
 4. Overwrite `.agents/handoff/<scope>.md` (<= 40 lines, `<scope>` = the package; Done = merged PRs, Blocked = review/
-   conflict/CI blocks, Next step = the first PR waiting for the human), commit it on `dev_agent` and push.
+   conflict/CI blocks, Next step = the first PR waiting for the human), commit it on `dev_agent` with `[skip ci]` in the subject and push.
 5. Report in <= 20 lines: one line per candidate (task, PR, verdict, merged / awaiting human with the reasons / blocked
    with the reason), then the paths of the files written.
 

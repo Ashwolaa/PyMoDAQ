@@ -37,7 +37,7 @@ guard() {
 publish() {  # regenerate STATUS.md and push it with whatever the step left committed
   python3 .agents/scripts/status.py --write >/dev/null
   if [ -n "$(git status --porcelain -- .agents/STATUS.md)" ]; then
-    git add .agents/STATUS.md && git commit -q -m "Status after $1" && git push -q origin dev_agent && log "STATUS.md pushed"
+    git add .agents/STATUS.md && git commit -q -m "Status after $1 [skip ci]" && git push -q origin dev_agent && log "STATUS.md pushed"
   fi
 }
 

@@ -9,7 +9,8 @@ review really happened (rules.md 16). Usage, in this order:
                                          blocked), push it if the head changed; prints the run id and the review
                                          report path to give pr-reviewer
   task.py checks RUN [--backend B]       only when start says the rebase changed the head (same run record)
-  merge.py ci RUN                        CI on the branch head: the draft PR's checks, or ci.py run; exit 2 = again
+  merge.py ci RUN                        optional: CI on the branch before the review (the normal CI run is the PR's
+                                         checks, waited for by gate); exit 2 = again
   (launch pr-reviewer with the task id, plan, branch and the report path; for round > 1 also the previous report)
   merge.py decide RUN                    verifies the review (pr-reviewer launched in this session after start, report
                                          written after start, head unchanged); changes/reject -> plan + registry;
@@ -187,9 +188,9 @@ def review_problems(rec):
             problems.append(f"{rec['report']} is older than this run")
     if T.git("rev-parse", rec["branch"]) != rec["head"]:
         problems.append("the branch head changed after start: start again")
-    ci = rec.get("ci")
-    if not ci or ci["head"] != rec["head"] or ci["rc"] not in (0, 4):
-        problems.append("CI not green for this head: merge.py ci RUN")
+    ci = rec.get("ci")  # optional before the review: the PR's checks (gate) are the CI run
+    if ci and ci["head"] == rec["head"] and ci["rc"] not in (0, 4):
+        problems.append("branch CI is red for this head")
     if rec["rebased"]:
         for k in ["static", *T.profile()["checks"]["qt_backends"]]:
             c = rec["checks"].get(k)
@@ -218,7 +219,8 @@ def pr_body(rec, text):
         f"**{rec['task_id']}**: {title}", "",
         f"Plan: `{rec['plan']}`. Review r{rec['round']} by pr-reviewer: **approve**. {fields(rec['report'])[0]['summary_text']}", "",
         *(["Review notes:", *findings, ""] if findings else []),
-        f"Branch CI: {'green' if not known else 'green except known upstream/dev failures: ' + '; '.join(known)}.",
+        "Local checks: flake8 blocking set, layering test, merge_gate lint and the scope's tests under each Qt binding "
+        "(task.py/merge.py records). CI: the checks of this PR." + (f" Known upstream/dev failures: {'; '.join(known)}." if known else ""),
         "", f"Agent-Run: {rec['run_id']}", "", "🤖 Generated with [Claude Code](https://claude.com/claude-code)"])
 
 
@@ -286,7 +288,9 @@ def cmd_gate(a):
     line = (g.stdout.strip() or g.stderr.strip())
     print(line)
     if g.returncode == 0:
-        T.sh(["gh", "pr", "merge", str(rec["pr"]), "-R", fork(), "--merge"])
+        # the PR's checks validated this head: no second CI run on the merge commit
+        T.sh(["gh", "pr", "merge", str(rec["pr"]), "-R", fork(), "--merge",
+              "--subject", f"Merge PR #{rec['pr']}: {rec['task_id']} [skip ci]"])
         T.git("pull", "-q", "--ff-only", "origin", "dev_agent")
         T.script("registry.py", "set-status", "--branch", rec["branch"], "--status", "merged")
         set_status(rec, f"done — PR #{rec['pr']} merged (auto: {line.removeprefix('AUTO-MERGE: ')[:140]})")
@@ -316,7 +320,7 @@ def cmd_close(a):
              "--prs-opened", str(rec["prs_created"]), "--note", f"{rec['task_id']}: {rec['outcome_status']}"[:300])
     T.script("status.py", "--write")
     T.git("add", ".agents")
-    T.git("commit", "-q", "-m", f"Log /optimize-merge {rec['task_id']} ({rec['outcome_status'][:80]})\n\nAgent-Run: {rec['run_id']}")
+    T.git("commit", "-q", "-m", f"Log /optimize-merge {rec['task_id']} ({rec['outcome_status'][:80]}) [skip ci]\n\nAgent-Run: {rec['run_id']}")
     T.git("push", "-q", "origin", "dev_agent")
     rec["closed"] = T.now()
     T.save(rec)

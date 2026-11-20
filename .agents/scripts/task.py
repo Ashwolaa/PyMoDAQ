@@ -10,7 +10,8 @@ or claimed without evidence (rules.md 16). Usage, in this order:
                                              scopes' tests under that Qt binding. Tests failing here are rerun on
                                              the base commit: failing there too = pre-existing
   git push [--force-with-lease] origin <branch>
-  task.py ci RUN                            ci.py run on the pushed head (--timeout 540); exit 2 = call again
+  task.py ci RUN                            optional, not part of the normal flow: CI runs once, on the PR
+                                             (/optimize-merge); kept for a branch whose CI must be seen early
   task.py finish RUN [--note TXT]           verifies everything for the current head (see below), switches to
                                              dev_agent, writes registry, plan status, findings and ledger
   (overwrite .agents/handoff/<scope>.md)
@@ -20,8 +21,8 @@ or claimed without evidence (rules.md 16). Usage, in this order:
 
 finish refuses unless: a specialist (spec-* or test-agent) was launched in this session since start; the main session
 made no Edit/Write to a product file; static checks and every [checks].qt_backends test run are recorded for the
-current head with no new failure; merge_gate lint passes; origin has the head; CI is recorded for the head with exit
-0 or 4 (known upstream failures, filed with findings.py by finish).
+current head with no new failure; merge_gate lint passes; origin has the head; if a branch CI run was made, it is
+green (0, or 4 = known upstream failures, filed with findings.py by finish).
 Run records live in <git common dir>/agent-runs/, outside the worktree, so they never reach a branch or a PR.
 """
 import argparse
@@ -293,16 +294,16 @@ def evidence(rec):
     remote = git("ls-remote", "origin", f"refs/heads/{rec['branch']}").split()
     if not remote or remote[0] != head:
         problems.append(f"origin does not have {head[:9]}: push the branch")
-    ci = rec.get("ci")
-    if not ci or ci["head"] != head:
-        problems.append("CI not recorded for the current head: task.py ci RUN")
-    elif ci["rc"] not in (0, 4):
+    ci = rec.get("ci")  # optional: CI runs once, on the PR (/optimize-merge); a branch run, if made, must be green
+    if ci and ci["head"] == head and ci["rc"] not in (0, 4):
         problems.append(f"CI is not green (ci.py exit {ci['rc']})")
     return problems
 
 
 def ci_word(rec):
-    return {0: "green", 4: "green except known upstream failures"}.get((rec.get("ci") or {}).get("rc"), "?")
+    if not rec.get("ci"):
+        return "on the PR"
+    return {0: "green", 4: "green except known upstream failures"}.get(rec["ci"].get("rc"), "?")
 
 
 def cmd_finish(a):
@@ -316,10 +317,10 @@ def cmd_finish(a):
     if not rec["rework"]:
         script("registry.py", "add", "--run-id", rec["run_id"], "--scope", rec["scope"], "--specialty", rec["specialty"],
                "--branch", rec["branch"], "--risk", rec["risk"], "--task-id", rec["task_id"], "--status", "pushed")
-    status = f"done — branch {rec['branch']}, CI {ci_word(rec)}" + \
+    status = f"done — branch {rec['branch']}, local checks green, CI {ci_word(rec)}" + \
              (f", reworked after review r{rec['rework']}" if rec["rework"] else "") + ", awaiting review"
     script("plan.py", "set-status", rec["plan"], rec["task_id"], status)
-    for line in re.findall(r"^\s*record: (python3 .*)$", rec["ci"]["out"], re.M):
+    for line in re.findall(r"^\s*record: (python3 .*)$", (rec.get("ci") or {}).get("out", ""), re.M):
         args = shlex.split(line)[2:]  # drop "python3 .agents/scripts/findings.py"
         print(script("findings.py", *args).stdout.strip())
     pre = sorted({f for b in profile()["checks"]["qt_backends"] for e in rec["checks"][b]["scopes"].values()
@@ -354,7 +355,7 @@ def cmd_close(a):
     script("status.py", "--write")  # STATUS.md follows every run
     git("add", ".agents")
     what = "blocked" if rec.get("blocked") else f"branch pushed, CI {ci_word(rec)}"
-    git("commit", "-q", "-m", f"Log /optimize-run {rec['task_id']} ({what})\n\nAgent-Run: {rec['run_id']}")
+    git("commit", "-q", "-m", f"Log /optimize-run {rec['task_id']} ({what}) [skip ci]\n\nAgent-Run: {rec['run_id']}")
     git("push", "-q", "origin", "dev_agent")
     rec["closed"] = now()
     save(rec)
