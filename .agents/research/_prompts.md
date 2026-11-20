@@ -75,3 +75,35 @@ and the design of an `/optimize-upstream` command that rebuilds a group on upstr
 branch, the checks and the PR text before anything is opened (owner's standing rule). Propose the command and any
 plan-format change (e.g. a `relevance:` field) as tasks for /optimize-plan; build nothing.
 ```
+
+## R5 — config-schema
+```
+/optimize-research config-schema: How can a PyMoDAQ configuration survive schema changes (keys added, renamed or
+removed, a changed type such as scalar -> list, a changed default) and switching between branches, without deleting
+the file, and how can developers, tests and agents use an isolated config folder?
+Stop when: the research note and a prototype that passes the branch-switch test below exist, or after 2 hours.
+Facts to start from (verified 2026-11-20, pymodaq_utils/config.py): the system folder (/etc, /Library/Application
+Support, %PROGRAMDATA%) falls back to ~/.pymodaq when it cannot be created (:109-120), so system and user files are
+then one file; the folder comes from Path.home() and is cached (:125), with no override; load() copies the whole
+template into the system file on first start (:427-428), so defaults are frozen; check_config only adds missing keys
+(:203-225), never removes, retypes or updates; the user file is deep-merged over the system one (:289). The plural/
+singular fallbacks in Config.__call__ (task T-pymodaq_utils-006) are hand-written compatibility for one such change.
+Method:
+1. List every config: the templates in all packages (`grep -rn config_template_path packages/`) and the plugins'
+   BaseConfig subclasses (public API: plugins register their own). From `git log -p` of the templates, collect the
+   real schema changes of the last years (renames, type changes, removals) as test cases.
+2. Compare approaches, each with what breaks for users and for plugins: (a) store only the user's overrides (a sparse
+   file) instead of a full template copy, so new defaults reach everyone; (b) a schema version in the template plus
+   ordered migration functions; (c) on load, check each value's type against the template: back up the file, reset
+   only the mismatching keys to the template, warn once; (d) an environment variable (e.g. PYMODAQ_CONFIG_DIR) or a
+   per-environment folder, for developers switching branches, for tests (a pytest fixture) and for agents.
+3. Prototype the most promising combination on agent-rd/config-schema (registered), with tests: a branch-switch
+   test (a file written by the old template, loaded with a template that changed a type and renamed a key, loads
+   without error, keeps the user's other values, leaves a backup); a test that a new default reaches a user who
+   never changed it; an isolation test (two config dirs do not see each other).
+Output: `.agents/research/config-schema.md` (<= 80 lines): current behaviour with file:line, the real schema changes
+found, the comparison, the recommended design and its plugin-compatibility impact (hard rule 1), and proposed tasks
+for /optimize-plan (expected `proposed`: public API). Also say whether running the agents' tests with HOME set to a
+scratch folder isolates them from the owner's ~/.pymodaq, verified by a run. Never touch ~/.pymodaq itself: work in
+temporary folders.
+```
