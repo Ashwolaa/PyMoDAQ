@@ -35,7 +35,7 @@ owner's explicit go. Never push to, open issues on, or comment in a repository y
    `.agents/plugins/<name>-pr.md`. Do not open that PR: show it to the owner and wait for an explicit go.
 5. Update the plugin's line in `index.jsonl` (`ported`, fork url, branch), log
    `ledger.py add --command optimize-plugins --session current --since <START> --outcome ok`, commit `.agents` on
-   `dev_agent` and push. Report in <= 20 lines with the paths written; for `port`, the fork branch URL and the PR draft path.
+   `dev_agent` (subject ending `[skip ci]`, rules.md 20) and push. Report in <= 20 lines with the paths written; for `port`, the fork branch URL and the PR draft path.
 
 With `--explain`: list what each step would do and touch nothing outside `.agents/reports/plugins/`.
 Every step runs in the foreground (rules.md 17); a notification after your report is not a new invocation.
