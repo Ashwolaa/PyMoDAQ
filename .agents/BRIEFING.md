@@ -6,6 +6,8 @@
    `.agents/runner/cycle.sh` (`--dry-run` first). Each cycle step is a fresh headless session run by
    `.agents/runner/step.py`; logs go to `<git common dir>/agent-runs/cycles/<stamp>/`.
 4. Decisions waiting for the owner are under "Needs you" in STATUS.md.
+5. Before changing any script: `pytest .agents/tests` (under `[tools].env`); shared logic lives in
+   `.agents/scripts/agentlib/` (git, plans, reports, evidence), not in each script.
 
 # Briefing for the next agent (written at the end of the design session)
 

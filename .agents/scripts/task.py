@@ -30,13 +30,13 @@ import json
 import os
 import re
 import shlex
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import AGENTS_DIR, fail, load_toml, read_jsonl, today
+from agentlib import evidence as ev, gitx, plans, reports
 
 REPO = AGENTS_DIR.parent
 SCRIPTS = AGENTS_DIR / "scripts"
@@ -44,15 +44,11 @@ PY = sys.executable
 
 
 def sh(cmd, check=True, cwd=REPO, shell=False):
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, shell=shell,
-                       executable="/bin/bash" if shell else None)
-    if check and r.returncode:
-        fail(f"{cmd if shell else ' '.join(cmd)}: {(r.stderr or r.stdout).strip()[-800:]}")
-    return r
+    return gitx.run(cmd, check=check, cwd=cwd, shell=shell)
 
 
 def git(*args, check=True):
-    return sh(["git", *args], check=check).stdout.strip()
+    return gitx.git(*args, check=check)
 
 
 def script(name, *args, check=True):
@@ -84,19 +80,18 @@ def now():
 
 
 def clean_on(branch):
-    cur = git("branch", "--show-current")
+    cur = gitx.branch()
     if cur != branch:
         fail(f"be on {branch} (you are on {cur or 'a detached head'})")
-    dirty = git("status", "--porcelain")
-    if dirty:
-        fail(f"commit or drop the changes first:\n{dirty}")
+    if gitx.dirty():
+        fail("commit or drop the changes first:\n" + "\n".join(f"{x} {p}" for x, p in gitx.porcelain()))
 
 
-def task_block(plan: Path, task_id: str) -> str:
-    m = re.search(rf"^## {re.escape(task_id)}\b.*?(?=^## |\Z)", plan.read_text(), re.M | re.S)
-    if not m:
+def task_block(plan, task_id: str) -> str:
+    task = plans.find(task_id, plan)
+    if not task:
         fail(f"{task_id} not found in {plan}")
-    return m.group(0)
+    return task.block
 
 
 def field(block, name):
@@ -104,12 +99,12 @@ def field(block, name):
     return m.group(1) if m else None
 
 
-def review_reports(scope, task_id):
-    return sorted((AGENTS_DIR / "reports" / scope).glob(f"*-pr-review-{task_id}*.md"))
+def review_reports(package, task_id):
+    return reports.for_task(package, task_id)
 
 
-def changes_rounds(scope, task_id):
-    return sum(1 for p in review_reports(scope, task_id) if re.search(r"^verdict:\s*changes", p.read_text(), re.M))
+def changes_rounds(package, task_id):
+    return reports.changes_rounds(package, task_id)
 
 
 def profile():
@@ -136,10 +131,11 @@ def touched_scopes(base, head):
 def cmd_start(a):
     clean_on(profile()["project"].get("integration_branch", "dev_agent"))
     script("budget.py", "check")
-    plan = Path(a.plan) if Path(a.plan).is_absolute() else REPO / a.plan
-    block = task_block(plan, a.task_id)
-    status = re.search(r"^- status:\s*(.*)$", block, re.M).group(1)
-    scope, specialty, risk = field(block, "scope"), field(block, "specialty"), field(block, "risk") or "medium"
+    plan = plans.resolve(a.plan)
+    task = plans.find(a.task_id, plan) or fail(f"{a.task_id} not found in {a.plan}")
+    block, status = task.block, task.status
+    # state paths and branch names use the package (rules.md 19); a plan may say `scope: docs`
+    scope, specialty, risk = plans.package_of(task), task.get("specialty"), task.get("risk", "medium")
     session = os.environ.get("CLAUDE_CODE_SESSION_ID")
     if not session:
         fail("CLAUDE_CODE_SESSION_ID is not set: run task.py from the coordinator's session")
@@ -256,27 +252,11 @@ def cmd_ci(a):
 # ------------------------------------------------------------------ finish / close / block
 def evidence(rec):
     """Problems that forbid `finish`, read from the transcripts and the run record."""
-    import usage
     problems = []
-    since = usage.parse_ts(rec["started"])
-    rows = list(usage.requests(rec["session"], since))
-    launched = {r["agent"] for r in rows if r["agent"] != "main"}
-    if not any(a.startswith("spec-") or a == "test-agent" for a in launched):
+    if not ev.specialist_launched(rec["session"], rec["started"]):
         problems.append("no specialist was launched in this run (rules.md 16)")
-    for path, sid, agent in usage.transcripts(rec["session"]):
-        if agent != "main":
-            continue
-        for line in open(path, encoding="utf-8", errors="replace"):
-            if '"tool_use"' not in line or '"file_path"' not in line:
-                continue
-            d = json.loads(line)
-            if usage.parse_ts(d.get("timestamp", "1970-01-01T00:00:00Z")) < since:
-                continue
-            for c in (d.get("message") or {}).get("content") or []:
-                if c.get("type") == "tool_use" and c.get("name") in ("Edit", "Write", "NotebookEdit"):
-                    fp = (c.get("input") or {}).get("file_path", "")
-                    if fp.startswith(str(REPO)) and "/.agents/" not in fp:
-                        problems.append(f"the coordinator edited a product file itself: {fp} (rules.md 16)")
+    for fp in ev.coordinator_edits(rec["session"], rec["started"], REPO):
+        problems.append(f"the coordinator edited a product file itself: {fp} (rules.md 16)")
     head = git("rev-parse", rec["branch"])
     static = rec["checks"].get("static")
     if not static or static["head"] != head:
@@ -341,15 +321,13 @@ def cmd_close(a):
     if git("branch", "--show-current") != "dev_agent":
         fail("be on dev_agent")
     handoff = AGENTS_DIR / "handoff" / f"{rec['scope']}.md"
-    changed = git("status", "--porcelain", "--", str(handoff.relative_to(REPO)))
-    if not changed:
+    if not gitx.dirty(str(handoff.relative_to(REPO))):
         fail(f"rewrite {handoff.relative_to(REPO)} for this run first (formats.md: handoff)")
     lines = len(handoff.read_text().splitlines())
     limit = profile()["limits"].get("handoff_max_lines", 40)
     if lines > limit:
         fail(f"{handoff.name} has {lines} lines > {limit}")
-    porcelain = sh(["git", "status", "--porcelain"]).stdout  # unstripped: the first line starts with a space
-    other = [l for l in porcelain.splitlines() if l and not l[3:].startswith(".agents/")]
+    other = [f"{x} {p}" for x, p in gitx.porcelain() if not p.startswith(".agents/")]
     if other:
         fail("product files changed on dev_agent: " + ", ".join(other))
     script("status.py", "--write")  # STATUS.md follows every run
@@ -364,7 +342,7 @@ def cmd_close(a):
 
 def cmd_block(a):
     rec = load(a.run_id)
-    if git("status", "--porcelain"):
+    if gitx.dirty():
         fail("commit or drop the changes on the branch first")
     if git("branch", "--show-current") != "dev_agent":
         git("switch", "-q", "dev_agent")
