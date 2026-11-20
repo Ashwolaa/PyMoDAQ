@@ -144,6 +144,7 @@ there. The findings are identified by these codes:
 ======== =================================================================================================
 Code     Meaning
 ======== =================================================================================================
+PMQ100   *pyproject.toml* cannot be parsed, or the package is not found (not installed)
 PMQ101-3 project name does not follow the convention, still the template one, differs from the package folder
 PMQ104-6 template placeholders left in *pyproject.toml* (url, description, authors)
 PMQ107   no pymodaq dependency declared
@@ -151,8 +152,10 @@ PMQ108   no entry points: PyMoDAQ will not find the plugin
 PMQ109   code found for a feature set to false in ``[features]`` (its entry points will not be generated)
 PMQ110   feature set to true but nothing found. PMQ111: README.rst or LICENSE missing
 PMQ112   python file that is not a valid module name (often a conflicted copy of a synchronisation tool): ignored
+PMQ200   syntax error in a python file while looking for the todos: its other checks are skipped until it is fixed
 PMQ201   TODO comment. PMQ202: ``NotImplementedError`` left. PMQ203: template placeholder name left
 PMQ204   example module of the template left. PMQ205: *config_template.toml* still has the template title
+PMQ300   syntax error in an instrument or extension module: its other checks are skipped until it is fixed
 PMQ302   deprecated or ignored class attribute (``_epsilon``, ``stage_names``, ``axis_names``)
 PMQ303   ``data_actuator_type`` is not ``DataActuatorType.DataActuator``
 PMQ304-6 (module that cannot be imported) inconsistent axes/units, unknown unit, missing mandatory method
