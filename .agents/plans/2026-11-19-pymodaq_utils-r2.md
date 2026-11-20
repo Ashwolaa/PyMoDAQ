@@ -55,7 +55,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - files: `docs/src/developer_folder/instrument_plugins.rst:144-180` (codes table)
 - constraints: only PMQ100 (pyproject.toml cannot be parsed, rules.py:307; package not found, rules.py:806), PMQ200 (syntax error while scanning for todos, rules.py:413), PMQ300 (syntax error in an instrument/extension module, rules.py:509, 703). The other seven codes in the advisor list are already covered by range rows (PMQ101-3, 104-6, 304-6, 330-1): do not split or repeat them. Do not touch legacy_to_current.rst. Wording checked against rules.py messages.
 - verdicts: decider-compat-risk: approve — narrowed to 3 codes, docs only; decider-triage: approve — fits one PR (originally counted 10 codes, narrowed after compat-risk)
-- status: done — branch agent/docs/docs/2026-11-20, local checks green, CI on the PR, awaiting review
+- status: done — PR #15 merged (auto: low risk, approved by decider-compat-risk, decider-triage, reviewer approve, 3 lines, no tests/UI/API)
 
 ## T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints
 - scope: pymodaq_utils   specialty: refactor   risk: medium
