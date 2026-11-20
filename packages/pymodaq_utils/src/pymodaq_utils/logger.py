@@ -83,6 +83,19 @@ def set_logger(logger_name, add_handler=False, base_logger=False, add_to_console
 
 
 def get_base_logger(logger: logging.Logger) -> logging.Logger:
+    """Get the logger named ``pymodaq`` among a logger and its ancestors
+
+    Parameters
+    ----------
+    logger: logging.Logger
+        A logger, typically named ``pymodaq`` or ``pymodaq.<something>``
+
+    Returns
+    -------
+    logging.Logger
+        The first logger, going up the parents, whose name is ``pymodaq``. If there is none, the root logger's
+        missing parent (None) is reached and an ``AttributeError`` is raised.
+    """
     while logger.name != 'pymodaq':
         logger = logger.parent
     return logger

@@ -10,6 +10,10 @@ from typing import List, Type, TypeVar, Union
 
 
 class StrEnum(_StrEnum):  #to be imported in other modules
+    """Enum whose members are also strings, with the ``names`` and ``values`` class methods
+
+    Based on ``enum.StrEnum`` (the ``strenum`` package before Python 3.11).
+    """
     @classmethod
     def names(cls) -> List[str]:
         """Returns all the names of the enum"""
