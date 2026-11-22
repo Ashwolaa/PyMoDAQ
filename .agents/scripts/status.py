@@ -40,7 +40,10 @@ def queue():
 
 
 def pending():
-    return [r for r in read_jsonl("registry.jsonl") if r["status"] == "pushed"]
+    """Pushed branches /optimize-merge could take: not those blocked by a review (they wait for a rework by
+    /optimize-run) or by the human, as merge.py candidates skips them too; else the cycle loops on `merge`."""
+    held = {t[0] for t in tasks() if t[2].startswith("blocked") and not t[2].startswith(RETRY)}
+    return [r for r in read_jsonl("registry.jsonl") if r["status"] == "pushed" and r["task_id"] not in held]
 
 
 def last_command(cmd):
