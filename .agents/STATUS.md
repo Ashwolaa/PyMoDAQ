@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-22 18:56 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 19:16 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `10ccf36d3`; 124 commits ahead of upstream/dev (92 files changed, 2583 insertions(+), 4181 deletions(-))
-- today: runs 0/20, specialist_runs 0/10, prs_opened 0/6, reviews 0/10; outcomes: none
-- last /usage reading: 2026-11-20T06:40:49.251000+00:00  session 25% (resets Nov 20, 12pm (Europe/Paris))  week 88% (resets Nov 22, 12am (Europe/Paris))
-- next cycle step: `plan pymodaq_data`
+- `dev_agent` at `0901fb613`; 129 commits ahead of upstream/dev (22 files changed, 324 insertions(+), 29 deletions(-))
+- today: runs 1/20, specialist_runs 0/10, prs_opened 0/6, reviews 0/10; outcomes: ok 1
+- last /usage reading: 2026-11-22T18:16:14.458000+00:00  session 25% (resets Nov 22, 11:40pm (Europe/Paris))  week 3% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_data-001 .agents/plans/2026-11-22-pymodaq_data.md`
 
 ## Needs you
 - approve or drop **T-pymodaq_utils-M06** Moved plugin_tools shims never call deprecation_msg — proposed (public API, touches tests, leaves the scope) (`.agents/plans/2026-11-19-pymodaq_utils-merged.md`)
@@ -18,16 +18,17 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - approve or drop **T-pymodaq_utils-011** packages.get_entrypoints delegates to utils.get_entrypoints — proposed (public API) (`.agents/plans/2026-11-19-pymodaq_utils-r2.md`)
 
 ## In flight
-- nothing queued
+- T-pymodaq_data-001 Imports and exception-handling hygiene — approved
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
 - [pymodaq_utils] Config files freeze the template on first start and only gain missing keys: type changes and renames survive branch switches until the file is deleted
+- [pymodaq_data] numpy_func.py:47 returns NotImplementedError instead of raising/returning NotImplemented
+- [pymodaq_data] Unverified ruff bug-risk items: B007 loop vars, B018 data.py:1718, F811 append data.py:4226/4241, backends.py:345 unreachable, hyperspy.py:57 data_arr
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-19-run-T-pymodaq_utils-M08 | optimize-run | ok | 4.9 | 4245 | M08 rework after review r1, CI green |
 | 2026-11-19-merge-T-pymodaq_utils-M08 | optimize-merge | ok | 6.1 | 7742 | merged 1, awaiting human 0, blocked 0 |
 | plan-pymodaq_utils-r2-20261119 | optimize-plan | ok | 6.5 | 81538 |  |
 | plan-pymodaq_utils-r3-20261119 | optimize-plan | ok |  | 409 |  |
@@ -37,6 +38,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-20-merge-T-pymodaq_utils-009-r1 | optimize-merge | ok | 6.0 | 6401 | T-pymodaq_utils-009: done — PR #14 merged (auto: low risk, approved by |
 | 2026-11-20-run-T-pymodaq_utils-010 | optimize-run | ok | 0.6 | 3748 | docs: 3 check_plugin codes added |
 | 2026-11-20-merge-T-pymodaq_utils-010-r1 | optimize-merge | ok | 5.7 | 5669 | T-pymodaq_utils-010: done — PR #15 merged (auto: low risk, approved by |
+| plan-pymodaq_data-20261122 | optimize-plan | ok | 3.5 | 53355 |  |
 
 ## Done so far
 - tasks done: 16; PRs merged into dev_agent: 12
