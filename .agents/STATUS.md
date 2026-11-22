@@ -1,11 +1,11 @@
-# Consortium status — generated 2026-11-22 21:47 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 22:10 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `449c25b29`; 164 commits ahead of upstream/dev (38 files changed, 474 insertions(+), 178 deletions(-))
-- today: runs 10/20, specialist_runs 6/10, prs_opened 3/6, reviews 4/10; outcomes: ok 9, failed 1
-- last /usage reading: 2026-11-22T20:23:23.266000+00:00  session 57% (resets Nov 22, 11:40pm (Europe/Paris))  week 5% (resets Nov 29, 12am (Europe/Paris))
+- `dev_agent` at `f65df4ac7`; 168 commits ahead of upstream/dev (36 files changed, 474 insertions(+), 134 deletions(-))
+- today: runs 11/20, specialist_runs 7/10, prs_opened 3/6, reviews 4/10; outcomes: ok 10, failed 1
+- last /usage reading: 2026-11-22T21:07:55.379000+00:00  session 60% (resets Nov 22, 11:40pm (Europe/Paris))  week 6% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
 ## Needs you
@@ -17,9 +17,8 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-007** — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 
 ## In flight
-- `agent/pymodaq_utils/refactor/2026-11-22-set-logger-must` (T-pymodaq_utils-007, risk medium): pushed, waiting for /optimize-merge
+- `agent/pymodaq_utils/test-quality/2026-11-22` (T-pymodaq_utils-008, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
-- T-pymodaq_utils-008 Isolate test_nested_update_from_user — approved — owner, 2026-11-22
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — approved — owner, 2026-11-22
 - T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — approved — owner, 2026-11-22
 
@@ -40,7 +39,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| plan-pymodaq_data-20261122 | optimize-plan | ok | 3.5 | 53355 |  |
 | 2026-11-22-run-T-pymodaq_data-001 | optimize-run | ok | 2.7 | 9458 | imports + exception hygiene, 12 files, 85 lines |
 | 2026-11-22-merge-T-pymodaq_data-001-r1 | optimize-merge | ok | 7.0 | 10756 | T-pymodaq_data-001: done — PR #16 open, awaiting the human: a decider  |
 | 2026-11-22-run-T-pymodaq_utils-M06 | optimize-run | failed | 71.2 | 10592 | pymodaq test scope hangs (extension_loading_test::test_load[Scanner])  |
@@ -50,6 +48,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-22-merge-T-pymodaq_utils-006-r1 | optimize-merge | ok | 5.4 | 6539 | T-pymodaq_utils-006: done — PR #18 open, awaiting the human: touches t |
 | 2026-11-22-run-T-pymodaq_utils-007 | optimize-run | ok | 1.9 | 7756 | set_logger raises ConfigError; test added; coverage logger.py 51->53%; |
 | 2026-11-22-merge-T-pymodaq_utils-007-r1 | optimize-merge | ok | 2.2 | 8063 | T-pymodaq_utils-007: blocked — review: set_logger now raises ConfigErr |
+| 2026-11-22-run-T-pymodaq_utils-008 | optimize-run | ok | 1.5 | 6449 | test isolated via get_set_local_dir patch; coverage unchanged |
 
 ## Done so far
-- tasks done: 19; PRs merged into dev_agent: 13
+- tasks done: 20; PRs merged into dev_agent: 13
