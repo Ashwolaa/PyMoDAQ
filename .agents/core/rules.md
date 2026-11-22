@@ -26,7 +26,8 @@
 14. Every `gh` call names the fork: `-R <profile [project].fork>` (the clone's default repo may be upstream).
 15. A CI failure that upstream/dev has too (`ci.py` exit 4, `KNOWN-UPSTREAM`) does not block a branch: it is filed with
     `findings.py` and becomes a task only through `/optimize-plan`. Any other failure blocks it.
-16. Never skip a command step or do a sub-agent's job yourself to save quota: the caps in `budget.toml` do that.
+16. Launch every sub-agent by its own type (`subagent_type: "<name>"` of `.claude/agents/`); a `general-purpose` agent given the same task does not count, the scripts check the type. If `merge.py decide` or `task.py finish` refuses for a missing launch, launch the right agent and retry; do not report it as a tooling fault.
+    Never skip a command step or do a sub-agent's job yourself to save quota: the caps in `budget.toml` do that.
     Product files are edited by specialists only, reworks included; `merge_gate.py lint` runs before every push.
 17. Run every step in the foreground and wait for it. A Bash call lasts at most 10 minutes (`timeout` 600000), so call
     `ci.py` with `--timeout 540` and call it again on exit 2: it resumes the same runs, it never dispatches twice.
