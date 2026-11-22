@@ -9,10 +9,9 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable
 
 # 3rd party imports
-import numpy as np
 
 # project imports
-from pymodaq_data.h5modules.backends import H5Backend, Node
+from pymodaq_data.h5modules.backends import Node
 from pymodaq_utils.logger import set_logger, get_module_name
 
 logger = set_logger(get_module_name(__file__))

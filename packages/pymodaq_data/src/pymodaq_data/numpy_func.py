@@ -43,7 +43,7 @@ def process_arguments_for_ufuncs(input: 'DataBase',
         else:
             try:
                 elts.append([Q_(array, elt.units) for array in elt.data])
-            except:
+            except Exception:
                 return NotImplementedError
     return elts
 

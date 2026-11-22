@@ -1,13 +1,11 @@
-from typing import List, Tuple, Any, TYPE_CHECKING, Union
-import sys
+from typing import TYPE_CHECKING, Union
 import datetime
 
 import numpy as np
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils import config as configmod
-from pymodaq_data.data import DataDim, DataWithAxes, DataToExport
-from pymodaq_utils import utils
+from pymodaq_data.data import DataWithAxes, DataToExport
 from pymodaq_data.plotting.plotter.plotter import PlotterBase, PlotterFactory
 from pymodaq_data.plotting.utils import PlotColors
 

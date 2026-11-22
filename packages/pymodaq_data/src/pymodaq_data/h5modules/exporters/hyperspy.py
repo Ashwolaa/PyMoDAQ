@@ -13,7 +13,7 @@ try:
 
     # project imports
     from pymodaq_data.h5modules.backends import Node
-    from pymodaq_data.h5modules.utils import get_h5_data_from_node, extract_axis, verify_axis_data_uniformity
+    from pymodaq_data.h5modules.utils import extract_axis, verify_axis_data_uniformity
     from pymodaq_data.h5modules.exporter import ExporterFactory, H5Exporter
     from pymodaq_utils.logger import set_logger, get_module_name
     from pymodaq_data.h5modules.data_saving import DataLoader
@@ -85,9 +85,9 @@ try:
                 try:
                     indexv = data.shape.index(len(unique_ax))
                     logger.info(f"{ax['label']}, size {len(unique_ax)}, data index: {indexv}")
-                except ValueError:
+                except ValueError as err:
                     raise ValueError(f"Signal axis of length {len(unique_ax)} does not match any "
-                                     f"dimension in data of shape {data.shape} ")
+                                     f"dimension in data of shape {data.shape} ") from err
                 is_nav = key.startswith('nav')
                 hyperspy_axes.append(self.build_hyperspy_axis(unique_ax, data_idx=indexv, label=ax['label'],
                                                               unit=ax['units'], navigate=is_nav))
@@ -139,5 +139,5 @@ try:
         def build_hyperspy_original_metadata(self, node: Node):
             """Build original metadata dictionary"""
             pass
-except:
+except Exception:
     pass

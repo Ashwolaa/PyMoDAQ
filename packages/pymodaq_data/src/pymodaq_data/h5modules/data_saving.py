@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from time import time
-from typing import Union, List, Tuple, Iterable
+from typing import Union, List, Iterable
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +22,6 @@ from .saving import DataType, H5SaverLowLevel
 from .backends import GROUP, CARRAY, Node, EARRAY, NodeError, GroupType  # noqa: F401
 from pymodaq_utils.utils import capitalize
 from pymodaq_data.h5modules.saving import SaveType
-from .. import DataToExport, DataDistribution
 
 SPECIAL_GROUP_NAMES = dict(nav_axes='NavAxes')
 
@@ -510,7 +508,7 @@ class DataSaverLoader(DataManagement):
                 error_node_index = self.get_index_from_node_name(data_node)
                 if error_node_index is not None:
                     error_node = self._error_saver.get_node_from_index(parent_node, error_node_index)
-            except NodeError as e:
+            except NodeError:
                 pass
 
         if 'axis' in self.data_type.name:

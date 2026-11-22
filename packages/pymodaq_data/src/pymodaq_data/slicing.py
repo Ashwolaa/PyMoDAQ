@@ -4,7 +4,7 @@ Created the 07/11/2022
 
 @author: Sebastien Weber
 """
-from typing import Union, List, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:

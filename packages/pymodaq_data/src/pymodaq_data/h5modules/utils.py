@@ -6,13 +6,11 @@ Created the 19/01/2023
 """
 # Standard imports
 from collections import OrderedDict
-from typing import List, Dict
 from pathlib import Path
 from importlib import import_module
 from pymodaq_utils.utils import get_entrypoints
 
 # 3rd party imports
-import numpy as np
 
 
 def register_exporter(parent_module_name: str = 'pymodaq_data.h5modules'):

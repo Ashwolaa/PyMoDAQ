@@ -977,7 +977,7 @@ class H5Backend:
                     else:
                         node = where
         except Exception as e:
-            raise NodeError(str(e))
+            raise NodeError(str(e)) from e
 
         if node is None:
             raise NodeError(f'Node {where} (name={name}) does not exist')
