@@ -3,9 +3,9 @@
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `9ba897f8d`; 132 commits ahead of upstream/dev (22 files changed, 324 insertions(+), 29 deletions(-))
+- `dev_agent` at `262b22c33`; 134 commits ahead of upstream/dev (22 files changed, 324 insertions(+), 29 deletions(-))
 - today: runs 3/20, specialist_runs 1/10, prs_opened 1/6, reviews 1/10; outcomes: ok 3
-- last /usage reading: 2026-11-22T18:26:41.538000+00:00  session 28% (resets Nov 22, 11:40pm (Europe/Paris))  week 3% (resets Nov 29, 12am (Europe/Paris))
+- last /usage reading: 2026-11-22T18:34:38.851000+00:00  session 33% (resets Nov 22, 11:40pm (Europe/Paris))  week 3% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `plan pymodaq_scripting`
 
 ## Needs you
