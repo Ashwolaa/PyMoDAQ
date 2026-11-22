@@ -20,7 +20,7 @@ the foreground (rules.md 17).
       `task.py checks <run-id> --backend <b>` for each `[checks].qt_backends`, `git switch dev_agent`. A new failure:
       stop this candidate (the task needs `/optimize-run` again) and go to f.
    c. No CI before the review: the PR's checks are the one CI run (step e, `merge.py gate`), rules.md 20.
-   d. Launch `pr-reviewer` with the task id, its plan, the branch and the report path from start (and the previous
+   d. Launch the agent of type `pr-reviewer` (`subagent_type: "pr-reviewer"`, Opus; never `general-purpose` briefed to review: `merge.py decide` checks the agent type and refuses otherwise) with the task id, its plan, the branch and the report path from start (and the previous
       report when start names one). Wait for it.
    e. `merge.py decide <run-id>`: refuses unless the review really happened for this head; acts on the verdict
       (changes / reject: task blocked or closed; approve: PR opened or the old draft marked ready, with a generated body).
