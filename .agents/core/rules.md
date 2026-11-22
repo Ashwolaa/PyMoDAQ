@@ -42,6 +42,17 @@
 20. Every commit that changes only `.agents/` or `.claude/` ends its subject with `[skip ci]`: state commits must not
     start the fork's workflows (72 wasted docs builds on 2026-11-18/19). CI runs once per task, on its PR.
 
+21. **Ask the owner only when the direction is genuinely open.** In R&D and for anything that adds a feature, before
+    building or concluding, ask yourself: would two reasonable answers to an open question lead to different work?
+    If yes, and the repository, `STATUS.md`, `handoff/` and earlier answers in `.agents/grill/` do not settle it,
+    write `.agents/grill/<topic>.md` and register it with `python3 .agents/scripts/grill.py add`:
+    `## Decision` (what you are stuck on and why it changes the work), then 3-7 numbered questions, most decisive
+    first, each with a `Recommended:` line (your answer and its evidence). Then stop that line of work, deliver
+    whatever part is clear, log the run `ok` with note `needs-direction`, and carry on with nothing else on that
+    topic. Do not ask about details you can settle with a sensible default, nor to avoid a decision: state the
+    default and go. At most `[grill].max_open` requests are open at once; `grill.py add` refuses beyond that (exit 3):
+    then make the safest choice and say so in the report. Answered requests (`## Direction`) are constraints.
+
 ## Project hard rules
 They are listed in `profile.toml` `[hard_rules]` and come from AGENTS.md. A violation is a veto, no exceptions
 without the human.

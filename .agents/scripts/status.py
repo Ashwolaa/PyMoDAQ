@@ -99,9 +99,10 @@ def render():
     blocked = [t for t in all_tasks if t[2].startswith("blocked") and t not in human]
     L += ["## Needs you"]
     L += [f"- approve or drop **{t[0]}** {t[1]} — {t[2]} (`{t[3]}`)" for t in proposed]
+    L += [f"- grill pending: **{g['topic']}** ({g['scope']}) — answer with `/optimize-grill {g['topic']}`" for g in read_jsonl("grill.jsonl") if g["status"] == "open"]
     L += [f"- **{t[0]}** — {t[2]}" for t in human]
     L += [f"- blocked: **{t[0]}** — {t[2]}" for t in blocked if not t[2].startswith(RETRY)]
-    if not (proposed or human or blocked):
+    if not (proposed or human or blocked or any(g["status"] == "open" for g in read_jsonl("grill.jsonl"))):
         L += ["- nothing"]
     L += [""]
     # in flight
