@@ -1,14 +1,15 @@
-# Consortium status — generated 2026-11-22 21:23 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 21:47 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `46d4e547e`; 158 commits ahead of upstream/dev (34 files changed, 356 insertions(+), 82 deletions(-))
+- `dev_agent` at `449c25b29`; 164 commits ahead of upstream/dev (38 files changed, 474 insertions(+), 178 deletions(-))
 - today: runs 10/20, specialist_runs 6/10, prs_opened 3/6, reviews 4/10; outcomes: ok 9, failed 1
 - last /usage reading: 2026-11-22T20:23:23.266000+00:00  session 57% (resets Nov 22, 11:40pm (Europe/Paris))  week 5% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
 ## Needs you
+- grill pending: **config-isolation** (pymodaq_utils) — answer with `/optimize-grill config-isolation`
 - **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
 - **T-pymodaq_utils-006** — done — PR #18 open, awaiting the human: touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
