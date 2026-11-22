@@ -371,6 +371,26 @@ def ftAxis_time(Npts, time_max):
     return omega_grid, time_grid
 
 
+def _check_ft_input(x, dim):
+    """Shared input checks of ft and ift"""
+    if not isinstance(dim, int):
+        raise TypeError('dim should be an integer specifying the array dimension over which to do the calculation')
+    assert isinstance(x, np.ndarray)
+    assert dim >= -1
+    assert dim <= len(x.shape) - 1
+
+
+def _check_ft2_input(x, dim):
+    """Shared input checks of ft2 and ift2: dim is an integer or an iterable of integers"""
+    assert isinstance(x, np.ndarray)
+    dims = dim if hasattr(dim, '__iter__') else (dim,)
+    for d in dims:
+        if not isinstance(d, int):
+            raise TypeError(
+                'elements in dim should be an integer specifying the array dimension over which to do the calculation')
+        assert d <= len(x.shape)
+
+
 def ft(x, dim=-1):
     """
     Process the 1D fast fourier transform and swaps the axis to get coorect results using ftAxis
@@ -385,11 +405,7 @@ def ft(x, dim=-1):
     --------
     ftAxis, ftAxis_time, ift, ft2, ift2
     """
-    if not isinstance(dim, int):
-        raise TypeError('dim should be an integer specifying the array dimension over which to do the calculation')
-    assert isinstance(x, np.ndarray)
-    assert dim >= -1
-    assert dim <= len(x.shape) - 1
+    _check_ft_input(x, dim)
 
     out = np.fft.fftshift(np.fft.fft(np.fft.fftshift(x, axes=dim), axis=dim), axes=dim)
     return out
@@ -409,11 +425,7 @@ def ift(x, dim=0):
     --------
     ftAxis, ftAxis_time, ift, ft2, ift2
     """
-    if not isinstance(dim, int):
-        raise TypeError('dim should be an integer specifying the array dimension over which to do the calculation')
-    assert isinstance(x, np.ndarray)
-    assert dim >= -1
-    assert dim <= len(x.shape) - 1
+    _check_ft_input(x, dim)
     out = np.fft.fftshift(np.fft.ifft(np.fft.fftshift(x, axes=dim), axis=dim), axes=dim)
     return out
 
@@ -432,18 +444,7 @@ def ft2(x, dim=(-2, -1)):
     --------
     ftAxis, ftAxis_time, ift, ft2, ift2
     """
-    assert isinstance(x, np.ndarray)
-    if hasattr(dim, '__iter__'):
-        for d in dim:
-            if not isinstance(d, int):
-                raise TypeError(
-                    'elements in dim should be an integer specifying the array dimension over which to do the calculation')
-            assert d <= len(x.shape)
-    else:
-        if not isinstance(dim, int):
-            raise TypeError(
-                'elements in dim should be an integer specifying the array dimension over which to do the calculation')
-        assert dim <= len(x.shape)
+    _check_ft2_input(x, dim)
     out = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(x, axes=dim)), axes=dim)
     return out
 
@@ -462,18 +463,7 @@ def ift2(x, dim=(-2, -1)):
     --------
     ftAxis, ftAxis_time, ift, ft2, ift2
     """
-    assert isinstance(x, np.ndarray)
-    if hasattr(dim, '__iter__'):
-        for d in dim:
-            if not isinstance(d, int):
-                raise TypeError(
-                    'elements in dim should be an integer specifying the array dimension over which to do the calculation')
-            assert d <= len(x.shape)
-    else:
-        if not isinstance(dim, int):
-            raise TypeError(
-                'elements in dim should be an integer specifying the array dimension over which to do the calculation')
-        assert dim <= len(x.shape)
+    _check_ft2_input(x, dim)
     out = np.fft.fftshift(np.fft.ifft2(np.fft.fftshift(x, axes=dim)), axes=dim)
     return out
 
