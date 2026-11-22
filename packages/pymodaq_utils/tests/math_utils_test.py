@@ -199,7 +199,69 @@ class TestMath:
             mutils.ift2(x, dim=(1.1, 1.2))
         with pytest.raises(TypeError):
             mutils.ift2(x, dim=1.1)
-            
+
+    @pytest.mark.parametrize('func', ['ft', 'ift'])
+    def test_ft_ift_input_checks(self, func):
+        f = getattr(mutils, func)
+        x = np.arange(12.).reshape(3, 4)
+        msg = 'dim should be an integer specifying the array dimension'
+        for bad in (1.5, "40", None):
+            with pytest.raises(TypeError, match=msg):
+                f(x, bad)
+        # dim type is checked before the array type
+        with pytest.raises(TypeError, match=msg):
+            f([1., 2.], 1.5)
+        for bad_x in ([1., 2.], 3.0, None):
+            with pytest.raises(AssertionError):
+                f(bad_x, 0)
+        with pytest.raises(AssertionError):
+            f(x, 2)  # dim > ndim - 1
+        with pytest.raises(AssertionError):
+            f(x, -2)  # dim < -1
+        assert f(x, -1).shape == x.shape
+        assert f(x, 1).shape == x.shape
+
+    def test_ft_ift_defaults(self):
+        x = np.arange(12.).reshape(3, 4) + 1j
+        expected_ft = np.fft.fftshift(np.fft.fft(np.fft.fftshift(x, axes=-1), axis=-1), axes=-1)
+        expected_ift_0 = np.fft.fftshift(np.fft.ifft(np.fft.fftshift(x, axes=0), axis=0), axes=0)
+        assert np.allclose(mutils.ft(x), expected_ft)
+        assert np.allclose(mutils.ift(x), expected_ift_0)  # ift default dim is 0
+        assert np.allclose(mutils.ift(x, 0), expected_ift_0)
+
+    @pytest.mark.parametrize('func', ['ft2', 'ift2'])
+    def test_ft2_ift2_input_checks(self, func):
+        f = getattr(mutils, func)
+        x = np.arange(12.).reshape(3, 4)
+        msg = 'elements in dim should be an integer specifying the array dimension'
+        for bad in (1.1, (1.1, 1.2), (0, 1.5), "40", None):
+            with pytest.raises(TypeError, match=msg):
+                f(x, bad)
+        # array type is checked before dim
+        with pytest.raises(AssertionError):
+            f([[1., 2.]], 1.1)
+        with pytest.raises(AssertionError):
+            f(3.0)
+        with pytest.raises(AssertionError):
+            f(x, 3)  # scalar > ndim
+        with pytest.raises(AssertionError):
+            f(x, (0, 3))  # one element > ndim
+        # a too small dim is not asserted by ft2/ift2 (numpy decides)
+        with pytest.raises(Exception) as exc:
+            f(x, -5)
+        assert not isinstance(exc.value, (AssertionError, TypeError))
+
+    def test_ft2_ift2_valid_dims(self):
+        x = np.arange(12.).reshape(3, 4) + 1j
+        for dim in ((-2, -1), (0, 1), [0, 1], 1, -1):
+            sh = np.fft.fftshift(x, axes=dim)
+            assert np.allclose(mutils.ft2(x, dim),
+                               np.fft.fftshift(np.fft.fft2(sh), axes=dim))
+            assert np.allclose(mutils.ift2(x, dim),
+                               np.fft.fftshift(np.fft.ifft2(sh), axes=dim))
+        assert np.allclose(mutils.ft2(x), mutils.ft2(x, (-2, -1)))
+        assert np.allclose(mutils.ift2(x), mutils.ift2(x, (-2, -1)))
+
     def test_rotate2D(self):
         accuracy = 10  # Rouding precision
         x,y = (0,0)  # Point to rotate
