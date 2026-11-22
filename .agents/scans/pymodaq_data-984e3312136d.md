@@ -1,0 +1,294 @@
+# Scan: pymodaq_data
+path: packages/pymodaq_data/src/pymodaq_data   tree: 984e3312136d
+tools: ruff 0.17.5, vulture 2.16, radon 6.0.1, jscpd 5.4.3
+
+## ruff (520 findings, repo config)
+### Bug risk (45)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1017 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/data.py:1100 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_data/src/pymodaq_data/data.py:1465 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:1468 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:1529 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:1718 B018 Found useless expression. Either assign it to a variable or remove it.
+- packages/pymodaq_data/src/pymodaq_data/data.py:1844 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:1876 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:1881 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:2033 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:2038 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_data/src/pymodaq_data/data.py:2108 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_data/src/pymodaq_data/data.py:2111 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq_data/src/pymodaq_data/data.py:2146 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/data.py:3066 B007 Loop control variable `ind` not used within loop body
+- packages/pymodaq_data/src/pymodaq_data/data.py:3069 B007 Loop control variable `ind` not used within loop body
+- packages/pymodaq_data/src/pymodaq_data/data.py:3071 B007 Loop control variable `ind` not used within loop body
+- packages/pymodaq_data/src/pymodaq_data/data.py:3267 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_data/src/pymodaq_data/data.py:3303 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/data.py:3402 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/data.py:3506 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/data.py:3537 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/data.py:3567 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/data.py:3612 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/data.py:4226 F811 Redefinition of unused `append` from line 4220: `append` redefined here
+- packages/pymodaq_data/src/pymodaq_data/data.py:4241 F811 Redefinition of unused `append` from line 4226: `append` redefined here
+- packages/pymodaq_data/src/pymodaq_data/data.py:4265 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/data.py:4296 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:980 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:1313 F811 Redefinition of unused `metadata` from line 12: `metadata` redefined here
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:26 F811 Redefinition of unused `DataDistribution` from line 20: `DataDistribution` redefined here
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:26 F811 Redefinition of unused `DataToExport` from line 20: `DataToExport` redefined here
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:513 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1314 B007 Loop control variable `ind_nav` not used within loop body
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporter.py:29 B027 `H5Exporter.__init__` is an empty method in an abstract base class, but has no abstract decorator
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:57 F841 Local variable `data_array` is assigned to but never used
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:89 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:142 E722 Do not use bare `except`
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:298 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:310 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:34 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq_data/src/pymodaq_data/numpy_func.py:46 E722 Do not use bare `except`
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotter.py:37 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotter.py:44 B027 `PlotterBase.__init__` is an empty method in an abstract base class, but has no abstract decorator
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:50 B007 Loop control variable `ind` not used within loop body
+### Unused imports (74)
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:1 F401 `importlib.util` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:2 F401 `os` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:3 F401 `sys` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:18 F401 `pymodaq_data.config` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:38 F401 `pymodaq_data.plotting.plotter.plotter.PlotterFactory` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:48 F401 `pymodaq_data.data.Axis` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:48 F401 `pymodaq_data.data.DataRaw` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:48 F401 `pymodaq_data.data.DataToExport` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:48 F401 `pymodaq_data.data.DataWithAxes` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:49 F401 `pymodaq_data.data.DataBase` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:49 F401 `pymodaq_data.data.DataCalculated` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:49 F401 `pymodaq_data.data.DataDim` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:49 F401 `pymodaq_data.data.DataDistribution` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:49 F401 `pymodaq_data.data.DataSource` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/data.py:9 F401 `abc.ABCMeta` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/data.py:16 F401 `typing.Type` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/data.py:41 F401 `pymodaq_data.ureg` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:1 F401 `.browsing` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:2 F401 `.utils.register_exporter` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:3 F401 `.backends.backends_available` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:4 F401 `.swmr.collect_datasets` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:4 F401 `.swmr.refresh_cached` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:4 F401 `.swmr.refresh_datasets` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:12 F401 `importlib.metadata` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:16 F401 `pymodaq_utils.utils.capitalize` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:19 F401 `pymodaq_utils.enums.enum_checker` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:7 F401 `typing.Tuple` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:8 F401 `os` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:10 F401 `typing.List` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:11 F401 `warnings` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:12 F401 `logging` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:13 F401 `webbrowser` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:14 F401 `numpy` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:16 F401 `packaging.version` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:11 F401 `time.time` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:12 F401 `typing.Tuple` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporter.py:12 F401 `numpy` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporter.py:15 F401 `pymodaq_data.h5modules.backends.H5Backend` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:16 F401 `pymodaq_data.h5modules.utils.get_h5_data_from_node` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:7 F401 `copy` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:11 F401 `dateutil.parser` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:12 F401 `numbers.Number` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:13 F401 `os` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:15 F401 `typing.Iterable` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:24 F401 `pymodaq_data.data.Axis` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:24 F401 `pymodaq_data.data.DataToExport` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:24 F401 `pymodaq_data.data.DataWithAxes` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:26 F401 `pymodaq_utils.warnings.deprecation_msg` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 F401 `.backends.InvalidExport` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 F401 `.backends.InvalidSave` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 F401 `.backends.backends_available` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:30 F401 `.backends.InvalidDataDimension` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:30 F401 `.backends.InvalidScanType` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:32 F401 `.browsing` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:9 F401 `typing.Dict` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:9 F401 `typing.List` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:15 F401 `numpy` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/numpy_func.py:6 F401 `pint.facets.numpy.numpy_func.HANDLED_UFUNCS` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotter.py:2 F401 `typing` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotter.py:6 F401 `typing.Union` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotter.py:9 F401 `numpy` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:1 F401 `typing.Any` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:1 F401 `typing.List` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:1 F401 `typing.Tuple` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:2 F401 `sys` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:9 F401 `pymodaq_data.data.DataDim` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:10 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:8 F401 `numbers.Number` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:9 F401 `typing.List` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:13 F401 `pymodaq_utils.math_utils` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:14 F401 `pymodaq_data.data.Axis` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:14 F401 `pymodaq_data.data.DataBase` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:14 F401 `pymodaq_data.data.DataRaw` imported but unused
+- packages/pymodaq_data/src/pymodaq_data/slicing.py:7 F401 `typing.List` imported but unused
+### Simplifications (45)
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:33 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:35 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:42 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/__init__.py:44 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/config.py:10 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:675 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:677 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:1165 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:1171 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:1654 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/data.py:1661 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/data.py:1667 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/data.py:1977 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/data.py:2316 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:2317 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:2319 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:2360 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:3082 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq_data/src/pymodaq_data/data.py:3204 SIM110 Use `return all(data_array.shape == error_array.shape for data_array, error_array in zip(data, errors))` instead of `for` loop
+- packages/pymodaq_data/src/pymodaq_data/data.py:3768 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq_data/src/pymodaq_data/data.py:3887 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:3893 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:4322 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/data.py:4324 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:129 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:424 SIM201 Use `data.shape != 1,` instead of `not data.shape == 1,`
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:570 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:934 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:96 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:157 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:538 SIM401 Use `data_node.attrs.get('source', 'raw')` instead of an `if` block
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:541 SIM401 Use `data_node.attrs.get('units', '')` instead of an `if` block
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:545 SIM401 Use `data_node.attrs.get('origin', '')` instead of an `if` block
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:546 SIM401 Use `data_node.attrs.get('nav_indexes', ())` instead of an `if` block
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:854 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/base.py:75 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/flimj.py:42 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:78 F541 f-string without any placeholders
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:27 SIM105 Use `contextlib.suppress(ModuleNotFoundError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:71 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:91 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:95 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_data/src/pymodaq_data/numpy_func.py:35 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:23 SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py:44 SIM401 Use `linewidth = kwargs.get('linewidth', self.linewidth)` instead of an `if` block
+### Style, counted only (356; per rule: findings / files)
+- I001: 26 / 20
+- UP004: 3 / 2
+- UP006: 108 / 8
+- UP007: 79 / 2
+- UP009: 14 / 14
+- UP031: 10 / 1
+- UP032: 1 / 1
+- UP035: 24 / 14
+- UP037: 12 / 1
+- UP045: 67 / 1
+- W291: 1 / 1
+- W292: 2 / 2
+- W293: 9 / 5
+
+## vulture (209 findings at >= 60% confidence)
+### >= 80% confidence (27)
+- packages/pymodaq_data/src/pymodaq_data/data.py:16 unused import 'Type' (90%)
+- packages/pymodaq_data/src/pymodaq_data/data.py:239 unused variable 'ignored' (100%)
+- packages/pymodaq_data/src/pymodaq_data/data.py:239 unused variable 'ignored_also' (100%)
+- packages/pymodaq_data/src/pymodaq_data/data.py:696 unused variable 'ignored' (100%)
+- packages/pymodaq_data/src/pymodaq_data/data.py:696 unused variable 'ignored_also' (100%)
+- packages/pymodaq_data/src/pymodaq_data/data.py:700 unused variable 'ignored' (100%)
+- packages/pymodaq_data/src/pymodaq_data/data.py:700 unused variable 'ignored_also' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:345 unreachable code after 'if' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:13 unused import 'webbrowser' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:16 unused import 'version_mod' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:91 unused variable 'exc_tb' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:91 unused variable 'exc_type' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:91 unused variable 'exc_val' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:917 unused variable 'exc_tb' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:917 unused variable 'exc_type' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:917 unused variable 'exc_val' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1239 unused variable 'exc_tb' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1239 unused variable 'exc_type' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1239 unused variable 'exc_val' (100%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:16 unused import 'get_h5_data_from_node' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:11 unused import 'parser' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 unused import 'InvalidDataDimension' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 unused import 'InvalidExport' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 unused import 'InvalidSave' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:29 unused import 'InvalidScanType' (90%)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:32 unused import 'browsing' (90%)
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotter.py:2 unused import 'typing' (90%)
+### 60-79% confidence, counted per file (mostly public API seen as unused)
+- packages/pymodaq_data/src/pymodaq_data/config.py: 2
+- packages/pymodaq_data/src/pymodaq_data/data.py: 68
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py: 2
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py: 22
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py: 3
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py: 12
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporter.py: 2
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/base.py: 3
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/flimj.py: 1
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py: 2
+- packages/pymodaq_data/src/pymodaq_data/h5modules/migration.py: 1
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py: 20
+- packages/pymodaq_data/src/pymodaq_data/h5modules/swmr.py: 3
+- packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py: 3
+- packages/pymodaq_data/src/pymodaq_data/numpy_func.py: 21
+- packages/pymodaq_data/src/pymodaq_data/plotting/plotter/plotters/matplotlib_plotters.py: 4
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py: 12
+- packages/pymodaq_data/src/pymodaq_data/slicing.py: 1
+
+## radon cyclomatic complexity, rank C or worse (23)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3088 DataWithAxes._slicer D(24)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3383 DataWithAxes.from_xarray D(21)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3175 DataWithAxes.deepcopy_with_new_data C(19)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3284 DataWithAxes.to_xarray C(18)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:471 DataSaverLoader.load_data C(18)
+- packages/pymodaq_data/src/pymodaq_data/numpy_func.py:171 _pad C(17)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3028 DataWithAxes._compute_slices C(16)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:960 H5Backend.get_node C(15)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1640 AxesManagerBase._manage_named_axes C(14)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:164 H5SaverLowLevel.init_file C(14)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1450 DataBase._check_data_type C(13)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/flimj.py:16 H5asciiExporter C(13)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/flimj.py:22 H5asciiExporter.export_data C(12)
+- packages/pymodaq_data/src/pymodaq_data/data.py:239 _compute_slices_from_axis C(11)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1205 DataBase._comparison_common C(11)
+- packages/pymodaq_data/src/pymodaq_data/data.py:2381 DataWithAxes.__eq__ C(11)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/__init__.py:13 open_h5_file_for_reading C(11)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:684 H5Backend.open_file C(11)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:1115 H5Backend.walk_nodes C(11)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:693 DataEnlargeableSaver.add_data C(11)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/base.py:53 H5txtExporter C(11)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/hyperspy.py:32 H5hspyExporter.export_data C(11)
+- packages/pymodaq_data/src/pymodaq_data/numpy_func.py:20 process_arguments_for_ufuncs C(11)
+
+## jscpd duplication: 3.68% of lines, 30 clones
+- packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/base.py:68-93 = packages/pymodaq_data/src/pymodaq_data/h5modules/exporters/flimj.py:33-61 (26 lines)
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:196-216 = packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:223-243 (21 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1596-1614 = packages/pymodaq_data/src/pymodaq_data/data.py:1891-1909 (19 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1596-1614 = packages/pymodaq_data/src/pymodaq_data/data.py:2042-2060 (19 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3544-3558 = packages/pymodaq_data/src/pymodaq_data/data.py:3572-3586 (15 lines)
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:140-154 = packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:171-185 (15 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:2731-2744 = packages/pymodaq_data/src/pymodaq_data/data.py:2775-2788 (14 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3500-3513 = packages/pymodaq_data/src/pymodaq_data/data.py:3531-3544 (14 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1822-1833 = packages/pymodaq_data/src/pymodaq_data/data.py:1998-2009 (12 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:4079-4090 = packages/pymodaq_data/src/pymodaq_data/data.py:4100-4111 (12 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:861-871 = packages/pymodaq_data/src/pymodaq_data/data.py:888-898 (11 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:1874-1884 = packages/pymodaq_data/src/pymodaq_data/data.py:2031-2042 (11 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:3530-3540 = packages/pymodaq_data/src/pymodaq_data/data.py:3560-3570 (11 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:975-985 = packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1008-1018 (11 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:977-987 = packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1010-1021 (11 lines)
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:154-164 = packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:185-195 (11 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:2142-2151 = packages/pymodaq_data/src/pymodaq_data/data.py:3502-3510 (10 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:961-970 = packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1188-1196 (10 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:504-513 = packages/pymodaq_data/src/pymodaq_data/h5modules/saving.py:516-525 (10 lines)
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:142-151 = packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:204-213 (10 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:945-953 = packages/pymodaq_data/src/pymodaq_data/data.py:2137-2145 (9 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:313-321 = packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:1094-1102 (9 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/browsing.py:96-104 = packages/pymodaq_data/src/pymodaq_data/h5modules/utils.py:95-103 (9 lines)
+- packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:209-217 = packages/pymodaq_data/src/pymodaq_data/post_treatment/process_to_scalar.py:236-244 (9 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:525-532 = packages/pymodaq_data/src/pymodaq_data/data.py:540-547 (8 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:662-669 = packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:809-817 (8 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:964-970 = packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:976-982 (7 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:965-971 = packages/pymodaq_data/src/pymodaq_data/h5modules/data_saving.py:1191-1197 (7 lines)
+- packages/pymodaq_data/src/pymodaq_data/data.py:2746-2751 = packages/pymodaq_data/src/pymodaq_data/data.py:2790-2795 (6 lines)
+- packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:690-695 = packages/pymodaq_data/src/pymodaq_data/h5modules/backends.py:706-711 (6 lines)
+sha256: e77859a28e63bdd7
+(scanned at commit a33731c4f; not part of the hash)
