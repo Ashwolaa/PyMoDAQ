@@ -24,7 +24,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils/config.py:Config.__call__|plural fallback never runs
 - constraints: delete option, all three branches (compat-risk found `dynamics` 598-602 too); do NOT catch ConfigError (would change returned values: medium risk). Characterisation test pins current behaviour: missing plural key raises ConfigError, present plural key returns its value (fixture tests/data/config_template.toml). The line cited as config.py:326 is `__contains__`; the raise is at :322. Merge T-003's Config.__call__ docstring text, rewritten to match the code after the deletion.
 - verdicts: decider-compat-risk: approve — dead branches, no caller-visible change with the delete option; decider-test-change: approve — test only added, existing tests untouched
-- status: approved — owner, 2026-11-22
+- status: done — branch agent/pymodaq_utils/refactor/2026-11-22-delete-the-dead, local checks green, CI on the PR, awaiting review
 
 ## T-pymodaq_utils-007 set_logger must not kill the importing process
 - scope: pymodaq_utils   specialty: refactor (bugfix)   risk: medium

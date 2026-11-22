@@ -1,20 +1,18 @@
-# Handoff: pymodaq_utils — 2026-11-22 (/optimize-merge)
+# Handoff: pymodaq_utils — 2026-11-22 (/optimize-run T-pymodaq_utils-006)
 
 ## Done
-- PR #16 (agent/pymodaq_data/hygiene/2026-11-22) merged into dev_agent (seen by sync).
-- T-M11 (shared ft/ift input checks): pr-reviewer approve, PR #17 open, CI green
-  (compile-doc, tests-utils, typing); pyqt6/pyside6 pymodaq_utils 329 passed, 1 pre-existing fail.
+- T-006 (delete dead plural fallbacks in Config.__call__): branch agent/pymodaq_utils/refactor/2026-11-22-delete-the-dead pushed,
+  no PR yet. Flake8, layering, lint OK; pyqt6/pyside6: 328 passed, 1 skipped, 1 pre-existing fail
+  (test_nested_update_from_user). Docstring rewritten; TestConfigPluralKeys added.
+- PR #17 (T-M11) still awaiting the human.
+
+## Open findings (ranked)
+1. config_test::test_nested_update_from_user fails on base too (fixed by T-008) [risk: low]
+2. pymodaq extension_loading_test Scanner load hangs offscreen [risk: medium]
 
 ## Blocked
-- T-M06 still blocked (pymodaq extension_loading_test Scanner hang, unchanged).
-
-## Open findings
-1. pymodaq extension_loading_test Scanner load hangs offscreen [medium]
-2. config_test::test_nested_update_from_user fails on base too [low]
+- T-M06 (Scanner hang, unchanged).
 
 ## Next step
-Human: decide PR #17 (not auto-merged: registry and plan risk medium, a decider vetoed or blocked it in the plan,
-1 of 2 needed approving deciders, touches tests/math_utils_test.py). Then M12 (test only, pymodaq scope).
-
-## Evidence
-- Review: .agents/reports/pymodaq_utils/2026-11-22-pr-review-T-pymodaq_utils-M11-r1.md
+Human: `/optimize-merge T-pymodaq_utils-006`. Then T-011, T-007, T-009, T-008 in plan order.
+Note: a path holding both 'backends' and 'backend' now takes the singular branch (negligible, unverified callers).
