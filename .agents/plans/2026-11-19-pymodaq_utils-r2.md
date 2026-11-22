@@ -40,7 +40,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils/tests/config_test.py:test_nested_update_from_user|local failure
 - constraints: `monkeypatch.setattr(pymodaq_utils.config, 'get_set_local_dir', lambda user=False: <distinct pre-created tmp_path dir>)` (get_set_local_dir is functools.cache'd, config.py:125, so patching CONFIG_BASE_PATH/Path.home alone leaks). Keep the assertions at :258-259 unchanged. Attach the failing traceback and a before/after coverage diff of config.py (must not drop). Out of scope (file as finding): `test_load_system_config` (config_test.py:113-136) shares the same folders and mutates global TOML_DICT.
 - verdicts: decider-compat-risk: approve — tests only; decider-test-change: approve (round 2, after procedural veto) — conditional on traceback + coverage diff + unchanged assertions
-- status: done — branch agent/pymodaq_utils/test-quality/2026-11-22, local checks green, CI on the PR, awaiting review
+- status: done — PR #19 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/config_test.py
 
 ## T-pymodaq_utils-009 Docstrings for six public names (absorbs the _literal_value part of T-003)
 - scope: pymodaq_utils   specialty: docs   risk: low
