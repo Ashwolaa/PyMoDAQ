@@ -166,17 +166,20 @@ def get_entrypoints(group='pymodaq.plugins'):
     ----------
     group: str
         the name of the group
+
+    Returns
+    -------
+    list of importlib.metadata.EntryPoint
+
+    .. deprecated::
+        Use :func:`pymodaq_utils.utils.get_entrypoints`. This function now delegates to it and
+        therefore returns a ``list`` instead of an ``EntryPoints`` object (no ``.names``/``.select()``).
     """
-    try:
-        discovered_entrypoints = metadata.entry_points(group=group)
-    except TypeError:
-        try:
-            discovered_entrypoints = metadata.entry_points().select(group=group)
-        except AttributeError:
-            discovered_entrypoints = metadata.entry_points().get(group, [])
-    if isinstance(discovered_entrypoints, tuple):  # API for python > 3.8
-        discovered_entrypoints = list(discovered_entrypoints)
-    return discovered_entrypoints
+    from pymodaq_utils.utils import get_entrypoints as _get_entrypoints  # local import: avoid cycles
+    from pymodaq_utils.warnings import deprecation_msg
+    deprecation_msg('pymodaq_utils.packages.get_entrypoints is deprecated and now returns a list, '
+                    'use pymodaq_utils.utils.get_entrypoints instead')
+    return _get_entrypoints(group)
 
 
 def post_error(message):
