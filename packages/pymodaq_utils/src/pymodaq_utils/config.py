@@ -576,9 +576,8 @@ class Config(BaseConfig):
         If the path contains ``backend``, ``debug_level`` or ``dynamic`` and the value found is not a list, the
         plural spelling (``backends``, ``debug_levels``, ``dynamics``) is tried and returned if it exists,
         otherwise the scalar is returned wrapped in a list. A list found under the singular key is returned
-        as is. If the path contains the plural spelling, the value is returned; the fallback to the singular
-        key only happens on ``KeyError``, which ``BaseConfig.__call__`` does not raise (it raises
-        ``ConfigError``), so a missing plural key raises ``ConfigError``.
+        as is. A path containing the plural spelling is forwarded unchanged: its value is returned, and a
+        missing plural key raises ``ConfigError`` (there is no fallback to the singular key).
         ``hdf5_backend`` is looked up the same way as the other singular keys but is not renamed, so its value
         is returned as found (a scalar is not wrapped in a list). Any other path is forwarded unchanged.
 
@@ -592,12 +591,7 @@ class Config(BaseConfig):
         Any
             The value stored in the configuration at this path
         """
-        if 'backends' in args:
-            try:
-                return super().__call__(*args)
-            except KeyError:
-               args = replace_item_in_list(args, 'backends', 'backend')
-        elif 'backend' in args:
+        if 'backend' in args:
             entry = super().__call__(*args)
             if not isinstance(entry, list):
                 try:
@@ -607,11 +601,6 @@ class Config(BaseConfig):
                     return [entry]
             else:
                 return entry
-        elif 'debug_levels' in args:
-            try:
-                return super().__call__(*args)
-            except KeyError:
-                args = replace_item_in_list(args, 'debug_levels', 'debug_level')
         elif 'debug_level' in args:
             entry = super().__call__(*args)
             if not isinstance(entry, list):
@@ -622,11 +611,6 @@ class Config(BaseConfig):
                     return [entry]
             else:
                 return entry
-        elif 'dynamics' in args:
-            try:
-                return super().__call__(*args)
-            except KeyError:
-                args = replace_item_in_list(args, 'dynamics', 'dynamic')
         elif 'dynamic' in args:
             entry = super().__call__(*args)
             if not isinstance(entry, list):
