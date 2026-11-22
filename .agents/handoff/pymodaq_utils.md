@@ -1,17 +1,18 @@
 # Handoff pymodaq_utils (after /optimize-merge, 2026-11-22)
 
 ## Done
-- Nothing merged in this run.
+- PR #19 (agent/pymodaq_utils/test-quality/2026-11-22) merged into dev_agent (seen by merge.py sync).
 
 ## Blocked
-- T-pymodaq_utils-011 (branch agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints), run 2026-11-22-merge-T-pymodaq_utils-011-r1:
-  - start rebased + pushed; checks: lint/layering ok; pyqt6 and pyside6 only the pre-existing config_test.py::test_nested_update_from_user failure.
-  - pr-reviewer verdict: changes (public_api yes, behaviour_change yes): add a test (list == utils.get_entrypoints(group) + DeprecationWarning),
-    give `.. deprecated::` a version (repo style `5.3.5`), remove unused `from importlib import metadata` in packages.py:2.
-  - `merge.py decide` refused twice: "no pr-reviewer was launched in this session since start" (ev.launches did not see the Agent launch).
-    Not worked around (rules.md 16). `merge.py close` also refuses (nothing decided). Task status in the plan is unchanged.
-  - Report: .agents/reports/pymodaq_utils/2026-11-22-pr-review-T-pymodaq_utils-011-r1.md
+- T-pymodaq_utils-011 (agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints), run 2026-11-22-merge-T-pymodaq_utils-011-r2:
+  - start rebased + pushed (head be45c4198); static, pyqt6 and pyside6 checks all pass (335 passed each).
+  - pr-reviewer verdict: changes (public_api yes, behaviour_change yes). Same three open items as r1:
+    1. add a test (returns list == utils.get_entrypoints(group); pytest.warns(DeprecationWarning, match='pymodaq_utils.utils.get_entrypoints'); no dependence on installed plugins)
+    2. give `.. deprecated::` a version (packages.py:174; repo style `5.3.5`)
+    3. remove unused `from importlib import metadata` (packages.py:2) or comment why it stays
+  - merge.py decide now worked (the r1 launch-detection refusal did not recur); task blocked, run closed.
+  - Report: .agents/reports/pymodaq_utils/2026-11-22-pr-review-T-pymodaq_utils-011-r2.md
 
 ## Next step
-- Owner: check why merge.py's session event log misses sub-agent launches, then rerun /optimize-merge pymodaq_utils
-  (the review is for this head; a rerun relaunches pr-reviewer), or send T-011 back to /optimize-run with the three fixes above.
+- Rework T-011 with /optimize-run (the three fixes above), then rerun /optimize-merge pymodaq_utils.
+- Since the change is public API (list instead of EntryPoints, new warning), the PR will go to the human, not auto-merge.
