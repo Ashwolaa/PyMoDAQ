@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-22 21:17 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 21:19 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `1006522e0`; 153 commits ahead of upstream/dev (34 files changed, 356 insertions(+), 82 deletions(-))
-- today: runs 8/20, specialist_runs 4/10, prs_opened 3/6, reviews 3/10; outcomes: ok 7, failed 1
-- last /usage reading: 2026-11-22T20:17:02.265000+00:00  session 51% (resets Nov 22, 11:40pm (Europe/Paris))  week 5% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_utils-007 .agents/plans/2026-11-19-pymodaq_utils-r2.md`
+- `dev_agent` at `70e09a3cb`; 154 commits ahead of upstream/dev (34 files changed, 356 insertions(+), 82 deletions(-))
+- today: runs 9/20, specialist_runs 6/10, prs_opened 3/6, reviews 3/10; outcomes: ok 8, failed 1
+- last /usage reading: 2026-11-22T20:17:16.076000+00:00  session 51% (resets Nov 22, 11:40pm (Europe/Paris))  week 5% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
@@ -15,7 +15,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- T-pymodaq_utils-007 set_logger must not kill the importing process — approved — owner, 2026-11-22
+- `agent/pymodaq_utils/refactor/2026-11-22-set-logger-must` (T-pymodaq_utils-007, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-008 Isolate test_nested_update_from_user — approved — owner, 2026-11-22
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — approved — owner, 2026-11-22
 - T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — approved — owner, 2026-11-22
@@ -30,11 +30,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_data] exporters/hyperspy.py:57 assigns data_array, never used (F841)
 - [pymodaq] packages/pymodaq tests hang at extension_loading_test.py::TestExtensions::test_load[Scanner] (offscreen, pyqt6 and pyside6, also on base)
 - [pymodaq_utils] config_test::test_nested_update_from_user fails (both backends, also on base)
+- [pymodaq_utils] logger.py: import sys unused after T-007; __init__.py ConfigError handler untested
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-20-run-T-pymodaq_utils-010 | optimize-run | ok | 0.6 | 3748 | docs: 3 check_plugin codes added |
 | 2026-11-20-merge-T-pymodaq_utils-010-r1 | optimize-merge | ok | 5.7 | 5669 | T-pymodaq_utils-010: done — PR #15 merged (auto: low risk, approved by |
 | plan-pymodaq_data-20261122 | optimize-plan | ok | 3.5 | 53355 |  |
 | 2026-11-22-run-T-pymodaq_data-001 | optimize-run | ok | 2.7 | 9458 | imports + exception hygiene, 12 files, 85 lines |
@@ -44,6 +44,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-22-merge-T-pymodaq_utils-M11-r1 | optimize-merge | ok | 5.6 | 5539 | T-pymodaq_utils-M11: done — PR #17 open, awaiting the human: registry  |
 | 2026-11-22-run-T-pymodaq_utils-006 | optimize-run | ok | 2.2 | 7142 | dead plural fallbacks deleted; characterisation tests added; pre-exist |
 | 2026-11-22-merge-T-pymodaq_utils-006-r1 | optimize-merge | ok | 5.4 | 6539 | T-pymodaq_utils-006: done — PR #18 open, awaiting the human: touches t |
+| 2026-11-22-run-T-pymodaq_utils-007 | optimize-run | ok | 1.9 | 7756 | set_logger raises ConfigError; test added; coverage logger.py 51->53%; |
 
 ## Done so far
-- tasks done: 19; PRs merged into dev_agent: 13
+- tasks done: 20; PRs merged into dev_agent: 13
