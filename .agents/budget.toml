@@ -10,6 +10,9 @@ runs = 20                  # owner 2026-11-19: about one day of the wheel (was 9
 reviews = 10               # pr-reviewer launches per day; owner 2026-11-19 (was 14)
 rd_share = 0.2            # fraction of the budget reserved for /optimize-research
 
+[grill]
+max_open = 2              # owner 2026-11-22: at most this many open questions for the owner at once
+
 [plan]
 reset_time_utc = "00:00"  # (assumed) replace with your real reset time
 schedule_after_reset_minutes = 30

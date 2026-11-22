@@ -99,3 +99,35 @@ def test_commands_page_is_current():
     """COMMANDS.md is generated from the commands, agents and scripts; regenerate it after changing any of them."""
     r = script(str(AGENTS / "scripts" / "docs.py"), "--check")
     assert r.returncode == 0, r.stdout
+
+
+# ---------------------------------------------------------------- grill
+GOOD = "## Decision\nWhich API?\n\n1. A or B?\n   Recommended: A (evidence)\n2. Keep X?\n   Recommended: yes\n3. Scope?\n   Recommended: small\n"
+
+
+def test_grill_file_check():
+    import grill
+    assert grill.check_file(GOOD) == []
+    assert any("Decision" in p for p in grill.check_file(GOOD.replace("## Decision", "## Why")))
+    assert any("numbered" in p for p in grill.check_file("## Decision\nx\n1. only one\n   Recommended: a\n"))
+    assert any("Recommended" in p for p in grill.check_file(GOOD.replace("   Recommended: yes\n", "")))
+
+
+def test_grill_add_cap_and_answer(tmp_path, monkeypatch):
+    import grill
+    monkeypatch.setattr(grill, "AGENTS_DIR", tmp_path)
+    monkeypatch.setattr(grill, "read_jsonl", lambda name: [json.loads(l) for l in (tmp_path / name).read_text().splitlines()]
+                        if (tmp_path / name).exists() else [])
+    monkeypatch.setattr(grill, "require_state_branch", lambda: None)
+    monkeypatch.setattr(grill, "max_open", lambda: 1)
+    (tmp_path / "t.md").write_text(GOOD)
+    ns = lambda **k: type("A", (), {"scope": "s", "file": str(tmp_path / "t.md"), "source": None, **k})
+    grill.cmd_add(ns(topic="one"))
+    grill.cmd_add(ns(topic="one"))  # already open: no second row
+    assert len(grill.read_jsonl("grill.jsonl")) == 1
+    with pytest.raises(SystemExit) as e:
+        grill.cmd_add(ns(topic="two"))
+    assert e.value.code == 3  # cap reached
+    grill.cmd_answer(type("A", (), {"topic": "one", "status": "answered"}))
+    assert grill.read_jsonl("grill.jsonl")[0]["status"] == "answered"
+    grill.cmd_add(ns(topic="two"))  # room again
