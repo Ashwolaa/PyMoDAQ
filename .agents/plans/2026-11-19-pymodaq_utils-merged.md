@@ -76,7 +76,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: refactor   risk: medium   found: 1/8
 - files: math_utils.py:374-478; pinning tests first in tests/math_utils_test.py
 - verdicts: decider-compat-risk: approve with conditions; decider-test-change: veto in round 1 (tests insufficient), approve in round 2 with pinning tests first (A2-sonnet)
-- status: approved — owner, 2026-11-22
+- status: done — branch agent/pymodaq_utils/refactor/2026-11-22-shared-input-checks, local checks green, CI on the PR, awaiting review
 
 ## T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists
 - scope: pymodaq (test only)   specialty: test-quality   risk: low   found: 1/8
