@@ -6,6 +6,7 @@ import datetime
 
 import toml
 
+import pymodaq_utils.config
 from pymodaq_utils.config import Config, GlobalConfig, BaseConfig, replace_file_extension, get_set_config_dir, get_set_local_dir, \
     copy_template_config, load_system_config_and_update_from_user, create_toml_from_dict, check_config, get_config_file, \
     recursive_iterable_flattening, ConfigError
@@ -263,9 +264,16 @@ def test_custom_config():
 
     assert config.to_dict() == config_dict
 
-def test_nested_update_from_user(tmp_path):
+def test_nested_update_from_user(tmp_path, monkeypatch):
     """ make sure the user defined entry within a nested config is loaded but that the other entries are also loaded
      from the system wide config file"""
+
+    # system and user local folders can coincide (~/.pymodaq): give them distinct temporary folders.
+    # get_set_local_dir is functools.cache'd, so it is patched itself (not CONFIG_BASE_PATH / Path.home)
+    local_dirs = {False: tmp_path.joinpath('system'), True: tmp_path.joinpath('user')}
+    for local_dir in local_dirs.values():
+        local_dir.mkdir()
+    monkeypatch.setattr(pymodaq_utils.config, 'get_set_local_dir', lambda user=False: local_dirs[user])
 
     test_name = 'test'
     template_path = tmp_path.joinpath('template.toml')
