@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-22 22:18 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 22:21 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `59b78c40d`; 173 commits ahead of upstream/dev (36 files changed, 474 insertions(+), 134 deletions(-))
-- today: runs 12/20, specialist_runs 7/10, prs_opened 4/6, reviews 5/10; outcomes: ok 11, failed 1
-- last /usage reading: 2026-11-22T21:18:27.362000+00:00  session 67% (resets Nov 22, 11:40pm (Europe/Paris))  week 6% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_utils-011 .agents/plans/2026-11-19-pymodaq_utils-r2.md`
+- `dev_agent` at `e1c39aa6c`; 174 commits ahead of upstream/dev (36 files changed, 474 insertions(+), 134 deletions(-))
+- today: runs 13/20, specialist_runs 8/10, prs_opened 4/6, reviews 5/10; outcomes: ok 12, failed 1
+- last /usage reading: 2026-11-22T21:18:39.958000+00:00  session 67% (resets Nov 22, 11:40pm (Europe/Paris))  week 6% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-isolation** (pymodaq_utils) — answer with `/optimize-grill config-isolation`
@@ -18,8 +18,8 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-007** — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 
 ## In flight
+- `agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints` (T-pymodaq_utils-011, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
-- T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — approved — owner, 2026-11-22
 - T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — approved — owner, 2026-11-22
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -40,7 +40,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-22-merge-T-pymodaq_data-001-r1 | optimize-merge | ok | 7.0 | 10756 | T-pymodaq_data-001: done — PR #16 open, awaiting the human: a decider  |
 | 2026-11-22-run-T-pymodaq_utils-M06 | optimize-run | failed | 71.2 | 10592 | pymodaq test scope hangs (extension_loading_test::test_load[Scanner])  |
 | 2026-11-22-run-T-pymodaq_utils-M11 | optimize-run | ok | 1.8 | 7607 | shared ft/ift/ft2/ift2 input checks, pinning tests first; pre-existing |
 | 2026-11-22-merge-T-pymodaq_utils-M11-r1 | optimize-merge | ok | 5.6 | 5539 | T-pymodaq_utils-M11: done — PR #17 open, awaiting the human: registry  |
@@ -50,6 +49,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-22-merge-T-pymodaq_utils-007-r1 | optimize-merge | ok | 2.2 | 8063 | T-pymodaq_utils-007: blocked — review: set_logger now raises ConfigErr |
 | 2026-11-22-run-T-pymodaq_utils-008 | optimize-run | ok | 1.5 | 6449 | test isolated via get_set_local_dir patch; coverage unchanged |
 | 2026-11-22-merge-T-pymodaq_utils-008-r1 | optimize-merge | ok | 6.1 | 6297 | T-pymodaq_utils-008: done — PR #19 open, awaiting the human: a decider |
+| 2026-11-22-run-T-pymodaq_utils-011 | optimize-run | ok | 1.9 | 6233 | packages.get_entrypoints delegates to utils (list; deprecation_msg); o |
 
 ## Done so far
-- tasks done: 20; PRs merged into dev_agent: 15
+- tasks done: 21; PRs merged into dev_agent: 15
