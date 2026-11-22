@@ -24,7 +24,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils/config.py:Config.__call__|plural fallback never runs
 - constraints: delete option, all three branches (compat-risk found `dynamics` 598-602 too); do NOT catch ConfigError (would change returned values: medium risk). Characterisation test pins current behaviour: missing plural key raises ConfigError, present plural key returns its value (fixture tests/data/config_template.toml). The line cited as config.py:326 is `__contains__`; the raise is at :322. Merge T-003's Config.__call__ docstring text, rewritten to match the code after the deletion.
 - verdicts: decider-compat-risk: approve — dead branches, no caller-visible change with the delete option; decider-test-change: approve — test only added, existing tests untouched
-- status: proposed (adds a test; public accessor)
+- status: approved — owner, 2026-11-22
 
 ## T-pymodaq_utils-007 set_logger must not kill the importing process
 - scope: pymodaq_utils   specialty: refactor (bugfix)   risk: medium
@@ -32,7 +32,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils/logger.py:set_logger|sys.exit on import
 - constraints: step 1 show reachability (fires only if debug_level is not a list AND a `debug_levels` key exists whose value is not a list, via GlobalConfig.__call__ config.py:588-597); if unreachable, end the task with a report and no code change. Otherwise raise a specific `Exception` subclass (ConfigError/ValueError, not SystemExit) with the same message; the message must stay visible when raised inside `__init__.py` (line 40's message "Couldn't create the local folder..." would mislead). Test builds a real debug_level/debug_levels config. Same signature and return type. Attach before/after coverage diff of logger.py and the test-agent justification. Do not reformat logger.py (rule 5).
 - verdicts: decider-compat-risk: approve — status proposed, medium-low risk; decider-test-change: approve (round 2, after provisional veto for missing evidence) — conditional on coverage diff
-- status: proposed (touches tests, public set_logger)
+- status: approved — owner, 2026-11-22
 
 ## T-pymodaq_utils-008 Isolate test_nested_update_from_user
 - scope: pymodaq_utils   specialty: test-quality   risk: low
@@ -40,7 +40,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils/tests/config_test.py:test_nested_update_from_user|local failure
 - constraints: `monkeypatch.setattr(pymodaq_utils.config, 'get_set_local_dir', lambda user=False: <distinct pre-created tmp_path dir>)` (get_set_local_dir is functools.cache'd, config.py:125, so patching CONFIG_BASE_PATH/Path.home alone leaks). Keep the assertions at :258-259 unchanged. Attach the failing traceback and a before/after coverage diff of config.py (must not drop). Out of scope (file as finding): `test_load_system_config` (config_test.py:113-136) shares the same folders and mutates global TOML_DICT.
 - verdicts: decider-compat-risk: approve — tests only; decider-test-change: approve (round 2, after procedural veto) — conditional on traceback + coverage diff + unchanged assertions
-- status: proposed (touches tests)
+- status: approved — owner, 2026-11-22
 
 ## T-pymodaq_utils-009 Docstrings for six public names (absorbs the _literal_value part of T-003)
 - scope: pymodaq_utils   specialty: docs   risk: low
@@ -62,7 +62,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - files: `packages.py:159-179`, `utils.py:762-784`
 - constraints: bodies are NOT identical: utils version returns a `list`, packages version returns `EntryPoints` (supports `.names`, `.select()`, lookup by name). Delegate packages -> utils only (never the reverse; callers in optimizers_base/models.py:211 and scanner/utils.py:50 rely on the list). Keep both public names; state the return-type change in the docstring and commit; compat-risk finds a `deprecation_msg` justified, or the alternative is to leave it. Do not edit the three monkeypatch tests (models_discovery_test.py:45,54, plugin_configs_test.py:43). Use a function-local import. Run both Qt bindings + layering test. External plugin use unverified.
 - verdicts: decider-compat-risk: approve as proposed — return type changes on a public name; decider-triage (fresh): approve — no import cycle
-- status: proposed (public API)
+- status: approved — owner, 2026-11-22
 
 ## Dropped (triage)
 - B006 `array_manipulation.py:151`, `math_utils.py:616`: read-only defaults; `utils.py:464/482/518` already in T-005.

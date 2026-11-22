@@ -46,7 +46,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils (+ packages/pymodaq/pyproject.toml)   specialty: refactor (compat)   risk: medium   found: 2/8
 - files: plugin_checks.py, plugin_rules.py, plugin_scaffold.py (docstrings say deprecated in 5.3.5, no warning is emitted; verified); call deprecation_msg before the sys.modules swap; packages/pymodaq/pyproject.toml:76 (point check_plugin at plugin_tools.checks:main); regenerate legacy_to_current.rst with docs/legacy_to_current.py, never by hand; new warning test
 - verdicts: decider-compat-risk: approve, closes the hard-rule-1 gap (A2-haiku, B2); decider-triage / test-change: approve with conditions (A2-haiku, B2)
-- status: proposed (public API, touches tests, leaves the scope)
+- status: approved — owner, 2026-11-22
 
 ## T-pymodaq_utils-M07 Docstrings for Config.__call__ and _literal_value
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
@@ -76,13 +76,13 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils   specialty: refactor   risk: medium   found: 1/8
 - files: math_utils.py:374-478; pinning tests first in tests/math_utils_test.py
 - verdicts: decider-compat-risk: approve with conditions; decider-test-change: veto in round 1 (tests insufficient), approve in round 2 with pinning tests first (A2-sonnet)
-- status: proposed (touches tests)
+- status: approved — owner, 2026-11-22
 
 ## T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists
 - scope: pymodaq (test only)   specialty: test-quality   risk: low   found: 1/8
 - files: new test in packages/pymodaq/tests/ comparing pymodaq_utils/plugin_tools/checks.py:46-48 with pymodaq/utils/daq_utils.py:35-36
 - verdicts: decider-compat-risk: approve in round 2 (placement); decider-test-change: approve in round 2 (B2)
-- status: proposed (tests, outside the pymodaq_utils scope)
+- status: approved — owner, 2026-11-22
 
 ## Dropped
 - Share get_entrypoints (A2-sonnet): compat-risk vetoed twice (return types differ, heavy imports); compat-risk itself says dropping is fine.
