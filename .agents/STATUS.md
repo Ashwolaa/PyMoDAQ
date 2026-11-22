@@ -1,19 +1,19 @@
-# Consortium status — generated 2026-11-22 20:59 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 21:06 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `546c2a6e2`; 144 commits ahead of upstream/dev (34 files changed, 356 insertions(+), 82 deletions(-))
-- today: runs 5/20, specialist_runs 3/10, prs_opened 1/6, reviews 1/10; outcomes: ok 4, failed 1
-- last /usage reading: 2026-11-22T19:59:50.212000+00:00  session 41% (resets Nov 22, 11:40pm (Europe/Paris))  week 4% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `c37fc1c92`; 146 commits ahead of upstream/dev (34 files changed, 356 insertions(+), 82 deletions(-))
+- today: runs 6/20, specialist_runs 3/10, prs_opened 2/6, reviews 2/10; outcomes: ok 5, failed 1
+- last /usage reading: 2026-11-22T20:00:05.210000+00:00  session 41% (resets Nov 22, 11:40pm (Europe/Paris))  week 4% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_utils-006 .agents/plans/2026-11-19-pymodaq_utils-r2.md`
 
 ## Needs you
+- **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- `agent/pymodaq_utils/refactor/2026-11-22-shared-input-checks` (T-pymodaq_utils-M11, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-006 Delete the dead plural fallbacks in Config.__call__ (absorbs the Config.__call__ part of T-003) — approved — owner, 2026-11-22
 - T-pymodaq_utils-007 set_logger must not kill the importing process — approved — owner, 2026-11-22
 - T-pymodaq_utils-008 Isolate test_nested_update_from_user — approved — owner, 2026-11-22
@@ -34,7 +34,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-19-merge-T-pymodaq_utils-009 | optimize-merge | budget | 0.2 | 1279 | STOP reviews 14>=14; merged 0, awaiting human 0, blocked 0 (T-009 unto |
 | 2026-11-19-run-T-pymodaq_utils-010 | optimize-run | budget | 0.3 | 1415 | DISABLE: day over budget; T-010 not started |
 | 2026-11-20-merge-T-pymodaq_utils-009-r1 | optimize-merge | ok | 6.0 | 6401 | T-pymodaq_utils-009: done — PR #14 merged (auto: low risk, approved by |
 | 2026-11-20-run-T-pymodaq_utils-010 | optimize-run | ok | 0.6 | 3748 | docs: 3 check_plugin codes added |
@@ -44,6 +43,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-22-merge-T-pymodaq_data-001-r1 | optimize-merge | ok | 7.0 | 10756 | T-pymodaq_data-001: done — PR #16 open, awaiting the human: a decider  |
 | 2026-11-22-run-T-pymodaq_utils-M06 | optimize-run | failed | 71.2 | 10592 | pymodaq test scope hangs (extension_loading_test::test_load[Scanner])  |
 | 2026-11-22-run-T-pymodaq_utils-M11 | optimize-run | ok | 1.8 | 7607 | shared ft/ift/ft2/ift2 input checks, pinning tests first; pre-existing |
+| 2026-11-22-merge-T-pymodaq_utils-M11-r1 | optimize-merge | ok | 5.6 | 5539 | T-pymodaq_utils-M11: done — PR #17 open, awaiting the human: registry  |
 
 ## Done so far
-- tasks done: 18; PRs merged into dev_agent: 12
+- tasks done: 18; PRs merged into dev_agent: 13
