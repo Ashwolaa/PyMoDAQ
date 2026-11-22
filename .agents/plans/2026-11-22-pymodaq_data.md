@@ -13,7 +13,7 @@ Arbiter (binding): K1 and K2 touched the same files, so they are one task; apply
 - do not touch: numpy_func.py:6 HANDLED_UFUNCS (re-exported, data.py:40 imports it), saving.py:24-32, all __init__.py re-exports, backends.py:12/1313, h5modules/utils.py:34 (return in finally keeps exporter discovery alive), numpy_func.py:47 (returns NotImplementedError instead of raising: out of scope, file a finding)
 - note: ~100 changed lines; if over 300, split by file group. Check re-importers by grep before each import removal. Tests: cd packages/pymodaq_data && pytest under PYTEST_QT_API=pyqt6 and pyside6, plus layering_test.
 - verdicts: decider-compat-risk: approve (K1 round 1; K2 vetoed numpy_func.py:6, approved in round 2 on amended scope); decider-triage (fresh instance): approve (K1 with conditions; K2 with numpy_func.py:6 dropped)
-- status: approved
+- status: done — branch agent/pymodaq_data/hygiene/2026-11-22, local checks green, CI on the PR, awaiting review
 
 ## Dropped / deferred (no task)
 - B012 h5modules/utils.py:34: return in finally is intentional; leave or noqa.
