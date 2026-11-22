@@ -1,10 +1,9 @@
-# Handoff: pymodaq_utils — 2026-11-22 (/optimize-run T-pymodaq_utils-M11)
+# Handoff: pymodaq_utils — 2026-11-22 (/optimize-merge)
 
 ## Done
-- T-M11 on agent/pymodaq_utils/refactor/2026-11-22-shared-input-checks (pushed, no PR yet):
-  972735a78 pinning tests (exact exceptions, defaults ift=0 / ft=-1), b3ff494b0 private helpers
-  _check_ft_input / _check_ft2_input shared by ft/ift and ft2/ift2. Behaviour unchanged.
-- Checks: flake8, layering, merge_gate lint OK; pyqt6 and pyside6: 329 passed, 1 pre-existing fail.
+- PR #16 (agent/pymodaq_data/hygiene/2026-11-22) merged into dev_agent (seen by sync).
+- T-M11 (shared ft/ift input checks): pr-reviewer approve, PR #17 open, CI green
+  (compile-doc, tests-utils, typing); pyqt6/pyside6 pymodaq_utils 329 passed, 1 pre-existing fail.
 
 ## Blocked
 - T-M06 still blocked (pymodaq extension_loading_test Scanner hang, unchanged).
@@ -14,7 +13,8 @@
 2. config_test::test_nested_update_from_user fails on base too [low]
 
 ## Next step
-`/optimize-merge T-pymodaq_utils-M11`; then M12 (test only, pymodaq scope).
+Human: decide PR #17 (not auto-merged: registry and plan risk medium, a decider vetoed or blocked it in the plan,
+1 of 2 needed approving deciders, touches tests/math_utils_test.py). Then M12 (test only, pymodaq scope).
 
 ## Evidence
-- task.py checks: pyqt6/pyside6 pymodaq_utils 1 failed (pre-existing), 329 passed
+- Review: .agents/reports/pymodaq_utils/2026-11-22-pr-review-T-pymodaq_utils-M11-r1.md
