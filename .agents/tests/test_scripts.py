@@ -131,3 +131,17 @@ def test_grill_add_cap_and_answer(tmp_path, monkeypatch):
     grill.cmd_answer(type("A", (), {"topic": "one", "status": "answered"}))
     assert grill.read_jsonl("grill.jsonl")[0]["status"] == "answered"
     grill.cmd_add(ns(topic="two"))  # room again
+
+
+# ---------------------------------------------------------------- status: pending
+def test_pending_skips_branches_blocked_by_review(monkeypatch):
+    """2026-11-22: a pushed branch whose task was blocked by its review made the cycle pick `merge` for ever
+    ('merge again, no progress') while the rework was never run."""
+    import status
+    rows = [{"status": "pushed", "task_id": "T-a", "branch": "b-a"}, {"status": "pushed", "task_id": "T-b", "branch": "b-b"},
+            {"status": "pushed", "task_id": "T-c", "branch": "b-c"}, {"status": "merged", "task_id": "T-d", "branch": "b-d"}]
+    monkeypatch.setattr(status, "read_jsonl", lambda name: rows)
+    monkeypatch.setattr(status, "tasks", lambda: [("T-a", "", "done — branch b-a, CI green, awaiting review", "", "x"),
+                                                  ("T-b", "", "blocked — review: changes", "", "x"),
+                                                  ("T-c", "", "blocked — CI red", "", "x")])
+    assert [r["task_id"] for r in status.pending()] == ["T-a", "T-c"]
