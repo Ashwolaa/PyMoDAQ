@@ -1,23 +1,17 @@
-# Handoff: pymodaq_utils — 2026-11-22 (/optimize-run T-pymodaq_utils-011)
+# Handoff pymodaq_utils (after /optimize-merge, 2026-11-22)
 
 ## Done
-- T-011 executed: packages.get_entrypoints now delegates to utils.get_entrypoints (function-local import).
-  Branch agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints, pushed, no PR yet.
-  Return type changes EntryPoints -> list; docstring states it and deprecation_msg is called.
-  No in-repo caller of packages.get_entrypoints (all use utils); external plugins unverified.
-- Checks: flake8 0, layering ok, merge_gate lint ok; pyqt6 and pyside6: 334 passed, 1 skipped, 1 failed
-  (test_nested_update_from_user, pre-existing, fixed by T-008 / PR #19).
-
-## Open findings (ranked)
-1. `tests/config_test.py` test_load_system_config shares the real ~/.pymodaq folders and mutates global TOML_DICT [risk: low]
+- Nothing merged in this run.
 
 ## Blocked
-- T-007 (agent/pymodaq_utils/refactor/2026-11-22-set-logger-must): needs rework run (review report r1).
-- T-M06 (Scanner hang in pymodaq extension_loading_test, unchanged).
-- PR #19 (T-008) awaits the human (touches a test, one approving decider).
+- T-pymodaq_utils-011 (branch agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints), run 2026-11-22-merge-T-pymodaq_utils-011-r1:
+  - start rebased + pushed; checks: lint/layering ok; pyqt6 and pyside6 only the pre-existing config_test.py::test_nested_update_from_user failure.
+  - pr-reviewer verdict: changes (public_api yes, behaviour_change yes): add a test (list == utils.get_entrypoints(group) + DeprecationWarning),
+    give `.. deprecated::` a version (repo style `5.3.5`), remove unused `from importlib import metadata` in packages.py:2.
+  - `merge.py decide` refused twice: "no pr-reviewer was launched in this session since start" (ev.launches did not see the Agent launch).
+    Not worked around (rules.md 16). `merge.py close` also refuses (nothing decided). Task status in the plan is unchanged.
+  - Report: .agents/reports/pymodaq_utils/2026-11-22-pr-review-T-pymodaq_utils-011-r1.md
 
 ## Next step
-Human: /optimize-merge T-pymodaq_utils-011 (pr-reviewer, PR). Then /optimize-run to rework T-007; T-009 remains.
-
-## Evidence
-- tests: task.py checks, both backends -> only the pre-existing failure
+- Owner: check why merge.py's session event log misses sub-agent launches, then rerun /optimize-merge pymodaq_utils
+  (the review is for this head; a rerun relaunches pr-reviewer), or send T-011 back to /optimize-run with the three fixes above.
