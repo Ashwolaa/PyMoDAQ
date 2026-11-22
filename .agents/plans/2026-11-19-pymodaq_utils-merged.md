@@ -82,7 +82,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq (test only)   specialty: test-quality   risk: low   found: 1/8
 - files: new test in packages/pymodaq/tests/ comparing pymodaq_utils/plugin_tools/checks.py:46-48 with pymodaq/utils/daq_utils.py:35-36
 - verdicts: decider-compat-risk: approve in round 2 (placement); decider-test-change: approve in round 2 (B2)
-- status: approved — owner, 2026-11-22
+- status: done — branch agent/pymodaq/test-quality/2026-11-22, local checks green, CI on the PR, awaiting review
 
 ## Dropped
 - Share get_entrypoints (A2-sonnet): compat-risk vetoed twice (return types differ, heavy imports); compat-risk itself says dropping is fine.
