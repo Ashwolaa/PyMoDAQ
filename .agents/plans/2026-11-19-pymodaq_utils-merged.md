@@ -46,7 +46,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq_utils (+ packages/pymodaq/pyproject.toml)   specialty: refactor (compat)   risk: medium   found: 2/8
 - files: plugin_checks.py, plugin_rules.py, plugin_scaffold.py (docstrings say deprecated in 5.3.5, no warning is emitted; verified); call deprecation_msg before the sys.modules swap; packages/pymodaq/pyproject.toml:76 (point check_plugin at plugin_tools.checks:main); regenerate legacy_to_current.rst with docs/legacy_to_current.py, never by hand; new warning test
 - verdicts: decider-compat-risk: approve, closes the hard-rule-1 gap (A2-haiku, B2); decider-triage / test-change: approve with conditions (A2-haiku, B2)
-- status: approved — owner, 2026-11-22
+- status: blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## T-pymodaq_utils-M07 Docstrings for Config.__call__ and _literal_value
 - scope: pymodaq_utils   specialty: docs   risk: low   found: 1/8
