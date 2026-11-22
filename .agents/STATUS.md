@@ -1,25 +1,25 @@
-# Consortium status — generated 2026-11-22 22:23 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 22:42 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `ec5bc7a34`; 177 commits ahead of upstream/dev (36 files changed, 474 insertions(+), 134 deletions(-))
-- today: runs 13/20, specialist_runs 8/10, prs_opened 4/6, reviews 5/10; outcomes: ok 12, failed 1
-- last /usage reading: 2026-11-22T21:23:47.503000+00:00  session 72% (resets Nov 22, 11:40pm (Europe/Paris))  week 7% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `fe48338c5`; 184 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
+- today: runs 14/20, specialist_runs 8/10, prs_opened 4/6, reviews 6/10; outcomes: ok 13, failed 1
+- last /usage reading: 2026-11-22T21:40:15.659000+00:00  session 74% (resets Nov 22, 11:40pm (Europe/Paris))  week 7% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_utils-M12 .agents/plans/2026-11-19-pymodaq_utils-merged.md`
 
 ## Needs you
-- grill pending: **config-isolation** (pymodaq_utils) — answer with `/optimize-grill config-isolation`
 - **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
 - **T-pymodaq_utils-006** — done — PR #18 open, awaiting the human: touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_utils-008** — done — PR #19 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 - blocked: **T-pymodaq_utils-007** — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
+- blocked: **T-pymodaq_utils-011** — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
 
 ## In flight
-- `agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints` (T-pymodaq_utils-011, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
+- T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
 - T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — approved — owner, 2026-11-22
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -40,7 +40,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-22-run-T-pymodaq_utils-M06 | optimize-run | failed | 71.2 | 10592 | pymodaq test scope hangs (extension_loading_test::test_load[Scanner])  |
 | 2026-11-22-run-T-pymodaq_utils-M11 | optimize-run | ok | 1.8 | 7607 | shared ft/ift/ft2/ift2 input checks, pinning tests first; pre-existing |
 | 2026-11-22-merge-T-pymodaq_utils-M11-r1 | optimize-merge | ok | 5.6 | 5539 | T-pymodaq_utils-M11: done — PR #17 open, awaiting the human: registry  |
 | 2026-11-22-run-T-pymodaq_utils-006 | optimize-run | ok | 2.2 | 7142 | dead plural fallbacks deleted; characterisation tests added; pre-exist |
@@ -50,6 +49,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-22-run-T-pymodaq_utils-008 | optimize-run | ok | 1.5 | 6449 | test isolated via get_set_local_dir patch; coverage unchanged |
 | 2026-11-22-merge-T-pymodaq_utils-008-r1 | optimize-merge | ok | 6.1 | 6297 | T-pymodaq_utils-008: done — PR #19 open, awaiting the human: a decider |
 | 2026-11-22-run-T-pymodaq_utils-011 | optimize-run | ok | 1.9 | 6233 | packages.get_entrypoints delegates to utils (list; deprecation_msg); o |
+| 2026-11-22-merge-T-pymodaq_utils-011-r2 | optimize-merge | ok | 1.3 | 4163 | T-pymodaq_utils-011: blocked — review: packages.get_entrypoints now de |
 
 ## Done so far
-- tasks done: 21; PRs merged into dev_agent: 15
+- tasks done: 20; PRs merged into dev_agent: 16
