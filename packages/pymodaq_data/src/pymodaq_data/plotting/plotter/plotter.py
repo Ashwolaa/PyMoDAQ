@@ -1,12 +1,10 @@
 # Standard imports
-import typing
 from abc import ABCMeta, abstractmethod
 from importlib import import_module
 from pathlib import Path
-from typing import Callable, List, Union
+from typing import Callable, List
 
 # 3rd party imports
-import numpy as np
 
 # project imports
 from pymodaq_utils.abstract import abstract_attribute
@@ -33,8 +31,7 @@ def register_plotter(parent_module_name: str = 'pymodaq_data.plotting.plotter'):
                     logger.warning(str(e))
     except Exception as e:
         logger.warning(str(e))
-    finally:
-        return plotters
+    return plotters
 
 
 class PlotterBase(metaclass=ABCMeta):

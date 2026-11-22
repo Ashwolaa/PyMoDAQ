@@ -4,16 +4,8 @@ Created the 15/11/2022
 
 @author: Sebastien Weber
 """
-from typing import Tuple
-import os
 from collections import OrderedDict
-from typing import List
-import warnings
-import logging
-import webbrowser
-import numpy as np
 from pathlib import Path
-from packaging import version as version_mod
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_utils.config import GlobalConfig as Config

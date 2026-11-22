@@ -5,13 +5,11 @@ Created the 04/11/2022
 @author: Sebastien Weber
 """
 import numpy as np
-from numbers import Number
-from typing import List, Tuple
+from typing import Tuple
 from abc import ABCMeta, abstractmethod, abstractproperty
 
 from pymodaq_utils.factory import ObjectFactory
-from pymodaq_utils import math_utils as mutils
-from pymodaq_data.data import DataWithAxes, Axis, DataRaw, DataBase, DataDim, DataCalculated
+from pymodaq_data.data import DataWithAxes, DataDim, DataCalculated
 
 
 config_processors = {

@@ -6,14 +6,14 @@ Created the 28/10/2022
 """
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from copy import deepcopy
 import numbers
 import re
 
 import numpy as np
 from numpy.lib.mixins import NDArrayOperatorsMixin
-from typing import List, Tuple, Union, Any, Callable, Type, Optional, cast
+from typing import List, Tuple, Union, Any, Callable, Optional, cast
 from typing import Iterable as IterableType
 from collections.abc import Iterable, Sequence
 from collections import OrderedDict
@@ -38,7 +38,7 @@ from pymodaq_utils.config import GlobalConfig as Config
 
 from pymodaq_data.plotting.plotter.plotter import PlotterFactory
 from pymodaq_data.numpy_func import HANDLED_FUNCTIONS, HANDLED_UFUNCS, process_arguments_for_ufuncs
-from pymodaq_data import Q_, ureg, Unit
+from pymodaq_data import Q_, Unit
 from pymodaq_data.slicing import SpecialSlicersData
 from serializall import SerializableFactory, SerializableBase
 
@@ -1016,7 +1016,7 @@ class DataBase(ExtraAttributesMixin, DataLowLevel, NDArrayOperatorsMixin):
         except pint.errors.DimensionalityError as e:
             raise DataUnitError(
                 f'Cannot change the Data units to {units} \n'
-                f'{e}')
+                f'{e}') from e
 
         if inplace:
             old_units = self._units
@@ -1097,7 +1097,7 @@ class DataBase(ExtraAttributesMixin, DataLowLevel, NDArrayOperatorsMixin):
             # the value but produce similar delta units!
             return bool(np.all([np.abs(self.quantities[ind] - other.quantities[ind])
                                 <= (epsilon - Q_(0, self.units)) for ind in range(len(self))]))
-        except pint.errors.DimensionalityError as e:
+        except pint.errors.DimensionalityError:
             return False
 
     def as_dte(self, name: str = 'mydte') -> DataToExport:
@@ -2105,10 +2105,9 @@ class AxesManagerSpread(AxesManagerBase):
                 string += str(self._data_shape[sig_index]) + ", "
             string = string.rstrip(", ")
             string += ")"
-        except Exception as e:
+        except Exception:
             string = f'({self._data_shape})'
-        finally:
-            return string
+        return string
 
 
 @ser_factory.register_decorator()
@@ -3264,7 +3263,7 @@ class DataWithAxes(DataBase, SerializableBase):
                 new_data._dim = self._get_dim_from_data(data)
             return new_data
 
-        except Exception as e:
+        except Exception:
             pass
         finally:
             self._data = old_data
@@ -3299,11 +3298,11 @@ class DataWithAxes(DataBase, SerializableBase):
         """
         try:
             import xarray as xr
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "xarray is required for to_xarray(). "
                 "Install it with: pip install 'pymodaq_data[xarray]'",
-            )
+            ) from err
 
         ndim = len(self.shape)
 
@@ -3398,11 +3397,11 @@ class DataWithAxes(DataBase, SerializableBase):
         """
         try:
             import xarray as xr
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "xarray is required for from_xarray(). "
                 "Install it with: pip install 'pymodaq_data[xarray]'",
-            )
+            ) from err
 
         if isinstance(ds, xr.DataArray):
             var_name = ds.name if ds.name else 'data'
@@ -4261,11 +4260,11 @@ class DataToExport(ExtraAttributesMixin, DataLowLevel, SerializableBase):
         """
         try:
             import xarray as xr
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "xarray is required for to_xarray(). "
                 "Install it with: pip install 'pymodaq_data[xarray]'",
-            )
+            ) from err
 
         children = {dwa.name: xr.DataTree(dataset=dwa.to_xarray()) for dwa in self}
         root_ds = xr.Dataset(attrs={'pymodaq_name': self.name})
@@ -4292,11 +4291,11 @@ class DataToExport(ExtraAttributesMixin, DataLowLevel, SerializableBase):
         """
         try:
             import xarray as xr
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "xarray is required for from_xarray(). "
                 "Install it with: pip install 'pymodaq_data[xarray]'",
-            )
+            ) from err
 
         if isinstance(dt, xr.DataTree):
             root_attrs = dt.dataset.attrs if dt.dataset is not None else {}
