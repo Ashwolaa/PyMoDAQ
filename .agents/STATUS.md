@@ -1,25 +1,24 @@
-# Consortium status — generated 2026-11-22 19:34 by `scripts/status.py`
+# Consortium status — generated 2026-11-22 19:39 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `262b22c33`; 134 commits ahead of upstream/dev (22 files changed, 324 insertions(+), 29 deletions(-))
+- `dev_agent` at `7113f0c77`; 138 commits ahead of upstream/dev (34 files changed, 356 insertions(+), 82 deletions(-))
 - today: runs 3/20, specialist_runs 1/10, prs_opened 1/6, reviews 1/10; outcomes: ok 3
 - last /usage reading: 2026-11-22T18:34:38.851000+00:00  session 33% (resets Nov 22, 11:40pm (Europe/Paris))  week 3% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `plan pymodaq_scripting`
+- next cycle step: `run T-pymodaq_utils-M06 .agents/plans/2026-11-19-pymodaq_utils-merged.md`
 
 ## Needs you
-- approve or drop **T-pymodaq_utils-M06** Moved plugin_tools shims never call deprecation_msg — proposed (public API, touches tests, leaves the scope) (`.agents/plans/2026-11-19-pymodaq_utils-merged.md`)
-- approve or drop **T-pymodaq_utils-M11** Shared input checks for ft/ift/ft2/ift2 — proposed (touches tests) (`.agents/plans/2026-11-19-pymodaq_utils-merged.md`)
-- approve or drop **T-pymodaq_utils-M12** Drift test for the duplicated entry-point group lists — proposed (tests, outside the pymodaq_utils scope) (`.agents/plans/2026-11-19-pymodaq_utils-merged.md`)
-- approve or drop **T-pymodaq_utils-006** Delete the dead plural fallbacks in Config.__call__ (absorbs the Config.__call__ part of T-003) — proposed (adds a test; public accessor) (`.agents/plans/2026-11-19-pymodaq_utils-r2.md`)
-- approve or drop **T-pymodaq_utils-007** set_logger must not kill the importing process — proposed (touches tests, public set_logger) (`.agents/plans/2026-11-19-pymodaq_utils-r2.md`)
-- approve or drop **T-pymodaq_utils-008** Isolate test_nested_update_from_user — proposed (touches tests) (`.agents/plans/2026-11-19-pymodaq_utils-r2.md`)
-- approve or drop **T-pymodaq_utils-011** packages.get_entrypoints delegates to utils.get_entrypoints — proposed (public API) (`.agents/plans/2026-11-19-pymodaq_utils-r2.md`)
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 
 ## In flight
-- nothing queued
+- T-pymodaq_utils-M06 Moved plugin_tools shims never call deprecation_msg — approved — owner, 2026-11-22
+- T-pymodaq_utils-M11 Shared input checks for ft/ift/ft2/ift2 — approved — owner, 2026-11-22
+- T-pymodaq_utils-006 Delete the dead plural fallbacks in Config.__call__ (absorbs the Config.__call__ part of T-003) — approved — owner, 2026-11-22
+- T-pymodaq_utils-007 set_logger must not kill the importing process — approved — owner, 2026-11-22
+- T-pymodaq_utils-008 Isolate test_nested_update_from_user — approved — owner, 2026-11-22
+- T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — approved — owner, 2026-11-22
+- T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — approved — owner, 2026-11-22
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
