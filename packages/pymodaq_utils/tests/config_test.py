@@ -8,7 +8,7 @@ import toml
 
 from pymodaq_utils.config import Config, GlobalConfig, BaseConfig, replace_file_extension, get_set_config_dir, get_set_local_dir, \
     copy_template_config, load_system_config_and_update_from_user, create_toml_from_dict, check_config, get_config_file, \
-    recursive_iterable_flattening
+    recursive_iterable_flattening, ConfigError
 from pymodaq_utils.config import _delete_config_files
 
 
@@ -26,6 +26,16 @@ class CustomConfig1(BaseConfig):
     """Main class to deal with configuration values for this plugin"""
     config_name = "test_utils_custom1"
     config_template_path = None
+
+    def __init__(self):
+        super().__init__()
+        atexit.unregister(self.save)
+        atexit.register(lambda : _delete_config_files(self))
+
+
+class CustomPymodaqConfig(Config):
+    config_name = 'test_utils_custom_plural'
+    config_template_path = Path(__file__).parent.joinpath('data/config_template.toml')
 
     def __init__(self):
         super().__init__()
@@ -183,6 +193,26 @@ class TestConfig:
         assert config.get(('an', 'unknown', 'key', 'in', 'the', 'config'), 'default_value') == 'default_value'
         config['style', 'theme'] = True
         assert config.get(('style', 'theme')) == True
+
+
+class TestConfigPluralKeys:
+    """Pin Config.__call__ on plural keys: forwarded unchanged, no fallback to the singular key"""
+
+    def test_present_plural_key_returns_its_value(self):
+        config = CustomPymodaqConfig()
+        assert config('qtbackend', 'backends') == ["pyqt5", "pyqt6", "pyside2", "pyside6"]
+
+    def test_singular_key_scalar_wrapped_in_list_or_plural(self):
+        config = CustomPymodaqConfig()
+        assert config('qtbackend', 'backend') == ["pyqt5", "pyqt6", "pyside2", "pyside6"]
+
+    @pytest.mark.parametrize('path', [('style', 'backends'),
+                                      ('qtbackend', 'debug_levels'),
+                                      ('qtbackend', 'dynamics')])
+    def test_missing_plural_key_raises(self, path):
+        config = CustomPymodaqConfig()
+        with pytest.raises(ConfigError):
+            config(*path)
 
 
 class TestConfigSingleton:
