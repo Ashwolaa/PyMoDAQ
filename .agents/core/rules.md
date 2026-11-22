@@ -30,6 +30,10 @@
     Product files are edited by specialists only, reworks included; `merge_gate.py lint` runs before every push.
 17. Run every step in the foreground and wait for it. A Bash call lasts at most 10 minutes (`timeout` 600000), so call
     `ci.py` with `--timeout 540` and call it again on exit 2: it resumes the same runs, it never dispatches twice.
+    Sub-agents also run in the background: after launching them, call `Yield` and keep calling it until every one has
+    reported. Never end your turn, and never write the final report, while a launched agent is still running: the
+    headless runner (`step.py`) takes the first end of turn as the final result and kills the session (2026-11-22:
+    `/optimize-plan pymodaq_data` died after launching its advisors, no plan written).
     A notification that arrives after your final report is not a new invocation: reply `already done (<run id>)`
     and change nothing.
 18. A problem outside the task (seen by a specialist, the coordinator or pr-reviewer) is filed with
