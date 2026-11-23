@@ -1,11 +1,11 @@
-# Consortium status — generated 2026-11-23 20:25 by `scripts/status.py`
+# Consortium status — generated 2026-11-23 22:19 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `86506fff1`; 191 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
-- today: runs 0/20, specialist_runs 0/10, prs_opened 0/6, reviews 0/10; outcomes: none
-- last /usage reading: 2026-11-23T19:24:59.057000+00:00  session 15% (resets Nov 23, 10:30pm (Europe/Paris))  week 16% (resets Nov 29, 12am (Europe/Paris))
+- `dev_agent` at `fdbc21f43`; 196 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
+- today: runs 1/20, specialist_runs 1/10, prs_opened 0/6, reviews 0/10; outcomes: ok 1
+- last /usage reading: 2026-11-23T21:19:10.474000+00:00  session 25% (resets Nov 23, 10:30pm (Europe/Paris))  week 17% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
 ## Needs you
@@ -19,8 +19,10 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 
 ## In flight
 - `agent/pymodaq/test-quality/2026-11-22` (T-pymodaq_utils-M12, risk low): pushed, waiting for /optimize-merge
+- `agent-rd/config-schema` (None, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
+- T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — blocked — CI red: after rebase on dev_agent pyqt6 new failure state_manager_test.py::TestWithSubEntries::test_non_blocking, pyside6 pytest abort (no failing id)
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -37,11 +39,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] error message calls config(...) a second time instead of reusing log_level (pre-existing)
 - [pymodaq_utils] test_load_system_config writes into the real ~/.pymodaq config folders and mutates global TOML_DICT (already flagged out of scope by the plan; leak no
 - [pymodaq] packages/pymodaq pytest under PYTEST_QT_API=pyqt6 stalls (2% CPU, no end after 20+ min, 3 attempts) during /optimize-merge checks
+- [pymodaq] pymodaq suite red on both Qt backends after rebase: pyqt6 state_manager_test::test_non_blocking fails, pyside6 aborts (core dump)
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-22-merge-T-pymodaq_utils-M11-r1 | optimize-merge | ok | 5.6 | 5539 | T-pymodaq_utils-M11: done — PR #17 open, awaiting the human: registry  |
 | 2026-11-22-run-T-pymodaq_utils-006 | optimize-run | ok | 2.2 | 7142 | dead plural fallbacks deleted; characterisation tests added; pre-exist |
 | 2026-11-22-merge-T-pymodaq_utils-006-r1 | optimize-merge | ok | 5.4 | 6539 | T-pymodaq_utils-006: done — PR #18 open, awaiting the human: touches t |
 | 2026-11-22-run-T-pymodaq_utils-007 | optimize-run | ok | 1.9 | 7756 | set_logger raises ConfigError; test added; coverage logger.py 51->53%; |
@@ -51,6 +53,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-22-run-T-pymodaq_utils-011 | optimize-run | ok | 1.9 | 6233 | packages.get_entrypoints delegates to utils (list; deprecation_msg); o |
 | 2026-11-22-merge-T-pymodaq_utils-011-r2 | optimize-merge | ok | 1.3 | 4163 | T-pymodaq_utils-011: blocked — review: packages.get_entrypoints now de |
 | 2026-11-22-run-T-pymodaq_utils-M12 | optimize-run | ok | 35.4 | 5972 | pyside6 suite aborts randomly (known upstream GC crash, also without t |
+| rd-config-schema-2026-11-23 | optimize-research | ok | 6.8 | 28691 | note + prototype agent-rd/config-schema; incident: one pre-HOME import |
 
 ## Done so far
-- tasks done: 21; PRs merged into dev_agent: 16
+- tasks done: 20; PRs merged into dev_agent: 16
