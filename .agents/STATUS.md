@@ -1,11 +1,11 @@
-# Consortium status — generated 2026-11-22 23:19 by `scripts/status.py`
+# Consortium status — generated 2026-11-23 20:25 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `6f4a35e85`; 188 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
-- today: runs 15/20, specialist_runs 9/10, prs_opened 4/6, reviews 6/10; outcomes: ok 14, failed 1
-- last /usage reading: 2026-11-22T22:19:24.996000+00:00  session 79% (resets Nov 22, 11:40pm (Europe/Paris))  week 7% (resets Nov 29, 12am (Europe/Paris))
+- `dev_agent` at `86506fff1`; 191 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
+- today: runs 0/20, specialist_runs 0/10, prs_opened 0/6, reviews 0/10; outcomes: none
+- last /usage reading: 2026-11-23T19:24:59.057000+00:00  session 15% (resets Nov 23, 10:30pm (Europe/Paris))  week 16% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
 ## Needs you
@@ -36,6 +36,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] the new `except ConfigError` branch in the package import has no test
 - [pymodaq_utils] error message calls config(...) a second time instead of reusing log_level (pre-existing)
 - [pymodaq_utils] test_load_system_config writes into the real ~/.pymodaq config folders and mutates global TOML_DICT (already flagged out of scope by the plan; leak no
+- [pymodaq] packages/pymodaq pytest under PYTEST_QT_API=pyqt6 stalls (2% CPU, no end after 20+ min, 3 attempts) during /optimize-merge checks
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
