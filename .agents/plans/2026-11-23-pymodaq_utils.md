@@ -23,7 +23,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - depends on: T-pymodaq_utils-012 merged
 - conditions: same decider-test-change mandatory list as T-012; hard rule 2
 - verdicts: decider-compat-risk: approve — tests only; decider-test-change: approve (round 2) with mandatory conditions
-- status: done — branch agent/pymodaq_utils/test-quality/2026-11-24, local checks green, CI on the PR, awaiting review
+- status: done — PR #23 open, awaiting the human: registry risk is medium; plan risk is medium; touches tests: packages/pymodaq_utils/tests/config_test.py, packages/pymodaq_utils/tests/conftest.py
 
 ## T-pymodaq_utils-014 Test the ConfigError handler in the package import
 - scope: pymodaq_utils/tests   specialty: test-quality
