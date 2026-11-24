@@ -12,7 +12,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - finding: config.py:get_set_local_dir|PYMODAQ_CONFIG_DIR + save guard
 - conditions: unset var leaves paths unchanged; <dir>/system and <dir>/user; coverage before/after on config.py and config_test.py, test count not lower, both Qt backends (decider-test-change mandatory); a minimal autouse conftest fixture only if the guard breaks existing tests. No reconcile/schema work.
 - verdicts: decider-compat-risk: approve — signature unchanged, conditions above; decider-test-change: approve (round 2) — veto lifted given the mandatory coverage/count conditions
-- status: approved — owner, 2026-11-24
+- status: done — branch agent/pymodaq_utils/refactor/2026-11-24-pymodaq-config-dir, local checks green, CI on the PR, awaiting review
 
 ## T-pymodaq_utils-013 Conftest isolation of the user config, fix test_load_system_config
 - scope: pymodaq_utils/tests   specialty: test-quality

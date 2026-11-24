@@ -1,19 +1,22 @@
-# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-merge)
+# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-run T-012)
 
 ## Done
-- T-pymodaq_utils-015 (hygiene): PR #21 reviewed (approve), CI green, auto-merged into dev_agent.
-- T-pymodaq_utils-M12 (test-quality, drift test for entry-point group lists): rebased, checks green on head
-  (pyqt6 885 passed; pyside6 885 passed on rerun after one known-flaky segfault), reviewer approve, PR #20 ready.
+- T-pymodaq_utils-012: PYMODAQ_CONFIG_DIR override (<dir>/system, <dir>/user, env var in cache key) and
+  BaseConfig.save pytest guard (warn + return under PYTEST_CURRENT_TEST unless PYMODAQ_CONFIG_DIR is set).
+  Branch agent/pymodaq_utils/refactor/2026-11-24-pymodaq-config-dir pushed, no PR yet (/optimize-merge opens it).
+  Checks: flake8, layering, merge_gate lint ok; pyqt6 340 passed/1 skipped, pyside6 340 passed/1 skipped
+  (before: 335 each, +5 new tests). Coverage config.py 80% -> 81%, config_test.py 100% -> 100%.
 
 ## Blocked / pending
-- PR #20 awaits the human: it touches tests and a UI scope (packages/pymodaq/tests/utils/entrypoint_groups_sync_test.py).
-  CI: only the pyside6 ubuntu segfault, which upstream/dev has too (finding tests-pymodaq.yml|tests (ubuntu-latest, pyside6)|crash, seen 3x).
-- T-pymodaq_utils-016: blocked, tool-task branch naming vs merge_gate lint; owner decides (agent/pymodaq_utils/tool/2026-11-24).
+- PR #20 awaits the human (tests + UI scope).
+- T-pymodaq_utils-016: blocked, tool-task branch naming vs merge_gate lint; owner decides.
 - T-pymodaq_utils-011: rework pending (three review items).
+- T-pymodaq_utils-014: blocked, premise false (no ConfigError handler in __init__.py); rewrite or drop.
 
 ## Notes
-- utils.py:750 has the same unused-enumerate pattern as 731 (not cited, left alone).
-- The plan still lists M12 in .agents/plans/2026-11-19-pymodaq_utils-merged.md; status was set by merge.py close.
+- Not run by the specialist: pymodaq / pymodaq_gui suites (callers of get_set_local_dir); pr-reviewer should check.
+- The "unset var keeps default paths" test checks the system path loosely (/etc/.pymodaq not creatable in sandbox).
+- T-013 (conftest isolation, edits existing tests) may start only after T-012 is merged.
 
 ## Next step
-- Human: review and merge PR #20 (Ashwolaa/PyMoDAQ).
+Human: /optimize-merge T-pymodaq_utils-012; then /optimize-run T-pymodaq_utils-013.

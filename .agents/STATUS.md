@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-24 16:17 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 20:33 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `00e186f3d`; 217 commits ahead of upstream/dev (49 files changed, 526 insertions(+), 367 deletions(-))
-- today: runs 4/20, specialist_runs 2/10, prs_opened 2/6, reviews 2/10; outcomes: ok 3, failed 1
-- last /usage reading: 2026-11-24T13:46:07.343000+00:00  session 13% (resets Nov 24, 5:20pm (Europe/Paris))  week 23% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_utils-012 .agents/plans/2026-11-23-pymodaq_utils.md`
+- `dev_agent` at `5e5bcd7ad`; 219 commits ahead of upstream/dev (40 files changed, 519 insertions(+), 168 deletions(-))
+- today: runs 5/20, specialist_runs 3/10, prs_opened 2/6, reviews 2/10; outcomes: ok 4, failed 1
+- last /usage reading: 2026-11-24T19:23:01.759000+00:00  session 15% (resets Nov 24, 10:20pm (Europe/Paris))  week 29% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
@@ -20,9 +20,9 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
+- `agent/pymodaq_utils/refactor/2026-11-24-pymodaq-config-dir` (T-pymodaq_utils-012, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
-- T-pymodaq_utils-012 PYMODAQ_CONFIG_DIR override and Config.save pytest guard — approved — owner, 2026-11-24
 - T-pymodaq_utils-013 Conftest isolation of the user config, fix test_load_system_config — approved — owner, 2026-11-24 (runs after T-012 is merged)
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -49,7 +49,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-22-merge-T-pymodaq_utils-008-r1 | optimize-merge | ok | 6.1 | 6297 | T-pymodaq_utils-008: done — PR #19 open, awaiting the human: a decider |
 | 2026-11-22-run-T-pymodaq_utils-011 | optimize-run | ok | 1.9 | 6233 | packages.get_entrypoints delegates to utils (list; deprecation_msg); o |
 | 2026-11-22-merge-T-pymodaq_utils-011-r2 | optimize-merge | ok | 1.3 | 4163 | T-pymodaq_utils-011: blocked — review: packages.get_entrypoints now de |
 | 2026-11-22-run-T-pymodaq_utils-M12 | optimize-run | ok | 35.4 | 5972 | pyside6 suite aborts randomly (known upstream GC crash, also without t |
@@ -59,6 +58,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-run-T-pymodaq_utils-015 | optimize-run | ok | 2.2 | 7383 | 8 files, +26/-33, both backends 335 passed |
 | 2026-11-24-merge-T-pymodaq_utils-M12-r1 | optimize-merge | ok | 42.5 | 6237 | T-pymodaq_utils-M12: done — PR #20 open, awaiting the human: touches t |
 | 2026-11-24-merge-T-pymodaq_utils-015-r1 | optimize-merge | ok | 6.4 | 4722 | T-pymodaq_utils-015: done — PR #21 merged (auto: low risk, approved by |
+| 2026-11-24-run-T-pymodaq_utils-012 | optimize-run | ok | 10.2 | 9254 | PYMODAQ_CONFIG_DIR override + pytest save guard; 340 tests both backen |
 
 ## Done so far
-- tasks done: 23; PRs merged into dev_agent: 18
+- tasks done: 24; PRs merged into dev_agent: 18
