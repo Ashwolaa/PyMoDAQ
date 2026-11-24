@@ -63,7 +63,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - constraints: bodies are NOT identical: utils version returns a `list`, packages version returns `EntryPoints` (supports `.names`, `.select()`, lookup by name). Delegate packages -> utils only (never the reverse; callers in optimizers_base/models.py:211 and scanner/utils.py:50 rely on the list). Keep both public names; state the return-type change in the docstring and commit; compat-risk finds a `deprecation_msg` justified, or the alternative is to leave it. Do not edit the three monkeypatch tests (models_discovery_test.py:45,54, plugin_configs_test.py:43). Use a function-local import. Run both Qt bindings + layering test. External plugin use unverified.
 - verdicts: decider-compat-risk: approve as proposed — return type changes on a public name; decider-triage (fresh): approve — no import cycle
 - extra_rounds: 1  (owner, 2026-11-24: the three open findings are mechanical; one more rework round)
-- status: blocked — review: owner granted one more rework round (extra_rounds: 1)
+- status: done — branch agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints, local checks green, CI on the PR, reworked after review r2, awaiting review
 
 ## Dropped (triage)
 - B006 `array_manipulation.py:151`, `math_utils.py:616`: read-only defaults; `utils.py:464/482/518` already in T-005.
