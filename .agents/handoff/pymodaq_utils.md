@@ -1,18 +1,20 @@
-# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-run T-pymodaq_utils-007 rework r1)
+# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-merge T-pymodaq_utils-007 r2)
 
 ## Done
-- T-pymodaq_utils-007 rework r1: the old branch no longer rebased on dev_agent, so the rework is on
-  agent/pymodaq_utils/refactor/2026-11-22-set-logger-must-v2 (old branch registry-closed). Pushed, no PR yet.
-  set_logger raises ConfigError (not SystemExit); __init__.py prints it before the generic handler; unused `import sys` removed.
-  New test uses the real GlobalConfig.__call__ (patched getitem_recursive) with pytest.raises(match=...).
-  Checks: flake8, layering, merge_gate lint OK; pyqt6 and pyside6 343 passed, 1 skipped each.
-  logger.py coverage (logger_test.py alone) 75% -> 78%; one test added, none removed or weakened.
+- No PR merged or opened this run.
+- T-pymodaq_utils-007 (branch agent/pymodaq_utils/refactor/2026-11-22-set-logger-must-v2): rebased on dev_agent and pushed;
+  flake8, layering, lint OK; pyqt6 and pyside6 343 passed, 1 skipped each.
 
-## Blocked / open
-- Not covered: the __init__.py `except ConfigError` handler (needs a module reload test).
-- task.py start left registry.jsonl dirty on the branch (written on dev_agent, then switched); I committed it on
-  dev_agent by hand. Tooling bug: start should commit its registry change or write it after switching.
+## Blocked
+- T-pymodaq_utils-007: pr-reviewer r2 verdict `changes` (public_api: yes, behaviour_change: yes). Code is correct; one r1 finding open:
+  logger_test.py:26 patches `config_mod.getitem_recursive` instead of building a real config.
+  Fix: `general = logger_mod.config._configs['utils']._config['general']; monkeypatch.setitem(general, 'debug_level', 'DEBUG')`.
+  Also fix the comment at logger_test.py:25 and the commit message: `debug_levels` is never read on this path.
+  Report: .agents/reports/pymodaq_utils/2026-11-24-pr-review-T-pymodaq_utils-007-r2.md
+- Findings filed: GlobalConfig.__getitem__ bypasses Config.__call__ (so its debug_levels fallback never applies);
+  the ConfigError handler in __init__.py is untested.
 - PR #20 awaits the human. PR #23 awaits the human. T-016 blocked, T-011 rework pending, T-014 blocked.
 
 ## Next step
-Human: `/optimize-merge T-pymodaq_utils-007` (pr-reviewer round 2, then PR; medium risk, touches tests and a public function).
+`/optimize-run T-pymodaq_utils-007` (rework r2 with the test fix above), then `/optimize-merge T-pymodaq_utils-007`.
+Human note: public `set_logger` raises ConfigError instead of SystemExit(-1).
