@@ -1,5 +1,4 @@
 from hashlib import sha256
-from importlib import metadata
 from typing import Union, List
 
 import requests
@@ -171,7 +170,7 @@ def get_entrypoints(group='pymodaq.plugins'):
     -------
     list of importlib.metadata.EntryPoint
 
-    .. deprecated::
+    .. deprecated:: 5.4.0
         Use :func:`pymodaq_utils.utils.get_entrypoints`. This function now delegates to it and
         therefore returns a ``list`` instead of an ``EntryPoints`` object (no ``.names``/``.select()``).
     """
