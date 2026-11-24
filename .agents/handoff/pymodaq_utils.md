@@ -1,22 +1,26 @@
-# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-run T-012)
+# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-merge T-012)
 
 ## Done
-- T-pymodaq_utils-012: PYMODAQ_CONFIG_DIR override (<dir>/system, <dir>/user, env var in cache key) and
-  BaseConfig.save pytest guard (warn + return under PYTEST_CURRENT_TEST unless PYMODAQ_CONFIG_DIR is set).
-  Branch agent/pymodaq_utils/refactor/2026-11-24-pymodaq-config-dir pushed, no PR yet (/optimize-merge opens it).
-  Checks: flake8, layering, merge_gate lint ok; pyqt6 340 passed/1 skipped, pyside6 340 passed/1 skipped
-  (before: 335 each, +5 new tests). Coverage config.py 80% -> 81%, config_test.py 100% -> 100%.
+- Nothing merged this run. T-pymodaq_utils-012 (PYMODAQ_CONFIG_DIR override + BaseConfig.save pytest guard) was reviewed:
+  branch rebased on dev_agent and pushed; flake8, layering, pyqt6 (340 passed) and pyside6 (340 passed) ok.
 
 ## Blocked / pending
+- T-pymodaq_utils-012: blocked, pr-reviewer verdict "changes" (report .agents/reports/pymodaq_utils/2026-11-24-pr-review-T-pymodaq_utils-012-r1.md):
+  1. atexit.register(self.save) runs after pytest unsets PYTEST_CURRENT_TEST, so the exit save writes ~/.pymodaq;
+     check for a pytest session instead of a running test, add an exit-path test.
+  2. config_path cached before PYMODAQ_CONFIG_DIR is set is still written; only write when inside PYMODAQ_CONFIG_DIR, add a test.
+  3. config_test.py:368 sets _modified_config on the singleton and never restores it; use monkeypatch.setattr.
+  4. Loose assertions config_test.py:345 (`or` accepts any .pymodaq dir) and :359 (`!= first`; cache clear skipped on failure).
+  5. Docstring at config.py:456 overclaims.
+  Public API for the human: new env var PYMODAQ_CONFIG_DIR; save() skips writes under pytest; get_set_local_dir loses functools.cache attrs except cache_clear.
 - PR #20 awaits the human (tests + UI scope).
 - T-pymodaq_utils-016: blocked, tool-task branch naming vs merge_gate lint; owner decides.
 - T-pymodaq_utils-011: rework pending (three review items).
 - T-pymodaq_utils-014: blocked, premise false (no ConfigError handler in __init__.py); rewrite or drop.
 
 ## Notes
-- Not run by the specialist: pymodaq / pymodaq_gui suites (callers of get_set_local_dir); pr-reviewer should check.
-- The "unset var keeps default paths" test checks the system path loosely (/etc/.pymodaq not creatable in sandbox).
-- T-013 (conftest isolation, edits existing tests) may start only after T-012 is merged.
+- Unverified: coverage before/after for T-012; plugin use of get_set_local_dir.cache_info / __wrapped__.
+- T-013 (conftest isolation) depends on T-012 being merged.
 
 ## Next step
-Human: /optimize-merge T-pymodaq_utils-012; then /optimize-run T-pymodaq_utils-013.
+/optimize-run T-pymodaq_utils-012 (rework the 5 review items), then /optimize-merge again; then T-013.
