@@ -336,3 +336,47 @@ def test_required_config_entries():
     assert 'host' in config('network', 'leco-server')
     assert 'port' in config('network', 'leco-server')
 
+
+
+class TestConfigDirOverride:
+    def test_unset_keeps_default_paths(self, monkeypatch):
+        monkeypatch.delenv('PYMODAQ_CONFIG_DIR', raising=False)
+        assert get_set_local_dir(user=True) == Path.home().joinpath('.pymodaq')
+        assert get_set_local_dir().name == '.pymodaq' or get_set_local_dir() == Path.home().joinpath('.pymodaq')
+
+    def test_env_var_sets_system_and_user_dirs(self, tmp_path, monkeypatch):
+        monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path))
+        assert get_set_local_dir() == tmp_path.joinpath('system')
+        assert get_set_local_dir(user=True) == tmp_path.joinpath('user')
+        assert tmp_path.joinpath('system').is_dir() and tmp_path.joinpath('user').is_dir()
+
+    def test_cache_key_includes_env_var(self, tmp_path, monkeypatch):
+        monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path / 'a'))
+        (tmp_path / 'a').mkdir()
+        first = get_set_local_dir(user=True)
+        monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path / 'b'))
+        (tmp_path / 'b').mkdir()
+        assert get_set_local_dir(user=True) != first
+        get_set_local_dir.cache_clear()
+
+
+class TestConfigSaveGuard:
+    def test_save_skipped_under_pytest(self, tmp_path, monkeypatch, caplog):
+        monkeypatch.delenv('PYMODAQ_CONFIG_DIR', raising=False)
+        config = CustomConfig0()
+        before = config.config_path.read_text() if config.config_path.is_file() else None
+        config._modified_config = {'guard_test': 1}
+        with caplog.at_level('WARNING'):
+            config.save()
+        assert 'Not saving config' in caplog.text
+        after = config.config_path.read_text() if config.config_path.is_file() else None
+        assert before == after
+
+    def test_save_allowed_with_isolated_dir(self, tmp_path, monkeypatch):
+        monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path))
+        config = CustomConfig0()
+        target = tmp_path.joinpath('saved.toml')
+        monkeypatch.setitem(config.__dict__, 'config_path', target)
+        monkeypatch.setattr(config, '_modified_config', {'guard_test': 1})
+        config.save()
+        assert toml.load(target) == {'guard_test': 1}

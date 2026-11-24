@@ -123,11 +123,22 @@ def get_set_path(a_base_path: Path, dir_name: str) -> Path:
 
 
 @functools.cache
+def _get_set_local_dir(user: bool, config_dir_override: Optional[str]) -> Path:
+    if config_dir_override:
+        return get_set_path(Path(config_dir_override), 'user' if user else 'system')
+    if user:
+        return get_set_path(Path.home(), '.pymodaq')
+    return get_set_path(CONFIG_BASE_PATH, '.pymodaq')
+
+
 def get_set_local_dir(user=False) -> Path:
     """Defines, creates and returns a local folder where configuration files will be saved
 
     Depending on the os the configurations files will be stored in CONFIG_BASE_PATH, then
     each user will have another one created that could override the default and system-wide base folder
+
+    If the environment variable ``PYMODAQ_CONFIG_DIR`` is set, the folders are ``<PYMODAQ_CONFIG_DIR>/system``
+    and ``<PYMODAQ_CONFIG_DIR>/user`` instead (useful to isolate tests or several installations).
 
     Parameters
     ----------
@@ -138,11 +149,10 @@ def get_set_local_dir(user=False) -> Path:
     -------
     Path: the local path
     """
-    if user:
-        local_path = get_set_path(Path.home(), '.pymodaq')
-    else:
-        local_path = get_set_path(CONFIG_BASE_PATH, '.pymodaq')
-    return local_path
+    return _get_set_local_dir(bool(user), environ.get('PYMODAQ_CONFIG_DIR') or None)
+
+
+get_set_local_dir.cache_clear = _get_set_local_dir.cache_clear
 
 
 def get_config_file(config_file_name: str, user=False) -> Path:
@@ -441,7 +451,15 @@ class BaseConfig(metaclass=ConfigSingleton):
             self._modified_config = toml.load(get_config_file(self.config_name, user=True))
 
     def save(self):
-        """Save the current Config object into the user toml file and reload it """
+        """Save the current Config object into the user toml file and reload it
+
+        Under pytest the user config file is not written (a warning is logged), unless ``PYMODAQ_CONFIG_DIR``
+        points to an isolated folder.
+        """
+        if 'PYTEST_CURRENT_TEST' in environ and not environ.get('PYMODAQ_CONFIG_DIR'):
+            logging.warning(f'Not saving config {self.config_name} under pytest: set PYMODAQ_CONFIG_DIR to '
+                            f'an isolated folder to allow it')
+            return
         with self._lock.write_lock():
             self.config_path.write_text(toml.dumps(self._modified_config))
             #  self._config = self.load_config(self.config_name, self.config_template_path)
