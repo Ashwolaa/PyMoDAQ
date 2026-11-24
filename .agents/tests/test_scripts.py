@@ -1,5 +1,6 @@
 """The scripts' decision logic: merge gate, budget kinds, CI triggers, cost check, the upstream guard."""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -145,3 +146,31 @@ def test_pending_skips_branches_blocked_by_review(monkeypatch):
                                                   ("T-b", "", "blocked — review: changes", "", "x"),
                                                   ("T-c", "", "blocked — CI red", "", "x")])
     assert [r["task_id"] for r in status.pending()] == ["T-a", "T-c"]
+
+
+# ---- task.py checks: a test run never hangs an agent, never touches the real HOME
+def _fake_profile(tmp_path, **checks):
+    return {"tools": {"env": ""}, "checks": {
+        "test": f"cd {tmp_path} && {sys.executable} -m pytest", "qt_backend_env": "X_BACKEND={backend}",
+        "qt_headless": "", **checks}}
+
+
+def test_run_tests_kills_a_hung_test_and_dumps_its_stack(tmp_path, monkeypatch):
+    import task
+    (tmp_path / "test_hang.py").write_text("import time\n\ndef test_hang():\n    time.sleep(60)\n")
+    monkeypatch.setattr(task, "profile", lambda: _fake_profile(tmp_path, test_timeout_s=4, test_faulthandler_s=1))
+    r, timed_out = task.run_tests("pyqt6", "x")
+    assert timed_out
+    assert "test_hang" in task.dump_of(r.stdout + r.stderr)
+
+
+def test_run_tests_uses_a_throwaway_home(tmp_path, monkeypatch):
+    import task
+    (tmp_path / "test_home.py").write_text(
+        "import os, pathlib\n\ndef test_home():\n    pathlib.Path(%r).write_text(os.environ['HOME'] + '|' + os.environ['USERPROFILE'])\n"
+        % str(tmp_path / "seen.txt"))
+    monkeypatch.setattr(task, "profile", lambda: _fake_profile(tmp_path))
+    r, timed_out = task.run_tests("pyqt6", "x")
+    home, userprofile = (tmp_path / "seen.txt").read_text().split("|")
+    assert r.returncode == 0 and not timed_out
+    assert home == userprofile and home != os.environ["HOME"] and not Path(home).exists()  # removed afterwards
