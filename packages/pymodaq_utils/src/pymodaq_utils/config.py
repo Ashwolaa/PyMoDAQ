@@ -318,9 +318,12 @@ _PYTEST_SEEN = False
 
 
 def _under_pytest() -> bool:
-    """True while a pytest test runs and, once one has run, for the rest of the process (atexit saves)"""
+    """True while a pytest session runs and, once seen, for the rest of the process (atexit saves)
+
+    Called from ``BaseConfig.__init__`` and ``__setitem__`` so the session is recorded before any exit-time save.
+    """
     global _PYTEST_SEEN
-    if 'PYTEST_CURRENT_TEST' in environ:
+    if 'PYTEST_CURRENT_TEST' in environ or 'PYTEST_VERSION' in environ:
         _PYTEST_SEEN = True
     return _PYTEST_SEEN
 
@@ -346,6 +349,7 @@ class BaseConfig(metaclass=ConfigSingleton):
         self._lock = ReaderWriterLock()
         self._config = {}
         self._modified_config = {}
+        _under_pytest()  # record a pytest session as early as possible
         self.load()
         atexit.register(self.save)
 
@@ -407,6 +411,7 @@ class BaseConfig(metaclass=ConfigSingleton):
         return ret
 
     def __setitem__(self, key, value):
+        _under_pytest()  # record a pytest session: the atexit save must then stay guarded
         with self._lock.write_lock():
             if isinstance(key, tuple):
                 # In visible config and modified config
@@ -464,9 +469,10 @@ class BaseConfig(metaclass=ConfigSingleton):
     def save(self):
         """Save the current Config object into the user toml file and reload it
 
-        Once a pytest session has been seen (a test is running, now or earlier in this process, so the atexit
-        save is covered too), the file is written only if ``config_path`` is inside the folder given by
-        ``PYMODAQ_CONFIG_DIR``. Otherwise a warning is logged and nothing is written.
+        A pytest session is detected from ``PYTEST_CURRENT_TEST`` or ``PYTEST_VERSION`` and remembered once seen
+        (at config creation, at ``__setitem__`` or here), so the atexit save is covered even if no ``save()`` ran
+        during a test. Under pytest the file is written only if ``config_path`` is inside the folder given by
+        ``PYMODAQ_CONFIG_DIR``; otherwise a warning is logged and nothing is written.
         """
         if _under_pytest():
             isolated = environ.get('PYMODAQ_CONFIG_DIR')

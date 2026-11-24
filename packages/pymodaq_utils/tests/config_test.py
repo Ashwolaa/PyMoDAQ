@@ -1,3 +1,4 @@
+import copy
 import atexit
 
 import pytest
@@ -394,10 +395,13 @@ class TestConfigSaveGuard:
         # at interpreter exit pytest has already removed PYTEST_CURRENT_TEST: the atexit save must still be guarded
         monkeypatch.delenv('PYMODAQ_CONFIG_DIR', raising=False)
         config = CustomConfig0()
-        pymodaq_utils.config._under_pytest()  # a test is running: the session is recorded
+        monkeypatch.setattr(config, '_config', copy.deepcopy(config._config))  # restored after the test
+        monkeypatch.setattr(config, '_modified_config', copy.deepcopy(config._modified_config))
+        monkeypatch.setattr(pymodaq_utils.config, '_PYTEST_SEEN', False)  # no save() ran: nothing recorded yet
+        config['guard_test'] = 1  # no save: only __setitem__ can record the session
         monkeypatch.delenv('PYTEST_CURRENT_TEST')
+        monkeypatch.delenv('PYTEST_VERSION', raising=False)
         before = config.config_path.read_text() if config.config_path.is_file() else None
-        monkeypatch.setattr(config, '_modified_config', {'guard_test': 1})
         with caplog.at_level('WARNING'):
             config.save()
         assert 'Not saving config' in caplog.text
