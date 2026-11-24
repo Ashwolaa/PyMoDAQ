@@ -122,11 +122,12 @@ class TestCopy:
         assert toml.load(dest_file) == TOML_DICT
 
 
-def test_load_system_config(tmp_path):
+def test_load_system_config(tmp_path, isolated_config_dir):
     test_name = 'test'
     template_path = tmp_path.joinpath('template.toml')
-    TOML_DICT['other'] = '123'
-    create_toml(template_path)
+    toml_dict = copy.deepcopy(TOML_DICT)  # do not mutate the module level TOML_DICT shared with other tests
+    toml_dict['other'] = '123'
+    template_path.write_text(toml.dumps(toml_dict))
 
     system_file = get_set_config_dir().joinpath(test_name + '.toml')
     user_file = get_set_config_dir(user=True).joinpath(test_name + '.toml')
@@ -135,7 +136,7 @@ def test_load_system_config(tmp_path):
 
     dest_file = copy_template_config(test_name, source_path=template_path)
     config_dict = load_system_config_and_update_from_user(test_name)
-    assert config_dict == TOML_DICT
+    assert config_dict == toml_dict
     assert config_dict['other'] == '123'
 
     user_path = get_set_config_dir(user=True).joinpath(
