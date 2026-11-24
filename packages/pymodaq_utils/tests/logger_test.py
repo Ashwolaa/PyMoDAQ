@@ -22,7 +22,8 @@ def test_get_base_logger():
 
 
 def test_set_logger_non_list_debug_level_raises_config_error(monkeypatch):
-    # real GlobalConfig.__call__ path: neither debug_level nor debug_levels is a list
-    monkeypatch.setattr(config_mod, 'getitem_recursive', lambda dic, *args, **kw: 'DEBUG')
+    # real GlobalConfig path: the scalar 'debug_level' is read (debug_levels is not read here)
+    general = logger_mod.config._configs['utils']._config['general']
+    monkeypatch.setitem(general, 'debug_level', 'DEBUG')
     with pytest.raises(config_mod.ConfigError, match='DEBUG is not a list'):
         logger_mod.set_logger('non_list_debug_level')
