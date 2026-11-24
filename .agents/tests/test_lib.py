@@ -119,3 +119,10 @@ def _report(tmp_path, monkeypatch, rounds):
 def test_rework_rule(tmp_path, monkeypatch, rounds, allowed):
     reports = _report(tmp_path, monkeypatch, rounds)
     assert reports.rework_allowed("pkg", "T-1")[0] is allowed
+
+
+def test_finding_count_reads_older_required_changes_reports(tmp_path):
+    from agentlib import reports
+    f = tmp_path / "x.md"
+    f.write_text("verdict: changes\n\n## r1 findings\n- a:1 old\n\n## Required changes\n1. one\n2. two\n3. three\n\nsummary: s\n")
+    assert reports.finding_count(f) == 3

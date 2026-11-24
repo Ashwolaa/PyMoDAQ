@@ -60,9 +60,13 @@ MAX_REWORK_ROUNDS = 4  # hard cap, whatever the trend
 
 
 def finding_count(path) -> int:
-    """Bullets of the report's `## Findings` section (a line `None` or an empty section counts 0)."""
-    m = re.search(r"^## Findings\s*\n(.*?)(?=^## |^summary:|\Z)", Path(path).read_text(), re.M | re.S)
-    return len([l for l in m.group(1).splitlines() if re.match(r"^\s*[-*] ", l)]) if m else 0
+    """Items of the report's `## Findings` (or older: `## Required changes`) section: bullets or numbered lines.
+    Several such sections add up (a r2 report also lists the r1 findings under `## r1 findings`, which is not counted)."""
+    text = Path(path).read_text()
+    total = 0
+    for m in re.finditer(r"^## (?:Findings|Required changes)\s*\n(.*?)(?=^## |^summary:|\Z)", text, re.M | re.S):
+        total += len([l for l in m.group(1).splitlines() if re.match(r"^\s*(?:[-*]|\d+[.)]) ", l)])
+    return total
 
 
 def rework_allowed(package, task_id) -> tuple:
@@ -76,6 +80,8 @@ def rework_allowed(package, task_id) -> tuple:
     if n >= MAX_REWORK_ROUNDS:
         return False, f"{n} rounds said changes (cap {MAX_REWORK_ROUNDS})"
     last, before = finding_count(changes[-1]), finding_count(changes[-2])
+    if last == 0 or before == 0:  # a `changes` verdict with nothing countable: the format is unknown, not "converged"
+        return False, f"cannot read the findings of the last two reviews ({before}, {last}): the human decides"
     if last < before:
         return True, f"findings {before} -> {last}: converging, round {n + 1}"
     return False, f"findings {before} -> {last}: not converging after {n} rounds"
