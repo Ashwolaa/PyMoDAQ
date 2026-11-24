@@ -54,3 +54,28 @@ def for_task(package, task_id) -> list:
 
 def changes_rounds(package, task_id) -> int:
     return sum(1 for p in for_task(package, task_id) if header(p).get("verdict") == "changes")
+
+
+MAX_REWORK_ROUNDS = 4  # hard cap, whatever the trend
+
+
+def finding_count(path) -> int:
+    """Bullets of the report's `## Findings` section (a line `None` or an empty section counts 0)."""
+    m = re.search(r"^## Findings\s*\n(.*?)(?=^## |^summary:|\Z)", Path(path).read_text(), re.M | re.S)
+    return len([l for l in m.group(1).splitlines() if re.match(r"^\s*[-*] ", l)]) if m else 0
+
+
+def rework_allowed(package, task_id) -> tuple:
+    """(allowed, why). A rework round is allowed while the review converges: the first two are free; after that only
+    when the latest `changes` report has strictly fewer findings than the one before, up to MAX_REWORK_ROUNDS.
+    A flat or growing count means the specialist does not understand the review: the task goes to the human."""
+    changes = [p for p in for_task(package, task_id) if header(p).get("verdict") == "changes"]
+    n = len(changes)
+    if n < 2:
+        return True, f"round {n + 1}"
+    if n >= MAX_REWORK_ROUNDS:
+        return False, f"{n} rounds said changes (cap {MAX_REWORK_ROUNDS})"
+    last, before = finding_count(changes[-1]), finding_count(changes[-2])
+    if last < before:
+        return True, f"findings {before} -> {last}: converging, round {n + 1}"
+    return False, f"findings {before} -> {last}: not converging after {n} rounds"

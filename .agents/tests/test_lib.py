@@ -98,3 +98,24 @@ def test_header_first_occurrence_wins(tmp_path):
 def test_real_report():
     rs = reports.for_task("pymodaq_utils", "T-pymodaq_utils-M10")
     assert rs and reports.header(rs[-1])["verdict"] == "approve"
+
+
+# ---- rework rule: two rounds, then only while the review converges
+def _report(tmp_path, monkeypatch, rounds):
+    from agentlib import reports
+    d = tmp_path / "reports" / "pkg"
+    d.mkdir(parents=True)
+    for i, n in enumerate(rounds, 1):
+        body = "".join(f"- a.py:{k} finding\n" for k in range(n)) or "None.\n"
+        (d / f"2026-01-01-pr-review-T-1-r{i}.md").write_text(
+            f"verdict: changes\npublic_api: no\nbehaviour_change: no\nfails_without_fix: n/a\n\n## Findings\n{body}\n"
+            "## API\n- x:1 not a finding\n\nsummary: s\n")
+    monkeypatch.setattr(reports, "AGENTS_DIR", tmp_path)
+    return reports
+
+
+@pytest.mark.parametrize("rounds,allowed", [([4], True), ([6, 5], True), ([6, 6], False), ([6, 3, 1], True),
+                                            ([6, 3, 3], False), ([6, 5, 4, 3], False)])
+def test_rework_rule(tmp_path, monkeypatch, rounds, allowed):
+    reports = _report(tmp_path, monkeypatch, rounds)
+    assert reports.rework_allowed("pkg", "T-1")[0] is allowed
