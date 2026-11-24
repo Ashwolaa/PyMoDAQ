@@ -174,3 +174,10 @@ def test_run_tests_uses_a_throwaway_home(tmp_path, monkeypatch):
     home, userprofile = (tmp_path / "seen.txt").read_text().split("|")
     assert r.returncode == 0 and not timed_out
     assert home == userprofile and home != os.environ["HOME"] and not Path(home).exists()  # removed afterwards
+
+
+def test_a_pr_without_checks_yet_is_retried_by_merge_not_run():
+    import merge, status
+    assert "blocked — PR CI unavailable" in merge.RETRY
+    assert "blocked — PR CI unavailable" in status.MERGE_RETRY
+    assert "blocked — PR CI unavailable" not in status.RETRY  # /optimize-run must not take it as a fresh task
