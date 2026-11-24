@@ -1,4 +1,4 @@
-# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-merge T-012 r3)
+# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-merge T-012 r4: no candidate)
 
 ## Done
 - T-pymodaq_utils-012: pr-reviewer r3 approved (public_api yes, behaviour_change yes, fails_without_fix yes).
@@ -12,6 +12,10 @@
 - T-013 depends on T-012. PR #20 awaits the human. T-016 blocked (branch naming vs merge_gate lint).
   T-011 rework pending. T-014 blocked (premise false).
 
+## Update r4
+- `merge.py candidates T-pymodaq_utils-012` returned nothing (task is blocked in the plan). PR #22 now has checks:
+  mypy and tests ubuntu 3.11-3.14 SUCCESS; windows tests and compile-doc still running at 2026-11-24 ~20:48Z.
+
 ## Notes
 - PR body must state: new env var PYMODAQ_CONFIG_DIR; get_set_local_dir loses cache_info, cache_parameters and
   __wrapped__ (owner accepted).
@@ -19,4 +23,4 @@
 - Not blocking: pytest < 8.2 lacks PYTEST_VERSION, config changed only at module load outside a test is not caught.
 
 ## Next step
-Human: look at why PR #22 has no checks (trigger CI), then /optimize-merge T-pymodaq_utils-012 again, or merge PR #22 by hand.
+Human: PR #22 checks now run; once green, merge PR #22 by hand (or unblock T-012 in the plan and rerun /optimize-merge). T-013 waits on it.
