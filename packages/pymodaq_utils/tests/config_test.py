@@ -342,7 +342,9 @@ class TestConfigDirOverride:
     def test_unset_keeps_default_paths(self, monkeypatch):
         monkeypatch.delenv('PYMODAQ_CONFIG_DIR', raising=False)
         assert get_set_local_dir(user=True) == Path.home().joinpath('.pymodaq')
-        assert get_set_local_dir().name == '.pymodaq' or get_set_local_dir() == Path.home().joinpath('.pymodaq')
+        # system folder: CONFIG_BASE_PATH, or the home folder when it cannot be created (see get_set_path)
+        assert get_set_local_dir() in (pymodaq_utils.config.CONFIG_BASE_PATH / '.pymodaq',
+                                       Path.home() / '.pymodaq')
 
     def test_env_var_sets_system_and_user_dirs(self, tmp_path, monkeypatch):
         monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path))
@@ -351,13 +353,20 @@ class TestConfigDirOverride:
         assert tmp_path.joinpath('system').is_dir() and tmp_path.joinpath('user').is_dir()
 
     def test_cache_key_includes_env_var(self, tmp_path, monkeypatch):
+        try:
+            self._check_cache_key(tmp_path, monkeypatch)
+        finally:
+            get_set_local_dir.cache_clear()
+
+    @staticmethod
+    def _check_cache_key(tmp_path, monkeypatch):
         monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path / 'a'))
         (tmp_path / 'a').mkdir()
         first = get_set_local_dir(user=True)
         monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(tmp_path / 'b'))
         (tmp_path / 'b').mkdir()
-        assert get_set_local_dir(user=True) != first
-        get_set_local_dir.cache_clear()
+        assert first == tmp_path / 'a' / 'user'
+        assert get_set_local_dir(user=True) == tmp_path / 'b' / 'user'
 
 
 class TestConfigSaveGuard:
@@ -365,7 +374,7 @@ class TestConfigSaveGuard:
         monkeypatch.delenv('PYMODAQ_CONFIG_DIR', raising=False)
         config = CustomConfig0()
         before = config.config_path.read_text() if config.config_path.is_file() else None
-        config._modified_config = {'guard_test': 1}
+        monkeypatch.setattr(config, '_modified_config', {'guard_test': 1})
         with caplog.at_level('WARNING'):
             config.save()
         assert 'Not saving config' in caplog.text
@@ -380,3 +389,30 @@ class TestConfigSaveGuard:
         monkeypatch.setattr(config, '_modified_config', {'guard_test': 1})
         config.save()
         assert toml.load(target) == {'guard_test': 1}
+
+    def test_save_skipped_on_exit_path(self, tmp_path, monkeypatch, caplog):
+        # at interpreter exit pytest has already removed PYTEST_CURRENT_TEST: the atexit save must still be guarded
+        monkeypatch.delenv('PYMODAQ_CONFIG_DIR', raising=False)
+        config = CustomConfig0()
+        pymodaq_utils.config._under_pytest()  # a test is running: the session is recorded
+        monkeypatch.delenv('PYTEST_CURRENT_TEST')
+        before = config.config_path.read_text() if config.config_path.is_file() else None
+        monkeypatch.setattr(config, '_modified_config', {'guard_test': 1})
+        with caplog.at_level('WARNING'):
+            config.save()
+        assert 'Not saving config' in caplog.text
+        after = config.config_path.read_text() if config.config_path.is_file() else None
+        assert before == after
+
+    def test_save_skipped_when_path_outside_isolated_dir(self, tmp_path, monkeypatch, caplog):
+        isolated = tmp_path / 'isolated'
+        isolated.mkdir()
+        config = CustomConfig0()
+        stale = tmp_path / 'stale.toml'  # config_path resolved before the variable was set
+        monkeypatch.setitem(config.__dict__, 'config_path', stale)
+        monkeypatch.setenv('PYMODAQ_CONFIG_DIR', str(isolated))
+        monkeypatch.setattr(config, '_modified_config', {'guard_test': 1})
+        with caplog.at_level('WARNING'):
+            config.save()
+        assert 'Not saving config' in caplog.text
+        assert not stale.exists()

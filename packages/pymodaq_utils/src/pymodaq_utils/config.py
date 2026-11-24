@@ -314,6 +314,17 @@ class ConfigSingleton(Singleton):
 
 
 
+_PYTEST_SEEN = False
+
+
+def _under_pytest() -> bool:
+    """True while a pytest test runs and, once one has run, for the rest of the process (atexit saves)"""
+    global _PYTEST_SEEN
+    if 'PYTEST_CURRENT_TEST' in environ:
+        _PYTEST_SEEN = True
+    return _PYTEST_SEEN
+
+
 class BaseConfig(metaclass=ConfigSingleton):
     """Base class to manage configuration files
 
@@ -453,13 +464,21 @@ class BaseConfig(metaclass=ConfigSingleton):
     def save(self):
         """Save the current Config object into the user toml file and reload it
 
-        Under pytest the user config file is not written (a warning is logged), unless ``PYMODAQ_CONFIG_DIR``
-        points to an isolated folder.
+        Once a pytest session has been seen (a test is running, now or earlier in this process, so the atexit
+        save is covered too), the file is written only if ``config_path`` is inside the folder given by
+        ``PYMODAQ_CONFIG_DIR``. Otherwise a warning is logged and nothing is written.
         """
-        if 'PYTEST_CURRENT_TEST' in environ and not environ.get('PYMODAQ_CONFIG_DIR'):
-            logging.warning(f'Not saving config {self.config_name} under pytest: set PYMODAQ_CONFIG_DIR to '
-                            f'an isolated folder to allow it')
-            return
+        if _under_pytest():
+            isolated = environ.get('PYMODAQ_CONFIG_DIR')
+            try:
+                allowed = bool(isolated) and Path(self.config_path).resolve().is_relative_to(
+                    Path(isolated).resolve())
+            except (OSError, ValueError):
+                allowed = False
+            if not allowed:
+                logging.warning(f'Not saving config {self.config_name} under pytest: set PYMODAQ_CONFIG_DIR to '
+                                f'an isolated folder containing its file to allow it')
+                return
         with self._lock.write_lock():
             self.config_path.write_text(toml.dumps(self._modified_config))
             #  self._config = self.load_config(self.config_name, self.config_template_path)
