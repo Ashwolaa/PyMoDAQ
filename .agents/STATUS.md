@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-24 21:20 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 21:42 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `933aba6d3`; 228 commits ahead of upstream/dev (40 files changed, 519 insertions(+), 168 deletions(-))
-- today: runs 8/20, specialist_runs 4/10, prs_opened 2/6, reviews 4/10; outcomes: ok 7, failed 1
+- `dev_agent` at `0042aa857`; 232 commits ahead of upstream/dev (40 files changed, 519 insertions(+), 168 deletions(-))
+- today: runs 9/20, specialist_runs 5/10, prs_opened 2/6, reviews 4/10; outcomes: ok 8, failed 1
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_utils-013 .agents/plans/2026-11-23-pymodaq_utils.md`
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
@@ -17,13 +17,12 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 - blocked: **T-pymodaq_utils-007** — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - blocked: **T-pymodaq_utils-011** — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
-- blocked: **T-pymodaq_utils-012** — blocked — review: Adds a PYMODAQ_CONFIG_DIR override to get_set_local_dir and a pytest guard in BaseConfig.save that writes only inside the isolated folder; the stale-path case i
 - blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
+- `agent/pymodaq_utils/refactor/2026-11-24-pymodaq-config-dir` (T-pymodaq_utils-012, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
-- T-pymodaq_utils-012 PYMODAQ_CONFIG_DIR override and Config.save pytest guard — blocked — review: Adds a PYMODAQ_CONFIG_DIR override to get_set_local_dir and a pytest guard in BaseConfig.save that writes only inside the isolated folder; the stale-path case i
 - T-pymodaq_utils-013 Conftest isolation of the user config, fix test_load_system_config — approved — owner, 2026-11-24 (runs after T-012 is merged)
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -51,7 +50,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| rd-config-schema-2026-11-23 | optimize-research | ok | 6.8 | 28691 | note + prototype agent-rd/config-schema; incident: one pre-HOME import |
 | 2026-11-23-plan-pymodaq_utils | optimize-plan | ok | 10.2 | 60530 |  |
 | 2026-11-24-run-T-pymodaq_utils-016 | optimize-run | failed | 1.9 | 5975 | merge_gate lint refuses .agents/scripts/task.py on branch agent/pymoda |
 | 2026-11-24-run-T-pymodaq_utils-015 | optimize-run | ok | 2.2 | 7383 | 8 files, +26/-33, both backends 335 passed |
@@ -61,6 +59,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-merge-T-pymodaq_utils-012-r1 | optimize-merge | ok | 4.1 | 13994 | T-pymodaq_utils-012: blocked — review: Adds a PYMODAQ_CONFIG_DIR overr |
 | 2026-11-24-run-T-pymodaq_utils-012-r1 | optimize-run | ok | 1.8 | 7090 | rework r1: 5 review findings fixed; narrow guard (config_path inside P |
 | 2026-11-24-merge-T-pymodaq_utils-012-r2 | optimize-merge | ok | 3.2 | 10327 | T-pymodaq_utils-012: blocked — review: Adds a PYMODAQ_CONFIG_DIR overr |
+| 2026-11-24-run-T-pymodaq_utils-012-r2 | optimize-run | ok | 2.3 | 5085 | rework r3: atexit leak closed, exit-path test rewritten, docstring fix |
 
 ## Done so far
-- tasks done: 23; PRs merged into dev_agent: 18
+- tasks done: 24; PRs merged into dev_agent: 18
