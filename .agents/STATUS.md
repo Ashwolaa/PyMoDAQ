@@ -1,10 +1,10 @@
-# Consortium status — generated 2026-11-24 14:38 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 14:45 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `4c8286ab5`; 209 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
-- today: runs 3/20, specialist_runs 2/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2, failed 1
+- `dev_agent` at `b85eca5c1`; 212 commits ahead of upstream/dev (39 files changed, 509 insertions(+), 168 deletions(-))
+- today: runs 4/20, specialist_runs 2/10, prs_opened 2/6, reviews 2/10; outcomes: ok 3, failed 1
 - last /usage reading: 2026-11-24T12:55:03.441000+00:00  session 5% (resets Nov 24, 5:20pm (Europe/Paris))  week 23% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
@@ -22,7 +22,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 
 ## In flight
 - `agent-rd/config-schema` (None, risk medium): pushed, waiting for /optimize-merge
-- `agent/pymodaq_utils/hygiene/2026-11-24` (T-pymodaq_utils-015, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
 - T-pymodaq_utils-012 PYMODAQ_CONFIG_DIR override and Config.save pytest guard — approved — owner, 2026-11-24
@@ -52,7 +51,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-22-run-T-pymodaq_utils-008 | optimize-run | ok | 1.5 | 6449 | test isolated via get_set_local_dir patch; coverage unchanged |
 | 2026-11-22-merge-T-pymodaq_utils-008-r1 | optimize-merge | ok | 6.1 | 6297 | T-pymodaq_utils-008: done — PR #19 open, awaiting the human: a decider |
 | 2026-11-22-run-T-pymodaq_utils-011 | optimize-run | ok | 1.9 | 6233 | packages.get_entrypoints delegates to utils (list; deprecation_msg); o |
 | 2026-11-22-merge-T-pymodaq_utils-011-r2 | optimize-merge | ok | 1.3 | 4163 | T-pymodaq_utils-011: blocked — review: packages.get_entrypoints now de |
@@ -62,6 +60,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-run-T-pymodaq_utils-016 | optimize-run | failed | 1.9 | 5975 | merge_gate lint refuses .agents/scripts/task.py on branch agent/pymoda |
 | 2026-11-24-run-T-pymodaq_utils-015 | optimize-run | ok | 2.2 | 7383 | 8 files, +26/-33, both backends 335 passed |
 | 2026-11-24-merge-T-pymodaq_utils-M12-r1 | optimize-merge | ok | 42.5 | 6237 | T-pymodaq_utils-M12: done — PR #20 open, awaiting the human: touches t |
+| 2026-11-24-merge-T-pymodaq_utils-015-r1 | optimize-merge | ok | 6.4 | 4722 | T-pymodaq_utils-015: done — PR #21 merged (auto: low risk, approved by |
 
 ## Done so far
-- tasks done: 23; PRs merged into dev_agent: 16
+- tasks done: 23; PRs merged into dev_agent: 17

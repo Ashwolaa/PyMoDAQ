@@ -39,7 +39,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - finding: packages/pymodaq_utils/src/pymodaq_utils/logger.py:set_logger|double config lookup
 - notes: packages.py:156 F541 excluded (T-011 owns packages.py); touch only cited lines (hard rule 5); run pymodaq_utils tests under both Qt backends; may split if over 300 lines
 - verdicts: decider-compat-risk: approve — citations verified, enums condition above; decider-triage (fresh): approve — behaviour-preserving, backends condition
-- status: done — branch agent/pymodaq_utils/hygiene/2026-11-24, local checks green, CI on the PR, awaiting review
+- status: done — PR #21 merged (auto: low risk, approved by decider-compat-risk, decider-triage, reviewer approve, 59 lines, no tests/UI/API)
 
 ## T-pymodaq_utils-016 Throwaway HOME for the agents' test checks
 - scope: .agents tooling   specialty: tool
