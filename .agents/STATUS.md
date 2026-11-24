@@ -1,10 +1,10 @@
-# Consortium status — generated 2026-11-24 07:58 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 08:01 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `e2e4e4e5c`; 202 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
-- today: runs 1/20, specialist_runs 1/10, prs_opened 0/6, reviews 0/10; outcomes: failed 1
+- `dev_agent` at `05011534f`; 204 commits ahead of upstream/dev (36 files changed, 483 insertions(+), 135 deletions(-))
+- today: runs 2/20, specialist_runs 2/10, prs_opened 0/6, reviews 0/10; outcomes: ok 1, failed 1
 - last /usage reading: 2026-11-24T06:55:26.728000+00:00  session 4% (resets Nov 24, 12:20pm (Europe/Paris))  week 18% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
@@ -25,9 +25,9 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## In flight
 - `agent/pymodaq/test-quality/2026-11-22` (T-pymodaq_utils-M12, risk low): pushed, waiting for /optimize-merge
 - `agent-rd/config-schema` (None, risk medium): pushed, waiting for /optimize-merge
+- `agent/pymodaq_utils/hygiene/2026-11-24` (T-pymodaq_utils-015, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
-- T-pymodaq_utils-015 Trivial lint cleanups, numpydoc underline, double config lookup — approved
 - T-pymodaq_utils-M12 Drift test for the duplicated entry-point group lists — blocked — CI red: after rebase on dev_agent pyqt6 new failure state_manager_test.py::TestWithSubEntries::test_non_blocking, pyside6 pytest abort (no failing id)
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -49,11 +49,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [agents] The merge agent filed a new finding (pyqt6-suite-stalls-2026-11-23, blamed Xvfb) instead of linking the existing M06 hang finding; findings add should
 - [agents] findings.py add only accepts ci-upstream/review/run/plugin, and /optimize-research does not file its proposed tasks as findings, so research notes nev
 - [agents] The headless merge step started the pyqt6 check in the background and ended its turn ('I'll wait for the completion notice'); step.py stops at the fir
+- [agents] Tool tasks cannot pass merge_gate lint: task.py start names them agent/<pkg>/tool/..., plan says agent-tool/<name>, and lint refuses .agents/ files
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-22-run-T-pymodaq_utils-007 | optimize-run | ok | 1.9 | 7756 | set_logger raises ConfigError; test added; coverage logger.py 51->53%; |
 | 2026-11-22-merge-T-pymodaq_utils-007-r1 | optimize-merge | ok | 2.2 | 8063 | T-pymodaq_utils-007: blocked — review: set_logger now raises ConfigErr |
 | 2026-11-22-run-T-pymodaq_utils-008 | optimize-run | ok | 1.5 | 6449 | test isolated via get_set_local_dir patch; coverage unchanged |
 | 2026-11-22-merge-T-pymodaq_utils-008-r1 | optimize-merge | ok | 6.1 | 6297 | T-pymodaq_utils-008: done — PR #19 open, awaiting the human: a decider |
@@ -63,6 +63,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | rd-config-schema-2026-11-23 | optimize-research | ok | 6.8 | 28691 | note + prototype agent-rd/config-schema; incident: one pre-HOME import |
 | 2026-11-23-plan-pymodaq_utils | optimize-plan | ok | 10.2 | 60530 |  |
 | 2026-11-24-run-T-pymodaq_utils-016 | optimize-run | failed | 1.9 | 5975 | merge_gate lint refuses .agents/scripts/task.py on branch agent/pymoda |
+| 2026-11-24-run-T-pymodaq_utils-015 | optimize-run | ok | 2.2 | 7383 | 8 files, +26/-33, both backends 335 passed |
 
 ## Done so far
-- tasks done: 20; PRs merged into dev_agent: 16
+- tasks done: 21; PRs merged into dev_agent: 16
