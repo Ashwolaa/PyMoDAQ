@@ -34,6 +34,9 @@ qt_backends = ["pyqt6", "pyside6"]
 qt_backend_env = "PYTEST_QT_API={backend}"
 qt_pins = { pyside6 = "<6.12" }
 qt_headless = "QT_QPA_PLATFORM=offscreen"
+# a check never hangs an agent: stacks of a test stuck this long (s) are dumped; the whole scope run is killed after test_timeout_s
+test_faulthandler_s = 120
+test_timeout_s = 1500
 
 # not a blocking check: the existing files are not ruff-formatted, so this fails on almost any touched file.
 # Hard rule 5 forbids reformatting untouched code. Agents report it, never fix it, never block on it.

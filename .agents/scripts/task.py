@@ -120,6 +120,30 @@ def env_prefix(backend=None):
     return "; ".join(p for p in parts if p)
 
 
+def run_tests(backend, scope, ids=()):
+    """One pytest run of a scope, the way CI would see it and without ever hanging an agent:
+    - a throwaway HOME/USERPROFILE: the shared ~/.pymodaq leaks test state between runs and branches
+      (2026-11-23: a stale save_path made h5manager open a modal dialog, 80 minutes lost);
+    - faulthandler_timeout: a test stuck for N seconds dumps every thread's stack into the output;
+    - a wall-clock limit on the whole run (coreutils timeout, exit 124), killed with its children.
+    Returns (CompletedProcess, timed_out)."""
+    import tempfile
+    ck = profile()["checks"]
+    limit = int(ck.get("test_timeout_s", 1500))
+    fh = int(ck.get("test_faulthandler_s", 120))
+    with tempfile.TemporaryDirectory(prefix="agents-home-") as home:
+        pre = f"{env_prefix(backend)}; export HOME={shlex.quote(home)} USERPROFILE={shlex.quote(home)}"
+        cmd = ck["test"].format(scope=scope)
+        # `cd packages/x && pytest` : the limit must wrap pytest, not the cd
+        head, _, tool = cmd.rpartition("&&")
+        tool = tool.strip()
+        extra = " ".join(shlex.quote(i) for i in ids)
+        full = (f"{pre}; {head + '&& ' if head else ''}timeout -k 10 {limit} {tool} -q -rfE -p no:cacheprovider "
+                f"-o faulthandler_timeout={fh} {extra}")
+        r = sh(full, check=False, shell=True)
+    return r, r.returncode == 124
+
+
 def touched_scopes(base, head):
     pr = profile()
     root, order = pr["scopes"].get("root", "packages"), pr["scopes"]["order"]
@@ -181,6 +205,12 @@ def cmd_start(a):
 
 
 # ------------------------------------------------------------------ checks
+def dump_of(out, n=1500):
+    """The faulthandler dump of a hung test ('Timeout (0:02:00)!' then the thread stacks), or the end of the output."""
+    i = out.find("Timeout (")
+    return (out[i:i + n] if i >= 0 else out.strip()[-n // 3:]).strip()
+
+
 def pytest_failures(out):
     return sorted({m.split(" - ")[0] for m in re.findall(r"^(?:FAILED|ERROR) (\S+(?: - .*)?)$", out, re.M)})
 
@@ -196,26 +226,33 @@ def cmd_checks(a):
             fail(f"--backend must be one of {ck['qt_backends']}")
         result = {"head": head, "scopes": {}}
         for s in scopes:
-            cmd = f"{env_prefix(a.backend)}; {ck['test'].format(scope=s)} -q -rfE -p no:cacheprovider"
-            r = sh(cmd, check=False, shell=True)
+            r, timed_out = run_tests(a.backend, s)
             tail = (r.stdout.strip().splitlines() or ["(no output)"])[-1]
             failed = pytest_failures(r.stdout)
-            entry = {"rc": r.returncode, "summary": tail, "failed": failed, "preexisting": []}
-            if r.returncode and not failed:
+            entry = {"rc": r.returncode, "summary": tail, "failed": failed, "preexisting": [], "flaky": []}
+            if timed_out:
+                entry["error"] = (f"timed out after {ck.get('test_timeout_s', 1500)} s (hung test, killed). "
+                                  "Thread stacks dumped by faulthandler: " + dump_of(r.stdout + r.stderr))
+            elif r.returncode and not failed:
                 entry["error"] = "pytest failed without a failing test id (crash or collection error): " + \
                                  (r.stdout + r.stderr).strip()[-400:]
-            if failed:  # rerun only those on the base commit: failing there too = pre-existing
-                git("switch", "-q", "--detach", rec["base"])
-                try:
-                    ids = " ".join(shlex.quote(f) for f in failed)
-                    b = sh(f"{env_prefix(a.backend)}; {ck['test'].format(scope=s)} -q -rfE -p no:cacheprovider {ids}",
-                           check=False, shell=True)
-                    entry["preexisting"] = [f for f in failed if f in pytest_failures(b.stdout)]
-                finally:
-                    git("switch", "-q", rec["branch"])
-            entry["new"] = [f for f in failed if f not in entry["preexisting"]]
+            if failed and not timed_out:
+                # 1. rerun the failures on the branch: green the second time = flaky, recorded, not blocking
+                r2, _ = run_tests(a.backend, s, failed)
+                still = [f for f in failed if f in pytest_failures(r2.stdout)]
+                entry["flaky"] = [f for f in failed if f not in still]
+                # 2. rerun the remaining ones on the base commit: failing there too = pre-existing
+                if still:
+                    git("switch", "-q", "--detach", rec["base"])
+                    try:
+                        b, _ = run_tests(a.backend, s, still)
+                        entry["preexisting"] = [f for f in still if f in pytest_failures(b.stdout)]
+                    finally:
+                        git("switch", "-q", rec["branch"])
+            entry["new"] = [f for f in failed if f not in entry["preexisting"] and f not in entry["flaky"]]
             result["scopes"][s] = entry
             print(f"{a.backend} {s}: {tail}" + (f"; pre-existing: {', '.join(entry['preexisting'])}" if entry["preexisting"] else "")
+                  + (f"; flaky (passed on rerun): {', '.join(entry['flaky'])}" if entry["flaky"] else "")
                   + (f"; NEW FAILURES: {', '.join(entry['new'])}" if entry["new"] else "") + (f"; {entry['error']}" if entry.get("error") else ""))
         if not scopes:
             print(f"{a.backend}: no package touched, no scope tests to run")
