@@ -82,7 +82,7 @@ Merge order (packages.py and config.py are shared): M04 first, then M01; M02 and
 - scope: pymodaq (test only)   specialty: test-quality   risk: low   found: 1/8
 - files: new test in packages/pymodaq/tests/ comparing pymodaq_utils/plugin_tools/checks.py:46-48 with pymodaq/utils/daq_utils.py:35-36
 - verdicts: decider-compat-risk: approve in round 2 (placement); decider-test-change: approve in round 2 (B2)
-- status: done — PR #20 open, awaiting the human: touches tests: packages/pymodaq/tests/utils/entrypoint_groups_sync_test.py; touches a UI scope: packages/pymodaq/tests/utils/entrypoint_groups_sync_test.py
+- status: done — PR #20 merged into dev_agent (00e186f3d), reviewed by pr-reviewer; the pyside6 CI segfault is the known upstream crash in daq_viewer_test.py
 
 ## Dropped
 - Share get_entrypoints (A2-sonnet): compat-risk vetoed twice (return types differ, heavy imports); compat-risk itself says dropping is fine.

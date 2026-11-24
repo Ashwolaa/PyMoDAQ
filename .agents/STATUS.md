@@ -1,17 +1,16 @@
-# Consortium status — generated 2026-11-24 14:46 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 16:17 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `dbc2cb1b0`; 214 commits ahead of upstream/dev (39 files changed, 509 insertions(+), 168 deletions(-))
+- `dev_agent` at `00e186f3d`; 217 commits ahead of upstream/dev (49 files changed, 526 insertions(+), 367 deletions(-))
 - today: runs 4/20, specialist_runs 2/10, prs_opened 2/6, reviews 2/10; outcomes: ok 3, failed 1
 - last /usage reading: 2026-11-24T13:46:07.343000+00:00  session 13% (resets Nov 24, 5:20pm (Europe/Paris))  week 23% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- next cycle step: `run T-pymodaq_utils-012 .agents/plans/2026-11-23-pymodaq_utils.md`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
 - **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
-- **T-pymodaq_utils-M12** — done — PR #20 open, awaiting the human: touches tests: packages/pymodaq/tests/utils/entrypoint_groups_sync_test.py; touches a UI scope: packages/pymodaq/tests/utils/entrypoint_groups_sync_test.py
 - **T-pymodaq_utils-006** — done — PR #18 open, awaiting the human: touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_utils-008** — done — PR #19 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
@@ -21,7 +20,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
-- `agent-rd/config-schema` (None, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
 - T-pymodaq_utils-012 PYMODAQ_CONFIG_DIR override and Config.save pytest guard — approved — owner, 2026-11-24
@@ -63,4 +61,4 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-merge-T-pymodaq_utils-015-r1 | optimize-merge | ok | 6.4 | 4722 | T-pymodaq_utils-015: done — PR #21 merged (auto: low risk, approved by |
 
 ## Done so far
-- tasks done: 23; PRs merged into dev_agent: 17
+- tasks done: 23; PRs merged into dev_agent: 18
