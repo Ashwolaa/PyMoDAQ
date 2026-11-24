@@ -42,7 +42,7 @@ def set_logger(logger_name, add_handler=False, base_logger=False, add_to_console
         log_level = config('utils','general', 'debug_level')
         if not isinstance(log_level, list):
             print(
-                f"{config('utils', 'general', 'debug_level')} is not a list, please delete your "
+                f"{log_level} is not a list, please delete your "
                 f"actual pymodaq_utils configuration file to "
                 f"reflect this new type")
             sys.exit(-1)

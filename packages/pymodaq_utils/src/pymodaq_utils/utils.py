@@ -472,9 +472,8 @@ def recursive_find_files(ini_path, exp='make_enum', paths=None,
         if child.is_dir():
             recursive_find_files(child, exp, paths, filters)
         else:
-            if exp in child.stem:
-                if not any([filt in str(child) for filt in filters]):
-                    paths.append(child)
+            if exp in child.stem and not any([filt in str(child) for filt in filters]):
+                paths.append(child)
     return paths
 
 
@@ -646,9 +645,8 @@ def find_object_if_matched_attr_name_val(obj, attr_name, attr_value):
     bool: True if the key/value pair has been found in dict_tmp
 
     """
-    if hasattr(obj, attr_name):
-        if getattr(obj, attr_name) == attr_value:
-            return True
+    if hasattr(obj, attr_name) and getattr(obj, attr_name) == attr_value:
+        return True
     return False
 
 
@@ -708,9 +706,8 @@ def find_dict_if_matched_key_val(dict_tmp, key, value):
     bool: True if the key/value pair has been found in dict_tmp
 
     """
-    if key in dict_tmp:
-        if dict_tmp[key] == value:
-            return True
+    if key in dict_tmp and dict_tmp[key] == value:
+        return True
     return False
 
 
@@ -728,7 +725,7 @@ def find_dicts_in_list_from_key_val(dicts, key, value):
     dict: if found otherwise returns None
     """
     selection = []
-    for ind, dict_tmp in enumerate(dicts):
+    for dict_tmp in dicts:
         if find_dict_if_matched_key_val(dict_tmp, key, value):
             selection.append(dict_tmp)
     return selection

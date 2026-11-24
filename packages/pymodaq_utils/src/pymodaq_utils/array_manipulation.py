@@ -21,9 +21,7 @@ def are_elements_contiguous(elts: Iterable[int]):
     mini = min(elts)
 
     result = maxi - mini + 1
-    if result != set_size:
-        return False
-    return True
+    return result == set_size
 
 
 def random_step(start, stop, step):
@@ -140,9 +138,9 @@ def crop_vector_to_axis(x, V, xlim):
     x1 = find_index(x, xlim[0])[0][0]
     x2 = find_index(x, xlim[1])[0][0]
     if x2 > x1:
-        ixx = np.linspace(x1, x2, x2 - x1 + 1, dtype=int);
+        ixx = np.linspace(x1, x2, x2 - x1 + 1, dtype=int)
     else:
-        ixx = np.linspace(x2, x1, x1 - x2 + 1, dtype=int);
+        ixx = np.linspace(x2, x1, x1 - x2 + 1, dtype=int)
 
     x_c = x[ixx]
     V_c = V[ixx]

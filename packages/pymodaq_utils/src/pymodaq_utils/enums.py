@@ -52,9 +52,8 @@ class BaseEnum(Enum):
 
     def __eq__(self, other: Union[str, Enum]):
         """testing for equality using the enum name"""
-        if isinstance(other, str):
-            if other == self.name:
-                return True
+        if isinstance(other, str) and other == self.name:
+            return True
         return super().__eq__(other)
 
 
@@ -82,7 +81,7 @@ def enum_checker(enum: Type[EnumT], item: Union[EnumT, str]) -> EnumT:
         if not isinstance(item, str):
             raise ValueError(f'{item} is an invalid {enum}. Should be a {enum} enum or '
                              f'a string in {enum.names()}')
-        for ind, name in enumerate(enum.names()):
+        for name in enum.names():
             if item.lower() == name.lower():
                 item = enum[name]
                 break
