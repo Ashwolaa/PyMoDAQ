@@ -3,7 +3,7 @@
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `4d0bff997`; 273 commits ahead of upstream/dev (42 files changed, 690 insertions(+), 182 deletions(-))
+- `dev_agent` at `14f560f23`; 278 commits ahead of upstream/dev (42 files changed, 714 insertions(+), 193 deletions(-))
 - today: runs 18/20, specialist_runs 9/10, prs_opened 6/6, reviews 9/10; outcomes: ok 17, failed 1
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `plan pymodaq_scripting`
@@ -67,4 +67,4 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-merge-T-pymodaq_utils-011-r3 | optimize-merge | ok | 5.9 | 5902 | T-pymodaq_utils-011: done — PR #25 open, awaiting the human: registry  |
 
 ## Done so far
-- tasks done: 27; PRs merged into dev_agent: 21
+- tasks done: 27; PRs merged into dev_agent: 22
