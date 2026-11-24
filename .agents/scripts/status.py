@@ -21,6 +21,7 @@ from agentlib import plans
 
 PLANS = AGENTS_DIR / "plans"
 RETRY = ("blocked — CI red", "blocked — conflicts")
+MERGE_RETRY = ("blocked — PR CI unavailable",)  # only /optimize-merge retries it (the PR's checks had not started yet)
 
 
 def tasks():
@@ -42,7 +43,7 @@ def queue():
 def pending():
     """Pushed branches /optimize-merge could take: not those blocked by a review (they wait for a rework by
     /optimize-run) or by the human, as merge.py candidates skips them too; else the cycle loops on `merge`."""
-    held = {t[0] for t in tasks() if t[2].startswith("blocked") and not t[2].startswith(RETRY)}
+    held = {t[0] for t in tasks() if t[2].startswith("blocked") and not t[2].startswith(RETRY + MERGE_RETRY)}
     return [r for r in read_jsonl("registry.jsonl") if r["status"] == "pushed" and r["task_id"] not in held]
 
 

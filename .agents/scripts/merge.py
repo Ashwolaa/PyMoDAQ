@@ -35,7 +35,7 @@ from agentlib import evidence as ev, gitx, plans, reports
 from datetime import datetime, timezone
 
 REPO = AGENTS_DIR.parent
-RETRY = ("blocked — CI red", "blocked — PR CI red", "blocked — conflicts")
+RETRY = ("blocked — CI red", "blocked — PR CI red", "blocked — PR CI unavailable", "blocked — conflicts")
 
 
 def fork():
@@ -275,6 +275,11 @@ def cmd_gate(a):
     if rec.get("verdict") != "approve" or not rec.get("pr"):
         fail("gate needs an approved review and an open PR (merge.py decide)")
     r = T.script("ci.py", "pr", "--pr", str(rec["pr"]), "--timeout", str(a.timeout), check=False)
+    if r.returncode == 3 and "no checks" in r.stderr.lower():
+        # GitHub starts the workflows a few seconds after the PR opens: 2026-11-24 the gate looked at once and gave up
+        import time
+        time.sleep(60)
+        r = T.script("ci.py", "pr", "--pr", str(rec["pr"]), "--timeout", str(a.timeout), check=False)
     print(r.stdout.strip())
     if r.returncode == 3:
         err = (r.stderr.strip().splitlines() or ["ci.py error"])[-1]
