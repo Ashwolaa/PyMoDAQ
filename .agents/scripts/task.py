@@ -168,7 +168,7 @@ def cmd_start(a):
     rows = [r for r in read_jsonl("registry.jsonl") if r.get("task_id") == a.task_id]
     if status.startswith("blocked — review"):
         n = changes_rounds(scope, a.task_id)
-        ok, why = reports.rework_allowed(scope, a.task_id)
+        ok, why = reports.rework_allowed(scope, a.task_id, int(field(block, 'extra_rounds') or 0))
         if not ok:
             script("plan.py", "set-status", str(plan), a.task_id, f"blocked — review: still failing, for the human ({why})")
             fail(f"no more rework rounds ({why}): the task goes to the human (plan updated; commit it with the handoff)", 1)

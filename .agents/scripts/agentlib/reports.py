@@ -69,7 +69,7 @@ def finding_count(path) -> int:
     return total
 
 
-def rework_allowed(package, task_id) -> tuple:
+def rework_allowed(package, task_id, extra=0) -> tuple:
     """(allowed, why). A rework round is allowed while the review converges: the first two are free; after that only
     when the latest `changes` report has strictly fewer findings than the one before, up to MAX_REWORK_ROUNDS.
     A flat or growing count means the specialist does not understand the review: the task goes to the human."""
@@ -77,6 +77,8 @@ def rework_allowed(package, task_id) -> tuple:
     n = len(changes)
     if n < 2:
         return True, f"round {n + 1}"
+    if n < 2 + extra:  # the owner granted `extra` more rounds in the plan (`- extra_rounds: N`), whatever the trend
+        return True, f"owner-granted round {n + 1} (extra_rounds: {extra})"
     if n >= MAX_REWORK_ROUNDS:
         return False, f"{n} rounds said changes (cap {MAX_REWORK_ROUNDS})"
     last, before = finding_count(changes[-1]), finding_count(changes[-2])
