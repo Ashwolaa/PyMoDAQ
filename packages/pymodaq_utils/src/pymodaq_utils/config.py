@@ -123,11 +123,22 @@ def get_set_path(a_base_path: Path, dir_name: str) -> Path:
 
 
 @functools.cache
+def _get_set_local_dir(user: bool, config_dir_override: Optional[str]) -> Path:
+    if config_dir_override:
+        return get_set_path(Path(config_dir_override), 'user' if user else 'system')
+    if user:
+        return get_set_path(Path.home(), '.pymodaq')
+    return get_set_path(CONFIG_BASE_PATH, '.pymodaq')
+
+
 def get_set_local_dir(user=False) -> Path:
     """Defines, creates and returns a local folder where configuration files will be saved
 
     Depending on the os the configurations files will be stored in CONFIG_BASE_PATH, then
     each user will have another one created that could override the default and system-wide base folder
+
+    If the environment variable ``PYMODAQ_CONFIG_DIR`` is set, the folders are ``<PYMODAQ_CONFIG_DIR>/system``
+    and ``<PYMODAQ_CONFIG_DIR>/user`` instead (useful to isolate tests or several installations).
 
     Parameters
     ----------
@@ -138,11 +149,10 @@ def get_set_local_dir(user=False) -> Path:
     -------
     Path: the local path
     """
-    if user:
-        local_path = get_set_path(Path.home(), '.pymodaq')
-    else:
-        local_path = get_set_path(CONFIG_BASE_PATH, '.pymodaq')
-    return local_path
+    return _get_set_local_dir(bool(user), environ.get('PYMODAQ_CONFIG_DIR') or None)
+
+
+get_set_local_dir.cache_clear = _get_set_local_dir.cache_clear
 
 
 def get_config_file(config_file_name: str, user=False) -> Path:
@@ -304,6 +314,20 @@ class ConfigSingleton(Singleton):
 
 
 
+_PYTEST_SEEN = False
+
+
+def _under_pytest() -> bool:
+    """True while a pytest session runs and, once seen, for the rest of the process (atexit saves)
+
+    Called from ``BaseConfig.__init__`` and ``__setitem__`` so the session is recorded before any exit-time save.
+    """
+    global _PYTEST_SEEN
+    if 'PYTEST_CURRENT_TEST' in environ or 'PYTEST_VERSION' in environ:
+        _PYTEST_SEEN = True
+    return _PYTEST_SEEN
+
+
 class BaseConfig(metaclass=ConfigSingleton):
     """Base class to manage configuration files
 
@@ -325,6 +349,7 @@ class BaseConfig(metaclass=ConfigSingleton):
         self._lock = ReaderWriterLock()
         self._config = {}
         self._modified_config = {}
+        _under_pytest()  # record a pytest session as early as possible
         self.load()
         atexit.register(self.save)
 
@@ -386,6 +411,7 @@ class BaseConfig(metaclass=ConfigSingleton):
         return ret
 
     def __setitem__(self, key, value):
+        _under_pytest()  # record a pytest session: the atexit save must then stay guarded
         with self._lock.write_lock():
             if isinstance(key, tuple):
                 # In visible config and modified config
@@ -441,7 +467,24 @@ class BaseConfig(metaclass=ConfigSingleton):
             self._modified_config = toml.load(get_config_file(self.config_name, user=True))
 
     def save(self):
-        """Save the current Config object into the user toml file and reload it """
+        """Save the current Config object into the user toml file and reload it
+
+        A pytest session is detected from ``PYTEST_CURRENT_TEST`` or ``PYTEST_VERSION`` and remembered once seen
+        (at config creation, at ``__setitem__`` or here), so the atexit save is covered even if no ``save()`` ran
+        during a test. Under pytest the file is written only if ``config_path`` is inside the folder given by
+        ``PYMODAQ_CONFIG_DIR``; otherwise a warning is logged and nothing is written.
+        """
+        if _under_pytest():
+            isolated = environ.get('PYMODAQ_CONFIG_DIR')
+            try:
+                allowed = bool(isolated) and Path(self.config_path).resolve().is_relative_to(
+                    Path(isolated).resolve())
+            except (OSError, ValueError):
+                allowed = False
+            if not allowed:
+                logging.warning(f'Not saving config {self.config_name} under pytest: set PYMODAQ_CONFIG_DIR to '
+                                f'an isolated folder containing its file to allow it')
+                return
         with self._lock.write_lock():
             self.config_path.write_text(toml.dumps(self._modified_config))
             #  self._config = self.load_config(self.config_name, self.config_template_path)
