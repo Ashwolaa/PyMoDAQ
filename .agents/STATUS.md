@@ -1,17 +1,18 @@
-# Consortium status — generated 2026-11-24 22:34 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 22:41 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `c59c9bc3b`; 259 commits ahead of upstream/dev (41 files changed, 675 insertions(+), 178 deletions(-))
-- today: runs 15/20, specialist_runs 8/10, prs_opened 4/6, reviews 7/10; outcomes: ok 14, failed 1
+- `dev_agent` at `018fc709f`; 260 commits ahead of upstream/dev (41 files changed, 675 insertions(+), 178 deletions(-))
+- today: runs 16/20, specialist_runs 8/10, prs_opened 5/6, reviews 8/10; outcomes: ok 15, failed 1
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- next cycle step: `run T-pymodaq_utils-011 .agents/plans/2026-11-19-pymodaq_utils-r2.md`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
 - **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
 - **T-pymodaq_utils-006** — done — PR #18 open, awaiting the human: touches tests: packages/pymodaq_utils/tests/config_test.py
+- **T-pymodaq_utils-007** — done — PR #24 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; reviewer: public_api yes;
 - **T-pymodaq_utils-008** — done — PR #19 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 - **T-pymodaq_utils-013** — done — PR #23 open, awaiting the human: registry risk is medium; plan risk is medium; touches tests: packages/pymodaq_utils/tests/config_test.py, packages/pymodaq_utils/tests/conftest.py
@@ -20,7 +21,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
-- `agent/pymodaq_utils/refactor/2026-11-22-set-logger-must-v2` (T-pymodaq_utils-007, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -50,11 +50,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] "--- Logging error ---" printed at interpreter exit for the 'Not saving config' warning (stream closed; unverified whether it also appears on dev_agen
 - [pymodaq_utils] task.py start (port-on-conflict path) writes registry.py on dev_agent then switches to the new branch with registry.jsonl uncommitted; checks refuses 
 - [pymodaq_utils] GlobalConfig()('utils', ...) reads through BaseConfig.__getitem__, so the singular/plural fallback in Config.__call__ (backend/debug_level/dynamic) ne
+- [pymodaq_utils] docstring says it is raised only for a missing key path; set_logger now also raises it for a wrong value type
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-merge-T-pymodaq_utils-012-r1 | optimize-merge | ok | 4.1 | 13994 | T-pymodaq_utils-012: blocked — review: Adds a PYMODAQ_CONFIG_DIR overr |
 | 2026-11-24-run-T-pymodaq_utils-012-r1 | optimize-run | ok | 1.8 | 7090 | rework r1: 5 review findings fixed; narrow guard (config_path inside P |
 | 2026-11-24-merge-T-pymodaq_utils-012-r2 | optimize-merge | ok | 3.2 | 10327 | T-pymodaq_utils-012: blocked — review: Adds a PYMODAQ_CONFIG_DIR overr |
 | 2026-11-24-run-T-pymodaq_utils-012-r2 | optimize-run | ok | 2.3 | 5085 | rework r3: atexit leak closed, exit-path test rewritten, docstring fix |
@@ -64,6 +64,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-run-T-pymodaq_utils-007-r1 | optimize-run | ok | 2.6 | 6482 | rework r1: real-config test, pytest.raises, unused import sys removed; |
 | 2026-11-24-merge-T-pymodaq_utils-007-r2 | optimize-merge | ok | 3.1 | 9176 | T-pymodaq_utils-007: blocked — review: set_logger now raises ConfigErr |
 | 2026-11-24-run-T-pymodaq_utils-007-r2 | optimize-run | ok | 1.3 | 3655 | rework r2: logger test builds a real config instead of patching getite |
+| 2026-11-24-merge-T-pymodaq_utils-007-r3 | optimize-merge | ok | 6.3 | 6492 | T-pymodaq_utils-007: done — PR #24 open, awaiting the human: registry  |
 
 ## Done so far
 - tasks done: 26; PRs merged into dev_agent: 20

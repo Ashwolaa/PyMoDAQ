@@ -32,7 +32,7 @@ T-002 (earlier plan), T-006, T-004 (earlier plan), T-011, T-007, T-009, T-008.
 - finding: pymodaq_utils/logger.py:set_logger|sys.exit on import
 - constraints: step 1 show reachability (fires only if debug_level is not a list AND a `debug_levels` key exists whose value is not a list, via GlobalConfig.__call__ config.py:588-597); if unreachable, end the task with a report and no code change. Otherwise raise a specific `Exception` subclass (ConfigError/ValueError, not SystemExit) with the same message; the message must stay visible when raised inside `__init__.py` (line 40's message "Couldn't create the local folder..." would mislead). Test builds a real debug_level/debug_levels config. Same signature and return type. Attach before/after coverage diff of logger.py and the test-agent justification. Do not reformat logger.py (rule 5).
 - verdicts: decider-compat-risk: approve — status proposed, medium-low risk; decider-test-change: approve (round 2, after provisional veto for missing evidence) — conditional on coverage diff
-- status: done — branch agent/pymodaq_utils/refactor/2026-11-22-set-logger-must-v2, local checks green, CI on the PR, reworked after review r2, awaiting review
+- status: done — PR #24 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; reviewer: public_api yes;
 
 ## T-pymodaq_utils-008 Isolate test_nested_update_from_user
 - scope: pymodaq_utils   specialty: test-quality   risk: low
