@@ -16,6 +16,7 @@ the ``Operating System`` classifiers of the ``pyproject.toml``.
 from __future__ import annotations
 
 import ast
+import contextlib
 import platform
 import re
 import sys
@@ -128,10 +129,8 @@ def declared_in_class(cls: ast.ClassDef) -> tuple[Optional[tuple], Optional[tupl
             targets, value = [node.target], node.value
         for target in targets:
             if target.id in ('supported_platforms', 'supported_architectures'):
-                try:
+                with contextlib.suppress(ValueError, SyntaxError):
                     found[target.id] = _as_tuple(ast.literal_eval(value))
-                except (ValueError, SyntaxError):
-                    pass
     return found.get('supported_platforms'), found.get('supported_architectures')
 
 

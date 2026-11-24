@@ -32,9 +32,9 @@ try:
         logger_var.info('')
         logger_var.info('')
         logger_var.info('************************')
-        logger_var.info(f"Registering Serializables...")
+        logger_var.info("Registering Serializables...")
         from pymodaq_utils.serialize.serializer import SerializableFactory, SERIALIZABLE
-        logger_var.info(f"Done")
+        logger_var.info("Done")
         logger_var.info('************************')
     except Exception:
         print("Couldn't create the local folder to store logs , experiments...")

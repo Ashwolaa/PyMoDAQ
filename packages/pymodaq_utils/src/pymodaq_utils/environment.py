@@ -93,11 +93,11 @@ class EnvironmentBackupManager:
             Also, remove the oldest one(s) if there's more than the limit defined in configuration.
         '''
         if self._should_save():
-            logger.info(f'Current environment is different than the last one. Keeping backup.')
+            logger.info('Current environment is different than the last one. Keeping backup.')
             self._save_newest()
 
         while len(self._backups) != 0 and len(self._backups) > config('utils', 'backup', 'limit'):
-            logger.info(f'Too many backups, deleting the oldest one.')
+            logger.info('Too many backups, deleting the oldest one.')
             self._remove_oldest()
 
 
@@ -136,7 +136,7 @@ class PythonEnvironment:
             operators that aren't consistant with __eq__.
 
             Returns
-            ----------
+            -------
             datetime: 
                 The date associated with this environment
         '''
@@ -189,8 +189,8 @@ class PythonEnvironment:
     def _from_stream(stream, filename=None):
         env = PythonEnvironment(filename=filename)
         with stream as s:
-            lines = map(lambda l : l.decode().strip(), s.readlines())
-            packages = filter(lambda l : l and l != '' and not l.startswith('#'), lines)
+            lines = map(lambda ln : ln.decode().strip(), s.readlines())
+            packages = filter(lambda ln : ln and ln != '' and not ln.startswith('#'), lines)
             env.extend(packages)
         return env
 

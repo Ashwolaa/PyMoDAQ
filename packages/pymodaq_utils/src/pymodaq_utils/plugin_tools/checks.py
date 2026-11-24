@@ -244,9 +244,9 @@ def check_move_class(klass: type) -> list[str]:
             problems.append(f"Unit '{unit}' in _controller_units is unknown from pint")
 
     epsilons = klass._epsilons
-    if epsilons is not None and not isinstance(epsilons, (int, float)):
-        if not isinstance(epsilons, type(axis_names)) or len(epsilons) != len(axis_names):
-            problems.append('_epsilons should be a number or have the same type and length as _axis_names')
+    if (epsilons is not None and not isinstance(epsilons, (int, float))
+            and (not isinstance(epsilons, type(axis_names)) or len(epsilons) != len(axis_names))):
+        problems.append('_epsilons should be a number or have the same type and length as _axis_names')
     if isinstance(axis_names, list) and len(set(axis_names)) != len(axis_names):
         problems.append('_axis_names contains duplicates')
     if klass.is_multiaxes is False and len(axis_names) > 1:
