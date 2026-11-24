@@ -12,7 +12,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - finding: config.py:get_set_local_dir|PYMODAQ_CONFIG_DIR + save guard
 - conditions: unset var leaves paths unchanged; <dir>/system and <dir>/user; coverage before/after on config.py and config_test.py, test count not lower, both Qt backends (decider-test-change mandatory); a minimal autouse conftest fixture only if the guard breaks existing tests. No reconcile/schema work.
 - verdicts: decider-compat-risk: approve — signature unchanged, conditions above; decider-test-change: approve (round 2) — veto lifted given the mandatory coverage/count conditions
-- status: proposed
+- status: approved — owner, 2026-11-24
 
 ## T-pymodaq_utils-013 Conftest isolation of the user config, fix test_load_system_config
 - scope: pymodaq_utils/tests   specialty: test-quality
@@ -22,7 +22,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - depends on: T-pymodaq_utils-012 merged
 - conditions: same decider-test-change mandatory list as T-012; hard rule 2
 - verdicts: decider-compat-risk: approve — tests only; decider-test-change: approve (round 2) with mandatory conditions
-- status: proposed
+- status: approved — owner, 2026-11-24 (runs after T-012 is merged)
 
 ## T-pymodaq_utils-014 Test the ConfigError handler in the package import
 - scope: pymodaq_utils/tests   specialty: test-quality
@@ -48,7 +48,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - finding: agents:tools.env|throwaway HOME
 - conditions: set HOME and USERPROFILE only for test-check commands; PATH expanded with the real HOME before the swap; ci.py/gh/git keep the real HOME; report says the system folder (/etc/.pymodaq) is not isolated and pymodaq/gui suites + Windows are unverified
 - verdicts: decider-compat-risk: approve — grill answer 5; decider-triage (fresh): approve — verified for 335 + 655 tests
-- status: blocked — merge_gate lint refuses .agents/scripts/task.py on branch agent/pymodaq_utils/tool/2026-11-24 (rules.md 12); task.py start names tool tasks agent/<pkg>/tool/..., not agent-tool/<name>; tooling needs a path the owner decides
+- status: done — merged into dev_agent by hand (a57ae95b2) as the bounded, isolated test checks: throwaway HOME, time limit with stack dump, flaky rerun, baseline rerun
 
 ## Not tasked
 - GRILL config-reconcile (finding config.py:BaseConfig.load|schema reconcile and the schema part of config.py:load|schema drift): `.agents/grill/config-reconcile.md`.
