@@ -11,6 +11,10 @@
 - Open findings: ConfigError docstring now incomplete (config.py); ConfigError handler in __init__.py untested;
   GlobalConfig.__getitem__ bypasses Config.__call__.
 
+## /optimize-run T-pymodaq_utils-011 (2026-11-24)
+- task.py start refused: rework limit reached (findings 0 -> 0, not converging after 2 rounds). Plan status set to
+  `blocked — review: still failing, for the human`. No specialist launched, no branch touched.
+
 ## Next step
 Human reviews PR #24 first. Human note: public `set_logger` raises ConfigError (same message) instead of
 SystemExit(-1); no caller in packages/ caught SystemExit.
