@@ -126,3 +126,11 @@ def test_finding_count_reads_older_required_changes_reports(tmp_path):
     f = tmp_path / "x.md"
     f.write_text("verdict: changes\n\n## r1 findings\n- a:1 old\n\n## Required changes\n1. one\n2. two\n3. three\n\nsummary: s\n")
     assert reports.finding_count(f) == 3
+
+
+def test_owner_granted_extra_round(tmp_path, monkeypatch):
+    reports = _report(tmp_path, monkeypatch, [3, 3])
+    assert reports.rework_allowed("pkg", "T-1")[0] is False
+    assert reports.rework_allowed("pkg", "T-1", extra=1)[0] is True
+    reports = _report(tmp_path / "b", monkeypatch, [3, 3, 3])
+    assert reports.rework_allowed("pkg", "T-1", extra=1)[0] is False  # the grant is used up
