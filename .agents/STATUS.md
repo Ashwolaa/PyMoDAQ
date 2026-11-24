@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-24 21:47 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 22:06 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `1ea1c9d06`; 233 commits ahead of upstream/dev (40 files changed, 519 insertions(+), 168 deletions(-))
-- today: runs 10/20, specialist_runs 5/10, prs_opened 3/6, reviews 5/10; outcomes: ok 9, failed 1
+- `dev_agent` at `6f529909f`; 243 commits ahead of upstream/dev (40 files changed, 652 insertions(+), 174 deletions(-))
+- today: runs 11/20, specialist_runs 6/10, prs_opened 3/6, reviews 5/10; outcomes: ok 10, failed 1
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_utils-013 .agents/plans/2026-11-23-pymodaq_utils.md`
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
@@ -17,13 +17,12 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 - blocked: **T-pymodaq_utils-007** — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - blocked: **T-pymodaq_utils-011** — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
-- blocked: **T-pymodaq_utils-012** — blocked — PR CI unavailable: no checks found on PR 22
 - blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
+- `agent/pymodaq_utils/test-quality/2026-11-24` (T-pymodaq_utils-013, risk medium): pushed, waiting for /optimize-merge
 - T-pymodaq_utils-007 set_logger must not kill the importing process — blocked — review: set_logger now raises ConfigError instead of calling sys.exit on a non-list debug_level, and the package import prints its message; the test must use a real con
 - T-pymodaq_utils-011 packages.get_entrypoints delegates to utils.get_entrypoints — blocked — review: packages.get_entrypoints now delegates to pymodaq_utils.utils.get_entrypoints, so it returns a list instead of EntryPoints and emits a DeprecationWarning; no in
-- T-pymodaq_utils-013 Conftest isolation of the user config, fix test_load_system_config — approved — owner, 2026-11-24 (runs after T-012 is merged)
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -46,11 +45,12 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [agents] The headless merge step started the pyqt6 check in the background and ended its turn ('I'll wait for the completion notice'); step.py stops at the fir
 - [agents] Tool tasks cannot pass merge_gate lint: task.py start names them agent/<pkg>/tool/..., plan says agent-tool/<name>, and lint refuses .agents/ files
 - [agents] status.py next ranks a rework after fresh tasks, but a fresh task that depends on the blocked one (T-013 on T-012) is picked and refused: the wheel st
+- [pymodaq_utils] At pytest exit, save() guard logging and CustomConfig atexit lambdas emit 'I/O operation on closed file' / get_set_path traceback
+- [pymodaq_utils] test_get_set_config_dir and TestCopy.test_copy_default still use the real config folders
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-run-T-pymodaq_utils-016 | optimize-run | failed | 1.9 | 5975 | merge_gate lint refuses .agents/scripts/task.py on branch agent/pymoda |
 | 2026-11-24-run-T-pymodaq_utils-015 | optimize-run | ok | 2.2 | 7383 | 8 files, +26/-33, both backends 335 passed |
 | 2026-11-24-merge-T-pymodaq_utils-M12-r1 | optimize-merge | ok | 42.5 | 6237 | T-pymodaq_utils-M12: done — PR #20 open, awaiting the human: touches t |
 | 2026-11-24-merge-T-pymodaq_utils-015-r1 | optimize-merge | ok | 6.4 | 4722 | T-pymodaq_utils-015: done — PR #21 merged (auto: low risk, approved by |
@@ -60,6 +60,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-merge-T-pymodaq_utils-012-r2 | optimize-merge | ok | 3.2 | 10327 | T-pymodaq_utils-012: blocked — review: Adds a PYMODAQ_CONFIG_DIR overr |
 | 2026-11-24-run-T-pymodaq_utils-012-r2 | optimize-run | ok | 2.3 | 5085 | rework r3: atexit leak closed, exit-path test rewritten, docstring fix |
 | 2026-11-24-merge-T-pymodaq_utils-012-r3 | optimize-merge | ok | 4.3 | 12126 | T-pymodaq_utils-012: blocked — PR CI unavailable: no checks found on P |
+| 2026-11-24-run-T-pymodaq_utils-013 | optimize-run | ok | 11.5 | 7411 | conftest isolated_config_dir fixture; test_load_system_config isolated |
 
 ## Done so far
-- tasks done: 23; PRs merged into dev_agent: 18
+- tasks done: 25; PRs merged into dev_agent: 19
