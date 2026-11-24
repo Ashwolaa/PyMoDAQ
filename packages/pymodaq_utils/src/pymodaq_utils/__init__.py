@@ -22,6 +22,7 @@ defined after it are then missing.
 
 try:
     from pymodaq_utils.logger import set_logger
+    from pymodaq_utils.config import ConfigError
     from pymodaq_utils.utils import get_version, PackageNotFoundError
     try:
         __version__ = get_version('pymodaq_utils')
@@ -36,6 +37,8 @@ try:
         from pymodaq_utils.serialize.serializer import SerializableFactory, SERIALIZABLE
         logger_var.info("Done")
         logger_var.info('************************')
+    except ConfigError as e:
+        print(e)
     except Exception:
         print("Couldn't create the local folder to store logs , experiments...")
 
