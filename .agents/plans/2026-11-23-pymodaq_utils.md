@@ -13,7 +13,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - conditions: unset var leaves paths unchanged; <dir>/system and <dir>/user; coverage before/after on config.py and config_test.py, test count not lower, both Qt backends (decider-test-change mandatory); a minimal autouse conftest fixture only if the guard breaks existing tests. No reconcile/schema work.
 - verdicts: decider-compat-risk: approve — signature unchanged, conditions above; decider-test-change: approve (round 2) — veto lifted given the mandatory coverage/count conditions
 - notes: owner guidance for the rework (2026-11-24), on top of the five review findings: (1) prefer the narrow guard rule: under pytest, save() writes only if self.config_path is inside PYMODAQ_CONFIG_DIR (Path.is_relative_to), otherwise warn and return; avoid a bare `'pytest' in sys.modules` test that would also trip plugin developers who import pytest outside a test run; the atexit path needs its own test. (2) Dropping cache_info/__wrapped__ from get_set_local_dir is accepted: say so in the PR body.
-- status: blocked — review: Adds a PYMODAQ_CONFIG_DIR override to get_set_local_dir and a pytest guard in BaseConfig.save; the guard still lets the atexit save and stale cached paths write
+- status: done — branch agent/pymodaq_utils/refactor/2026-11-24-pymodaq-config-dir, local checks green, CI on the PR, reworked after review r1, awaiting review
 
 ## T-pymodaq_utils-013 Conftest isolation of the user config, fix test_load_system_config
 - scope: pymodaq_utils/tests   specialty: test-quality
