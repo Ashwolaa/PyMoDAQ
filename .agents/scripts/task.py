@@ -194,7 +194,11 @@ def cmd_start(a):
             script("registry.py", "set-status", "--branch", port_from, "--status", "closed")
             script("registry.py", "add", "--run-id", run_id, "--scope", scope, "--specialty", specialty, "--branch", branch,
                    "--risk", risk, "--task-id", a.task_id, "--status", "pushed")
+            git("add", ".agents/registry.jsonl")  # the new branch must start from a clean tree (checks refuse a dirty one)
+            git("commit", "-q", "-m", f"Registry: {a.task_id} continues on {branch} [skip ci]")
+            base = git("rev-parse", "HEAD")
             git("switch", "-q", branch)
+            git("reset", "-q", "--hard", base)  # the fresh branch carries the registry commit too
     elif status.startswith("approved"):
         if rows:
             fail(f"{a.task_id} already has a branch ({rows[-1]['branch']}); a rework needs status 'blocked — review'")
