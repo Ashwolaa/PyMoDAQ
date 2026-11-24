@@ -1,16 +1,18 @@
-# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-merge T-pymodaq_utils-013)
+# Handoff: pymodaq_utils — 2026-11-24 (after /optimize-run T-pymodaq_utils-007 rework r1)
 
 ## Done
-- T-pymodaq_utils-012 merged (PR #22).
-- T-pymodaq_utils-013: pr-reviewer approved, PR #23 opened, CI green (compile-doc, tests-utils, typing).
-  Opt-in `isolated_config_dir` fixture (tests/conftest.py); test_load_system_config isolated, deepcopy of TOML_DICT.
-  Checks after rebase: lint, layering, merge_gate lint OK; pyqt6 and pyside6 342 passed, 1 skipped each.
+- T-pymodaq_utils-007 rework r1: the old branch no longer rebased on dev_agent, so the rework is on
+  agent/pymodaq_utils/refactor/2026-11-22-set-logger-must-v2 (old branch registry-closed). Pushed, no PR yet.
+  set_logger raises ConfigError (not SystemExit); __init__.py prints it before the generic handler; unused `import sys` removed.
+  New test uses the real GlobalConfig.__call__ (patched getitem_recursive) with pytest.raises(match=...).
+  Checks: flake8, layering, merge_gate lint OK; pyqt6 and pyside6 343 passed, 1 skipped each.
+  logger.py coverage (logger_test.py alone) 75% -> 78%; one test added, none removed or weakened.
 
 ## Blocked / open
-- PR #20 awaits the human. T-016 blocked (branch naming vs lint). T-011 rework pending. T-014 blocked (premise false).
-- Findings filed by pr-reviewer: TestCopy (config_test.py) still writes test.toml to the real ~/.pymodaq/config;
-  atexit "Logging error" at interpreter exit for "Not saving config" (unverified whether dev_agent prints it too).
-- Not done: before/after coverage comparison from T-012's conditions (reviewer did not run it; implementer reported config.py 79% before/after).
+- Not covered: the __init__.py `except ConfigError` handler (needs a module reload test).
+- task.py start left registry.jsonl dirty on the branch (written on dev_agent, then switched); I committed it on
+  dev_agent by hand. Tooling bug: start should commit its registry change or write it after switching.
+- PR #20 awaits the human. PR #23 awaits the human. T-016 blocked, T-011 rework pending, T-014 blocked.
 
 ## Next step
-Human: review and merge PR #23 (medium risk, touches tests: gate left it open for the human).
+Human: `/optimize-merge T-pymodaq_utils-007` (pr-reviewer round 2, then PR; medium risk, touches tests and a public function).
