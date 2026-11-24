@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-24 22:52 by `scripts/status.py`
+# Consortium status — generated 2026-11-24 22:59 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `d79bdc4ac`; 272 commits ahead of upstream/dev (42 files changed, 690 insertions(+), 182 deletions(-))
-- today: runs 17/20, specialist_runs 9/10, prs_opened 5/6, reviews 8/10; outcomes: ok 16, failed 1
+- `dev_agent` at `4d0bff997`; 273 commits ahead of upstream/dev (42 files changed, 690 insertions(+), 182 deletions(-))
+- today: runs 18/20, specialist_runs 9/10, prs_opened 6/6, reviews 9/10; outcomes: ok 17, failed 1
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- next cycle step: `plan pymodaq_scripting`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
@@ -14,13 +14,14 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - **T-pymodaq_utils-006** — done — PR #18 open, awaiting the human: touches tests: packages/pymodaq_utils/tests/config_test.py
 - **T-pymodaq_utils-007** — done — PR #24 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; reviewer: public_api yes;
 - **T-pymodaq_utils-008** — done — PR #19 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/config_test.py
+- **T-pymodaq_utils-011** — done — PR #25 open, awaiting the human: registry risk is medium; plan risk is medium; reviewer: public_api yes; touches tests: packages/pymodaq_utils/tests/packages_test.py
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 - **T-pymodaq_utils-013** — done — PR #23 open, awaiting the human: registry risk is medium; plan risk is medium; touches tests: packages/pymodaq_utils/tests/config_test.py, packages/pymodaq_utils/tests/conftest.py
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 - blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
-- `agent/pymodaq_utils/refactor/2026-11-22-packages-get-entrypoints` (T-pymodaq_utils-011, risk medium): pushed, waiting for /optimize-merge
+- nothing queued
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -54,7 +55,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-merge-T-pymodaq_utils-012-r2 | optimize-merge | ok | 3.2 | 10327 | T-pymodaq_utils-012: blocked — review: Adds a PYMODAQ_CONFIG_DIR overr |
 | 2026-11-24-run-T-pymodaq_utils-012-r2 | optimize-run | ok | 2.3 | 5085 | rework r3: atexit leak closed, exit-path test rewritten, docstring fix |
 | 2026-11-24-merge-T-pymodaq_utils-012-r3 | optimize-merge | ok | 4.3 | 12126 | T-pymodaq_utils-012: blocked — PR CI unavailable: no checks found on P |
 | 2026-11-24-run-T-pymodaq_utils-013 | optimize-run | ok | 11.5 | 7411 | conftest isolated_config_dir fixture; test_load_system_config isolated |
@@ -64,6 +64,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-run-T-pymodaq_utils-007-r2 | optimize-run | ok | 1.3 | 3655 | rework r2: logger test builds a real config instead of patching getite |
 | 2026-11-24-merge-T-pymodaq_utils-007-r3 | optimize-merge | ok | 6.3 | 6492 | T-pymodaq_utils-007: done — PR #24 open, awaiting the human: registry  |
 | 2026-11-24-run-T-pymodaq_utils-011-r2 | optimize-run | ok | 1.5 | 4619 | rework r2: test, deprecated version, unused import |
+| 2026-11-24-merge-T-pymodaq_utils-011-r3 | optimize-merge | ok | 5.9 | 5902 | T-pymodaq_utils-011: done — PR #25 open, awaiting the human: registry  |
 
 ## Done so far
 - tasks done: 27; PRs merged into dev_agent: 21
