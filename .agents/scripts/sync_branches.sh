@@ -17,7 +17,14 @@ run git fetch origin
 # dev: fast-forward only, never receives agent commits. Updated without a checkout, so the script can run
 # from the dev_agent worktree; a plain (non-force) push refuses anything but a fast-forward on the fork.
 git merge-base --is-ancestor dev upstream/dev || { echo "local dev has diverged from upstream/dev" >&2; exit 2; }
-run git branch -f dev upstream/dev
+if [ "$(git rev-parse dev)" != "$(git rev-parse upstream/dev)" ]; then
+  # git refuses to move a branch checked out in another worktree (e.g. the owner's main checkout on `dev`):
+  # stop with a clear message instead of failing inside git
+  if git worktree list --porcelain | grep -qx "branch refs/heads/dev"; then
+    echo "dev is behind upstream/dev and checked out in a worktree: fast-forward it there (git merge --ff-only upstream/dev)" >&2; exit 2
+  fi
+  run git branch -f dev upstream/dev
+fi
 run git push origin upstream/dev:refs/heads/dev
 # dev_agent: create from dev if missing, then merge dev into it
 if ! git show-ref --verify --quiet refs/heads/dev_agent; then
