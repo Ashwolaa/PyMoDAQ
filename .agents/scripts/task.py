@@ -158,6 +158,7 @@ def cmd_start(a):
     plan = plans.resolve(a.plan)
     task = plans.find(a.task_id, plan) or fail(f"{a.task_id} not found in {a.plan}")
     block, status = task.block, task.status
+    port_from = None
     # state paths and branch names use the package (rules.md 19); a plan may say `scope: docs`
     scope, specialty, risk = plans.package_of(task), task.get("specialty"), task.get("risk", "medium")
     session = os.environ.get("CLAUDE_CODE_SESSION_ID")
@@ -178,10 +179,22 @@ def cmd_start(a):
         git("switch", "-q", branch)
         r = sh(["git", "rebase", "-q", base], check=False)
         if r.returncode:
+            # dev_agent moved under the branch (2026-11-24: T-015 changed the lines T-007 edits). Do not stop: start the
+            # rework on a fresh branch from dev_agent and have the specialist port the old change onto it.
             sh(["git", "rebase", "--abort"], check=False)
             git("switch", "-q", "dev_agent")
-            script("plan.py", "set-status", str(plan), a.task_id, "blocked — conflicts with dev_agent, rerun the task")
-            fail(f"rebase of {branch} on dev_agent conflicts: task blocked", 1)
+            port_from = branch
+            k = 2
+            while git("rev-parse", "-q", "--verify", f"{port_from}-v{k}", check=False) or \
+                    git("ls-remote", "origin", f"refs/heads/{port_from}-v{k}"):
+                k += 1
+            branch = f"{port_from}-v{k}"
+            git("switch", "-q", "-c", branch, base)
+            git("switch", "-q", "dev_agent")
+            script("registry.py", "set-status", "--branch", port_from, "--status", "closed")
+            script("registry.py", "add", "--run-id", run_id, "--scope", scope, "--specialty", specialty, "--branch", branch,
+                   "--risk", risk, "--task-id", a.task_id, "--status", "pushed")
+            git("switch", "-q", branch)
     elif status.startswith("approved"):
         if rows:
             fail(f"{a.task_id} already has a branch ({rows[-1]['branch']}); a rework needs status 'blocked — review'")
@@ -198,9 +211,13 @@ def cmd_start(a):
         fail(f"{a.task_id} is '{status}': only approved tasks, or tasks blocked by review (rework), can run")
     rec = {"run_id": run_id, "task_id": a.task_id, "plan": str(plan.relative_to(REPO)) if plan.is_relative_to(REPO) else str(plan), "scope": scope,
            "specialty": specialty, "risk": risk, "branch": branch, "rework": rework, "session": session,
-           "started": now(), "base": base, "checks": {}, "ci": None}
+           "started": now(), "base": base, "checks": {}, "ci": None, "port_from": port_from}
     save(rec)
     print(f"run {run_id}: on {branch}" + (f" (rework of review r{rework}, rebased on dev_agent)" if rework else ""))
+    if port_from:
+        print(f"{port_from} no longer rebases on dev_agent: this rework is on the fresh branch {branch}. The specialist re-applies "
+              f"that branch's change by hand (`git diff {base[:9]}...{port_from}` shows it; the code under it moved), "
+              f"then fixes the review points.")
     print(f"next: launch the {specialty} specialist with the task block"
           + (f" and the latest review report ({review_reports(scope, a.task_id)[-1].relative_to(REPO)})" if rework else "")
           + f", then `task.py checks {run_id}`")
