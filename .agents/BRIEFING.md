@@ -18,7 +18,7 @@ plugin for any GitHub repository.
 - Project commands in `.claude/commands/`, agents in `.claude/agents/`, state in `.agents/`. Core (generic) and
   profile (repo-specific: `profile.toml`, `budget.toml`) are kept in separate files.
 - Commands: `/optimize-plan [scope]` (advisory board, never edits code), `/optimize-run [scope|task-id]`
-  (executive, pushes branches, no PR), `/optimize-merge [scope|task-id]` (pr-reviewer validates, then PR + merge gate),
+  (executive, pushes branches, no PR), `/optimize-grill [topic]`, `/optimize-plugins discover|assess|port`, `/optimize-merge [scope|task-id]` (pr-reviewer validates, then PR + merge gate),
   `/optimize-status`, `/optimize-revert <run-id>`, `/optimize-research <topic>`, `/optimize-review`
   (committee). All take `--explain` (dry run). Later: `/optimize-init` (drafts a project profile, marking each
   field detected vs assumed, human confirms before anything is written).
@@ -35,7 +35,7 @@ plugin for any GitHub repository.
 - Layers: advisory board (5 advisors: quality, uxui, performance, docs, compat -> decider-triage; decisioners
   compat-risk (veto), test-change (veto), arbiter (binding)); executive (cocoordinator, specialists hygiene,
   test-quality, refactor, uiux, docs; one test-agent instance per test folder, 12 today); audit (scripts: merge_gate.py lint/check, ci.py; the auditor agent was removed 2026-11-19, pr-reviewer checks drift);
-  R&D (rd-researcher, best-practice); committee (efficiency, outcomes, governance; reads only ledger, registry,
+  R&D (rd-researcher, best-practice); plugin track (plugin-scout, spec-plugin-port); committee (efficiency, outcomes, governance; reads only ledger, registry,
   handoffs, reports; may recommend and pause a role, never edits agent definitions).
 - Deliberation: two decisioners must both approve each finding, any single veto stops it; on disagreement each
   reads the other's reasoning and decides again; still split -> `blocked` for the human.
@@ -54,30 +54,35 @@ plugin for any GitHub repository.
 - Cloud for scheduled runs (daily); planning on demand during the pilot. R&D gets about 20% of the budget.
 - Rotation (planning): dependency order utils, data, scripting, gui (6 slices), pymodaq (4 slices).
 
-## State
-- Step 1 done (2026-11-18): fork `dev` force-reset to `upstream/dev` (it had drifted: merge + README-bot commits);
-  `dev_agent` created from it with the skeleton and pushed; label `agent-made` created. The fork's "Generate
-  README.rst from templates" workflow is disabled (it committed to every pushed branch). Local worktree for
-  `dev_agent`: `../PyMoDAQ-dev-agent`; run `sync_branches.sh` from there.
-- Metrics (owner: "measure first"): `scripts/usage.py` measures tokens from the local transcripts (all projects,
-  sub-agents included, one count per request), lists `/usage` readings and limit hits, and calibrates tokens per
-  week-%. `ledger.py add --session current --since <START>` fills token figures; every command now notes START.
-  `scripts/pr_stats.py` gives PR size vs time-to-merge. Weekly limit resets Sunday 00:00 Europe/Paris (seen in
-  transcripts); only one `/usage` reading exists so far (2026-11-17: week 33%).
-- Commands and agents have still never been run. Cloud runs leave no local transcript (tokens null there).
+## State (refreshed 2026-11-25; live numbers are in `STATUS.md`, never copy them here)
+- Built and running: step 1 (fork `dev` reset to `upstream/dev`, `dev_agent` pushed, label `agent-made`, README-bot
+  workflow disabled) and the whole cycle: `/optimize-plan`, `-run`, `-merge`, `-status`, `-revert`, `-research`,
+  `-review`, plus `/optimize-grill` (owner questions an agent could not settle, `scripts/grill.py`, at most
+  `[grill].max_open` open) and `/optimize-plugins` (discover, assess, port; `plugin-scout`, `spec-plugin-port`).
+  `runner/cycle.sh` turns the wheel unattended: `status.py next` picks the step, `runner/cost.py` checks it fits the
+  plan quota, `runner/step.py` runs it headless. Start a session from `README.md`.
+- Ledger (2026-11-25): 84 lines (39 run, 30 merge, 14 plan, 1 research); 25 branches in the registry; PRs #16-#26 open
+  on the fork, waiting for the human. Scopes planned so far: `pymodaq_utils`, `pymodaq_data`; next is `pymodaq_scripting`.
+- Never run yet: `/optimize-review` (committee) has no ledger line, nor has any `/optimize-plugins` step; `/optimize-init`
+  and the plugin extraction (step 5) are not started.
+- Caps: daily `[daily]` caps in `budget.toml` were set by the owner on 2026-11-19 from the pilot ("about one day of the
+  wheel"); calibration data via `usage.py calibrate`. Weekly limit resets Sunday 00:00 Europe/Paris.
+- Known blockers (details in `STATUS.md` "Open findings"): the `packages/pymodaq` suite hangs on
+  `extension_loading_test::test_load[Scanner]` (task `M06`) and has flaky Qt tests (`state_manager_test`, random
+  PySide6 abort); the agents have no notion of known-flaky tests; a merge run that ends blocked before the gate
+  cannot be closed in the ledger.
 
 ## Next (in order)
-1. Calibrate: owner runs `/usage`, then the pilot, then `/usage` again, with nothing else using the plan.
-2. Pilot: `/optimize-plan pymodaq_utils --explain`; install missing scanners first (`vulture`, `jscpd`, `radon`,
-   `mutmut`, `import-linter`; ruff is not installed in this WSL env). `usage.py calibrate` afterwards.
-3. Review the pilot with the owner, set caps in `budget.toml` from the calibration, then one real hygiene run,
-   then scheduling.
-4. Add API/compat, perf/threading, backport specialists; tool-building track; R&D; committee runs.
+1. Owner: answer the pending grill (`/optimize-grill config-reconcile`) and review the open PRs; merge with a merge
+   commit, never squash.
+2. Fix the agent tooling findings that stall the wheel (hung-test timeout, known-flaky tests, closing a blocked merge
+   run, tool-task branch names vs `merge_gate` lint); then keep turning the wheel through the rotation.
+3. First `/optimize-review` (committee) once enough runs exist; adjust caps from it.
+4. Backport specialist, tool-building track, more R&D (`research/_prompts.md`).
 5. Extract the plugin and build `/optimize-init`.
 
 ## Open (ask the owner)
-- Desired daily caps, once calibrated (`budget.toml`; the daily `runs = 1` cap prevents a plan and a run on the
-  same day).
-- PR size cap: owner unsure about 300. Upstream median 89 / p75 262 lines; the owner's own PRs merge in ~1 day
-  below 150 lines and 3-12 days above. Re-measure on `agent-made` PRs with `pr_stats.py --label agent-made`.
+- PR size cap: `pr_max_changed_lines = 300` is still an assumption. Upstream median 89 / p75 262 lines; the owner's own
+  PRs merge in ~1 day below 150 lines and 3-12 days above. `pr_stats.py --label agent-made` matched no merged PR on
+  2026-11-25: re-measure once the first agent PRs are merged.
 - Whether sub-agents can spawn sub-agents here (unverified; flat execution is the baseline).
