@@ -134,3 +134,10 @@ def test_owner_granted_extra_round(tmp_path, monkeypatch):
     assert reports.rework_allowed("pkg", "T-1", extra=1)[0] is True
     reports = _report(tmp_path / "b", monkeypatch, [3, 3, 3])
     assert reports.rework_allowed("pkg", "T-1", extra=1)[0] is False  # the grant is used up
+
+
+def test_finding_count_accepts_text_after_the_findings_heading(tmp_path):
+    from agentlib import reports
+    f = tmp_path / "x.md"
+    f.write_text("verdict: changes\n\n## r1 findings\n- a:1 old\n\n## Findings (what to change)\n- b:2 one\n- c:3 two\n\nsummary: s\n")
+    assert reports.finding_count(f) == 2

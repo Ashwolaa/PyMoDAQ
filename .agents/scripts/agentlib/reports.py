@@ -60,11 +60,11 @@ MAX_REWORK_ROUNDS = 4  # hard cap, whatever the trend
 
 
 def finding_count(path) -> int:
-    """Items of the report's `## Findings` (or older: `## Required changes`) section: bullets or numbered lines.
+    """Items of the report's `## Findings` (or older: `## Required changes`) section, whatever text follows on the heading line (`## Findings (what to change)`): bullets or numbered lines.
     Several such sections add up (a r2 report also lists the r1 findings under `## r1 findings`, which is not counted)."""
     text = Path(path).read_text()
     total = 0
-    for m in re.finditer(r"^## (?:Findings|Required changes)\s*\n(.*?)(?=^## |^summary:|\Z)", text, re.M | re.S):
+    for m in re.finditer(r"^## (?:Findings|Required changes)[^\n]*\n(.*?)(?=^## |^summary:|\Z)", text, re.M | re.S):
         total += len([l for l in m.group(1).splitlines() if re.match(r"^\s*(?:[-*]|\d+[.)]) ", l)])
     return total
 
