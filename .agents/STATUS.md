@@ -1,20 +1,19 @@
-# Consortium status — generated 2026-11-25 20:43 by `scripts/status.py`
+# Consortium status — generated 2026-11-25 21:37 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `99f86c2bc`; 317 commits ahead of upstream/dev (46 files changed, 750 insertions(+), 195 deletions(-))
-- today: runs 11/20, specialist_runs 5/10, prs_opened 2/6, reviews 5/10; outcomes: ok 11
-- last /usage reading: 2026-11-25T19:43:04.874000+00:00  session 33% (resets Nov 25, 10:50pm (Europe/Paris))  week 49% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_scripting-002 .agents/plans/2026-11-25-pymodaq_scripting.md`
+- `dev_agent` at `00e0858be`; 318 commits ahead of upstream/dev (46 files changed, 750 insertions(+), 195 deletions(-))
+- today: runs 12/20, specialist_runs 6/10, prs_opened 2/6, reviews 5/10; outcomes: ok 12
+- last /usage reading: 2026-11-25T20:34:47.493000+00:00  session 34% (resets Nov 25, 10:50pm (Europe/Paris))  week 49% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
-- blocked: **T-pymodaq_scripting-002** — blocked — review: Points the scripting docs to the pymodaq_scripting package, replaces configuration calls with get_states/apply_state and documents the real grab/snap behaviour;
 
 ## In flight
-- T-pymodaq_scripting-002 Fix scripting docs against the code — blocked — review: Points the scripting docs to the pymodaq_scripting package, replaces configuration calls with get_states/apply_state and documents the real grab/snap behaviour;
+- `agent/pymodaq_scripting/docs/2026-11-25` (T-pymodaq_scripting-002, risk low): pushed, waiting for /optimize-merge
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -52,7 +51,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-merge-T-pymodaq_utils-014-r1 | optimize-merge | ok | 2.6 | 8513 | T-pymodaq_utils-014: blocked — review: Adds a test that a ConfigError  |
 | 2026-11-25-run-T-pymodaq_utils-014-r1 | optimize-run | ok | 1.3 | 3278 | rework: CONFIG assertion made non-vacuous (delattr before reload), vac |
 | 2026-11-25-merge-T-pymodaq_utils-014-r2 | optimize-merge | ok | 3.3 | 5840 | T-pymodaq_utils-014: blocked — review: Adds a test that a ConfigError  |
 | 2026-11-25-run-T-pymodaq_utils-014-r2 | optimize-run | ok | 2.9 | 3698 | rework r2: assert CONFIG before the restoring reload |
@@ -62,6 +60,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-25-merge-T-pymodaq_scripting-001-r1 | optimize-merge | ok | 5.7 | 5603 | T-pymodaq_scripting-001: done — PR #27 merged (auto: low risk, approve |
 | 2026-11-25-run-T-pymodaq_scripting-002 | optimize-run | ok | 2.1 | 12314 | docs only, 101 lines; make_component_leco_available.rst:584-610 left o |
 | 2026-11-25-merge-T-pymodaq_scripting-002-r1 | optimize-merge | ok | 2.6 | 8818 | T-pymodaq_scripting-002: blocked — review: Points the scripting docs t |
+| 2026-11-25-run-T-pymodaq_scripting-002-r1 | optimize-run | ok | 1.1 | 4216 | rework r1: 3 review fixes applied (leco import + :class: targets, get_ |
 
 ## Done so far
-- tasks done: 29; PRs merged into dev_agent: 24
+- tasks done: 30; PRs merged into dev_agent: 24

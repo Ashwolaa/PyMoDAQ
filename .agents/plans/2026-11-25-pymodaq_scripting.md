@@ -19,4 +19,4 @@ Not planned: docs/src/user_folder/common_questions.rst:47 uses the old pymodaq.s
 - files: `docs/src/user_folder/scripting.rst`, `docs/src/developer_folder/make_component_leco_available.rst:327-579`
 - notes: use pymodaq_scripting imports and :class: targets; get_states/apply_state instead of get_configurations/apply_configuration; grab() toggles (devices.py:149, utils.py:273-282), keep=True returns the list only from the starting call; snap() returns None while grabbing; typo "result in set". Do not edit legacy_to_current.rst (generated). Leave out the autostart claim unless confirmed in code. Split per file if over 300 lines.
 - verdicts: decider-compat-risk: approve — old paths are not importable, methods named exist in code; decider-triage (2nd): approve — checked get_states/apply_state and snap signature
-- status: blocked — review: Points the scripting docs to the pymodaq_scripting package, replaces configuration calls with get_states/apply_state and documents the real grab/snap behaviour;
+- status: done — branch agent/pymodaq_scripting/docs/2026-11-25, local checks green, CI on the PR, reworked after review r1, awaiting review
