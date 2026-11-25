@@ -1,19 +1,19 @@
-# Consortium status — generated 2026-11-25 10:04 by `scripts/status.py`
+# Consortium status — generated 2026-11-25 20:35 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `95785dc03`; 311 commits ahead of upstream/dev (46 files changed, 751 insertions(+), 196 deletions(-))
-- today: runs 9/20, specialist_runs 4/10, prs_opened 2/6, reviews 4/10; outcomes: ok 9
-- last /usage reading: 2026-11-25T09:04:14.112000+00:00  session 55% (resets Nov 25, 12pm (Europe/Paris))  week 40% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_scripting-002 .agents/plans/2026-11-25-pymodaq_scripting.md`
+- `dev_agent` at `2e15a8943`; 313 commits ahead of upstream/dev (46 files changed, 750 insertions(+), 195 deletions(-))
+- today: runs 10/20, specialist_runs 5/10, prs_opened 2/6, reviews 4/10; outcomes: ok 10
+- last /usage reading: 2026-11-25T19:32:39.217000+00:00  session 25% (resets Nov 25, 10:50pm (Europe/Paris))  week 48% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- T-pymodaq_scripting-002 Fix scripting docs against the code — approved
+- `agent/pymodaq_scripting/docs/2026-11-25` (T-pymodaq_scripting-002, risk low): pushed, waiting for /optimize-merge
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -44,11 +44,13 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] GlobalConfig()('utils', ...) reads through BaseConfig.__getitem__, so the singular/plural fallback in Config.__call__ (backend/debug_level/dynamic) ne
 - [pymodaq_utils] docstring says it is raised only for a missing key path; set_logger now also raises it for a wrong value type
 - [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
+- [pymodaq_scripting] make_component_leco_available.rst:584-610 still uses pymodaq.scripting import (line 592) and ~pymodaq.scripting.devices targets (608-609)
+- [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
+- [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-merge-T-pymodaq_utils-011-r3 | optimize-merge | ok | 5.9 | 5902 | T-pymodaq_utils-011: done — PR #25 open, awaiting the human: registry  |
 | 2026-11-25-run-T-pymodaq_utils-014 | optimize-run | ok | 2.7 | 4482 | test for ConfigError handler; handler is at __init__.py:40-41 |
 | 2026-11-25-merge-T-pymodaq_utils-014-r1 | optimize-merge | ok | 2.6 | 8513 | T-pymodaq_utils-014: blocked — review: Adds a test that a ConfigError  |
 | 2026-11-25-run-T-pymodaq_utils-014-r1 | optimize-run | ok | 1.3 | 3278 | rework: CONFIG assertion made non-vacuous (delattr before reload), vac |
@@ -58,6 +60,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | plan-pymodaq_scripting-20261125 | optimize-plan | ok | 7.3 | 43748 |  |
 | 2026-11-25-run-T-pymodaq_scripting-001 | optimize-run | ok | 0.8 | 3559 | hygiene: __all__, unused imports, .keys() |
 | 2026-11-25-merge-T-pymodaq_scripting-001-r1 | optimize-merge | ok | 5.7 | 5603 | T-pymodaq_scripting-001: done — PR #27 merged (auto: low risk, approve |
+| 2026-11-25-run-T-pymodaq_scripting-002 | optimize-run | ok | 2.1 | 12314 | docs only, 101 lines; make_component_leco_available.rst:584-610 left o |
 
 ## Done so far
-- tasks done: 29; PRs merged into dev_agent: 24
+- tasks done: 30; PRs merged into dev_agent: 24
