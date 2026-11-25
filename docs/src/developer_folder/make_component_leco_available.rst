@@ -589,7 +589,7 @@ With the public classes in place, scripts are straightforward.  Calling
 
 .. code-block:: python
 
-   from pymodaq.scripting import Actuator, Detector, Dashboard
+   from pymodaq_scripting import Actuator, Detector, Dashboard
 
    # connect to a running Dashboard and load an experiment
    dashboard = Dashboard()
@@ -605,6 +605,6 @@ With the public classes in place, scripts are straightforward.  Calling
    frame = camera.snap().result()
 
 ``get_scripting_devices()`` calls ``get_devices()`` on the Dashboard and
-automatically wraps the returned names in :class:`~pymodaq.scripting.devices.Actuator`
-and :class:`~pymodaq.scripting.devices.Detector` instances, so the caller
+automatically wraps the returned names in :class:`~pymodaq_scripting.devices.Actuator`
+and :class:`~pymodaq_scripting.devices.Detector` instances, so the caller
 never has to manage LECO names manually.

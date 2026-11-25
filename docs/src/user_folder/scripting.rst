@@ -41,7 +41,8 @@ Three classes are available directly from :mod:`pymodaq_scripting`:
 Most methods that communicate over the network return a
 :class:`~concurrent.futures.Future`.  Calling ``.result()`` on it **blocks**
 until the remote component replies and the result is set in the corresponding `Future`.
-The exceptions are ``grab``, ``stop_grab``, ``set_settings`` and ``sign_out``, and
+The exceptions are ``grab``, ``stop_grab``, ``set_settings`` and ``sign_out``,
+``Dashboard.get_scripting_devices``, which waits and returns a dict directly, and
 ``snap``, which returns ``None`` while a continuous grab is running.
 
 .. code-block:: python
