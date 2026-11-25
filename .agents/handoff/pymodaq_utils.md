@@ -1,4 +1,4 @@
-# Handoff: pymodaq_utils — 2026-11-25 (after /optimize-merge T-pymodaq_utils-014 r2)
+# Handoff: pymodaq_utils — 2026-11-25 (after /optimize-run T-pymodaq_utils-014, refused)
 
 ## Done
 - Nothing merged this run. T-014 branch agent/pymodaq_utils/test-quality/2026-11-25 rebased on dev_agent and
@@ -16,5 +16,6 @@
 - Seen, not investigated: "--- Logging error ---" / "I/O operation on closed file" blocks in the utils suite.
 
 ## Next step
-/optimize-run T-pymodaq_utils-014 (rework r2 per the fix above), then /optimize-merge T-pymodaq_utils-014.
-The human reviews the open PRs meanwhile.
+/optimize-run T-pymodaq_utils-014 was refused by task.py start: no more rework rounds (it cannot read the findings
+of the last two reviews, counted 0 and 0), so the human decides. Plan status set to `blocked — review: still failing, for the human`.
+The r2 fix above is still valid if the human wants to apply it or lift the limit. The human reviews the open PRs meanwhile.
