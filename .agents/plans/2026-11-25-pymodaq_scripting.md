@@ -11,7 +11,7 @@ Not planned: docs/src/user_folder/common_questions.rst:47 uses the old pymodaq.s
 - risk: low
 - files: `packages/pymodaq_scripting/src/pymodaq_scripting/__init__.py:1` (add __all__ of Actuator, Detector, Dashboard), `packages/pymodaq_scripting/src/pymodaq_scripting/examples/dashboard_script.py:1` (drop unused Actuator, Detector), `packages/pymodaq_scripting/src/pymodaq_scripting/utils.py:60` (drop .keys())
 - verdicts: decider-compat-risk: approve — re-exports unchanged, only star-import of submodule names changes and none exists in the repo; decider-triage (2nd): approve — each edit checked in code
-- status: done — branch agent/pymodaq_scripting/hygiene/2026-11-25, local checks green, CI on the PR, awaiting review
+- status: done — PR #27 merged (auto: low risk, approved by decider-compat-risk, decider-triage, reviewer approve, 8 lines, no tests/UI/API)
 
 ## T-pymodaq_scripting-002 Fix scripting docs against the code
 - scope: docs   specialty: docs

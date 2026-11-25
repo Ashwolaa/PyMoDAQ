@@ -1,19 +1,18 @@
-# Consortium status — generated 2026-11-25 09:54 by `scripts/status.py`
+# Consortium status — generated 2026-11-25 10:03 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `62c911888`; 306 commits ahead of upstream/dev (43 files changed, 746 insertions(+), 193 deletions(-))
-- today: runs 8/20, specialist_runs 4/10, prs_opened 1/6, reviews 3/10; outcomes: ok 8
-- last /usage reading: 2026-11-25T08:54:49.869000+00:00  session 52% (resets Nov 25, 12pm (Europe/Paris))  week 40% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `aad1a47c3`; 309 commits ahead of upstream/dev (46 files changed, 751 insertions(+), 196 deletions(-))
+- today: runs 9/20, specialist_runs 4/10, prs_opened 2/6, reviews 4/10; outcomes: ok 9
+- last /usage reading: 2026-11-25T08:56:53.998000+00:00  session 52% (resets Nov 25, 12pm (Europe/Paris))  week 40% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_scripting-002 .agents/plans/2026-11-25-pymodaq_scripting.md`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- `agent/pymodaq_scripting/hygiene/2026-11-25` (T-pymodaq_scripting-001, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_scripting-002 Fix scripting docs against the code — approved
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -49,7 +48,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-run-T-pymodaq_utils-011-r2 | optimize-run | ok | 1.5 | 4619 | rework r2: test, deprecated version, unused import |
 | 2026-11-24-merge-T-pymodaq_utils-011-r3 | optimize-merge | ok | 5.9 | 5902 | T-pymodaq_utils-011: done — PR #25 open, awaiting the human: registry  |
 | 2026-11-25-run-T-pymodaq_utils-014 | optimize-run | ok | 2.7 | 4482 | test for ConfigError handler; handler is at __init__.py:40-41 |
 | 2026-11-25-merge-T-pymodaq_utils-014-r1 | optimize-merge | ok | 2.6 | 8513 | T-pymodaq_utils-014: blocked — review: Adds a test that a ConfigError  |
@@ -59,6 +57,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-25-merge-T-pymodaq_utils-014-r3 | optimize-merge | ok | 6.7 | 5425 | T-pymodaq_utils-014: done — PR #26 open, awaiting the human: a decider |
 | plan-pymodaq_scripting-20261125 | optimize-plan | ok | 7.3 | 43748 |  |
 | 2026-11-25-run-T-pymodaq_scripting-001 | optimize-run | ok | 0.8 | 3559 | hygiene: __all__, unused imports, .keys() |
+| 2026-11-25-merge-T-pymodaq_scripting-001-r1 | optimize-merge | ok | 5.7 | 5603 | T-pymodaq_scripting-001: done — PR #27 merged (auto: low risk, approve |
 
 ## Done so far
-- tasks done: 29; PRs merged into dev_agent: 23
+- tasks done: 29; PRs merged into dev_agent: 24
