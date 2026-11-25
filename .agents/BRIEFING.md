@@ -61,8 +61,10 @@ plugin for any GitHub repository.
   `[grill].max_open` open) and `/optimize-plugins` (discover, assess, port; `plugin-scout`, `spec-plugin-port`).
   `runner/cycle.sh` turns the wheel unattended: `status.py next` picks the step, `runner/cost.py` checks it fits the
   plan quota, `runner/step.py` runs it headless. Start a session from `README.md`.
-- Ledger (2026-11-25): 84 lines (39 run, 30 merge, 14 plan, 1 research); 25 branches in the registry; PRs #16-#26 open
-  on the fork, waiting for the human. Scopes planned so far: `pymodaq_utils`, `pymodaq_data`; next is `pymodaq_scripting`.
+- Ledger (2026-11-25): 84 lines (39 run, 30 merge, 14 plan, 1 research); 25 branches in the registry; PRs #3-#26 on
+  the fork are merged into `dev_agent` (#10 closed, replaced by #11); none is open. Scopes planned so far:
+  `pymodaq_utils`, `pymodaq_data`; next is `pymodaq_scripting`. Plan files keep the text "PR open, awaiting the
+  human" after the owner merges, so trust the registry or `gh pr list`, not the plan text.
 - Never run yet: `/optimize-review` (committee) has no ledger line, nor has any `/optimize-plugins` step; `/optimize-init`
   and the plugin extraction (step 5) are not started.
 - Caps: daily `[daily]` caps in `budget.toml` were set by the owner on 2026-11-19 from the pilot ("about one day of the
@@ -73,8 +75,8 @@ plugin for any GitHub repository.
   cannot be closed in the ledger.
 
 ## Next (in order)
-1. Owner: answer the pending grill (`/optimize-grill config-reconcile`) and review the open PRs; merge with a merge
-   commit, never squash.
+1. Owner: answer the pending grill (`/optimize-grill config-reconcile`); merge future PRs with a merge commit,
+   never squash.
 2. Fix the agent tooling findings that stall the wheel (hung-test timeout, known-flaky tests, closing a blocked merge
    run, tool-task branch names vs `merge_gate` lint); then keep turning the wheel through the rotation.
 3. First `/optimize-review` (committee) once enough runs exist; adjust caps from it.

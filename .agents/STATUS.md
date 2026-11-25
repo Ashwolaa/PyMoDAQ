@@ -1,23 +1,15 @@
-# Consortium status — generated 2026-11-25 08:40 by `scripts/status.py`
+# Consortium status — generated 2026-11-25 09:24 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `a9faa9c65`; 299 commits ahead of upstream/dev (43 files changed, 746 insertions(+), 193 deletions(-))
+- `dev_agent` at `2224c2332`; 302 commits ahead of upstream/dev (43 files changed, 746 insertions(+), 193 deletions(-))
 - today: runs 6/20, specialist_runs 3/10, prs_opened 1/6, reviews 3/10; outcomes: ok 6
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `plan pymodaq_scripting`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
-- **T-pymodaq_utils-M11** — done — PR #17 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/p
-- **T-pymodaq_utils-006** — done — PR #18 open, awaiting the human: touches tests: packages/pymodaq_utils/tests/config_test.py
-- **T-pymodaq_utils-007** — done — PR #24 open, awaiting the human: registry risk is medium; plan risk is medium; a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; reviewer: public_api yes;
-- **T-pymodaq_utils-008** — done — PR #19 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 1 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/config_test.py
-- **T-pymodaq_utils-011** — done — PR #25 open, awaiting the human: registry risk is medium; plan risk is medium; reviewer: public_api yes; touches tests: packages/pymodaq_utils/tests/packages_test.py
-- **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
-- **T-pymodaq_utils-013** — done — PR #23 open, awaiting the human: registry risk is medium; plan risk is medium; touches tests: packages/pymodaq_utils/tests/config_test.py, packages/pymodaq_utils/tests/conftest.py
-- **T-pymodaq_utils-014** — done — PR #26 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 0 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/package_import_test.py
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight

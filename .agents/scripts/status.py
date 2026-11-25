@@ -99,7 +99,11 @@ def render():
     # needs you
     all_tasks = tasks()
     proposed = [t for t in all_tasks if t[2].startswith("proposed")]
-    human = [t for t in all_tasks if "awaiting the human" in t[2] or "for the human" in t[2]]
+    # the plan text says "PR open, awaiting the human" from the moment the PR is opened and is never rewritten when
+    # the owner merges on GitHub: the registry (latest entry per task) is what knows the PR is already merged
+    latest = {r["task_id"]: r["status"] for r in read_jsonl("registry.jsonl") if r.get("task_id")}
+    human = [t for t in all_tasks if ("awaiting the human" in t[2] or "for the human" in t[2])
+             and latest.get(t[0]) != "merged"]
     blocked = [t for t in all_tasks if t[2].startswith("blocked") and t not in human]
     L += ["## Needs you"]
     L += [f"- approve or drop **{t[0]}** {t[1]} — {t[2]} (`{t[3]}`)" for t in proposed]
