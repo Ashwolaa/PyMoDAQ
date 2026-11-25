@@ -32,7 +32,7 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 - finding: packages/pymodaq_utils/src/pymodaq_utils/__init__.py:ConfigError handler|untested
 - notes: owner 2026-11-25: premise is now true (T-007 merged). Test only: patch `set_logger` to raise `ConfigError("msg")`, reload `pymodaq_utils` (restore it afterwards), assert the message is printed (capsys) and the import does not raise. No source change. Use the isolated config dir fixture (T-013).
 - verdicts: owner-approved 2026-11-25 (earlier decider vetoes were about the false premise)
-- status: blocked — review: Adds a test that a ConfigError raised while creating the pymodaq logger is printed and does not stop the pymodaq_utils import; its CONFIG assertion must be made
+- status: done — branch agent/pymodaq_utils/test-quality/2026-11-25, local checks green, CI on the PR, reworked after review r1, awaiting review
 
 ## T-pymodaq_utils-015 Trivial lint cleanups, numpydoc underline, double config lookup
 - scope: pymodaq_utils   specialty: hygiene
