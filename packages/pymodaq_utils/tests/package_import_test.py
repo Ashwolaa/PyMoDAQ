@@ -20,10 +20,13 @@ def test_config_error_while_creating_logger_is_printed_and_import_goes_on(
             capsys.readouterr()
             importlib.reload(pymodaq_utils)
             captured = capsys.readouterr()
+        # read before the restoring reload, which would recreate CONFIG anyway
+        config_after = getattr(pymodaq_utils, 'CONFIG', None)
     finally:
         importlib.reload(pymodaq_utils)  # back to the normal module state
 
     assert "msg" in captured.out
     assert "Couldn't create the local folder" not in captured.out
     # the import went on after the handler: CONFIG, defined after it, was recreated
-    assert pymodaq_utils.CONFIG is GlobalConfig()
+    # by the patched reload itself
+    assert config_after is GlobalConfig()
