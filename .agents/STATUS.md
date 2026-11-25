@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-25 08:18 by `scripts/status.py`
+# Consortium status — generated 2026-11-25 08:26 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `b4b54198f`; 292 commits ahead of upstream/dev (42 files changed, 714 insertions(+), 193 deletions(-))
-- today: runs 5/20, specialist_runs 3/10, prs_opened 0/6, reviews 2/10; outcomes: ok 5
+- `dev_agent` at `5d0f7079d`; 293 commits ahead of upstream/dev (42 files changed, 714 insertions(+), 193 deletions(-))
+- today: runs 6/20, specialist_runs 3/10, prs_opened 1/6, reviews 3/10; outcomes: ok 6
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- next cycle step: `plan pymodaq_scripting`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
@@ -17,10 +17,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - **T-pymodaq_utils-011** — done — PR #25 open, awaiting the human: registry risk is medium; plan risk is medium; reviewer: public_api yes; touches tests: packages/pymodaq_utils/tests/packages_test.py
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 - **T-pymodaq_utils-013** — done — PR #23 open, awaiting the human: registry risk is medium; plan risk is medium; touches tests: packages/pymodaq_utils/tests/config_test.py, packages/pymodaq_utils/tests/conftest.py
+- **T-pymodaq_utils-014** — done — PR #26 open, awaiting the human: a decider vetoed or blocked it in the plan; plan shows 0 approving decider(s), 2 needed; touches tests: packages/pymodaq_utils/tests/package_import_test.py
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- `agent/pymodaq_utils/test-quality/2026-11-25` (T-pymodaq_utils-014, risk low): pushed, waiting for /optimize-merge
+- nothing queued
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -55,7 +56,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-merge-T-pymodaq_utils-007-r2 | optimize-merge | ok | 3.1 | 9176 | T-pymodaq_utils-007: blocked — review: set_logger now raises ConfigErr |
 | 2026-11-24-run-T-pymodaq_utils-007-r2 | optimize-run | ok | 1.3 | 3655 | rework r2: logger test builds a real config instead of patching getite |
 | 2026-11-24-merge-T-pymodaq_utils-007-r3 | optimize-merge | ok | 6.3 | 6492 | T-pymodaq_utils-007: done — PR #24 open, awaiting the human: registry  |
 | 2026-11-24-run-T-pymodaq_utils-011-r2 | optimize-run | ok | 1.5 | 4619 | rework r2: test, deprecated version, unused import |
@@ -65,6 +65,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-25-run-T-pymodaq_utils-014-r1 | optimize-run | ok | 1.3 | 3278 | rework: CONFIG assertion made non-vacuous (delattr before reload), vac |
 | 2026-11-25-merge-T-pymodaq_utils-014-r2 | optimize-merge | ok | 3.3 | 5840 | T-pymodaq_utils-014: blocked — review: Adds a test that a ConfigError  |
 | 2026-11-25-run-T-pymodaq_utils-014-r2 | optimize-run | ok | 2.9 | 3698 | rework r2: assert CONFIG before the restoring reload |
+| 2026-11-25-merge-T-pymodaq_utils-014-r3 | optimize-merge | ok | 6.7 | 5425 | T-pymodaq_utils-014: done — PR #26 open, awaiting the human: a decider |
 
 ## Done so far
 - tasks done: 28; PRs merged into dev_agent: 22
