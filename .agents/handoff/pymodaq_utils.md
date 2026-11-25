@@ -16,6 +16,8 @@
 - Seen, not investigated: "--- Logging error ---" / "I/O operation on closed file" blocks in the utils suite.
 
 ## Next step
-/optimize-run T-pymodaq_utils-014 was refused by task.py start: no more rework rounds (it cannot read the findings
-of the last two reviews, counted 0 and 0), so the human decides. Plan status set to `blocked — review: still failing, for the human`.
-The r2 fix above is still valid if the human wants to apply it or lift the limit. The human reviews the open PRs meanwhile.
+/optimize-run T-pymodaq_utils-014 (2026-11-25, second attempt) refused by task.py start: the owner re-approved the
+task (plan status `approved — owner 2026-11-25 ...`), but the branch agent/pymodaq_utils/test-quality/2026-11-25
+already exists, and a rework needs status `blocked — review`. Not worked around (rules.md 16); nothing run.
+The human must either set the status back to `blocked — review` with `plan.py set-status` (then re-run, the
+r2 fix above is the only change) or have task.py accept `approved` for an existing branch after re-approval.
