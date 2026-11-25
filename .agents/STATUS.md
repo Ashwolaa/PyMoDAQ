@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-24 22:59 by `scripts/status.py`
+# Consortium status — generated 2026-11-25 07:13 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `14f560f23`; 278 commits ahead of upstream/dev (42 files changed, 714 insertions(+), 193 deletions(-))
-- today: runs 18/20, specialist_runs 9/10, prs_opened 6/6, reviews 9/10; outcomes: ok 17, failed 1
+- `dev_agent` at `99ab7d5d7`; 280 commits ahead of upstream/dev (42 files changed, 714 insertions(+), 193 deletions(-))
+- today: runs 1/20, specialist_runs 1/10, prs_opened 0/6, reviews 0/10; outcomes: ok 1
 - last /usage reading: 2026-11-24T19:40:03.004000+00:00  session 24% (resets Nov 24, 10:20pm (Europe/Paris))  week 30% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `plan pymodaq_scripting`
+- next cycle step: `merge`
 
 ## Needs you
 - grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
@@ -18,10 +18,9 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - **T-pymodaq_data-001** — done — PR #16 open, awaiting the human: a decider vetoed or blocked it in the plan
 - **T-pymodaq_utils-013** — done — PR #23 open, awaiting the human: registry risk is medium; plan risk is medium; touches tests: packages/pymodaq_utils/tests/config_test.py, packages/pymodaq_utils/tests/conftest.py
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
-- blocked: **T-pymodaq_utils-014** — blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
 
 ## In flight
-- nothing queued
+- `agent/pymodaq_utils/test-quality/2026-11-25` (T-pymodaq_utils-014, risk low): pushed, waiting for /optimize-merge
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -51,11 +50,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] task.py start (port-on-conflict path) writes registry.py on dev_agent then switches to the new branch with registry.jsonl uncommitted; checks refuses 
 - [pymodaq_utils] GlobalConfig()('utils', ...) reads through BaseConfig.__getitem__, so the singular/plural fallback in Config.__call__ (backend/debug_level/dynamic) ne
 - [pymodaq_utils] docstring says it is raised only for a missing key path; set_logger now also raises it for a wrong value type
+- [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-24-run-T-pymodaq_utils-012-r2 | optimize-run | ok | 2.3 | 5085 | rework r3: atexit leak closed, exit-path test rewritten, docstring fix |
 | 2026-11-24-merge-T-pymodaq_utils-012-r3 | optimize-merge | ok | 4.3 | 12126 | T-pymodaq_utils-012: blocked — PR CI unavailable: no checks found on P |
 | 2026-11-24-run-T-pymodaq_utils-013 | optimize-run | ok | 11.5 | 7411 | conftest isolated_config_dir fixture; test_load_system_config isolated |
 | 2026-11-24-merge-T-pymodaq_utils-013-r1 | optimize-merge | ok | 7.1 | 10106 | T-pymodaq_utils-013: done — PR #23 open, awaiting the human: registry  |
@@ -65,6 +64,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-24-merge-T-pymodaq_utils-007-r3 | optimize-merge | ok | 6.3 | 6492 | T-pymodaq_utils-007: done — PR #24 open, awaiting the human: registry  |
 | 2026-11-24-run-T-pymodaq_utils-011-r2 | optimize-run | ok | 1.5 | 4619 | rework r2: test, deprecated version, unused import |
 | 2026-11-24-merge-T-pymodaq_utils-011-r3 | optimize-merge | ok | 5.9 | 5902 | T-pymodaq_utils-011: done — PR #25 open, awaiting the human: registry  |
+| 2026-11-25-run-T-pymodaq_utils-014 | optimize-run | ok | 2.7 | 4482 | test for ConfigError handler; handler is at __init__.py:40-41 |
 
 ## Done so far
-- tasks done: 27; PRs merged into dev_agent: 22
+- tasks done: 28; PRs merged into dev_agent: 22
