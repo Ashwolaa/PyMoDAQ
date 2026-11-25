@@ -57,7 +57,7 @@ def compare_xml_trees(base: Element, modified: Element) -> list[tuple[list[str],
         children2_dict = {child.tag: child for child in children2}
 
         # Recursively compare matching children
-        for tag in children1_dict.keys():
+        for tag in children1_dict:
             if tag in children2_dict:
                 compare_elements(children1_dict[tag], children2_dict[tag],
                                  path + [tag])
