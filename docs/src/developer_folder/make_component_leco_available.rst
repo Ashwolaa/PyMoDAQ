@@ -325,16 +325,16 @@ Part 2 – Scripting LECO-Enabled Components
 
 Once a component is LECO-enabled you can control it from a plain Python script
 without any PyMoDAQ GUI.  The scripting utilities live in
-:mod:`pymodaq.scripting`.
+:mod:`pymodaq_scripting`.
 
 Class Hierarchy
 ~~~~~~~~~~~~~~~~
 
 The scripting layer is built around a two-tier design:
 
-* **Low-level wrappers** (in :mod:`pymodaq.scripting.utils`) manage the LECO
+* **Low-level wrappers** (in :mod:`pymodaq_scripting.utils`) manage the LECO
   plumbing – listener, communicator, director, and callbacks.
-* **Public device classes** (in :mod:`pymodaq.scripting.devices`) expose a
+* **Public device classes** (in :mod:`pymodaq_scripting.devices`) expose a
   clean Python API and hide the ``Future``-resolution callbacks from the user.
 
 The inheritance tree is::
@@ -354,7 +354,7 @@ The inheritance tree is::
 ``LECOBaseWrapper``
 ~~~~~~~~~~~~~~~~~~~~
 
-:class:`~pymodaq.scripting.utils.LECOBaseWrapper` provides all the common LECO
+:class:`~pymodaq_scripting.utils.LECOBaseWrapper` provides all the common LECO
 infrastructure for every scripting wrapper:
 
 1. Creates a :class:`pyleco.utils.listener.Listener` registered on the LECO
@@ -410,15 +410,15 @@ Key points:
 ``LECODeviceWrapper``
 ~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`~pymodaq.scripting.utils.LECODeviceWrapper` extends
-:class:`~pymodaq.scripting.utils.LECOBaseWrapper` with settings management
+:class:`~pymodaq_scripting.utils.LECODeviceWrapper` extends
+:class:`~pymodaq_scripting.utils.LECOBaseWrapper` with settings management
 shared by actuators and detectors.  In its ``__init__`` it registers two
 callbacks on the listener:
 
 * ``set_director_settings`` (plain RPC) – receives the XML settings bytes and
   resolves the ``_settings_future``.
 * ``set_director_info`` (binary RPC) – placeholder for device-specific
-  information (overridden by subclasses as needed).
+  information (currently does nothing).
 
 .. code-block:: python
 
@@ -451,8 +451,8 @@ Writing a New Scripting Wrapper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To expose a new LECO-enabled component via scripting, subclass
-:class:`~pymodaq.scripting.utils.LECOBaseWrapper` (or
-:class:`~pymodaq.scripting.utils.LECODeviceWrapper` if settings support is
+:class:`~pymodaq_scripting.utils.LECOBaseWrapper` (or
+:class:`~pymodaq_scripting.utils.LECODeviceWrapper` if settings support is
 needed) and follow these steps:
 
 1. **Declare ``Future`` attributes** for each asynchronous reply your wrapper
@@ -472,7 +472,7 @@ Minimal skeleton:
 
    from concurrent.futures import Future, InvalidStateError
    from serializall import SerializableFactory
-   from pymodaq.scripting.utils import LECOBaseWrapper
+   from pymodaq_scripting.utils import LECOBaseWrapper
 
    sf = SerializableFactory()
 
@@ -544,7 +544,7 @@ The ``Device`` Public Interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 End-user scripts should not deal with the low-level wrappers directly.
-Instead, a :class:`~pymodaq.scripting.utils.Device` subclass wraps a wrapper
+Instead, a :class:`~pymodaq_scripting.utils.Device` subclass wraps a wrapper
 and exposes only the user-facing methods, hiding the ``Future``-resolution
 callbacks:
 
@@ -552,7 +552,7 @@ callbacks:
 
    from abc import ABC
    from typing import Generic, TypeVar
-   from pymodaq.scripting.utils import LECOBaseWrapper
+   from pymodaq_scripting.utils import LECOBaseWrapper
 
    WrapperT = TypeVar('WrapperT', bound=LECOBaseWrapper)
 
@@ -575,10 +575,10 @@ callbacks:
        def do_something(self, value: str) -> Future[str]:
            return self._wrapper.do_something(value)
 
-The existing :class:`~pymodaq.scripting.devices.Actuator`,
-:class:`~pymodaq.scripting.devices.Detector`, and
-:class:`~pymodaq.scripting.devices.Dashboard` classes in
-:mod:`pymodaq.scripting.devices` follow exactly this pattern.
+The existing :class:`~pymodaq_scripting.devices.Actuator`,
+:class:`~pymodaq_scripting.devices.Detector`, and
+:class:`~pymodaq_scripting.devices.Dashboard` classes in
+:mod:`pymodaq_scripting.devices` follow exactly this pattern.
 
 
 Using the Public Classes in a Script

@@ -4,26 +4,23 @@ Scripting PyMoDAQ
 =================
 
 PyMoDAQ can be controlled from a plain Python script.
-The :mod:`pymodaq.scripting` module provides a small, synchronous and asynchronous API
-that lets you move actuators, acquire data, and manage experiments or configurations programmatically.
+The :mod:`pymodaq_scripting` package provides a small, synchronous and asynchronous API
+that lets you move actuators, acquire data, and manage experiments or states programmatically.
 
 Communication between the script and the running PyMoDAQ application uses
 `LECO`_.  Before running any script you must therefore have:
 
-1. A LECO **Coordinator** running (``coordinator`` in a terminal, or PyMoDAQ setting to start it automatically enabled).
+1. A LECO **Coordinator** running (``coordinator`` in a terminal, or the PyMoDAQ setting
+   ``run_coordinator_at_startup`` enabled).
 2. The PyMoDAQ components you want to control already **connected to LECO**
    (see :ref:`leco_communication`).
 
 .. _LECO: https://leco-laboratory-experiment-control-protocol.readthedocs.io
 
-.. important::
-
-    New PyMoDAQ versions containing scripting modules automatically starts a coordinator and connects devices.
-
 Public Classes
 --------------
 
-Three classes are available directly from :mod:`pymodaq.scripting`:
+Three classes are available directly from :mod:`pymodaq_scripting`:
 
 .. list-table::
    :header-rows: 1
@@ -31,19 +28,21 @@ Three classes are available directly from :mod:`pymodaq.scripting`:
 
    * - Class
      - Purpose
-   * - :class:`~pymodaq.scripting.devices.Dashboard`
-     - Connect to a running Dashboard, apply experiments/configurations, retrieve
+   * - :class:`~pymodaq_scripting.devices.Dashboard`
+     - Connect to a running Dashboard, apply experiments/states, retrieve
        the list of loaded modules.
-   * - :class:`~pymodaq.scripting.devices.Actuator`
+   * - :class:`~pymodaq_scripting.devices.Actuator`
      - Move an actuator (absolute, relative, home), read its current position,
        stop a move.
-   * - :class:`~pymodaq.scripting.devices.Detector`
+   * - :class:`~pymodaq_scripting.devices.Detector`
      - Acquire a single frame (snap) or a continuous stream (grab), stop
        acquisition.
 
-Every method that communicates over the network returns a
+Most methods that communicate over the network return a
 :class:`~concurrent.futures.Future`.  Calling ``.result()`` on it **blocks**
-until the remote component replies and the result in set in the corresponding `Future`.
+until the remote component replies and the result is set in the corresponding `Future`.
+The exceptions are ``grab``, ``stop_grab``, ``set_settings`` and ``sign_out``, and
+``snap``, which returns ``None`` while a continuous grab is running.
 
 .. code-block:: python
 
@@ -54,14 +53,14 @@ until the remote component replies and the result in set in the corresponding `F
 Connecting to a Dashboard
 --------------------------
 
-A good starting point is a :class:`~pymodaq.scripting.devices.Dashboard`.
+A good starting point is a :class:`~pymodaq_scripting.devices.Dashboard`.
 It lets you load an experiment (which starts the instrument modules), then retrieve
-the corresponding :class:`~pymodaq.scripting.devices.Actuator` and
-:class:`~pymodaq.scripting.devices.Detector` objects with a single call.
+the corresponding :class:`~pymodaq_scripting.devices.Actuator` and
+:class:`~pymodaq_scripting.devices.Detector` objects with a single call.
 
 .. code-block:: python
 
-   from pymodaq.scripting import Dashboard
+   from pymodaq_scripting import Dashboard
 
    dashboard = Dashboard()
 
@@ -70,10 +69,10 @@ the corresponding :class:`~pymodaq.scripting.devices.Actuator` and
    # >>> ['default']
    dashboard.apply_experiment('default').result()
 
-   # list available configurations
-   print(dashboard.get_configurations().result())
-   # >>> ['default', 'my_custom_config']
-   dashboard.apply_configuration('default').result()
+   # list available states (instrument settings and actuator values) and apply one
+   print(dashboard.get_states().result())
+   # >>> ['default', 'my_custom_state']
+   dashboard.apply_state('default').result()
 
    # retrieve all loaded modules by name
    print(dashboard.get_devices().result())
@@ -90,7 +89,7 @@ Controlling Actuators
 
 .. code-block:: python
 
-   from pymodaq.scripting import Actuator
+   from pymodaq_scripting import Actuator
    from pymodaq_data import Q_
 
    theta = Actuator('Theta')
@@ -116,19 +115,25 @@ Acquiring Data with Detectors
 
 .. code-block:: python
 
-   from pymodaq.scripting import Detector
+   import time
+
+   from pymodaq_scripting import Detector
 
    camera = Detector('Camera')
 
    # single acquisition (blocking)
    data = camera.snap().result()   # returns a DataToExport
 
-   # continuous acquisition — collect N frames
-   frames = []
-   for _ in range(10):
-       camera.grab()           # start / continue grabbing
-       frames.append(camera.grab(keep=True))  # keep=True returns accumulated data
-   camera.stop_grab()
+   # continuous acquisition: each call to grab() toggles, the first one starts it
+   frames = camera.grab(keep=True)  # list, filled with each DataToExport received
+   time.sleep(2)
+   camera.grab()                    # second call: stops the grab, returns None
+   print(len(frames))
+
+``grab(keep=True)`` returns the list only from the call that starts the grab;
+``keep`` is ignored by the call that stops it, and ``grab()`` without ``keep``
+returns ``None``. :meth:`~pymodaq_scripting.devices.Detector.stop_grab` also
+stops the grab. While grabbing, ``snap()`` sends nothing and returns ``None``.
 
 
 A Complete Scan Script
@@ -144,7 +149,7 @@ each step, and saves the result to an HDF5 file.
    from pymodaq_data import Q_
    from pymodaq_data.h5modules.backends import GroupType
    from pymodaq_data.h5modules.data_saving import DataToExportEnlargeableSaver
-   from pymodaq.scripting import Actuator, Detector
+   from pymodaq_scripting import Actuator, Detector
 
    theta  = Actuator('Angle')
    det0d  = Detector('Det0D')
