@@ -28,10 +28,11 @@ Order: T-012 -> T-013 (arbiter: T-012 only adds tests to config_test.py; T-013 a
 ## T-pymodaq_utils-014 Test the ConfigError handler in the package import
 - scope: pymodaq_utils/tests   specialty: test-quality
 - risk: low
-- files: `packages/pymodaq_utils/src/pymodaq_utils/__init__.py:39,47`
+- files: `packages/pymodaq_utils/src/pymodaq_utils/__init__.py:43-44` (`except ConfigError as e: print(e)`, added by T-007 / PR #24), new test in `packages/pymodaq_utils/tests/`
 - finding: packages/pymodaq_utils/src/pymodaq_utils/__init__.py:ConfigError handler|untested
-- verdicts: decider-compat-risk: veto — premise false: __init__.py has no `except ConfigError`, only `except Exception` at 39 and 47; decider-test-change: veto — same
-- status: blocked — premise false on dev_agent (no ConfigError handler in __init__.py; likely on an unmerged T-007 branch). Rewrite the finding against the `except Exception` fallbacks (reload with a patched GlobalConfig that raises) or drop.
+- notes: owner 2026-11-25: premise is now true (T-007 merged). Test only: patch `set_logger` to raise `ConfigError("msg")`, reload `pymodaq_utils` (restore it afterwards), assert the message is printed (capsys) and the import does not raise. No source change. Use the isolated config dir fixture (T-013).
+- verdicts: owner-approved 2026-11-25 (earlier decider vetoes were about the false premise)
+- status: approved
 
 ## T-pymodaq_utils-015 Trivial lint cleanups, numpydoc underline, double config lookup
 - scope: pymodaq_utils   specialty: hygiene
