@@ -1,2 +1,2 @@
 {"closed": "2026-11-22", "file": ".agents/grill/config-isolation.md", "opened": "2026-11-22", "scope": "pymodaq_utils", "source": null, "status": "answered", "topic": "config-isolation"}
-{"file": ".agents/grill/config-reconcile.md", "opened": "2026-11-23", "scope": "pymodaq_utils", "source": "optimize-plan", "status": "open", "topic": "config-reconcile"}
+{"closed": "2026-11-26", "file": ".agents/grill/config-reconcile.md", "opened": "2026-11-23", "scope": "pymodaq_utils", "source": "optimize-plan", "status": "answered", "topic": "config-reconcile"}
