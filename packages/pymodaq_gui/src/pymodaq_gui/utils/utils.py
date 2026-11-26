@@ -242,7 +242,7 @@ def clickable(widget):
     return filter.clicked
 
 
-def h5tree_to_QTree(base_node, base_tree_elt=None, pixmap_items=[]):
+def h5tree_to_QTree(base_node, base_tree_elt=None, pixmap_items=None):
     """
         | Convert a loaded h5 file to a QTreeWidgetItem element structure containing two columns.
         | The first is the name of the h5 current node, the second is the path of the node in the h5 structure.
@@ -270,6 +270,8 @@ def h5tree_to_QTree(base_node, base_tree_elt=None, pixmap_items=[]):
 
     """
 
+    if pixmap_items is None:
+        pixmap_items = []
     if base_tree_elt is None:
         base_tree_elt = QtWidgets.QTreeWidgetItem([base_node.name, "", base_node.path])
     for node_name, node in base_node.children().items():

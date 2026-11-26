@@ -374,7 +374,7 @@ def get_table_model_class(module_name: str, class_name: str) -> type:
     return _cls
 
 
-def walk_xml_to_parameter(params=[], XML_elt=None):
+def walk_xml_to_parameter(params=None, XML_elt=None):
     """ To convert an XML element (and children) to list of dict enabling creation of parameter object.
 
         =============== ================== =======================================
@@ -403,6 +403,8 @@ def walk_xml_to_parameter(params=[], XML_elt=None):
         --------
         walk_parameters_to_xml
     """
+    if params is None:
+        params = []
     try:
         if type(XML_elt) is not ET.Element:
             raise TypeError('not valid XML element')
