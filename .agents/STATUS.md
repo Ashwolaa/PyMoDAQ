@@ -1,19 +1,19 @@
-# Consortium status — generated 2026-11-26 11:39 by `scripts/status.py`
+# Consortium status — generated 2026-11-26 12:15 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `0a9fbd6a8`; 339 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 5/20, specialist_runs 1/10, prs_opened 2/6, reviews 2/10; outcomes: ok 4, failed 1
-- last /usage reading: 2026-11-26T10:39:17.443000+00:00  session 67% (resets Nov 26, 12:50pm (Europe/Paris))  week 59% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_gui-001 .agents/plans/2026-11-26-pymodaq_gui.md`
+- `dev_agent` at `8bafb0d93`; 340 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 6/20, specialist_runs 2/10, prs_opened 2/6, reviews 2/10; outcomes: ok 5, failed 1
+- last /usage reading: 2026-11-26T11:01:03.175000+00:00  session 69% (resets Nov 26, 12:50pm (Europe/Paris))  week 59% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - **T-pymodaq_gui-005** — done — PR #29 open, awaiting the human: touches a UI scope: packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py, packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.p
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- T-pymodaq_gui-001 Fix mutable default arguments — approved — owner, 2026-11-26
+- `agent/pymodaq_gui/hygiene/2026-11-26-fix-mutable-default` (T-pymodaq_gui-001, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_gui-002 Drop the direct PyQt6 import in PatternCompleter — approved — owner, 2026-11-26
 - T-pymodaq_gui-003 Manager sub-entry status colours via StatusPalette — approved — owner, 2026-11-26
 - T-pymodaq_gui-004 Exclude generated icon resources from jscpd — approved — owner, 2026-11-26 (tool path now exists)
@@ -51,11 +51,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [tool] task.py checks passes vacuously when pytest aborts on collection errors
 - [pymodaq_gui] tests/managers/action_manager_test.py::test_icon_qt fails on base (PyQt6 and PySide6, offscreen)
 - [pymodaq_gui] The 6 touched files still have other unused imports (e.g. roi.py LinearRegionItem, Slot; pixmap.py QByteArray, QObject; filter.py QtCore, roi_format),
+- [pymodaq_gui] flake8 on pymodaq_gui prints SyntaxWarning invalid escape '\*' at <unknown>:457 (file not identified)
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-run-T-pymodaq_scripting-001 | optimize-run | ok | 0.8 | 3559 | hygiene: __all__, unused imports, .keys() |
 | 2026-11-25-merge-T-pymodaq_scripting-001-r1 | optimize-merge | ok | 5.7 | 5603 | T-pymodaq_scripting-001: done — PR #27 merged (auto: low risk, approve |
 | 2026-11-25-run-T-pymodaq_scripting-002 | optimize-run | ok | 2.1 | 12314 | docs only, 101 lines; make_component_leco_available.rst:584-610 left o |
 | 2026-11-25-merge-T-pymodaq_scripting-002-r1 | optimize-merge | ok | 2.6 | 8818 | T-pymodaq_scripting-002: blocked — review: Points the scripting docs t |
@@ -65,6 +65,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-26-run-T-pymodaq_gui-004 | optimize-run | failed |  | 336 | tool task not executable by /optimize-run: its only file .agents/scrip |
 | 2026-11-26-run-T-pymodaq_gui-005 | optimize-run | ok | 10.5 | 10490 | task.py checks: pytest stopped at 2 editor collection errors (missing  |
 | 2026-11-26-merge-T-pymodaq_gui-005-r1 | optimize-merge | ok | 8.4 | 7983 | T-pymodaq_gui-005: done — PR #29 open, awaiting the human: touches a U |
+| 2026-11-26-run-T-pymodaq_gui-001 | optimize-run | ok | 12.8 | 12291 | mutable defaults fixed in 5 files, 2 regression tests; local gui suite |
 
 ## Done so far
-- tasks done: 31; PRs merged into dev_agent: 25
+- tasks done: 32; PRs merged into dev_agent: 25
