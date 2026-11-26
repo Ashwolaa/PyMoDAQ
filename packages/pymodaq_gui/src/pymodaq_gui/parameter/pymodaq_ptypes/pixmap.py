@@ -2,9 +2,6 @@ import numpy as np
 from qtpy import QtWidgets, QtGui
 from qtpy.QtCore import QByteArray, QObject
 from pyqtgraph.parametertree.parameterTypes.basetypes import WidgetParameterItem, SimpleParameter
-from qtpy import QtWidgets, QtGui
-from qtpy.QtCore import QByteArray
-from pyqtgraph.parametertree.parameterTypes.basetypes import WidgetParameterItem
 
 
 class PixmapCheckData:

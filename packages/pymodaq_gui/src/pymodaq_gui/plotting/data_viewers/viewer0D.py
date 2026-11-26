@@ -1,5 +1,4 @@
 from typing import List, Union, Dict
-from numbers import Real
 
 from qtpy import QtWidgets, QtGui
 from qtpy.QtCore import QObject, Slot, Signal, Qt

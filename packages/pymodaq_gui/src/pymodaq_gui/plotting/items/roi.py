@@ -14,7 +14,7 @@ from pymodaq_utils.math_utils import rotate2D
 
 from pymodaq_data.plotting.utils import PlotColors
 
-from pyqtgraph import ROI as pgROI, ROI, LinearRegionItem, mkColor
+from pyqtgraph import ROI as pgROI, LinearRegionItem, mkColor
 from pyqtgraph import LinearRegionItem as pgLinearROI
 from pyqtgraph import functions as fn
 from qtpy import QtCore, QtGui, QtWidgets

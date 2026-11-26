@@ -12,8 +12,6 @@ from pymodaq_utils.logger import set_logger, get_module_name
 
 from pymodaq_gui.parameter.utils import Parameter, ParameterWithPath
 
-from pymodaq_utils.enums import StrEnum
-
 
 logger = set_logger(get_module_name(__file__))
 ser_factory = SerializableFactory()

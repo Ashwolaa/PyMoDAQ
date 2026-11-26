@@ -17,7 +17,6 @@ from pymodaq_data.data import DataFromRoi, DataToExport, Axis, DataWithAxes
 from pymodaq_data import data as data_mod
 from pymodaq_data.post_treatment.process_to_scalar import DataProcessorFactory
 
-from pymodaq_gui.managers.roi_viewer_manager import ROIViewerManager
 from  pymodaq_gui.plotting.items.roi import LinearROI, RectROI
 from pymodaq_gui.plotting.items.crosshair import Crosshair
 from pymodaq_gui.plotting.items.image import UniformImageItem
