@@ -44,7 +44,7 @@ over LECO:
 
 .. code-block:: python
 
-   from pymodaq.scripting import Actuator, Detector
+   from pymodaq_scripting import Actuator, Detector
    from pymodaq_data import Q_
 
    stage = Actuator('Stage')      # names of the modules in the Dashboard
