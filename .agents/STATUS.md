@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-26 10:51 by `scripts/status.py`
+# Consortium status — generated 2026-11-26 11:06 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `37d5d66df`; 332 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 3/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2, failed 1
-- last /usage reading: 2026-11-26T09:51:52.539000+00:00  session 48% (resets Nov 26, 12:50pm (Europe/Paris))  week 56% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_gui-005 .agents/plans/2026-11-26-pymodaq_gui.md`
+- `dev_agent` at `2ed00b611`; 333 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 4/20, specialist_runs 1/10, prs_opened 1/6, reviews 1/10; outcomes: ok 3, failed 1
+- last /usage reading: 2026-11-26T09:54:33.613000+00:00  session 48% (resets Nov 26, 12:50pm (Europe/Paris))  week 56% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `merge`
 
 ## Needs you
 - approve or drop **T-pymodaq_gui-001** Fix mutable default arguments — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
@@ -16,7 +16,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_gui-004** — blocked — tool task not executable by /optimize-run: its only file .agents/scripts/scan.py is refused on any agent branch by merge_gate.py lint (rules.md 12), task.py names it agent/pymodaq_gui/tool/ not agent-tool/, no tool specialist exists; owner to apply on dev_agent or add a tool path
 
 ## In flight
-- T-pymodaq_gui-005 Remove unused and duplicate imports — approved
+- `agent/pymodaq_gui/hygiene/2026-11-26` (T-pymodaq_gui-005, risk low): pushed, waiting for /optimize-merge
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -50,11 +50,12 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
 - [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
 - [tool] /optimize-plan approves tool-specialty tasks that /optimize-run cannot execute (.agents/ files refused by merge_gate lint; task.py has no agent-tool/ 
+- [tool] task.py checks passes vacuously when pytest aborts on collection errors
+- [pymodaq_gui] tests/managers/action_manager_test.py::test_icon_qt fails on base (PyQt6 and PySide6, offscreen)
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-merge-T-pymodaq_utils-014-r3 | optimize-merge | ok | 6.7 | 5425 | T-pymodaq_utils-014: done — PR #26 open, awaiting the human: a decider |
 | plan-pymodaq_scripting-20261125 | optimize-plan | ok | 7.3 | 43748 |  |
 | 2026-11-25-run-T-pymodaq_scripting-001 | optimize-run | ok | 0.8 | 3559 | hygiene: __all__, unused imports, .keys() |
 | 2026-11-25-merge-T-pymodaq_scripting-001-r1 | optimize-merge | ok | 5.7 | 5603 | T-pymodaq_scripting-001: done — PR #27 merged (auto: low risk, approve |
@@ -64,6 +65,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-26-merge-T-pymodaq_scripting-002-r2 | optimize-merge | ok | 5.0 | 6689 | T-pymodaq_scripting-002: done — PR #28 merged (auto: low risk, approve |
 | plan-pymodaq_gui-2026-11-26 | optimize-plan | ok | 7.0 | 86184 |  |
 | 2026-11-26-run-T-pymodaq_gui-004 | optimize-run | failed |  | 336 | tool task not executable by /optimize-run: its only file .agents/scrip |
+| 2026-11-26-run-T-pymodaq_gui-005 | optimize-run | ok | 10.5 | 10490 | task.py checks: pytest stopped at 2 editor collection errors (missing  |
 
 ## Done so far
-- tasks done: 30; PRs merged into dev_agent: 25
+- tasks done: 31; PRs merged into dev_agent: 25
