@@ -1,19 +1,22 @@
-# Consortium status — generated 2026-11-26 07:58 by `scripts/status.py`
+# Consortium status — generated 2026-11-26 10:44 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `47611e3df`; 327 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
-- last /usage reading: 2026-11-26T06:58:54.808000+00:00  session 6% (resets Nov 26, 12:50pm (Europe/Paris))  week 52% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `plan pymodaq_gui`
+- `dev_agent` at `12d38c9c1`; 330 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 2/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2
+- last /usage reading: 2026-11-26T09:44:02.716000+00:00  session 45% (resets Nov 26, 12:50pm (Europe/Paris))  week 56% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_gui-004 .agents/plans/2026-11-26-pymodaq_gui.md`
 
 ## Needs you
-- grill pending: **config-reconcile** (pymodaq_utils) — answer with `/optimize-grill config-reconcile`
+- approve or drop **T-pymodaq_gui-001** Fix mutable default arguments — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
+- approve or drop **T-pymodaq_gui-002** Drop the direct PyQt6 import in PatternCompleter — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
+- approve or drop **T-pymodaq_gui-003** Manager sub-entry status colours via StatusPalette — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- nothing queued
+- T-pymodaq_gui-004 Exclude generated icon resources from jscpd — approved
+- T-pymodaq_gui-005 Remove unused and duplicate imports — approved
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -50,7 +53,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-merge-T-pymodaq_utils-014-r2 | optimize-merge | ok | 3.3 | 5840 | T-pymodaq_utils-014: blocked — review: Adds a test that a ConfigError  |
 | 2026-11-25-run-T-pymodaq_utils-014-r2 | optimize-run | ok | 2.9 | 3698 | rework r2: assert CONFIG before the restoring reload |
 | 2026-11-25-merge-T-pymodaq_utils-014-r3 | optimize-merge | ok | 6.7 | 5425 | T-pymodaq_utils-014: done — PR #26 open, awaiting the human: a decider |
 | plan-pymodaq_scripting-20261125 | optimize-plan | ok | 7.3 | 43748 |  |
@@ -60,6 +62,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-25-merge-T-pymodaq_scripting-002-r1 | optimize-merge | ok | 2.6 | 8818 | T-pymodaq_scripting-002: blocked — review: Points the scripting docs t |
 | 2026-11-25-run-T-pymodaq_scripting-002-r1 | optimize-run | ok | 1.1 | 4216 | rework r1: 3 review fixes applied (leco import + :class: targets, get_ |
 | 2026-11-26-merge-T-pymodaq_scripting-002-r2 | optimize-merge | ok | 5.0 | 6689 | T-pymodaq_scripting-002: done — PR #28 merged (auto: low risk, approve |
+| plan-pymodaq_gui-2026-11-26 | optimize-plan | ok | 7.0 | 86184 |  |
 
 ## Done so far
 - tasks done: 30; PRs merged into dev_agent: 25
