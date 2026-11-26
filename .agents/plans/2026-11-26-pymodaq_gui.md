@@ -13,7 +13,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py:245`, `packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:377`, `packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:442`, `packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:102,172`, `packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer.py:296`
 - notes: default None, build in body; keep names, keywords and positions. Confirmed bugs: h5tree_to_QTree shared pixmap_items (browsing.py:494 omits it, utils.py:298 appends); walk_xml_to_parameter shared params when the caller omits it (docstring example :398; in-repo callers pass params=[]). viewer1Dbasic.py:102 needs labels=[] in body (lines 105-106 slice/compare). 172 and browsing.py:442 are read-only cleanup. Add regression tests that fail on current code (call twice with the default); edit no existing test. Leave roi.py out (#1515).
 - verdicts: decider-compat-risk: approve — names/keywords/positions unchanged, no hard rule touched; decider-test-change: approve — tests only added, must fail before the fix
-- status: proposed
+- status: approved — owner, 2026-11-26
 
 ## T-pymodaq_gui-002 Drop the direct PyQt6 import in PatternCompleter
 - scope: pymodaq_gui   specialty: hygiene
@@ -21,7 +21,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:188`
 - notes: delete the local `from PyQt6.QtWidgets import QListView` (qtpy QListView already imported at line 8). Under PySide6 word_wrap raises ImportError or is silently ignored. Add a test in tests/utils/widgets/pattern_completer_test.py asserting popup.wordWrap(), run under PyQt6 and PySide6 (PYTEST_QT_API, offscreen).
 - verdicts: decider-compat-risk: approve — hard rule 6 fix, no public name changes; decider-test-change: approve — test added, none weakened
-- status: proposed
+- status: approved — owner, 2026-11-26
 
 ## T-pymodaq_gui-003 Manager sub-entry status colours via StatusPalette
 - scope: pymodaq_gui   specialty: uiux
@@ -29,7 +29,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:58-94`
 - notes: None->OFF, True->IDLE, False->ERROR (utils/status_palette.py:121-128; ERROR is orange, not darkRed). Keep set_status(int, bool) signature and the .colors attribute (note in PR if its element type changes). DecorationRole icons (:80-85) and settings_manager.py:288 out of scope. Before/after screenshots, light and dark.
 - verdicts: decider-compat-risk: approve (medium) — public set_status/.colors kept, visible colour change unrendered; decider-triage (2nd): approve — mapping exists, .colors never read in repo
-- status: proposed
+- status: approved — owner, 2026-11-26
 
 ## T-pymodaq_gui-004 Exclude generated icon resources from jscpd
 - scope: tool   specialty: tool
