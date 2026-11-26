@@ -37,7 +37,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `.agents/scripts/scan.py:126`
 - notes: add `--ignore "**/resources/material_icons/resources/**"` to the jscpd call (no jscpd config file exists); state the ignore pattern in the jscpd section header of the scan. Branch agent-tool/<name>, no product files. Scan sha256 of all scopes changes afterwards (expected).
 - verdicts: decider-compat-risk: approve — scanner only, files are rcc-generated (hard rule 3); decider-triage (2nd): approve — 24% duplication is all generated
-- status: approved
+- status: blocked — tool task not executable by /optimize-run: its only file .agents/scripts/scan.py is refused on any agent branch by merge_gate.py lint (rules.md 12), task.py names it agent/pymodaq_gui/tool/ not agent-tool/, no tool specialist exists; owner to apply on dev_agent or add a tool path
 
 ## T-pymodaq_gui-005 Remove unused and duplicate imports
 - scope: pymodaq_gui   specialty: hygiene

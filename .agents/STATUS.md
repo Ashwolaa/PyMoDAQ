@@ -1,21 +1,21 @@
-# Consortium status — generated 2026-11-26 10:44 by `scripts/status.py`
+# Consortium status — generated 2026-11-26 10:51 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `12d38c9c1`; 330 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 2/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2
-- last /usage reading: 2026-11-26T09:44:02.716000+00:00  session 45% (resets Nov 26, 12:50pm (Europe/Paris))  week 56% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `run T-pymodaq_gui-004 .agents/plans/2026-11-26-pymodaq_gui.md`
+- `dev_agent` at `63501f5c2`; 331 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 3/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2, failed 1
+- last /usage reading: 2026-11-26T09:49:54.384000+00:00  session 46% (resets Nov 26, 12:50pm (Europe/Paris))  week 56% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_gui-005 .agents/plans/2026-11-26-pymodaq_gui.md`
 
 ## Needs you
 - approve or drop **T-pymodaq_gui-001** Fix mutable default arguments — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
 - approve or drop **T-pymodaq_gui-002** Drop the direct PyQt6 import in PatternCompleter — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
 - approve or drop **T-pymodaq_gui-003** Manager sub-entry status colours via StatusPalette — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
+- blocked: **T-pymodaq_gui-004** — blocked — tool task not executable by /optimize-run: its only file .agents/scripts/scan.py is refused on any agent branch by merge_gate.py lint (rules.md 12), task.py names it agent/pymodaq_gui/tool/ not agent-tool/, no tool specialist exists; owner to apply on dev_agent or add a tool path
 
 ## In flight
-- T-pymodaq_gui-004 Exclude generated icon resources from jscpd — approved
 - T-pymodaq_gui-005 Remove unused and duplicate imports — approved
 
 ## Open findings (go to the next /optimize-plan of their scope)
@@ -49,11 +49,11 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
 - [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
 - [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
+- [tool] /optimize-plan approves tool-specialty tasks that /optimize-run cannot execute (.agents/ files refused by merge_gate lint; task.py has no agent-tool/ 
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-run-T-pymodaq_utils-014-r2 | optimize-run | ok | 2.9 | 3698 | rework r2: assert CONFIG before the restoring reload |
 | 2026-11-25-merge-T-pymodaq_utils-014-r3 | optimize-merge | ok | 6.7 | 5425 | T-pymodaq_utils-014: done — PR #26 open, awaiting the human: a decider |
 | plan-pymodaq_scripting-20261125 | optimize-plan | ok | 7.3 | 43748 |  |
 | 2026-11-25-run-T-pymodaq_scripting-001 | optimize-run | ok | 0.8 | 3559 | hygiene: __all__, unused imports, .keys() |
@@ -63,6 +63,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-25-run-T-pymodaq_scripting-002-r1 | optimize-run | ok | 1.1 | 4216 | rework r1: 3 review fixes applied (leco import + :class: targets, get_ |
 | 2026-11-26-merge-T-pymodaq_scripting-002-r2 | optimize-merge | ok | 5.0 | 6689 | T-pymodaq_scripting-002: done — PR #28 merged (auto: low risk, approve |
 | plan-pymodaq_gui-2026-11-26 | optimize-plan | ok | 7.0 | 86184 |  |
+| 2026-11-26-run-T-pymodaq_gui-004 | optimize-run | failed |  | 336 | tool task not executable by /optimize-run: its only file .agents/scrip |
 
 ## Done so far
 - tasks done: 30; PRs merged into dev_agent: 25
