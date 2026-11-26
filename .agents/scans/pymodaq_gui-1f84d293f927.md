@@ -1,0 +1,1576 @@
+# Scan: pymodaq_gui
+path: packages/pymodaq_gui/src/pymodaq_gui   tree: 1f84d293f927
+tools: ruff 0.17.5, vulture 2.16, radon 6.0.1, jscpd 5.4.3
+
+## ruff (927 findings, repo config)
+### Bug risk (96)
+- packages/pymodaq_gui/src/pymodaq_gui/config_saver_loader.py:71 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/config_saver_loader.py:86 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_checked_icons.py:38 F841 Local variable `mywidget` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_manager_example.py:135 F841 Local variable `edit_menu` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_manager_example.py:234 F841 Local variable `help_menu` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_manager_example.py:255 F841 Local variable `retrieved_file_toolbar` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:323 F841 Local variable `msg_box` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:442 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:527 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:531 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/h5browser.py:20 F811 Redefinition of unused `sys` from line 3: `sys` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:253 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:360 F841 Local variable `scan_type` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:475 F841 Local variable `scan_paths` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:363 E722 Do not use bare `except`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:757 B028 No explicit `stacklevel` keyword argument found
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1262 B013 A length-one tuple literal is redundant in exception handlers
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1262 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1278 F811 Redefinition of unused `is_action_visible` from line 1269: `is_action_visible` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1298 F811 Redefinition of unused `is_action_checked` from line 1289: `is_action_checked` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1318 F811 Redefinition of unused `set_action_visible` from line 1309: `set_action_visible` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1335 F811 Redefinition of unused `set_action_checked` from line 1324: `set_action_checked` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1353 F811 Redefinition of unused `set_action_enabled` from line 1341: `set_action_enabled` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:1368 F811 Redefinition of unused `is_action_enabled` from line 1359: `is_action_enabled` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/config_manager.py:49 F841 Local variable `cancel_button` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/config_manager.py:53 F841 Local variable `ret` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:609 F841 Local variable `checked` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:654 F841 Local variable `blocker` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:656 B007 Loop control variable `ind_file` not used within loop body
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:667 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:671 B007 Loop control variable `ind_file` not used within loop body
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:701 B007 Loop control variable `ind_file` not used within loop body
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:483 F841 Local variable `path` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py:15 F811 Redefinition of unused `StrEnum` from line 9: `StrEnum` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:106 E722 Do not use bare `except`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:424 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:12 F811 Redefinition of unused `Path` from line 6: `Path` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:16 F811 Redefinition of unused `np` from line 8: `np` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:277 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:377 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:553 F841 Local variable `tree` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/__init__.py:17 F811 Redefinition of unused `GroupParameter` from line 2: `GroupParameter` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/list.py:77 F841 Local variable `t` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:5 F811 Redefinition of unused `QtGui` from line 2: `QtGui` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:5 F811 Redefinition of unused `QtWidgets` from line 2: `QtWidgets` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:6 F811 Redefinition of unused `QByteArray` from line 3: `QByteArray` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:7 F811 Redefinition of unused `WidgetParameterItem` from line 4: `WidgetParameterItem` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/table.py:65 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:65 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer.py:296 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:182 F841 Local variable `yaxis` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:454 F841 Local variable `prog` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:726 F841 Local variable `y2` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:728 F841 Local variable `tau2` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:858 F841 Local variable `prog` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:102 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:172 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:230 B018 Found useless expression. Either assign it to a variable or remove it.
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1091 F841 Local variable `pos` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1092 F841 Local variable `size` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1094 F841 Local variable `offset_x` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1095 F841 Local variable `offset_y` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1289 F841 Local variable `prog` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:310 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:313 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:412 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:448 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:451 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/image_viewer.py:63 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/crosshair.py:6 F811 Redefinition of unused `np` from line 2: `np` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:333 F841 Local variable `profile` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:353 F841 Local variable `axes` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:221 F811 Redefinition of unused `ROI` from line 17: `ROI` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:361 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:465 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:465 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:522 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:522 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:533 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:533 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:552 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:552 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi_sync.py:239 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi_sync.py:241 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/axes_viewer.py:35 B007 Loop control variable `ind` not used within loop body
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py:20 F811 Redefinition of unused `ROIViewerManager` from line 3: `ROIViewerManager` redefined here
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:141 F841 Local variable `color` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/widgets.py:53 F841 Local variable `layout` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:150 F841 Local variable `row` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:151 F841 Local variable `col` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:155 B007 Loop control variable `ind` not used within loop body
+- packages/pymodaq_gui/src/pymodaq_gui/utils/shared_ui.py:364 F841 Local variable `ret` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/utils/shared_ui.py:365 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py:245 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1865 B007 Loop control variable `widget_id` not used within loop body
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/factories.py:105 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+### Unused imports (222)
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py:1 F401 `importlib.util` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py:67 F401 `pymodaq_gui.config` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py:119 F401 `pymodaq_gui.plotting.data_viewers` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/config_saver_loader.py:1 F401 `collections.abc.Iterable` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_checked_icons.py:6 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_checked_icons.py:6 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/custom_viewer.py:6 F401 `pymodaq_gui.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/icons.py:3 F401 `PyQt6.QtWidgets.QApplication` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/material_icon_ex.py:6 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/material_icon_ex.py:8 F401 `pymodaq_gui.resources.material_icons.MaterialIcon` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/material_icon_ex.py:9 F401 `pymodaq_gui.utils.styling.resource_path_exists` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/material_icon_ex.py:10 F401 `pymodaq_gui.utils.custom_app.CustomApp` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/parameter_ex.py:6 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/pattern_completer_demo.py:18 F401 `qtpy.QtWidgets.QPushButton` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/saving_loading.py:17 F401 `pymodaq_data.h5modules.data_saving.DataToExportSaver` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/view2D_parts.py:5 F401 `pymodaq_data.DataToExport` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:20 F401 `qtpy.QtGui.QColor` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:20 F401 `qtpy.QtGui.QPalette` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:22 F401 `pymodaq_gui.utils.widget_sync.BaseWidgetSync` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/5_extending_sync_example.py:25 F401 `qtpy.QtWidgets.QPushButton` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/5_extending_sync_example.py:26 F401 `qtpy.QtWidgets.QDoubleSpinBox` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/5_extending_sync_example.py:30 F401 `pymodaq_gui.utils.widget_sync.BaseWidgetSync` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/6_parameter_binding_example.py:23 F401 `qtpy.QtWidgets.QHBoxLayout` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:9 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:12 F401 `logging` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:13 F401 `webbrowser` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:14 F401 `numpy` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:36 F401 `pymodaq_gui.managers.action_manager.ActionManager` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/h5browser.py:3 F401 `sys` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/h5browser.py:5 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:27 F401 `pymodaq_gui.parameter.ParameterTree` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:27 F401 `pymodaq_gui.parameter.Parameter` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/h5manager.py:8 F401 `pymodaq_gui.parameter.ParameterTree` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:7 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:1 F401 `dataclasses` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:2 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:7 F401 `numpy` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:10 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:10 F401 `qtpy.QtCore.QSignalBlocker` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:10 F401 `qtpy.QtCore.Slot` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:11 F401 `qtpy.QtGui.QIcon` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:11 F401 `qtpy.QtGui.QPixmap` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:23 F401 `pymodaq_gui.parameter.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:24 F401 `pymodaq_gui.parameter.ParameterTree` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:25 F401 `pymodaq_gui.managers.action_manager.QAction` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py:29 F401 `pymodaq_gui.plotting.items.roi_sync.ROI` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/runner_thread_manager.py:2 F401 `typing.Any` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/settings_manager.py:6 F401 `toml` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/settings_manager.py:14 F401 `pymodaq_utils.config.get_set_local_dir` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/settings_manager.py:29 F401 `pymodaq_gui.managers.manager_base.ManagerActions` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py:2 F401 `time` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py:24 F401 `pymodaq_gui.managers.settings.settings_manager.SettingsManager` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:4 F401 `typing.Any` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:9 F401 `qtpy.QtWidgets.QDialogButtonBox` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:9 F401 `qtpy.QtWidgets.QDialog` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:11 F401 `pymodaq_gui.managers.settings.subentries.SubEntryHandlerTypes` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:28 F401 `serializall.SerializableBase` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/messenger.py:1 F401 `warnings` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/__init__.py:1 F401 `contextlib.contextmanager` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/__init__.py:2 F401 `typing.Any` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/__init__.py:6 F401 `pyqtgraph.parametertree.parameterTypes` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/__init__.py:7 F401 `.pymodaq_ptypes` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:3 F401 `copy` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:14 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:25 F401 `pyqtgraph.parametertree.Parameter.PARAM_NAMES` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/__init__.py:2 F401 `pyqtgraph.parametertree.parameterTypes.basetypes.GroupParameterItem` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/__init__.py:2 F401 `pyqtgraph.parametertree.parameterTypes.basetypes.SimpleParameter` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/__init__.py:6 F401 `.slide.SliderSpinBox` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/__init__.py:11 F401 `.tableview.TableViewCustom` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/__init__.py:18 F401 `pyqtgraph.parametertree.Parameter.registerParameterItemType` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/action_led.py:5 F401 `pymodaq_gui.utils.widgets.DEFAULT_STATES` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/date.py:2 F401 `pyqtgraph.functions` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/date.py:4 F401 `pyqtgraph.parametertree.ParameterItem` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/date.py:5 F401 `pymodaq_gui.parameter.Parameter` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/filedir.py:4 F401 `pyqtgraph.parametertree.Parameter.ParameterItem` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/list.py:3 F401 `pyqtgraph.parametertree.Parameter.ParameterItem` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:3 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:6 F401 `qtpy.QtCore.QByteArray` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:2 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:5 F401 `pyqtgraph.widgets.ColorButton` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text.py:1 F401 `os` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text.py:2 F401 `pathlib.Path` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text.py:4 F401 `pyqtgraph.parametertree.Parameter.ParameterItem` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:1 F401 `.base.ViewerError` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:1 F401 `.base.ViewersEnum` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:3 F401 `.viewer0D.Viewer0D` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:4 F401 `.viewer1D.Viewer1D` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:5 F401 `.viewer2D.Viewer2D` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:6 F401 `.viewerND.ViewerND` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py:7 F401 `.viewer.ViewerDispatcher` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/base.py:15 F401 `pymodaq_gui.utils.dock.Dock` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/base.py:19 F401 `pymodaq_gui.plotting.data_viewers.viewerND.ViewerND` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer.py:7 F401 `pymodaq_data.data.Averaging` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:1 F401 `typing.Union` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:2 F401 `numbers.Real` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:16 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:30 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:31 F401 `datetime` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:2 F401 `datetime` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:3 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:8 F401 `qtpy.QtCore.QRectF` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:14 F401 `pymodaq_data.data.DataCalculated` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:14 F401 `pymodaq_data.data.DataFromRoi` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:19 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:1 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:2 F401 `qtpy.QtCore.QDateTime` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:2 F401 `qtpy.QtCore.QLocale` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:2 F401 `qtpy.QtCore.QSize` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:2 F401 `qtpy.QtCore.QThread` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:9 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:13 F401 `pymodaq_data` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:20 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D_basic.py:4 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D_basic.py:4 F401 `qtpy.QtCore.Signal` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D_basic.py:120 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:1 F401 `abc.ABCMeta` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:12 F401 `scipy.spatial.qhull.Delaunay` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:15 F401 `qtpy.QtCore.QPointF` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:15 F401 `qtpy.QtCore.QRectF` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:15 F401 `qtpy.QtCore.Slot` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/crosshair.py:1 F401 `os` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/crosshair.py:3 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/crosshair.py:3 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/crosshair.py:6 F401 `numpy` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:3 F401 `typing.List` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:3 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:17 F401 `pyqtgraph.LinearRegionItem` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:21 F401 `qtpy.QtCore.Slot` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:26 F401 `pymodaq_gui.plotting.utils.plot_utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi_sync.py:2 F401 `pyqtgraph.parametertree.parameterTypes.SimpleParameter` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/navigator.py:1 F401 `sys` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/navigator.py:2 F401 `os` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/navigator.py:4 F401 `pathlib.Path` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:1 F401 `typing.Any` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:1 F401 `typing.List` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:1 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:1 F401 `typing.Tuple` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:12 F401 `pymodaq_gui.plotting.data_viewers.Viewer2D` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:12 F401 `pymodaq_gui.plotting.data_viewers.ViewerND` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:13 F401 `pymodaq_gui.plotting.data_viewers.Viewer0D` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/axes_viewer.py:13 F401 `pymodaq_utils.math_utils.find_index` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py:5 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py:7 F401 `typing.List` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py:7 F401 `typing.Tuple` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py:11 F401 `pymodaq_gui.plotting.items.roi_sync.roi_format` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:17 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/plot_utils.py:10 F401 `multipledispatch.dispatch` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:2 F401 `os` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:3 F401 `sys` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:4 F401 `warnings` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:12 F401 `qtpy.QtGui.QColor` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:12 F401 `qtpy.QtGui.QPainter` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/qt_utils.py:14 F401 `qtpy.QtSvg.QSvgRenderer` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/resources/__init__.py:3 F401 `importlib.util.module_from_spec` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/resources/__init__.py:3 F401 `importlib.util.spec_from_file_location` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12 F401 `PySide2.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12 F401 `PySide2.QtWidgets` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12 F401 `PySide2.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12 F401 `PySide2.QtWidgets` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:1 F401 `.dock.DockArea` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:1 F401 `.dock.Dock` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:2 F401 `.list_picker.ListPicker` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:3 F401 `.file_io.select_file` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:4 F401 `.widgets.table.BooleanDelegate` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:4 F401 `.widgets.table.SpinBoxDelegate` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:4 F401 `.widgets.table.TableModel` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:4 F401 `.widgets.table.TableView` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:5 F401 `.widgets.push.EditPushInfo` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:5 F401 `.widgets.push.EditPushRel` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:5 F401 `.widgets.push.EditPush` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:5 F401 `.widgets.push.PushButtonIcon` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:6 F401 `.widgets.qled.QLED` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:7 F401 `.widgets.spinbox.QSpinBoxWithShortcut` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:7 F401 `.widgets.spinbox.QSpinBox_ro` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:8 F401 `.custom_app.CustomApp` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:10 F401 `.utils.set_dark_palette` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/__init__.py:11 F401 `.status_palette.StatusPalette` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:2 F401 `dataclasses.dataclass` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:19 F401 `pymodaq_utils.utils.ThreadCommand` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/custom_app.py:3 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/custom_app.py:7 F401 `qtpy.QtCore.QLocale` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/custom_app.py:13 F401 `pymodaq_gui.managers.h5manager.FileStatus` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:1 F401 `warnings` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:3 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:4 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:4 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:5 F401 `pyqtgraph.dockarea.DockLabel` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:7 F401 `pyqtgraph.widgets.VerticalLabel.VerticalLabel` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:1 F401 `.qled.QLED` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:2 F401 `.multistate_led.DEFAULT_STATES` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:2 F401 `.multistate_led.LedState` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:2 F401 `.multistate_led.MultistateLED` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:3 F401 `pymodaq_gui.utils.status_palette.StatusPalette` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:3 F401 `pymodaq_gui.utils.status_palette.Status` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:4 F401 `.painter_utils.GRADIENTS` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:4 F401 `.painter_utils.SHAPES` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:4 F401 `.painter_utils.desaturate` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:4 F401 `.painter_utils.draw_shape` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:4 F401 `.painter_utils.make_brush` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:5 F401 `.push.EditPushRel` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:5 F401 `.push.EditPush` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:5 F401 `.push.PushButtonIcon` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:6 F401 `.spinbox.QSpinBoxWithShortcut` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:6 F401 `.spinbox.QSpinBox_ro` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:6 F401 `.spinbox.SpinBox` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:7 F401 `.table.TableModel` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:7 F401 `.table.TableView` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/__init__.py:8 F401 `.label.LabelWithFont` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/collapsible_widget.py:11 F401 `qtpy.QtCore.Qt` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/highlighted_combo.py:1 F401 `sys` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/label.py:8 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/push.py:5 F401 `qtpy.QtWidgets.QWidget` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/qled.py:1 F401 `os` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/qled.py:2 F401 `numpy` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/qled.py:3 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/qled.py:3 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/qled.py:5 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:7 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:11 F401 `pymodaq_data.Q_` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:2 F401 `qtpy.QtCore.QLocale` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_toml.py:16 F401 `pymodaq_gui.parameter.ParameterTree` imported but unused
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_toml.py:19 F401 `pymodaq_utils.config.create_toml_from_dict` imported but unused
+### Simplifications (104)
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py:107 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py:116 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/config.py:10 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/config_saver_loader.py:68 SIM105 Use `contextlib.suppress(ConfigError, TypeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/editor/monaco.py:60 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/editor/monaco.py:61 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/editor/monaco.py:62 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/editor/monaco.py:63 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/editor/monaco.py:210 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/examples/parameter_ex.py:191 SIM910 Use `data.get("visible")` instead of `data.get("visible", None)`
+- packages/pymodaq_gui/src/pymodaq_gui/examples/saving_loading.py:113 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/examples/saving_loading.py:309 SIM105 Use `contextlib.suppress(TypeError, AttributeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/2_dict_sync_example.py:207 E741 Ambiguous variable name: `l`
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:441 E741 Ambiguous variable name: `l`
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:686 E741 Ambiguous variable name: `l`
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:321 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:22 SIM105 Use `contextlib.suppress(ImportError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:379 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:190 SIM105 Use `contextlib.suppress(RuntimeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:259 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:262 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:265 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:268 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:347 SIM105 Use `contextlib.suppress(TypeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:395 SIM105 Use `contextlib.suppress(TypeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:717 SIM300 Yoda condition detected
+- packages/pymodaq_gui/src/pymodaq_gui/managers/runner_thread_manager.py:90 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py:206 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:249 SIM210 Remove unnecessary `True if ... else False`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:62 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:140 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:264 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:280 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:295 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:471 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/action_led.py:68 SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/filedir.py:54 SIM208 Use `folder_name` instead of `not (not folder_name)`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/itemselect.py:209 SIM201 Use `text != ""` instead of `not text == ""`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/led.py:126 SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/list.py:107 SIM201 Use `text != ""` instead of `not text == ""`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/list.py:114 SIM201 Use `text != ""` instead of `not text == ""`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py:158 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/slide.py:171 SIM105 Use `contextlib.suppress(AttributeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text.py:127 SIM201 Use `text != ""` instead of `not text == ""`
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:270 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:279 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:300 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:301 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:317 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:318 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:335 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:336 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:353 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:354 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:102 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:340 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:437 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:443 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/base.py:183 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:635 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:637 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:693 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:204 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1142 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1144 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1146 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1152 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:313 SIM107 Don't use `return` in `try`-`except` and `finally`
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:451 SIM107 Don't use `return` in `try`-`except` and `finally`
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:469 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:611 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:274 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/navigator.py:215 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py:59 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:43 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:123 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:230 SIM105 Use `contextlib.suppress(AttributeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:272 SIM105 Use `contextlib.suppress(TypeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:287 SIM105 Use `contextlib.suppress(TypeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:315 SIM105 Use `contextlib.suppress(TypeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/file_io.py:34 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/file_io.py:43 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/styling.py:185 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py:232 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py:233 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:333 SIM105 Use `contextlib.suppress(TypeError, RuntimeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:348 SIM105 Use `contextlib.suppress(TypeError, RuntimeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:434 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:480 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:562 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:706 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1591 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1682 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:205 SIM105 Use `contextlib.suppress(TypeError, RuntimeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:221 SIM105 Use `contextlib.suppress(TypeError, RuntimeError)` instead of `try`-`except`-`pass`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:136 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:175 SIM210 Remove unnecessary `True if ... else False`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:238 F541 f-string without any placeholders
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:120 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:122 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:138 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:140 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:143 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:143 SIM118 Use `key in dict` instead of `key in dict.keys()`
+### Style, counted only (505; per rule: findings / files)
+- E402: 12 / 3
+- E721: 2 / 2
+- I001: 149 / 119
+- UP006: 98 / 19
+- UP007: 6 / 2
+- UP008: 7 / 5
+- UP009: 10 / 10
+- UP015: 2 / 1
+- UP024: 1 / 1
+- UP031: 1 / 1
+- UP032: 8 / 6
+- UP034: 4 / 4
+- UP035: 53 / 26
+- UP037: 1 / 1
+- UP039: 3 / 3
+- UP045: 7 / 1
+- W291: 69 / 14
+- W292: 27 / 27
+- W293: 43 / 12
+- W605: 2 / 1
+
+## vulture (319 findings at >= 60% confidence)
+### >= 80% confidence (19)
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:434 unused variable 'create_scan_folder' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:435 unused variable 'create_dataset_folder' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:25 unused import 'PARAM_NAMES' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:5 unused import 'ColorButton' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer.py:7 unused import 'Averaging' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:2 unused import 'Real' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:297 unused variable 'parent_image_item' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:1 unused import 'ABCMeta' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:459 unused variable 'fileName' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:463 unused variable 'targetHistogramSize' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:26 unused import 'plot_utils' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:338 unused variable 'opt' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:500 unused variable 'opt' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/navigator.py:326 unused variable 'log_type' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:232 unused variable 'curve_key' (100%)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py:27 unused import 'ModulesManager' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:5 unused import 'DockLabel' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py:7 unused import 'VerticalLabel' (90%)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_toml.py:19 unused import 'create_toml_from_dict' (90%)
+### 60-79% confidence, counted per file (mostly public API seen as unused)
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/config.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/config_saver_loader.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/editor/monaco.py: 4
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_checked_icons.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/examples/action_manager_example.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/examples/saving_loading.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/5_extending_sync_example.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/managers/config_manager.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/managers/h5manager.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py: 16
+- packages/pymodaq_gui/src/pymodaq_gui/managers/roi_viewer_manager.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/managers/runner_thread_manager.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py: 8
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py: 8
+- packages/pymodaq_gui/src/pymodaq_gui/messenger.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/action_led.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/bool.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/date.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/filedir.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/itemselect.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/led.py: 6
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/slide.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/table.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py: 5
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/__init__.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/base.py: 11
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer.py: 11
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py: 11
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py: 12
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D_basic.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/image_viewer.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/axis_scaled.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py: 9
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py: 13
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/navigator.py: 5
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plot_theme.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plotter/plotters/qt_plotters.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/axes_viewer.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py: 7
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py: 12
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/plot_utils.py: 7
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/widgets.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/_icon.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/app_worker.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/utils/custom_app.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/utils/dock.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/utils/layout.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/utils/list_picker.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/shared_ui.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/styling.py: 23
+- packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/__init__.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py: 10
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/factories.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/collapsible_widget.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/multistate_led.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py: 6
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/push.py: 3
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/qled.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/spinbox.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py: 9
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/widget_bkg.py: 1
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/widget_with_label_title.py: 2
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/widget_with_title_in_toolbar.py: 2
+
+## radon cyclomatic complexity, rank C or worse (46)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/plot_utils.py:272 makeAlphaTriangles E(38)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:445 set_txt_from_elt D(23)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:587 ViewerND.set_data_test D(23)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:59 UniformImageItem.setImage D(22)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1603 DictSync.bind_parameter D(22)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:205 UniformDataDisplayer.update_viewer_data D(21)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:336 PatternCompleter._pattern_on_text_changed C(20)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:194 addaction C(18)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:124 add_text_to_elt C(17)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:186 dict_from_param C(17)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/base.py:99 ViewersEnum.get_viewers_enum_from_data C(17)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:568 BaseWidgetSync._handle_initialization C(17)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:836 ActionManager.add_menu C(16)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:172 SettingsManagerModel.data C(16)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:245 elt_to_dict C(16)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:210 SpreadImageItem.setImage C(16)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1150 ValueSync.add C(16)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:258 PatternCompleter._find_active_trigger C(16)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:421 set_param_from_param C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:463 filter_parameter_tree C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/base.py:61 ViewersEnum.get_viewers_enum_from_metadata C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:102 Viewer1DBasic.update_labels C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/plot_theme.py:92 _restyle_item C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py:245 h5tree_to_QTree C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_toml.py:47 TreeFromToml._post_process_params C(14)
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:537 H5SaverBase.value_changed C(13)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:313 addwidget C(13)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/plot_utils.py:500 Data0DWithHistory.add_data_dict C(13)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/styling.py:300 create_icon C(13)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_toml.py:169 TreeFromToml.dict_to_param C(13)
+- packages/pymodaq_gui/src/pymodaq_gui/__init__.py:7 set_and_check_qt_backend_or_die C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:391 H5SaverBase.find_part_in_path_and_subpath C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:54 PatternParameterItem.optsChanged C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:135 DataDisplayer.update_plot C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:398 SpreadDataDisplayer.update_nav_data C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:677 ViewerND.update_widget_visibility C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/file_io.py:9 select_file_filter C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:147 PatternCompleter.update_completer_config C(12)
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:502 browse_data C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/h5modules/saving.py:197 H5SaverBase._check_swmr_compatibility C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:75 ManagerSubEntriesModel.data C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/itemselect.py:113 ItemSelect.set_value C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/utils.py:268 iter_children_params C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer0D.py:225 DataDisplayer.update_plots C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/filter.py:141 Filter2DFromCrosshair.get_data_from_uniform C(11)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1451 DictSync._setup_property_binding C(11)
+
+## jscpd duplication: 24.43% of lines, 971 clones
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13207-13796 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15344-15933 (590 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:15144-15434 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:17281-17571 (291 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11236-11406 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11405-11575 (171 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:648-766 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:765-883 (119 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3586-3701 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3700-3815 (116 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6319-6418 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6417-6516 (100 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9839-9936 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9935-10032 (98 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12701-12797 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12805-12901 (97 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11004-11099 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11098-11193 (96 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8331-8424 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8423-8516 (94 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:187-278 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:277-368 (92 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6515-6605 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6604-6694 (91 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5087-5176 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5175-5264 (90 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13027-13115 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13119-13207 (89 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4272-4359 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4358-4445 (88 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14700-14787 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14786-14873 (88 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9270-9356 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9355-9441 (87 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10031-10117 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10116-10202 (87 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10201-10285 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10284-10368 (85 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5298-5381 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5380-5463 (84 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5462-5543 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5542-5623 (82 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15178-15259 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15263-15344 (82 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13091-13169 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13168-13246 (79 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10710-10787 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10792-10869 (78 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:493-569 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:568-644 (77 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:959-1035 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1034-1110 (77 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7468-7544 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7543-7619 (77 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8515-8589 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8588-8662 (75 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1747-1819 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1818-1890 (73 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11035-11106 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11105-11176 (72 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4122-4193 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4192-4263 (72 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:708-778 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:776-846 (71 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:963-1033 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6519-6589 (71 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1384-1453 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1452-1521 (70 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3523-3592 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3591-3660 (70 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12493-12560 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12559-12626 (68 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12289-12354 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12353-12418 (66 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3298-3362 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3361-3425 (65 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1109-1173 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1172-1236 (65 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11595-11659 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11658-11722 (65 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:713-776 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5466-5529 (64 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1623-1686 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1685-1748 (64 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6098-6161 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6177-6240 (64 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8209-8271 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8270-8332 (63 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10516-10578 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10577-10639 (63 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-78 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:78-140 (63 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3990-4052 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4060-4122 (63 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10768-10830 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10829-10891 (63 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2300-2361 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2374-2435 (62 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8806-8866 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8865-8925 (61 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2108-2168 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2167-2227 (61 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13417-13477 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13476-13536 (61 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:845-903 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:902-960 (59 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9777-9835 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9834-9892 (59 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10346-10404 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10403-10461 (59 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3772-3830 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3829-3887 (59 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:157-214 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:213-270 (58 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9060-9117 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9116-9173 (58 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12671-12728 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12727-12784 (58 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2824-2880 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2879-2935 (57 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1239-1294 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1321-1376 (56 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9286-9341 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9340-9395 (56 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1278-1332 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1331-1385 (55 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1674-1728 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1727-1781 (55 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8317-8371 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8369-8423 (55 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9713-9767 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9776-9830 (55 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10894-10948 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10951-11005 (55 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3275-3327 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3364-3416 (53 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13705-13757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13756-13808 (53 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9587-9638 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9637-9688 (52 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1889-1940 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1939-1990 (52 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2969-3020 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3023-3074 (52 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3073-3124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3123-3174 (52 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7618-7669 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7668-7719 (52 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-66 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:66-116 (51 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9172-9222 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9221-9271 (51 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2350-2399 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2398-2447 (50 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3193-3241 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3246-3294 (49 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1993-2041 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2059-2107 (49 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:963-1010 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1034-1081 (48 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11801-11848 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11847-11894 (48 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2857-2904 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2908-2955 (48 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3663-3710 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3725-3772 (48 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5267-5314 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5318-5365 (48 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11985-12032 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12030-12077 (48 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5125-5171 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5181-5227 (47 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7738-7784 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7783-7829 (47 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4835-4881 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4895-4941 (47 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9178-9224 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9229-9275 (47 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10613-10659 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10664-10710 (47 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14610-14656 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14655-14701 (47 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2446-2491 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2490-2535 (46 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8340-8385 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13032-13077 (46 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11196-11241 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11246-11291 (46 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14872-14917 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14916-14961 (46 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1520-1564 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1563-1607 (45 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6313-6357 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6360-6404 (45 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7876-7920 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7931-7975 (45 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9496-9540 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9545-9589 (45 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12203-12247 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12246-12290 (45 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12583-12626 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12629-12672 (44 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2769-2812 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2811-2854 (44 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11386-11429 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11443-11486 (44 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13333-13376 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13375-13418 (44 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2938-2980 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2985-3027 (43 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8011-8053 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8057-8099 (43 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4448-4489 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4499-4540 (42 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7644-7685 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7696-7737 (42 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:459-500 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:499-540 (42 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15094-15135 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15134-15175 (42 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3035-3075 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3074-3114 (41 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9444-9484 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9489-9529 (41 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3177-3217 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3221-3261 (41 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5935-5975 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5974-6014 (41 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11790-11830 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11845-11885 (41 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11890-11930 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11945-11985 (41 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6403-6442 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6441-6480 (40 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10270-10309 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10308-10347 (40 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1399-1438 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1437-1476 (40 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:237-275 = packages/pymodaq_gui/src/pymodaq_gui/plotting/items/roi.py:368-406 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2198-2236 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2235-2273 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7919-7957 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7968-8006 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8106-8144 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8158-8196 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8928-8966 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8971-9009 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12783-12821 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12820-12858 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4419-4457 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14303-14341 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11489-11527 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11531-11569 (39 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1834-1871 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1881-1918 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4058-4095 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4099-4136 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10112-10149 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10148-10185 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11588-11625 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11638-11675 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4320-4357 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14379-14416 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4460-4497 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4496-4533 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12625-12662 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12661-12698 (38 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6964-7000 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6999-7035 (37 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2226-2262 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2261-2297 (37 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12902-12938 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12937-12973 (37 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2538-2573 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2584-2619 (36 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9944-9979 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9990-10025 (36 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10030-10065 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10076-10111 (36 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10638-10673 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10672-10707 (36 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5684-5719 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5724-5759 (36 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12976-13011 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13030-13065 (36 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1479-1513 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1558-1592 (35 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6948-6982 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6981-7015 (35 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7983-8017 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8026-8060 (35 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9034-9068 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9067-9101 (35 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5752-5785 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5790-5823 (34 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:467-500 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7636-7669 (34 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6825-6858 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6873-6906 (34 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6617-6649 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6666-6698 (33 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2276-2307 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2318-2349 (32 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5866-5897 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5896-5927 (32 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6030-6061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6083-6114 (32 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7525-7556 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7555-7586 (32 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9691-9722 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9745-9776 (32 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8167-8198 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8235-8266 (32 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1101-1131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1130-1160 (31 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4783-4813 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4818-4848 (31 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5622-5652 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5651-5681 (31 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:349-378 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:377-406 (30 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1163-1192 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1221-1250 (30 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13889-13918 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13917-13946 (30 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5684-5712 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5717-5745 (29 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6866-6894 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6928-6956 (29 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6693-6721 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6720-6748 (29 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7014-7042 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7041-7069 (29 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14446-14474 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14473-14501 (29 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11952-11979 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11978-12005 (28 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9206-9233 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10641-10668 (28 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1610-1636 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1641-1667 (27 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1780-1806 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1805-1831 (27 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2380 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5999-6025 (27 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5232-5258 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5271-5297 (27 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10873-10899 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10898-10924 (27 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5025-5051 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5056-5082 (27 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:139-164 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:163-188 (26 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10367-10392 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10391-10416 (26 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5925-5949 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5947-5971 (25 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10952-10976 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11005-11029 (25 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12080-12104 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12149-12173 (25 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5007-5030 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5038-5061 (24 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7670-7693 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7942-7965 (24 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12008-12031 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12095-12118 (24 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3433-3456 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3482-3505 (24 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:115-137 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:136-158 (23 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4219-4241 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4246-4268 (23 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6843-6865 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6899-6921 (23 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9636-9658 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11623-11645 (23 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6906-6928 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6927-6949 (23 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10567-10589 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10588-10610 (23 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2753-2774 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2789-2810 (22 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9587-9608 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11574-11595 (22 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13949-13970 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14039-14060 (22 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1564-1585 = packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1814-1835 (22 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:358-378 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6422-6442 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2076 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2134-2154 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2374 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5626-5646 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2374 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5974-5994 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2374 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7832-7852 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3429-3449 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3511-3531 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7072-7092 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7096-7116 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7072-7092 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9452-9472 (21 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/custom_viewer.py:61-80 = packages/pymodaq_gui/src/pymodaq_gui/examples/data_picker.py:78-97 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:406-425 = packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:47-66 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:261-280 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:382-401 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:676-695 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9588-9607 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5830-5849 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5848-5867 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7176-7195 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7202-7221 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12442-12461 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12464-12483 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3253-3272 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9430-9449 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5295-5314 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6839-6858 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5358-5377 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6851-6870 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9268-9287 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10703-10722 (20 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9895-9913 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9921-9939 (19 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10770-10788 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10852-10870 (19 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-161 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11375-11393 (19 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-161 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11432-11450 (19 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-161 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13421-13439 (19 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/2_dict_sync_example.py:198-215 = packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:432-449 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5770-5787 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8951-8968 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-160 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:924-941 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-160 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9104-9121 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-160 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9136-9153 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2554-2571 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2578-2595 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2554-2571 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5481-5498 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2554-2571 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5505-5522 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2606-2623 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2694-2711 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5804-5821 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8701-8718 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7271 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7360-7377 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10725-10742 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10750-10767 (18 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:297-313 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:435-451 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-135 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:679-695 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8661-8677 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8676-8692 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9020-9036 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9041-9057 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10188-10204 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10227-10243 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12256-12272 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12350-12366 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2969-2985 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6697-6713 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3201-3217 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9422-9438 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14137-14153 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14189-14205 (17 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:324-339 = packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:719-734 (16 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:313-328 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:359-374 (16 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4080-4095 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7893-7908 (16 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4129-4144 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7901-7916 (16 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5816-5831 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9002-9017 (16 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10927-10942 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10980-10995 (16 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:720-734 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:212-225 (15 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:136-150 = packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:293-307 (15 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1403-1417 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5939-5953 (15 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8064-8078 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8131-8145 (15 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/factories.py:184-198 = packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/factories.py:217-231 (15 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/curves.py:101-114 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1193-1206 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/curves.py:116-129 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1229-1241 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/curves.py:136-149 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1249-1260 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/parameter_ex.py:29-42 = packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text_pattern.py:218-231 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:258-271 = packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:626-639 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2015-2028 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2034-2047 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2015-2028 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4619-4632 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2015-2028 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4641-4654 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4149-4162 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4184-4197 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4949-4962 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4992-5005 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6767-6780 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6803-6816 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:500-513 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:514-527 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:500-513 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:528-541 (14 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:242-254 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:168-180 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/icons.svg:108-120 = packages/pymodaq_gui/src/pymodaq_gui/resources/icons.svg:128-140 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3657-3669 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3670-3682 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4883-4895 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7230-7242 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6137-6149 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6226-6238 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12486-12498 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12533-12545 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9696-9708 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12476-12488 (13 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/custom_viewer.py:93-104 = packages/pymodaq_gui/src/pymodaq_gui/examples/data_picker.py:111-122 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4859-4870 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4879-4890 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4859-4870 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7226-7237 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4859-4870 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7252-7263 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8042-8053 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10502-10513 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8092-8103 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10506-10517 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-154 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3077-3088 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-154 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14133-14144 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-154 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14185-14196 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2554-2565 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8795-8806 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4692-4703 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4945-4956 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4692-4703 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4988-4999 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4692-4703 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8734-8745 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4692-4703 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8766-8777 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4750-4761 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4795-4806 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5774-5785 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5800-5811 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5774-5785 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8671-8682 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5774-5785 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8697-8708 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8616-8627 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8643-8654 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10104-10115 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15247-15258 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11299-11310 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11340-11351 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/file_io.py:10-21 = packages/pymodaq_gui/src/pymodaq_gui/utils/file_io.py:64-75 (12 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/view2D_parts.py:20-30 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1224-1233 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:243-253 = packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:611-621 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:342-352 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:392-402 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:394-404 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:775-785 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:208-218 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:352-363 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:21-31 = packages/pymodaq_gui/src/pymodaq_gui/plotting/items/image.py:39-49 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-129 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2450-2460 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-129 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7379-7389 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-129 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12173-12183 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-129 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12216-12226 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1115 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5002-5012 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1115 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5033-5043 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6770-6780 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6818-6828 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7383-7393 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12177-12187 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7383-7393 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12220-12230 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12180-12190 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12223-12233 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6245-6255 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6290-6300 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7264 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8612-8622 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7264 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8639-8649 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10082-10092 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15225-15235 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10093-10103 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15236-15246 (11 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/curves.py:150-159 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer2D.py:1262-1271 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:216-225 = packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:570-579 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1606-1615 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4998-5007 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1606-1615 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5029-5038 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3117-3126 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3159-3168 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3993-4002 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4022-4031 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4709-4718 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6894-6903 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5925-5934 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12437-12446 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5925-5934 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12459-12468 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6489-6498 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6588-6597 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7730-7739 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7999-8008 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8006-8015 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12578-12587 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10734-10743 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10768-10777 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3890-3899 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3936-3945 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4268-4277 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4364-4373 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10115-10124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15258-15267 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/collapsible_widget.py:105-114 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/collapsible_widget.py:117-126 (10 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:835-843 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:885-892 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:157-165 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6839-6847 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:273-281 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9781-9789 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1384-1392 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2130-2138 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1830-1838 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2934-2942 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1830-1838 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6356-6364 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1942-1950 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2314-2322 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1943-1951 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3938-3946 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1978-1986 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5680-5688 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1978-1986 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7585-7593 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2534-2542 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7692-7700 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2624-2632 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2679-2687 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2749-2757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4018-4026 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2934-2942 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6309-6317 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3035-3043 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7486-7494 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3155-3163 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10638-10646 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3424-3432 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10706-10714 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4242-4250 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7525-7533 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4902-4910 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7915-7923 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5970-5978 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6708-6716 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6662-6670 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8007-8015 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6662-6670 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9940-9948 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6662-6670 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12625-12633 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7093-7101 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9485-9493 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7274-7282 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7301-7309 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7868-7876 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10223-10231 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8423-8431 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13023-13031 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8423-8431 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13115-13123 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9777-9785 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12911-12919 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10464-10472 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10488-10496 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-151 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4266-4274 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-151 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4362-4370 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:539-547 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2965-2973 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:539-547 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3019-3027 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:593-601 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11786-11794 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2055-2063 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11242-11250 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2055-2063 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14500-14508 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2853-2861 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3721-3729 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2904-2912 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9225-9233 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3217-3225 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9394-9402 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3479-3487 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8763-8771 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3772-3780 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10890-10898 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3772-3780 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10947-10955 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3772-3780 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11371-11379 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3772-3780 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11428-11436 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3932-3940 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12972-12980 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4688-4696 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8550-8558 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5307-5315 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6899-6907 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5491-5499 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5515-5523 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5833-5841 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8937-8945 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6286-6294 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9034-9042 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7262 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9290-9298 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9174-9182 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10609-10617 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9605-9613 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9662-9670 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10031-10039 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15174-15182 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11386-11394 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13432-13440 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11941-11949 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11986-11994 (9 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/table.py:7-14 = packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:9-16 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:116-123 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:158-165 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:270-277 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:305-312 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:350-357 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:406-413 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:450-457 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:494-501 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:644-651 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:676-683 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:710-717 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:846-853 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:960-967 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1031-1038 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1102-1109 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1160-1167 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1218-1225 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1279-1286 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1385-1392 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1521-1528 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1607-1614 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1638-1645 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1675-1682 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1781-1788 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1831-1838 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1878-1885 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1943-1950 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1979-1986 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2012-2019 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2031-2038 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2053-2060 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2273-2280 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2351-2358 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2447-2454 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2535-2542 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2581-2588 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2621-2628 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2676-2683 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2750-2757 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2786-2793 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2825-2832 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2982-2989 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3036-3043 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3114-3121 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3156-3163 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3190-3197 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3243-3250 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3299-3306 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3425-3432 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3507-3514 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3587-3594 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3815-3822 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3847-3854 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3888-3895 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3990-3997 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4055-4062 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4096-4103 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4144-4151 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4179-4186 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4216-4223 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4273-4280 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4445-4452 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4541-4548 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4580-4587 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4616-4623 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4638-4645 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4657-4664 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4711-4718 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4780-4787 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4815-4822 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4856-4863 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4876-4883 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4903-4910 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4952-4959 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5122-5129 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5178-5185 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5229-5236 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5268-5275 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5463-5470 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5714-5721 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5749-5756 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5787-5794 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5831-5838 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5867-5874 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5927-5934 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5971-5978 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6027-6034 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6080-6087 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6134-6141 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6223-6230 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6404-6411 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6549-6556 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6614-6621 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6663-6670 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6767-6774 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6815-6822 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7094-7101 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7141-7148 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7173-7180 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7199-7206 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7223-7230 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7249-7256 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7296-7303 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7320-7327 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7376-7383 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7448-7455 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7619-7626 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7641-7648 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7739-7746 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7829-7836 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7965-7972 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8054-8061 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8103-8110 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8155-8162 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8210-8217 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8332-8339 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8516-8523 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8692-8699 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8738-8745 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8807-8814 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8925-8932 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8968-8975 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9017-9024 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9038-9045 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9061-9068 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9173-9180 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9271-9278 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9533-9540 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9557-9564 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9688-9695 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9742-9749 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9778-9785 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9892-9899 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9918-9925 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9987-9994 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10027-10034 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10073-10080 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10113-10120 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10185-10192 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10271-10278 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10347-10354 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10461-10468 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10789-10796 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10874-10881 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10924-10931 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10977-10984 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11036-11043 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11176-11183 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11212-11219 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11237-11244 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11675-11682 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11724-11731 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11802-11809 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12005-12012 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12170-12177 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12213-12220 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12253-12260 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12672-12679 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12858-12865 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12969-12976 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:128-135 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9600-9607 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:305-312 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5623-5630 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:305-312 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10517-10524 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:406-413 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12347-12354 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:676-683 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5299-5306 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1102-1109 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4496-4503 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1521-1528 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7269-7276 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1638-1645 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6480-6487 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1831-1838 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5996-6003 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2053-2060 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4243-4250 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2308-2315 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10066-10073 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2753-2760 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4147-4154 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2753-2760 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4182-4189 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2753-2760 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7272-7279 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2753-2760 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7299-7306 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3299-3306 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12483-12490 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3425-3432 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12530-12537 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3507-3514 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10485-10492 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3990-3997 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9441-9448 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4625-4632 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4647-4654 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4883-4890 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7256-7263 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4903-4910 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6734-6741 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5268-5275 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7869-7876 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7097-7104 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7144-7151 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7589-7596 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7622-7629 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8332-8339 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12996-13003 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8349-8356 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8367-8374 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8386-8393 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13078-13085 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8692-8699 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12092-12099 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10924-10931 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12784-12791 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:140-147 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:188-195 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:368-375 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:409-416 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:460-467 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:540-547 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:594-601 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:649-656 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:883-890 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:921-928 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:960-967 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1110-1117 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1236-1243 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1318-1325 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1400-1407 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1476-1483 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1555-1562 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1624-1631 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1748-1755 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1890-1897 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1990-1997 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2056-2063 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2109-2116 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2227-2234 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2297-2304 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2371-2378 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2476-2483 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2512-2519 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2551-2558 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2575-2582 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2603-2610 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2691-2698 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2770-2777 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2854-2861 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2905-2912 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3074-3081 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3174-3181 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3218-3225 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3272-3279 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3430-3437 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3479-3486 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3524-3531 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3660-3667 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3773-3780 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3887-3894 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3933-3940 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3987-3994 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4123-4130 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4263-4270 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4359-4366 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4533-4540 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4588-4595 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4635-4642 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4689-4696 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4747-4754 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4792-4799 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4832-4839 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4892-4899 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4942-4949 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4985-4992 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5022-5029 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5053-5060 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5088-5095 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5315-5322 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5377-5384 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5429-5436 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5478-5485 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5502-5509 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5529-5536 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5610-5617 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5681-5688 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5721-5728 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5771-5778 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5797-5804 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5834-5841 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5883-5890 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5936-5943 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6095-6102 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6174-6181 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6242-6249 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6287-6294 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6516-6523 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6694-6701 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6748-6755 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6782-6789 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6822-6829 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6870-6877 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6949-6956 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7015-7022 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7069-7076 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7093-7100 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7127-7134 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7192-7199 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7251-7258 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7357-7364 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7619-7626 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7719-7726 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7793-7800 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7873-7880 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7928-7935 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8061-8068 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8128-8135 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8167-8174 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8505-8512 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8636-8643 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8668-8675 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8792-8799 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8875-8882 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8987-8994 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9101-9108 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9133-9140 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9175-9182 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9287-9294 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9449-9456 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9493-9500 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9542-9549 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9602-9609 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9710-9717 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9840-9847 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10416-10423 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10481-10488 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10722-10729 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10747-10754 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10769-10776 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11005-11012 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11193-11200 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11296-11303 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11337-11344 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11486-11493 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11528-11535 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11596-11603 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11842-11849 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11887-11894 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11942-11949 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12077-12084 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12146-12153 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12204-12211 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12290-12297 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12418-12425 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12454-12461 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12494-12501 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12698-12705 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12802-12809 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13246-13253 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13296-13303 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13536-13543 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13706-13713 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13946-13953 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14229-14236 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14343-14350 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14447-14454 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14554-14561 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14611-14618 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14873-14880 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15024-15031 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:16-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:15095-15102 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:883-890 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14701-14708 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1236-1243 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4057-4064 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1318-1325 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6320-6327 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1555-1562 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6907-6914 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1555-1562 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10032-10039 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2056-2063 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3361-3368 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2109-2116 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7469-7476 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2109-2116 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8609-8616 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2227-2234 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5264-5271 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2227-2234 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9773-9780 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2854-2861 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11722-11729 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3660-3667 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11757-11764 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3660-3667 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14036-14043 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3987-3994 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8023-8030 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4536-4543 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4591-4598 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4747-4754 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13092-13099 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4942-4949 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13418-13425 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6095-6102 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14961-14968 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6174-6181 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12626-12633 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6174-6181 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14130-14137 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7015-7022 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7980-7987 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7357-7364 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8731-8738 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8061-8068 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10202-10209 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8061-8068 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12903-12910 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8508-8515 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8554-8561 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8738-8745 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8770-8777 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8792-8799 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9659-9666 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9493-9500 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13027-13034 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9710-9717 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14182-14189 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11942-11949 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13629-13636 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14232-14239 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14346-14353 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:420-427 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:450-457 (8 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/custom_viewer.py:26-32 = packages/pymodaq_gui/src/pymodaq_gui/examples/data_picker.py:64-71 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/2_dict_sync_example.py:168-174 = packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:392-398 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:787-793 = packages/pymodaq_gui/src/pymodaq_gui/examples/widget_sync/3_advanced_sync_example.py:815-821 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:49-55 = packages/pymodaq_gui/src/pymodaq_gui/utils/styling.py:300-306 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:198-204 = packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:550-556 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:753-759 = packages/pymodaq_gui/src/pymodaq_gui/managers/parameter_manager.py:797-803 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/list.py:22-28 = packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/text.py:66-73 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:788-794 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1D.py:838-844 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:596-602 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:619-625 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:170-176 = packages/pymodaq_gui/src/pymodaq_gui/plotting/utils/lineout.py:180-187 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:17-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2200-2206 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-125 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3428-3434 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-125 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3510-3516 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6712-6718 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6737-6743 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9536-9542 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9560-9566 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:17-23 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8695-8701 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6751-6757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6785-6791 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11725-11731 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11760-11766 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12421-12427 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12457-12463 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:118-124 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/tree_layout.py:136-142 (7 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:48-53 = packages/pymodaq_gui/src/pymodaq_gui/managers/action_manager.py:199-203 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:197-202 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:107-112 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/managers/settings/utils.py:289-294 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/table.py:190-195 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/action_led.py:108-113 = packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/led.py:161-165 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/list.py:152-157 = packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/tableview.py:121-126 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:602-607 = packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewerND.py:625-630 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:647-652 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4219-4224 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4246-4251 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6483-6488 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7176-7181 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7202-7207 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7589-7594 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:119-124 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7622-7627 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:161-166 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1946-1951 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:161-166 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4544-4549 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:161-166 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7323-7328 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:161-166 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8519-8524 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:161-166 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9020-9025 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:161-166 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9041-9046 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:273-278 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1678-1683 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:308-313 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4783-4788 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:308-313 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4818-4823 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:308-313 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6407-6412 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:353-358 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9691-9696 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:353-358 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9745-9750 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:409-414 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:713-718 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:409-414 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5466-5471 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1524-1529 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1610-1615 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1641-1646 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1784-1789 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2359 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4583-4588 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4906-4911 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5626-5631 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5684-5689 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5717-5722 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5870-5875 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5974-5979 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5999-6004 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7832-7837 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8213-8218 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8695-8700 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8741-8746 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10116-10121 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10350-10355 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10877-10882 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1105-1110 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11039-11044 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1163-1168 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5232-5237 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1163-1168 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5271-5276 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1163-1168 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5302-5307 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1163-1168 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8928-8933 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:1163-1168 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8971-8976 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6770-6775 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6818-6823 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9444-9449 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9489-9494 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9895-9900 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2056-2061 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9921-9926 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2202-2207 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2753-2758 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2202-2207 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2789-2794 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2202-2207 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4147-4152 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2202-2207 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4182-4187 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2202-2207 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7272-7277 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2202-2207 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7299-7304 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2359 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4583-4588 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2359 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5870-5875 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2354-2359 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11039-11044 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2624-2629 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6843-6848 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2624-2629 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6899-6904 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2828-2833 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9944-9949 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:2828-2833 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9990-9995 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3302-3307 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7742-7747 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3302-3307 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9536-9541 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3302-3307 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9560-9565 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3302-3307 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13027-13032 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3302-3307 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:13119-13124 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3818-3823 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3850-3855 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3993-3998 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6552-6557 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3993-3998 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12972-12977 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:3993-3998 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12999-13004 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4149-4154 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7274-7279 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4149-4154 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7301-7306 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4448-4453 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7529-7534 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4448-4453 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10030-10035 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4448-4453 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10076-10081 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4583-4588 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5870-5875 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:4859-4864 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9064-9069 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5232-5237 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5302-5307 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5232-5237 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8928-8933 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5232-5237 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8971-8976 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5752-5757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6617-6622 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5752-5757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6666-6671 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5752-5757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7919-7924 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:5752-5757 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7968-7973 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:6712-6717 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:10274-10279 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7097-7102 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:11678-11683 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7742-7747 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9536-9541 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:7742-7747 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:9560-9565 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8335-8340 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12008-12013 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:8335-8340 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12095-12100 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12972-12977 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_20.py:12999-13004 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:886-891 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2554-2559 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2578-2583 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5481-5486 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5505-5510 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7796-7801 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:143-148 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8795-8800 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2515-2520 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3433-3438 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3482-3487 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4692-4697 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4945-4950 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4988-4993 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5380-5385 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8734-8739 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:191-196 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10205-10210 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:371-376 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1627-1632 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:371-376 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2112-2117 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:371-376 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11599-11604 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:597-602 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:963-968 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:597-602 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6519-6524 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1403-1408 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6952-6957 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1479-1484 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10613-10618 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1479-1484 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10664-10669 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1479-1484 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12293-12298 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1993-1998 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2059-2064 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2230-2235 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2969-2974 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3023-3028 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5432-5437 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5532-5537 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5886-5891 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6245-6250 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6290-6295 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6323-6328 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6697-6702 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7072-7077 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7096-7101 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9452-9457 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9843-9848 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10419-10424 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10484-10489 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11990-11995 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1893-1898 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:12906-12911 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1993-1998 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5432-5437 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1993-1998 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5532-5537 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:1993-1998 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6323-6328 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:2773-2778 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6910-6915 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3433-3438 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4692-4697 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3433-3438 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4945-4950 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3433-3438 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4988-4993 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3433-3438 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8734-8739 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3527-3532 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9038-9043 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3527-3532 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11790-11795 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3527-3532 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11845-11850 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3527-3532 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11890-11895 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3527-3532 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11945-11950 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:3663-3668 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13539-13544 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7259 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7360-7365 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8612-8617 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8639-8644 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9290-9295 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11299-11304 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:4126-4131 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11340-11345 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5532-5537 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6323-6328 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:5774-5779 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10772-10777 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6825-6830 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9496-9501 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:6825-6830 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9545-9550 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7130-7135 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7195-7200 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7259 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11299-11304 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:7254-7259 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11340-11345 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8941-8946 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10894-10899 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8941-8946 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:10951-10956 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8990-8995 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9605-9610 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:8990-8995 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:9662-9667 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:11008-11013 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:13095-13100 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14504-14509 = packages/pymodaq_gui/src/pymodaq_gui/resources/material_icons/resources/icons_rounded_40.py:14557-14562 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/__init__.py:20-25 = packages/pymodaq_gui/src/pymodaq_gui/utils/widget_sync/core.py:1362-1367 (6 lines)
+- packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/widget_with_label_title.py:37-42 = packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/widget_with_title_in_toolbar.py:20-25 (6 lines)
+sha256: 5005f30dafdc8585
+(scanned at commit e596dd95a; not part of the hash)
