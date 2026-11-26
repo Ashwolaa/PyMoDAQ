@@ -78,7 +78,8 @@ plugin for any GitHub repository.
 1. Owner: answer the pending grill (`/optimize-grill config-reconcile`); merge future PRs with a merge commit,
    never squash.
 2. Fix the agent tooling findings that stall the wheel (hung-test timeout, known-flaky tests, closing a blocked merge
-   run, tool-task branch names vs `merge_gate` lint); then keep turning the wheel through the rotation.
+   run); then keep turning the wheel through the rotation. Tool tasks run since 2026-11-26: `agent-tool/<task-id>`,
+   `spec-tool`, `.agents/tests` as their check, auto-merge only within `merge_gate.py` TOOL_AUTO_MERGE.
 3. First `/optimize-review` (committee) once enough runs exist; adjust caps from it.
 4. Backport specialist, tool-building track, more R&D (`research/_prompts.md`).
 5. Extract the plugin and build `/optimize-init`.

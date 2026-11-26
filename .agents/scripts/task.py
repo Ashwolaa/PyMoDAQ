@@ -202,7 +202,8 @@ def cmd_start(a):
     elif status.startswith("approved"):
         if rows:
             fail(f"{a.task_id} already has a branch ({rows[-1]['branch']}); a rework needs status 'blocked — review'")
-        branch = f"agent/{scope}/{specialty}/{today()}"
+        # a tool task changes the agents' own scripts: its branch is agent-tool/<task-id> (rules.md 3)
+        branch = f"agent-tool/{a.task_id}" if specialty == "tool" else f"agent/{scope}/{specialty}/{today()}"
         exists = lambda b: git("rev-parse", "-q", "--verify", b, check=False) or git("ls-remote", "origin", f"refs/heads/{b}")
         if exists(branch):
             title = re.match(rf"## {re.escape(a.task_id)}\s+(.*)", block).group(1)
@@ -290,6 +291,11 @@ def cmd_checks(a):
         r = script("merge_gate.py", "lint", "--branch", rec["branch"], "--task-id", rec["task_id"], "--base", rec["base"],
                    check=False)
         result["items"]["merge_gate lint"] = {"rc": r.returncode, "out": (r.stdout + r.stderr).strip()}
+        if rec["branch"].startswith("agent-tool/"):
+            # a tool branch touches no package: the agents' own test suite is what proves it
+            r = sh(f"{env_prefix()}; cd {shlex.quote(str(REPO))} && timeout -k 10 600 python3 -m pytest .agents/tests -q "
+                   f"-p no:cacheprovider", check=False, shell=True)
+            result["items"]["agents tests"] = {"rc": r.returncode, "out": (r.stdout.strip().splitlines() or [""])[-1]}
         for k, v in result["items"].items():
             print(f"{'ok  ' if v['rc'] == 0 else 'FAIL'} {k}: {v['out'].splitlines()[-1] if v['out'] else ''}")
         rec["checks"]["static"] = result
@@ -317,6 +323,10 @@ def evidence(rec):
         problems.append("no specialist was launched in this run (rules.md 16)")
     for fp in ev.coordinator_edits(rec["session"], rec["started"], REPO):
         problems.append(f"the coordinator edited a product file itself: {fp} (rules.md 16)")
+    if rec["branch"].startswith("agent-tool/"):  # on a tool run the tool code is the product
+        for fp in ev.coordinator_edits(rec["session"], rec["started"], REPO, allowed=()):
+            if any(t in fp for t in ("/.agents/scripts/", "/.agents/runner/", "/.agents/tests/")):
+                problems.append(f"the coordinator edited tool code itself: {fp} (rules.md 16)")
     head = git("rev-parse", rec["branch"])
     static = rec["checks"].get("static")
     if not static or static["head"] != head:

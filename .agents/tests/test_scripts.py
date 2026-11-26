@@ -181,3 +181,25 @@ def test_a_pr_without_checks_yet_is_retried_by_merge_not_run():
     assert "blocked — PR CI unavailable" in merge.RETRY
     assert "blocked — PR CI unavailable" in status.MERGE_RETRY
     assert "blocked — PR CI unavailable" not in status.RETRY  # /optimize-run must not take it as a fresh task
+
+
+@pytest.mark.parametrize("changed, errors", [
+    ([".agents/scripts/scan.py", ".agents/tests/test_scripts.py", ".agents/COMMANDS.md"], []),
+    ([".agents/scripts/scan.py", "packages/pymodaq_gui/src/x.py"], ["packages/pymodaq_gui/src/x.py"]),
+    ([".agents/ledger.jsonl", ".agents/plans/p.md"], [".agents/ledger.jsonl", ".agents/plans/p.md"]),
+    ([".claude/agents/spec-tool.md"], [".claude/agents/spec-tool.md"]),
+])
+def test_tool_branch_carries_tool_code_only(changed, errors):
+    import merge_gate
+    assert merge_gate.is_tool_branch("agent-tool/T-pymodaq_gui-004")
+    assert not merge_gate.is_tool_branch("agent/pymodaq_gui/tool/2026-11-26")
+    assert merge_gate.tool_path_errors(changed) == errors
+
+
+def test_tool_branch_auto_merges_only_outside_the_guards():
+    import merge_gate
+    scan = [".agents/scripts/scan.py", ".agents/tests/test_scripts.py"]
+    assert merge_gate.tool_human_reasons(scan, [("3", "1", scan[0]), ("12", "0", scan[1])]) == []
+    gate = [".agents/scripts/merge_gate.py"]
+    assert "guards" in merge_gate.tool_human_reasons(gate, [("2", "2", gate[0])])[0]
+    assert "removes lines" in merge_gate.tool_human_reasons(scan, [("3", "1", scan[0]), ("0", "4", scan[1])])[0]

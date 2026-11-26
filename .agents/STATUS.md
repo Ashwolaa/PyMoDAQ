@@ -1,22 +1,22 @@
-# Consortium status — generated 2026-11-26 11:06 by `scripts/status.py`
+# Consortium status — generated 2026-11-26 11:10 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `fd1970c18`; 334 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- `dev_agent` at `8f2f228de`; 336 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
 - today: runs 4/20, specialist_runs 1/10, prs_opened 1/6, reviews 1/10; outcomes: ok 3, failed 1
 - last /usage reading: 2026-11-26T10:06:46.302000+00:00  session 53% (resets Nov 26, 12:50pm (Europe/Paris))  week 57% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
 ## Needs you
-- approve or drop **T-pymodaq_gui-001** Fix mutable default arguments — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
-- approve or drop **T-pymodaq_gui-002** Drop the direct PyQt6 import in PatternCompleter — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
-- approve or drop **T-pymodaq_gui-003** Manager sub-entry status colours via StatusPalette — proposed (`.agents/plans/2026-11-26-pymodaq_gui.md`)
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
-- blocked: **T-pymodaq_gui-004** — blocked — tool task not executable by /optimize-run: its only file .agents/scripts/scan.py is refused on any agent branch by merge_gate.py lint (rules.md 12), task.py names it agent/pymodaq_gui/tool/ not agent-tool/, no tool specialist exists; owner to apply on dev_agent or add a tool path
 
 ## In flight
 - `agent/pymodaq_gui/hygiene/2026-11-26` (T-pymodaq_gui-005, risk low): pushed, waiting for /optimize-merge
+- T-pymodaq_gui-001 Fix mutable default arguments — approved — owner, 2026-11-26
+- T-pymodaq_gui-002 Drop the direct PyQt6 import in PatternCompleter — approved — owner, 2026-11-26
+- T-pymodaq_gui-003 Manager sub-entry status colours via StatusPalette — approved — owner, 2026-11-26
+- T-pymodaq_gui-004 Exclude generated icon resources from jscpd — approved — owner, 2026-11-26 (tool path now exists)
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -37,7 +37,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [agents] The merge agent filed a new finding (pyqt6-suite-stalls-2026-11-23, blamed Xvfb) instead of linking the existing M06 hang finding; findings add should
 - [agents] findings.py add only accepts ci-upstream/review/run/plugin, and /optimize-research does not file its proposed tasks as findings, so research notes nev
 - [agents] The headless merge step started the pyqt6 check in the background and ended its turn ('I'll wait for the completion notice'); step.py stops at the fir
-- [agents] Tool tasks cannot pass merge_gate lint: task.py start names them agent/<pkg>/tool/..., plan says agent-tool/<name>, and lint refuses .agents/ files
 - [agents] status.py next ranks a rework after fresh tasks, but a fresh task that depends on the blocked one (T-013 on T-012) is picked and refused: the wheel st
 - [pymodaq_utils] At pytest exit, save() guard logging and CustomConfig atexit lambdas emit 'I/O operation on closed file' / get_set_path traceback
 - [pymodaq_utils] test_get_set_config_dir and TestCopy.test_copy_default still use the real config folders
@@ -49,7 +48,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
 - [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
 - [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
-- [tool] /optimize-plan approves tool-specialty tasks that /optimize-run cannot execute (.agents/ files refused by merge_gate lint; task.py has no agent-tool/ 
 - [tool] task.py checks passes vacuously when pytest aborts on collection errors
 - [pymodaq_gui] tests/managers/action_manager_test.py::test_icon_qt fails on base (PyQt6 and PySide6, offscreen)
 

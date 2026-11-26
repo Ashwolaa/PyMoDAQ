@@ -14,6 +14,10 @@ public API waits for the human. Concretely AUTO-MERGE needs all of:
   - the pr-reviewer report says `verdict: approve` and `public_api: no`;
   - no changed file is a test, none is in a `[scopes].ui` package, the diff is within `[limits].pr_max_changed_lines`.
 A lint violation (see `lint`), or a review verdict other than approve, is an error (exit 2).
+
+Tool branches (`agent-tool/<task-id>`, rules.md 3, 4, 12) carry tool code only (TOOL_PATHS), no size cap. They may
+auto-merge only when every changed file is in TOOL_AUTO_MERGE or is an added test under `.agents/tests/`: any other
+script is one of the agents' own guards (gate, runs, budget, state, runner) and waits for the human.
 """
 import argparse
 import re
@@ -26,6 +30,34 @@ from registry import BRANCH_RE
 from agentlib import gitx, plans, reports
 
 REPO_ROOT = AGENTS_DIR.parent
+
+TOOL_PREFIX = "agent-tool/"
+TOOL_PATHS = (".agents/scripts/", ".agents/runner/", ".agents/tests/", ".agents/COMMANDS.md")
+# Tool files a reviewed, approved tool branch may change without the human. Everything else under TOOL_PATHS
+# decides what agents may do (merge_gate, task, merge, budget, ledger, registry, plan, ci, runner, agentlib...).
+TOOL_AUTO_MERGE = (".agents/scripts/scan.py", ".agents/scripts/pr_stats.py", ".agents/scripts/docs.py",
+                   ".agents/COMMANDS.md")
+
+
+def is_tool_branch(branch: str) -> bool:
+    return branch.startswith(TOOL_PREFIX)
+
+
+def tool_path_errors(changed: list) -> list:
+    """Files a tool branch may not carry: product files, state, `.claude/`."""
+    return [p for p in changed if not p.startswith(TOOL_PATHS)]
+
+
+def tool_human_reasons(changed: list, numstat: list) -> list:
+    """Why a tool branch waits for the human. numstat: (added, deleted, path) rows of the diff."""
+    reasons = []
+    guards = [p for p in changed if not p.startswith(TOOL_AUTO_MERGE) and not p.startswith(".agents/tests/")]
+    if guards:
+        reasons.append(f"tool branch changes the agents' guards: {', '.join(guards)}")
+    cut = [p for a, d, p in numstat if p.startswith(".agents/tests/") and str(d).isdigit() and int(d) > 0]
+    if cut:
+        reasons.append(f"tool branch removes lines from agent tests: {', '.join(cut)}")
+    return reasons
 
 
 def git(*args: str) -> str:
@@ -71,9 +103,15 @@ def lint(branch: str, base: str, task_id: str | None = None) -> tuple[list, int]
     changed = [p for p in git("diff", "--name-only", f"{base}...{branch}").splitlines() if p]
     if not changed:
         errors.append(f"no changes against {base}")
-    state = [p for p in changed if p.startswith((".agents/", ".claude/"))]
-    if state:
-        errors.append(f"state/tooling files on the branch (rules.md 12): {', '.join(state)}")
+    tool = is_tool_branch(branch)
+    if tool:
+        bad = tool_path_errors(changed)
+        if bad:
+            errors.append(f"a tool branch carries tool code only, {', '.join(TOOL_PATHS)} (rules.md 4, 12): {', '.join(bad)}")
+    else:
+        state = [p for p in changed if p.startswith((".agents/", ".claude/"))]
+        if state:
+            errors.append(f"state/tooling files on the branch (rules.md 12): {', '.join(state)}")
     for sha in git("rev-list", f"{base}..{branch}").split():
         body = git("log", "-1", "--format=%B", sha)
         m = re.search(r"^Agent-Run:\s*(\S+)", body, re.M)
@@ -84,7 +122,7 @@ def lint(branch: str, base: str, task_id: str | None = None) -> tuple[list, int]
     numstat = git("diff", "--numstat", f"{base}...{branch}").splitlines()
     size = sum(int(x) + int(y) for x, y, _ in (l.split("\t", 2) for l in numstat) if x.isdigit() and y.isdigit())
     cap = profile["limits"]["pr_max_changed_lines"]
-    if size > cap:
+    if size > cap and not tool:  # tool tasks are exempt (rules.md 4)
         errors.append(f"{size} changed lines > cap {cap} (rules.md 4)")
     if task_id:
         rows = [r for r in read_jsonl("registry.jsonl") if r["branch"] == branch]
@@ -98,7 +136,8 @@ def cmd_lint(a):
     if errors:
         print("LINT FAILED:\n  " + "\n  ".join(errors))
         sys.exit(1)
-    print(f"LINT OK: {a.branch}, {size} changed lines, product files only, trailers present")
+    what = "tool code only" if is_tool_branch(a.branch) else "product files only"
+    print(f"LINT OK: {a.branch}, {size} changed lines, {what}, trailers present")
 
 
 def cmd_check(a):
@@ -132,6 +171,10 @@ def cmd_check(a):
     if errors:
         fail("not mergeable, lint failed: " + "; ".join(errors))
     changed = [p for p in git("diff", "--name-only", f"{a.base}...{a.branch}").splitlines() if p]
+    if is_tool_branch(a.branch):
+        numstat = [l.split("\t", 2) for l in git("diff", "--numstat", f"{a.base}...{a.branch}").splitlines() if l]
+        reasons += tool_human_reasons(changed, numstat)
+        changed = [p for p in changed if not p.startswith(".agents/tests/")]  # added agent tests: judged just above
     tests = [p for p in changed if is_test(p)]
     if tests:
         reasons.append(f"touches tests: {', '.join(tests)}")

@@ -19,7 +19,9 @@
 10. Log `--outcome failed` when the run produced nothing usable (no scan output, aborted setup), never `ok`.
 11. End every command report with the absolute path of each file it wrote, so the human can open them.
 12. State (`.agents/`: ledger, registry, plans, handoff, reports, scans) is committed only on `dev_agent`, never on an
-    `agent/*` branch: a PR carries product files only. `ledger.py`, `registry.py`, `plan.py` and `findings.py` refuse other branches.
+    `agent/*` or `agent-tool/*` branch: an `agent/*` PR carries product files only, an `agent-tool/*` PR tool code only
+    (`.agents/scripts`, `.agents/runner`, `.agents/tests`, the generated `COMMANDS.md`; never `.claude/`). A tool PR
+    auto-merges only within `merge_gate.py` TOOL_AUTO_MERGE; any other script is a guard and waits for the human. `ledger.py`, `registry.py`, `plan.py` and `findings.py` refuse other branches.
 13. Task status in a plan changes only through `scripts/plan.py set-status`. An executed task becomes
     `done — branch <b>, CI <result>, awaiting review`; after /optimize-merge `done — PR #n merged (...)`,
     `done — PR #n open, awaiting the human: ...` or `blocked — <reason>`.
