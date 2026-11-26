@@ -3,9 +3,9 @@
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `d6e148501`; 325 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- `dev_agent` at `47611e3df`; 327 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
 - today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
-- last /usage reading: 2026-11-26T06:51:53.840000+00:00  session 2% (resets Nov 26, 12:50pm (Europe/Paris))  week 51% (resets Nov 29, 12am (Europe/Paris))
+- last /usage reading: 2026-11-26T06:58:54.808000+00:00  session 6% (resets Nov 26, 12:50pm (Europe/Paris))  week 52% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `plan pymodaq_gui`
 
 ## Needs you
@@ -44,7 +44,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] GlobalConfig()('utils', ...) reads through BaseConfig.__getitem__, so the singular/plural fallback in Config.__call__ (backend/debug_level/dynamic) ne
 - [pymodaq_utils] docstring says it is raised only for a missing key path; set_logger now also raises it for a wrong value type
 - [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
-- [pymodaq_scripting] make_component_leco_available.rst:584-610 still uses pymodaq.scripting import (line 592) and ~pymodaq.scripting.devices targets (608-609)
 - [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
 - [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
 
