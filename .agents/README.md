@@ -45,7 +45,7 @@ work with them; the rest:
 `/optimize-run` (a specialist on a branch, local checks on PyQt6 and PySide6, pushed; no PR, no CI) ->
 `/optimize-merge` (pr-reviewer on Opus; approve -> PR -> its CI, the only CI run -> merge gate: low risk, two
 approving decisioners, no tests/UI/public API -> automatic merge; otherwise the PR waits for you; "changes" ->
-`/optimize-run` reworks it, at most twice). Problems found on the way become findings for the next plan.
+`/optimize-run` reworks it: two free rounds, then only while each review has fewer findings than the one before, at most four). Problems found on the way become findings for the next plan.
 Upstream: nothing goes there without you (R&D prompt R4 `upstream-strategy` prepares how).
 
 ## Guards (what keeps it safe and cheap)
