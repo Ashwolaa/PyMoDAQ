@@ -1,36 +1,41 @@
-# Consortium status — generated 2026-11-28 00:05 by `scripts/status.py`
+# Consortium status — generated 2026-11-28 00:18 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `d3910ccd6`; 365 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
-- last /usage reading: 2026-11-27T23:05:30.589000+00:00  session 43% (resets Nov 28, 2am (Europe/Paris))  week 20% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `plan pymodaq`
+- `dev_agent` at `790334ecd`; 375 commits ahead of upstream/dev (66 files changed, 931 insertions(+), 274 deletions(-))
+- today: runs 2/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2
+- last /usage reading: 2026-11-27T23:17:57.450000+00:00  session 82% (resets Nov 28, 2am (Europe/Paris))  week 24% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq-001 .agents/plans/2026-11-28-pymodaq.md`
 
 ## Needs you
+- approve or drop **T-pymodaq-003** Move return out of finally (B012) in four plugin-discovery helpers — proposed (`.agents/plans/2026-11-28-pymodaq.md`)
+- approve or drop **T-pymodaq-007** Fix the "Enable scripting" tooltip — proposed (`.agents/plans/2026-11-28-pymodaq.md`)
+- approve or drop **T-pymodaq-011** None sentinel for mutable default arguments — proposed (`.agents/plans/2026-11-28-pymodaq.md`)
+- grill pending: **pymodaq-managers-entrypoint** (pymodaq) — answer with `/optimize-grill pymodaq-managers-entrypoint`
 - **T-pymodaq_gui-001** — done — PR #30 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/parameter_test/param_ioxml_mutable_default_test.py, packages/pymodaq_gui/tests/utils/h5tree_to_qtree_test.py; touches
 - **T-pymodaq_gui-002** — done — PR #31 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/utils/widgets/pattern_completer_test.py; touches a UI scope: packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/patter
 - **T-pymodaq_gui-003** — done — PR #32 open, awaiting the human: registry risk is medium; plan risk is medium; reviewer: public_api yes; touches tests: packages/pymodaq_gui/tests/managers/manager_base_test.py; touches a UI sc
 - **T-pymodaq_gui-005** — done — PR #29 open, awaiting the human: touches a UI scope: packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py, packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.p
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
+- blocked: **T-pymodaq-002** — blocked — vetoed by both: qtpy has no PyQt6 QtStateMachine; owner to confirm states.py as a hard-rule-6 exception
+- blocked: **T-pymodaq-006** — blocked — vetoed by both: not status colours; re-triage as a ThemeColor task if wanted
+- blocked: **T-pymodaq-008** — blocked — vetoed by decider-test-change: fix as written weakens asserts; re-scope as root-cause task
 
 ## In flight
-- nothing queued
+- T-pymodaq-001 Remove the dead first DAQ_Move_base.ini_stage_init body — approved
+- T-pymodaq-004 Replace three bare excepts around disconnect calls — approved
+- T-pymodaq-005 Remove three duplicate definitions (dict key, imports) — approved
+- T-pymodaq-009 Regenerate legacy_to_current.rst — approved
+- T-pymodaq-010 Use ThreadStatus enum members instead of raw strings — approved
 
 ## Open findings (go to the next /optimize-plan of their scope)
-- [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
 - [pymodaq_data] numpy_func.py:47 returns NotImplementedError instead of raising/returning NotImplemented
 - [pymodaq_data] Unverified ruff bug-risk items: B007 loop vars, B018 data.py:1718, F811 append data.py:4226/4241, backends.py:345 unreachable, hyperspy.py:57 data_arr
 - [pymodaq_data] numpy_func.py:47 returns NotImplementedError instead of raising it
 - [pymodaq_data] data.py:4225 and :4240 redefine append (F811)
 - [pymodaq_data] exporters/hyperspy.py:57 assigns data_array, never used (F841)
-- [pymodaq] packages/pymodaq tests hang at extension_loading_test.py::TestExtensions::test_load[Scanner] (offscreen, pyqt6 and pyside6, also on base)
-- [pymodaq] packages/pymodaq pytest under PYTEST_QT_API=pyqt6 stalls (2% CPU, no end after 20+ min, 3 attempts) during /optimize-merge checks
-- [pymodaq] pymodaq suite red on both Qt backends after rebase: pyqt6 state_manager_test::test_non_blocking fails, pyside6 aborts (core dump)
 - [pymodaq_utils] Reconcile config files with the template at load (scalar<->list, retype reset, new default follows untouched keys, migrations + snapshot, backup first
-- [pymodaq] test_required_config_entries asserts the removed key viewer_in_thread; passes only through a leaked value in the real ~/.pymodaq, fails with a fresh H
-- [pymodaq] TestWithSubEntries::test_non_blocking and test_blocking_without_blocking_the_caller[False] fail intermittently on plain dev_agent (3 of 5 runs, pyqt6,
 - [agents] A merge run that ends blocked before decide/gate cannot be closed (merge.py close: 'nothing decided yet'), so it gets no ledger line: both M12 runs on
 - [agents] task.py checks waited ~20 min per attempt on a hung pytest (2% CPU) and the agent retried 3 times (~60 min) without a stack dump; add per-test timeout
 - [agents] No notion of known-flaky tests: a flaky pyqt6 test (state_manager_test, 3 of 5 plain dev_agent runs) and the random pyside6 abort block merges as CI r
@@ -47,15 +52,14 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] docstring says it is raised only for a missing key path; set_logger now also raises it for a wrong value type
 - [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
 - [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
-- [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
 - [pymodaq_gui] tests/managers/action_manager_test.py::test_icon_qt fails on base (PyQt6 and PySide6, offscreen)
 - [pymodaq_gui] The 6 touched files still have other unused imports (e.g. roi.py LinearRegionItem, Slot; pixmap.py QByteArray, QObject; filter.py QtCore, roi_format),
 - [pymodaq_gui] flake8 on pymodaq_gui prints SyntaxWarning invalid escape '\*' at <unknown>:457 (file not identified)
+- [pymodaq] PIDRunner with default setpoints=[] raises IndexError at setpoints[ind]
 
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-26-run-T-pymodaq_gui-005 | optimize-run | ok | 10.5 | 10490 | task.py checks: pytest stopped at 2 editor collection errors (missing  |
 | 2026-11-26-merge-T-pymodaq_gui-005-r1 | optimize-merge | ok | 8.4 | 7983 | T-pymodaq_gui-005: done — PR #29 open, awaiting the human: touches a U |
 | 2026-11-26-run-T-pymodaq_gui-001 | optimize-run | ok | 12.8 | 12291 | mutable defaults fixed in 5 files, 2 regression tests; local gui suite |
 | 2026-11-27-merge-T-pymodaq_gui-001-r1 | optimize-merge | ok | 8.8 | 8553 | T-pymodaq_gui-001: done — PR #30 open, awaiting the human: touches tes |
@@ -65,6 +69,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-27-merge-T-pymodaq_gui-003-r1 | optimize-merge | ok | 7.9 | 8309 | T-pymodaq_gui-003: done — PR #32 open, awaiting the human: registry ri |
 | 2026-11-27-run-T-pymodaq_gui-004 | optimize-run | ok | 1.4 | 4960 | jscpd --ignore material_icons resources; 55 agents tests green |
 | 2026-11-28-merge-T-pymodaq_gui-004-r1 | optimize-merge | ok | 3.1 | 7116 | T-pymodaq_gui-004: done — PR #33 merged (auto: low risk, approved by d |
+| 2026-11-28-plan-pymodaq | optimize-plan | ok | 6.7 | 140567 |  |
 
 ## Done so far
 - tasks done: 35; PRs merged into dev_agent: 26
