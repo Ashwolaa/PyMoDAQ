@@ -1,0 +1,843 @@
+# Scan: pymodaq
+path: packages/pymodaq/src/pymodaq   tree: f140d199ab62
+tools: ruff 0.17.5, vulture 2.16, radon 6.0.1, jscpd 5.4.3
+
+## ruff (1972 findings, repo config)
+### Bug risk (99)
+- packages/pymodaq/src/pymodaq/__init__.py:40 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/__init__.py:52 F811 Redefinition of unused `register_scanners` from line 29: `register_scanners` redefined here
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:649 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:27 F811 Redefinition of unused `ThreadCommand` from line 12: `ThreadCommand` redefined here
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:448 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:139 B008 Do not perform function call `config` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:298 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/control_modules/instruments.py:44 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:78 B008 Do not perform function call `config` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:145 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:147 B008 Do not perform function call `config` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:853 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:962 F811 Redefinition of unused `ini_stage_init` from line 532: `ini_stage_init` redefined here
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:369 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:374 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq/src/pymodaq/dashboard.py:799 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/dashboard.py:1166 F841 Local variable `ret` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:111 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:120 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:151 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/loss_factory.py:109 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:153 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:41 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:283 F841 Local variable `res` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:448 E722 Do not use bare `except`
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:465 E722 Do not use bare `except`
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py:45 B008 Do not perform function call `config` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py:46 B008 Do not perform function call `config` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py:187 F841 Local variable `time_stamp` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/h5logging.py:64 F841 Local variable `logger_node` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:69 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:188 E722 Do not use bare `except`
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:8 F811 Redefinition of unused `List` from line 2: `List` redefined here
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:3 F811 Redefinition of unused `np` from line 1: `np` redefined here
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:488 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:693 F841 Local variable `act_units` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:751 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:583 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:784 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:785 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/histograming.py:213 F841 Local variable `actuator_param` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/histograming.py:239 F841 Local variable `x_dwa` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/histograming.py:353 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/histograming.py:379 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/ramp_generator.py:5 B008 Do not perform function call `Q_` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/models/user_input_choice.py:19 F841 Local variable `button_goback` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/choice_models/factory.py:29 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:64 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/grab.py:150 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:156 F841 Local variable `path` is assigned to but never used
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:187 B008 Do not perform function call `QModelIndex` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:215 B008 Do not perform function call `QModelIndex` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:225 B008 Do not perform function call `QModelIndex` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:310 B008 Do not perform function call `QModelIndex` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:322 B008 Do not perform function call `QModelIndex` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:516 B008 Do not perform function call `QModelIndex` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:546 B023 Function definition does not bind loop variable `current_index`
+- packages/pymodaq/src/pymodaq/utils/data.py:125 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:133 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:187 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:121 F811 Redefinition of unused `data` from line 11: `data` redefined here
+- packages/pymodaq/src/pymodaq/utils/leco/leco_director.py:144 B018 Found useless expression. Either assign it to a variable or remove it.
+- packages/pymodaq/src/pymodaq/utils/leco/leco_director.py:163 B018 Found useless expression. Either assign it to a variable or remove it.
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:37 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:37 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:64 F841 Local variable `cancel_button` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:68 F841 Local variable `ret` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:229 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:229 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:332 F841 Local variable `prog` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/utils.py:32 B009 Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/utils.py:143 F841 Local variable `typ_full` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/modules/modules_manager.py:742 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/utils.py:19 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:28 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:80 F601 Dictionary key literal `'removable'` repeated
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:129 F601 Dictionary key literal `'removable'` repeated
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:132 F601 Dictionary key literal `'removable'` repeated
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:260 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:260 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:268 F841 Local variable `cancel_button` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:276 F841 Local variable `ret` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:380 F841 Local variable `path` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:422 F841 Local variable `path` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:180 F841 Local variable `blocker` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:23 F811 Redefinition of unused `StrEnum` from line 12: `StrEnum` redefined here
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:24 F811 Redefinition of unused `ModuleType` from line 22: `ModuleType` redefined here
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:220 F841 Local variable `module_type` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:62 B026 Star-arg unpacking after a keyword argument is strongly discouraged
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:371 F841 Local variable `mod` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:410 F841 Local variable `app` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:438 F841 Local variable `selector` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:162 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_1d_scanners.py:176 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py:228 F841 Local variable `coordinates` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:40 F841 Local variable `e` is assigned to but never used
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:45 B012 `return` inside `finally` blocks cause exceptions to be silenced
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:101 B006 Do not use mutable data structures for argument defaults
+- packages/pymodaq/src/pymodaq/utils/shared_ui.py:100 F841 Local variable `window` is assigned to but never used
+### Unused imports (322)
+- packages/pymodaq/src/pymodaq/__init__.py:2 F401 `os` imported but unused
+- packages/pymodaq/src/pymodaq/__init__.py:4 F401 `pint.UnitRegistry` imported but unused
+- packages/pymodaq/src/pymodaq/__init__.py:5 F401 `pathlib.Path` imported but unused
+- packages/pymodaq/src/pymodaq/__init__.py:7 F401 `warnings` imported but unused
+- packages/pymodaq/src/pymodaq/__init__.py:31 F401 `pymodaq_data.plotting.plotter.plotter.PlotterFactory` imported but unused
+- packages/pymodaq/src/pymodaq/__init__.py:31 F401 `pymodaq_data.plotting.plotter.plotter.register_plotter` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/__init__.py:1 F401 `.ui_utils` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:6 F401 `pymodaq_utils.categorizing.MOCK_ITEMS` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:6 F401 `pymodaq_utils.categorizing.REMOTE_ITEMS` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:6 F401 `pymodaq_utils.categorizing.categorize_items` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:6 F401 `pymodaq_utils.categorizing.find_last_index` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:11 F401 `importlib.import_module` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:15 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:18 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:18 F401 `qtpy.QtCore.QThread` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:18 F401 `qtpy.QtCore.Qt` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:19 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:31 F401 `pymodaq.utils.exceptions.ActuatorError` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:37 F401 `pymodaq_gui.parameter.ioxml` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:51 F401 `pymodaq.utils.leco.pymodaq_listener.LECOCommands` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:55 F401 `pymodaq.control_modules.daq_move_ui.factory.ActuatorUIFactory` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:1 F401 `abc.abstractmethod` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:2 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:5 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/uis/binary.py:2 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:9 F401 `abc.ABC` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:10 F401 `importlib.import_module` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:21 F401 `qtpy.QtCore.QObject` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:21 F401 `qtpy.QtCore.Qt` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:24 F401 `pymodaq_data.data.Averaging` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:25 F401 `pymodaq.utils.data.DataFromPlugins` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:35 F401 `pymodaq_gui.h5modules.browsing.browse_data` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:50 F401 `pymodaq.control_modules.instruments.DetectorError` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:60 F401 `pymodaq.utils.leco.pymodaq_listener.LECOClientCommands` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:3 F401 `typing.Union` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:4 F401 `numpy` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:6 F401 `qt_themes` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:12 F401 `pymodaq_gui.utils.styling.create_font` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:12 F401 `pymodaq_gui.utils.styling.create_icon` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/viewer_utility_classes.py:55 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/control_modules/viewer_utility_classes.py:59 F401 `pymodaq.utils.gui_utils.DockArea` imported but unused
+- packages/pymodaq/src/pymodaq/daq_utils/daq_utils.py:1 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq/src/pymodaq/dashboard.py:9 F401 `typing.Any` imported but unused
+- packages/pymodaq/src/pymodaq/dashboard.py:50 F401 `pymodaq.utils.gui_utils.loader_utils.create_extension` imported but unused
+- packages/pymodaq/src/pymodaq/examples/run_elts.py:9 F401 `pymodaq.extensions.sequencer.utilities.elements.grab.GrabElt` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/__init__.py:10 F401 `.utils.get_extensions` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/__init__.py:11 F401 `.pid.utils.get_models` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/__init__.py:1 F401 `.adaptive_optimization` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/__init__.py:2 F401 `.utils` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_1d_loss_functions.py:1 F401 `typing.Callable` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_1d_loss_functions.py:1 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_1d_loss_functions.py:11 F401 `adaptive.learner.learner1D.uses_nth_neighbors` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_2d_loss_functions.py:1 F401 `typing.Callable` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_2d_loss_functions.py:1 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/__init__.py:1 F401 `.loss_factory.LossDim` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/__init__.py:1 F401 `.loss_factory.LossFunctionFactory` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/__init__.py:2 F401 `._1d_loss_functions` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/__init__.py:3 F401 `._2d_loss_functions` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/loss_factory.py:1 F401 `abc.abstractmethod` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/loss_factory.py:3 F401 `typing.Sequence` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/loss_factory.py:7 F401 `adaptive.learner.BaseLearner` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:8 F401 `typing.Iterable` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:8 F401 `typing.List` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:8 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:12 F401 `collections.abc.Iterable` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:17 F401 `pymodaq_data.data.Axis` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:17 F401 `pymodaq_data.data.DataCalculated` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:17 F401 `pymodaq_data.data.DataRaw` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:25 F401 `pymodaq.extensions.adaptive_optim.loss_function.loss_factory.LossFunctionBase` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/__init__.py:1 F401 `.bayesian_optimization` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/__init__.py:2 F401 `.utils` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/__init__.py:1 F401 `.acquisition_function_factory.GenericAcquisitionFunctionBase` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/__init__.py:1 F401 `.acquisition_function_factory.GenericAcquisitionFunctionFactory` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/__init__.py:2 F401 `.base_acquisition_function.GenericExpectedImprovement` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/__init__.py:2 F401 `.base_acquisition_function.GenericProbabilityOfImprovement` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/__init__.py:2 F401 `.base_acquisition_function.GenericUpperConfidenceBound` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/acquisition_function_factory.py:4 F401 `numpy.random.RandomState` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/acquisition_function_factory.py:7 F401 `pymodaq_gui.managers.parameter_manager.ParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/bayesian_optimization.py:10 F401 `pymodaq.extensions.optimizers_base.optimizer.OptimizerAction` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:8 F401 `typing.Iterable` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:8 F401 `typing.List` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:8 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:10 F401 `bayes_opt.exception` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:12 F401 `collections.namedtuple` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:21 F401 `pymodaq_data.data.DataToExport` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/__init__.py:1 F401 `.daq_logger.main` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:38 F401 `sqlalchemy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger_models.py:3 F401 `sqlalchemy.orm.sessionmaker` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/h5logging.py:9 F401 `numpy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/h5logging.py:12 F401 `pymodaq_gui.h5modules.saving.H5Saver` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/daq_0Dviewer_DataMixer.py:2 F401 `numpy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/daq_0Dviewer_DataMixer.py:4 F401 `pymodaq_utils.utils.ThreadCommand` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/daq_0Dviewer_DataMixer.py:9 F401 `pymodaq.utils.data.DataFromPlugins` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:4 F401 `inspect` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:6 F401 `warnings` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:8 F401 `typing.Union` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:10 F401 `numpy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:17 F401 `pymodaq_gui.managers.parameter_manager.ParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/equation_model.py:1 F401 `pymodaq.extensions.data_mixer.model.np` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/equation_model.py:8 F401 `pymodaq.extensions.data_mixer.parser.extract_data_names` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:7 F401 `pymodaq_data.data.DataDim` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:7 F401 `pymodaq_data.data.DataWithAxes` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:11 F401 `pymodaq.extensions.data_mixer.parser.extract_data_names` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:11 F401 `pymodaq.extensions.data_mixer.parser.replace_names_in_formula` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:11 F401 `pymodaq.extensions.data_mixer.parser.split_formulae` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/utils.py:1 F401 `pymodaq_utils.config.BaseConfig` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/h5browser.py:1 F401 `pymodaq_gui.h5modules.h5browser.H5Browser` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/__init__.py:4 F401 `pymodaq_utils.logger.get_module_name` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:5 F401 `typing.List` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:2 F401 `inspect` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:4 F401 `warnings` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:6 F401 `typing.Union` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:12 F401 `pymodaq_gui.utils.dock.DockArea` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:16 F401 `pymodaq.utils.daq_utils.get_plugins` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:138 F401 `pathlib.Path` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:139 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/__init__.py:1 F401 `.ramping.RampExtension` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:1 F401 `typing.Mapping` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:1 F401 `typing.Union` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:3 F401 `pymodaq_data.data.DataToExport` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:6 F401 `pymodaq.utils.h5modules.module_saving.ActuatorTimeSaver` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:6 F401 `pymodaq.utils.h5modules.module_saving.DetectorTimeSaver` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:6 F401 `pymodaq.utils.h5modules.module_saving.Node` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:9 F401 `pymodaq_data.h5modules.backends.GROUP` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:16 F401 `qt_themes` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/scan_manager.py:1 F401 `copy.deepcopy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/scan_manager.py:6 F401 `toml` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/scan_manager.py:7 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/scan_manager.py:13 F401 `pymodaq_utils.enums.StrEnum` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:2 F401 `dataclasses.dataclass` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:4 F401 `typing.Callable` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:4 F401 `typing.Tuple` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:6 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:22 F401 `pymodaq.dashboard.DashBoard` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/choice_models/model.py:19 F401 `pymodaq.extensions.sequencer.utilities.element_factory.SeqEltBase` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:3 F401 `dataclasses.Field` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:3 F401 `dataclasses.InitVar` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:3 F401 `dataclasses.dataclass` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:4 F401 `typing.Mapping` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:9 F401 `pymodaq.extensions.sequencer.utilities.states.QState` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:13 F401 `serializall.SerializableBase` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:16 F401 `pymodaq_gui.managers.action_manager.QAction` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:16 F401 `pymodaq_gui.managers.action_manager.addaction` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:17 F401 `pymodaq_gui.managers.parameter_manager.ParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:18 F401 `pymodaq_gui.qt_utils.mkQApp` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:3 F401 `weakref` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:14 F401 `pymodaq.utils.scanner.scanner.Orientation` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:23 F401 `pymodaq_utils.categorizing.find_last_index` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:6 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:13 F401 `pymodaq_gui.parameter.pymodaq_ptypes.itemselect.ItemSelect` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:14 F401 `pymodaq_gui.utils.widgets.SpinBox` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:17 F401 `pymodaq.extensions.sequencer.utilities.elements.repeat.RepeatElt` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:19 F401 `qt_themes.get_theme` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:20 F401 `pymodaq.utils.managers.modules_manager.ModulesManager` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/sequence.py:3 F401 `numpy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/sequence.py:6 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/sequence.py:12 F401 `pymodaq.extensions.sequencer.utilities.element_factory.ElementError` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/state.py:13 F401 `pymodaq_gui.managers.manager_base.ManagerActions` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:1 F401 `collections.abc.Mapping` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:2 F401 `typing.TYPE_CHECKING` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:3 F401 `numpy` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:5 F401 `qtpy.QtWidgets` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:8 F401 `pymodaq_data.DataRaw` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:8 F401 `pymodaq_data.DataWithAxes` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:16 F401 `pymodaq_gui.utils.CustomApp` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py:7 F401 `pymodaq.extensions.sequencer.utilities.states.QHistoryState` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py:7 F401 `pymodaq.extensions.sequencer.utilities.states.TrackedTransition` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py:18 F401 `pymodaq_utils.config.Config` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:19 F401 `PyQt5.QtCore.QHistoryState` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/widget_with_toolbar.py:4 F401 `pymodaq_gui.managers.action_manager.QAction` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/widget_with_toolbar.py:4 F401 `pymodaq_gui.managers.action_manager.addaction` imported but unused
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/yaml_utils.py:1 F401 `typing.Any` imported but unused
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:7 F401 `os` imported but unused
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:9 F401 `typing.Dict` imported but unused
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:11 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:20 F401 `pymodaq_gui.plotting.data_viewers.ViewerND` imported but unused
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:21 F401 `pymodaq_gui.utils.Dock` imported but unused
+- packages/pymodaq/src/pymodaq/scripting/__init__.py:1 F401 `pymodaq_scripting.devices.Actuator` imported but unused
+- packages/pymodaq/src/pymodaq/scripting/__init__.py:1 F401 `pymodaq_scripting.devices.Dashboard` imported but unused
+- packages/pymodaq/src/pymodaq/scripting/__init__.py:1 F401 `pymodaq_scripting.devices.Detector` imported but unused
+- packages/pymodaq/src/pymodaq/utils/compact_dock_manager.py:28 F401 `pymodaq.control_modules.daq_move.DAQ_Move` imported but unused
+- packages/pymodaq/src/pymodaq/utils/compact_dock_manager.py:29 F401 `pymodaq.control_modules.daq_viewer.DAQ_Viewer` imported but unused
+- packages/pymodaq/src/pymodaq/utils/config.py:6 F401 `pymodaq_utils.config.ConfigError` imported but unused
+- packages/pymodaq/src/pymodaq/utils/config.py:7 F401 `pymodaq_utils.config.CONFIG_BASE_PATH` imported but unused
+- packages/pymodaq/src/pymodaq/utils/config.py:7 F401 `pymodaq_utils.config.USER` imported but unused
+- packages/pymodaq/src/pymodaq/utils/config.py:7 F401 `pymodaq_utils.config.get_set_local_dir` imported but unused
+- packages/pymodaq/src/pymodaq/utils/conftests.py:1 F401 `pytest` imported but unused
+- packages/pymodaq/src/pymodaq/utils/custom_ext.py:7 F401 `pymodaq_gui.h5modules.saving.H5Saver` imported but unused
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 F401 `pymodaq_utils.utils.ThreadCommand` imported but unused
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 F401 `pymodaq_utils.utils.find_keys_from_val` imported but unused
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 F401 `pymodaq_utils.utils.getLineInfo` imported but unused
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 F401 `pymodaq_utils.utils.is_64bits` imported but unused
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 F401 `pymodaq_utils.utils.timer` imported but unused
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:12 F401 `pymodaq.utils.data.DataFromPlugins` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:3 F401 `warnings` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:11 F401 `pymodaq_data.data.DataCalculated` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:11 F401 `pymodaq_data.data.DataDim` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:12 F401 `pymodaq_data.data.Axis` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:12 F401 `pymodaq_data.data.DataBase` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:12 F401 `pymodaq_data.data.DataDistribution` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:12 F401 `pymodaq_data.data.DataSource` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:12 F401 `pymodaq_data.data.NavAxis` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:12 F401 `pymodaq_data.data.Unit` imported but unused
+- packages/pymodaq/src/pymodaq/utils/data.py:17 F401 `serializall.SerializableBase` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:1 F401 `pymodaq_gui.utils.dock.DockArea` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:1 F401 `pymodaq_gui.utils.dock.Dock` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:2 F401 `pymodaq_gui.utils.list_picker.ListPicker` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:3 F401 `pymodaq_gui.utils.custom_app.CustomApp` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:4 F401 `pymodaq_gui.utils.file_io.select_file` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:5 F401 `pymodaq_gui.utils.widgets.table.BooleanDelegate` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:5 F401 `pymodaq_gui.utils.widgets.table.SpinBoxDelegate` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:5 F401 `pymodaq_gui.utils.widgets.table.TableModel` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:5 F401 `pymodaq_gui.utils.widgets.table.TableView` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:6 F401 `pymodaq_gui.utils.widgets.push.EditPushInfo` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:6 F401 `pymodaq_gui.utils.widgets.push.EditPushRel` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:6 F401 `pymodaq_gui.utils.widgets.push.EditPush` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:6 F401 `pymodaq_gui.utils.widgets.push.PushButtonIcon` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:7 F401 `pymodaq_gui.utils.widgets.qled.QLED` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:8 F401 `pymodaq_gui.utils.widgets.spinbox.QSpinBox_ro` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/__init__.py:10 F401 `pymodaq_gui.utils.splash.get_splash_sc` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/widgets/lcd.py:1 F401 `pymodaq_gui.utils.widgets.lcd.LCD` imported but unused
+- packages/pymodaq/src/pymodaq/utils/gui_utils/widgets/window.py:1 F401 `pymodaq_gui.utils.widgets.lcd.LCD` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:16 F401 `pymodaq.control_modules.thread_commands.ThreadStatus` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:23 F401 `pymodaq.utils.leco.leco_director.DirectorCommands` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:24 F401 `pymodaq.utils.leco.leco_director.DirectorReceivedCommands` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:5 F401 `pymodaq.control_modules.thread_commands.ThreadStatusViewer` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:5 F401 `pymodaq.control_modules.thread_commands.ThreadStatus` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:9 F401 `pymodaq_utils.utils.ThreadCommand` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:9 F401 `pymodaq_utils.utils.getLineInfo` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/director_utils.py:7 F401 `typing.List` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/director_utils.py:12 F401 `pymodaq_gui.parameter.ioxml` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/director_utils.py:14 F401 `pymodaq.utils.leco.utils.SerializableFactory` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py:1 F401 `abc.ABC` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py:1 F401 `abc.abstractmethod` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py:17 F401 `pymodaq_gui.parameter.ioxml` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/utils.py:4 F401 `typing.TypeVar` imported but unused
+- packages/pymodaq/src/pymodaq/utils/leco/utils.py:7 F401 `pymodaq.utils.data` imported but unused
+- packages/pymodaq/src/pymodaq/utils/logger.py:1 F401 `pymodaq_utils.logger.get_base_logger` imported but unused
+- packages/pymodaq/src/pymodaq/utils/logger.py:1 F401 `pymodaq_utils.logger.get_module_name` imported but unused
+- packages/pymodaq/src/pymodaq/utils/logger.py:1 F401 `pymodaq_utils.logger.get_set_config_dir` imported but unused
+- packages/pymodaq/src/pymodaq/utils/logger.py:1 F401 `pymodaq_utils.logger.set_logger` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/__init__.py:1 F401 `.modules.modules_manager` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/experiment_manager.py:11 F401 `pymodaq_gui.parameter.utils.iter_children_params` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/modules/__init__.py:1 F401 `.modules_manager.ModulesManagerParam` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/utils/managers/modules/__init__.py:1 F401 `.modules_manager.ModulesManager` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/utils/managers/modules/__init__.py:2 F401 `.utils.ModuleType` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py:8 F401 `pymodaq_gui.utils.DockArea` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py:19 F401 `pymodaq.control_modules.instruments.ACTUATOR_TYPES` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_settings_manager.py:5 F401 `importlib.import_module` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_settings_manager.py:13 F401 `pymodaq.control_modules.instruments.find_dicts_in_list_from_key_val` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/modules/modules_manager.py:20 F401 `pymodaq_data.data.DataSource` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/modules/modules_manager.py:24 F401 `pymodaq_gui.utils.Dock` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/overshooter.py:11 F401 `pymodaq.utils.config.get_set_experiment_path` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/utils.py:1 F401 `random` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/utils.py:3 F401 `pymodaq.utils.data.DataActuator` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/utils.py:8 F401 `pymodaq_utils.config.get_set_config_dir` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/utils.py:11 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/utils.py:13 F401 `pymodaq.utils.managers.state.state_manager.StateManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:1 F401 `dataclasses` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:3 F401 `typing.Union` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:10 F401 `pymodaq_data.DataToExport` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:10 F401 `pymodaq_data.DataWithAxes` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:15 F401 `pymodaq.utils.config.get_set_experiment_path` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py:18 F401 `pymodaq_gui.parameter.ParameterTree` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:1 F401 `random` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:3 F401 `pymodaq.utils.data.DataActuator` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:4 F401 `pymodaq.utils.managers.modules_manager.ModulesManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:5 F401 `pymodaq_data.DataDim` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:5 F401 `pymodaq_data.DataToExport` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:7 F401 `pymodaq_utils.enums.StrEnum` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:8 F401 `pymodaq_utils.config.get_set_config_dir` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:11 F401 `pymodaq_utils.utils` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:12 F401 `pymodaq_gui.parameter.pymodaq_ptypes.GroupParameter` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:12 F401 `pymodaq_gui.parameter.pymodaq_ptypes.registerParameterType` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/utils.py:13 F401 `pymodaq.utils.managers.state.state_manager.StateManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/state_manager.py:7 F401 `qtpy.QtGui` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/state_manager.py:15 F401 `pymodaq_utils.config.get_set_local_dir` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/state_manager.py:37 F401 `pymodaq_gui.managers.manager_base.ManagerBase` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/state_manager.py:39 F401 `pymodaq.launcher.HISTORY_FILE_NAME` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:1 F401 `dataclasses.dataclass` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:3 F401 `pymodaq.control_modules.enums.MoveType` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:5 F401 `time` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:6 F401 `typing.Callable` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:6 F401 `typing.Tuple` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:13 F401 `pymodaq_utils.abstract.abstract_attribute` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:15 F401 `pymodaq_data.DataToExport` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:20 F401 `pymodaq.utils.data.DataToActuators` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/utils.py:1 F401 `pathlib.Path` imported but unused
+- packages/pymodaq/src/pymodaq/utils/managers/state/utils.py:2 F401 `typing.Any` imported but unused
+- packages/pymodaq/src/pymodaq/utils/messenger.py:3 F401 `pymodaq_gui.messenger.messagebox` imported but unused
+- packages/pymodaq/src/pymodaq/utils/parameter/__init__.py:1 F401 `pymodaq_gui.parameter.ParameterTree` imported but unused
+- packages/pymodaq/src/pymodaq/utils/parameter/__init__.py:1 F401 `pymodaq_gui.parameter.Parameter` imported but unused
+- packages/pymodaq/src/pymodaq/utils/parameter/__init__.py:1 F401 `pymodaq_gui.parameter.ioxml` imported but unused
+- packages/pymodaq/src/pymodaq/utils/parameter/__init__.py:1 F401 `pymodaq_gui.parameter.utils` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/__init__.py:1 F401 `importlib.import_module` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/__init__.py:2 F401 `pathlib.Path` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/__init__.py:5 F401 `.scanner.Scanner` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_config.py:8 F401 `pathlib.Path` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_config.py:9 F401 `pymodaq_utils.config.BaseConfig` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_factory.py:10 F401 `typing.Union` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_factory.py:35 F401 `pymodaq.utils.config.Config` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:1 F401 `abc.ABC` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:6 F401 `typing.Dict` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:10 F401 `qtpy.QtCore.Slot` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:12 F401 `pyqtgraph.ROI` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:3 F401 `collections.OrderedDict` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:5 F401 `serializall.SerializableBase` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:23 F401 `pymodaq.utils.data.DataActuator` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:24 F401 `pymodaq_utils.utils.find_objects_in_list_from_attr_name_val` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_1d_scanners.py:20 F401 `..scan_factory.ScanParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:15 F401 `..scan_factory.ScanParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py:20 F401 `..scan_factory.ScanParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:20 F401 `..scan_factory.ScanParameterManager` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:11 F401 `serializall.SerializableBase` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:13 F401 `pymodaq_gui.parameter.Parameter` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:14 F401 `pymodaq_gui.parameter.utils.ParameterWithPath` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:14 F401 `pymodaq_gui.parameter.utils.compareValuesParameter` imported but unused
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:26 F401 `pymodaq.utils.scanner.Scanner` imported but unused
+- packages/pymodaq/src/pymodaq/utils/shared_ui.py:4 F401 `typing.cast` imported but unused
+- packages/pymodaq/src/pymodaq/utils/svg/svg_renderer.py:9 F401 `qtpy.QtSvg` imported but unused
+- packages/pymodaq/src/pymodaq/utils/svg/svg_view.py:9 F401 `qtpy.QtCore` imported but unused
+- packages/pymodaq/src/pymodaq/utils/svg/svg_viewer2D.py:13 F401 `pymodaq.utils.data.DataFromRoi` imported but unused
+### Simplifications (64)
+- packages/pymodaq/src/pymodaq/__init__.py:61 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/__init__.py:81 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/__init__.py:85 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/__init__.py:88 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/__init__.py:96 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/__init__.py:98 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:679 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:652 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:843 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/viewer_selector.py:14 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:186 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:455 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:456 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:855 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:856 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:115 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:449 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:560 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/control_modules/viewer_utility_classes.py:66 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/dashboard.py:513 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/dashboard.py:814 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/dashboard.py:866 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:31 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:116 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:36 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:146 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py:95 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py:96 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py:110 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:161 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:244 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/parser.py:117 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/utils.py:10 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/models.py:225 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:525 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:708 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:711 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:714 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:718 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:752 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:812 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/utils.py:32 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/utils.py:83 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:454 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:1726 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:1740 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:148 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/choice_models/factory.py:73 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:531 SIM118 Use `key in dict` instead of `key in dict.keys()`
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:169 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:172 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py:175 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:229 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/utils/compact_dock_manager.py:525 SIM114 Combine `if` branches using logical `or` operator
+- packages/pymodaq/src/pymodaq/utils/config.py:65 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/utils/leco/__init__.py:14 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/utils/leco/__init__.py:15 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/utils/leco/__init__.py:17 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/experiment_manager.py:111 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py:376 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:228 SIM210 Remove unnecessary `True if ... else False`
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_config.py:15 F541 f-string without any placeholders
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:174 SIM102 Use a single `if` statement instead of nested `if` statements
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:254 SIM102 Use a single `if` statement instead of nested `if` statements
+### Style, counted only (1487; per rule: findings / files)
+- BLE001: 69 / 34
+- C401: 1 / 1
+- C403: 1 / 1
+- C406: 12 / 4
+- C408: 81 / 25
+- C414: 1 / 1
+- D419: 39 / 16
+- FLY002: 1 / 1
+- FURB167: 1 / 1
+- I001: 201 / 162
+- N999: 5 / 5
+- PIE790: 54 / 31
+- PLC0206: 4 / 3
+- PLR0402: 1 / 1
+- PLR1704: 4 / 2
+- PLR1730: 1 / 1
+- PLR2044: 1 / 1
+- PLW0133: 1 / 1
+- PLW1510: 1 / 1
+- PYI041: 2 / 1
+- RET501: 3 / 3
+- RUF010: 30 / 14
+- RUF012: 83 / 46
+- RUF013: 104 / 30
+- RUF015: 7 / 4
+- RUF022: 1 / 1
+- RUF059: 37 / 21
+- RUF100: 5 / 5
+- S110: 13 / 11
+- TC005: 4 / 4
+- TRY002: 3 / 3
+- TRY004: 1 / 1
+- TRY201: 1 / 1
+- TRY401: 56 / 21
+- UP006: 196 / 41
+- UP007: 114 / 36
+- UP009: 34 / 34
+- UP024: 1 / 1
+- UP028: 1 / 1
+- UP031: 1 / 1
+- UP032: 7 / 5
+- UP034: 59 / 2
+- UP035: 99 / 62
+- UP037: 22 / 12
+- UP045: 124 / 39
+
+## vulture (457 findings at >= 60% confidence)
+### >= 80% confidence (52)
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:6 unused import 'MOCK_ITEMS' (90%)
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:6 unused import 'REMOTE_ITEMS' (90%)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:24 unused import 'Averaging' (90%)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:35 unused import 'browse_data' (90%)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:256 unused variable 'force' (100%)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:347 unused variable 'ready' (100%)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:350 unused variable 'ready' (100%)
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:6 unused import 'qt_themes' (90%)
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py:12 unused import 'create_font' (90%)
+- packages/pymodaq/src/pymodaq/control_modules/viewer_utility_classes.py:210 unused variable 'crosshair_info' (100%)
+- packages/pymodaq/src/pymodaq/daq_utils/daq_utils.py:1 unused import 'daq_utils' (90%)
+- packages/pymodaq/src/pymodaq/examples/run_elts.py:9 unused import 'GrabElt' (90%)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_1d_loss_functions.py:5 unused import 'uses_nth_neighbors' (90%)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/loss_factory.py:7 unused import 'BaseLearner' (90%)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:12 unused import 'IterableClass' (90%)
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/acquisition_function_factory.py:4 unused import 'RandomState' (90%)
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py:10 unused import 'bayes_opt' (90%)
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:38 unused import 'sqlalchemy' (90%)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/equation_model.py:7 unused import 'extract_data_names' (90%)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py:10 unused import 'extract_data_names' (90%)
+- packages/pymodaq/src/pymodaq/extensions/h5browser.py:1 unused import 'H5Browser' (90%)
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py:16 unused import 'get_plugins' (90%)
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/module_saver.py:1 unused import 'Mapping' (90%)
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:16 unused import 'qt_themes' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:3 unused import 'Field' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:3 unused import 'InitVar' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:4 unused import 'Mapping' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py:16 unused import 'addaction' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py:17 unused import 'RepeatElt' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py:1 unused import 'Mapping' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py:6 unused import 'QHistoryState' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:15 unused import 'QHistoryState' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:17 unused import 'QHistoryState' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:19 unused import 'QHistoryState' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/widget_with_toolbar.py:4 unused import 'addaction' (90%)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/yaml_utils.py:5 unused variable 'indentless' (100%)
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:20 unused import 'ViewerND' (90%)
+- packages/pymodaq/src/pymodaq/utils/config.py:6 unused import 'CONFIG_BASE_PATH' (90%)
+- packages/pymodaq/src/pymodaq/utils/config.py:6 unused import 'USER' (90%)
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 unused import 'getLineInfo' (90%)
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:9 unused import 'is_64bits' (90%)
+- packages/pymodaq/src/pymodaq/utils/data.py:11 unused import 'NavAxis' (90%)
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:23 unused import 'DirectorCommands' (90%)
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:23 unused import 'DirectorReceivedCommands' (90%)
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:9 unused import 'getLineInfo' (90%)
+- packages/pymodaq/src/pymodaq/utils/logger.py:1 unused import 'get_base_logger' (90%)
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:33 unused import 'StateModel' (90%)
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_factory.py:35 unused import 'ControlModulesConfig' (90%)
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:12 unused import 'ROI' (90%)
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py:83 unused variable 'kwds' (100%)
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:14 unused import 'compareValuesParameter' (90%)
+- packages/pymodaq/src/pymodaq/utils/svg/svg_viewer2D.py:13 unused import 'DataFromRoi' (90%)
+### 60-79% confidence, counted per file (mostly public API seen as unused)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py: 7
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py: 10
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/uis/binary.py: 1
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/uis/relative.py: 1
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/uis/simple.py: 1
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/utils.py: 3
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py: 14
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py: 6
+- packages/pymodaq/src/pymodaq/control_modules/enums.py: 7
+- packages/pymodaq/src/pymodaq/control_modules/mocks.py: 1
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py: 6
+- packages/pymodaq/src/pymodaq/control_modules/thread_commands.py: 2
+- packages/pymodaq/src/pymodaq/control_modules/ui_utils.py: 1
+- packages/pymodaq/src/pymodaq/control_modules/utils.py: 5
+- packages/pymodaq/src/pymodaq/control_modules/viewer_utility_classes.py: 6
+- packages/pymodaq/src/pymodaq/dashboard.py: 21
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py: 2
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_1d_loss_functions.py: 5
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/_2d_loss_functions.py: 5
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/loss_function/loss_factory.py: 1
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py: 1
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/base_acquisition_function.py: 3
+- packages/pymodaq/src/pymodaq/extensions/bayesian/bayesian_optimization.py: 2
+- packages/pymodaq/src/pymodaq/extensions/bayesian/utils.py: 2
+- packages/pymodaq/src/pymodaq/extensions/console.py: 1
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger.py: 7
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py: 5
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger.py: 1
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/db/db_logger_models.py: 6
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/h5logging.py: 2
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/daq_0Dviewer_DataMixer.py: 1
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py: 2
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/equation_model.py: 1
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/models/gaussian_fit_model.py: 1
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/parser.py: 1
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/utils.py: 1
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/algorithm.py: 5
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/models.py: 1
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py: 5
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/utils.py: 1
+- packages/pymodaq/src/pymodaq/extensions/pid/daq_move_PID.py: 1
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py: 5
+- packages/pymodaq/src/pymodaq/extensions/pid/utils.py: 2
+- packages/pymodaq/src/pymodaq/extensions/ramping/ramping.py: 12
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/histograming.py: 4
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py: 14
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/scan_manager.py: 5
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py: 5
+- packages/pymodaq/src/pymodaq/extensions/sequencer/models/composite_choice_model.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/models/false_choice_model.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/models/threshold_choice_model.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/models/true_choice_model.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/models/user_input_choice.py: 2
+- packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py: 8
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/choice_models/factory.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/element_factory.py: 4
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/choice.py: 3
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/grab.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/move.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/repeat.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/scanner.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/sequence.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/state.py: 2
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/wait.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/while_loop.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/holders/condition_holder_base.py: 1
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py: 8
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py: 2
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py: 5
+- packages/pymodaq/src/pymodaq/launcher/launcher.py: 3
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py: 1
+- packages/pymodaq/src/pymodaq/utils/chrono_timer.py: 7
+- packages/pymodaq/src/pymodaq/utils/compact_dock_manager.py: 3
+- packages/pymodaq/src/pymodaq/utils/config.py: 2
+- packages/pymodaq/src/pymodaq/utils/conftests.py: 2
+- packages/pymodaq/src/pymodaq/utils/custom_ext.py: 1
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py: 1
+- packages/pymodaq/src/pymodaq/utils/dashboard_mixin.py: 4
+- packages/pymodaq/src/pymodaq/utils/data.py: 1
+- packages/pymodaq/src/pymodaq/utils/exceptions.py: 3
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py: 5
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py: 2
+- packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py: 9
+- packages/pymodaq/src/pymodaq/utils/leco/leco_director.py: 3
+- packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py: 5
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py: 3
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/experiment_manager.py: 7
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/utils.py: 1
+- packages/pymodaq/src/pymodaq/utils/managers/extension/extension_manager.py: 5
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py: 1
+- packages/pymodaq/src/pymodaq/utils/managers/modules/modules_manager.py: 10
+- packages/pymodaq/src/pymodaq/utils/managers/modules/utils.py: 1
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/overshooter.py: 7
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py: 7
+- packages/pymodaq/src/pymodaq/utils/managers/roi_manager/roi_manager.py: 6
+- packages/pymodaq/src/pymodaq/utils/managers/state/state_manager.py: 7
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py: 19
+- packages/pymodaq/src/pymodaq/utils/managers/state/utils.py: 2
+- packages/pymodaq/src/pymodaq/utils/plugin_testing/extension_testing.py: 2
+- packages/pymodaq/src/pymodaq/utils/plugin_testing/harness.py: 2
+- packages/pymodaq/src/pymodaq/utils/plugin_testing/package_checks.py: 5
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_config.py: 1
+- packages/pymodaq/src/pymodaq/utils/scanner/scan_selector.py: 4
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_1d_scanners.py: 2
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py: 5
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py: 3
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py: 2
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py: 2
+
+## radon cyclomatic complexity, rank C or worse (42)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:718 DAQ_Move.thread_status E(32)
+- packages/pymodaq/src/pymodaq/utils/plugin_testing/compliance_report.py:118 check D(29)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/parser.py:138 _evaluate D(25)
+- packages/pymodaq/src/pymodaq/dashboard.py:802 DashBoard.pygame_loop D(23)
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:91 get_instrument_plugins D(22)
+- packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py:319 ActorListener.queue_command C(20)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:748 DAQ_Viewer.show_data C(19)
+- packages/pymodaq/src/pymodaq/utils/managers/modules/modules_manager.py:665 ModulesManager.connect_actuators C(18)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:297 DAQ_Move.process_ui_cmds C(17)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:921 DAQ_Viewer.thread_status C(17)
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:615 ParameterControlModule.thread_status C(16)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/parser.py:100 _numpy_member C(16)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:689 GenericOptimization.ini_live_plot C(16)
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:394 DAQ_PID.value_changed C(16)
+- packages/pymodaq/src/pymodaq/extensions/ramping/utilities/histograming.py:287 HistogramProcessor.compute_histogram C(16)
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:971 DAQScan.check_number_type_viewers C(16)
+- packages/pymodaq/src/pymodaq/utils/plugin_testing/compliance_report.py:202 main C(16)
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:391 ControlModule.thread_status C(14)
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:1053 DAQScan.thread_status C(14)
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:177 LoaderPlotter.group_0D_data C(14)
+- packages/pymodaq/src/pymodaq/utils/managers/overshoot/overshooter.py:152 Overshooter._execute_entry C(14)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanner.py:173 Scanner.value_changed C(14)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:368 DAQ_Viewer.process_ui_cmds C(13)
+- packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:1233 DetectorWorker.grab_data C(13)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:497 GenericOptimization.value_changed C(13)
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py:459 build_menu_for_module_creation C(13)
+- packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:368 RemoteManager.parameter_tree_changed C(13)
+- packages/pymodaq/src/pymodaq/utils/plugin_testing/compliance_report.py:180 render C(13)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:307 Scan2DSpiral.set_scan C(13)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:1043 ActuatorWorker.queue_command C(12)
+- packages/pymodaq/src/pymodaq/dashboard.py:300 DashBoard.process_leco_commands C(12)
+- packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:1116 DAQScan.save_temp_live_data C(12)
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:126 LoaderPlotter.average_axis C(12)
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/experiment_manager.py:216 ExperimentManager.list_control_modules_from_experiment C(12)
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:693 ParameterControlModule.value_changed C(11)
+- packages/pymodaq/src/pymodaq/dashboard.py:497 DashBoard.quit_fun C(11)
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:208 DAQ_Logger.set_logging C(11)
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:861 PIDRunner.queue_command C(11)
+- packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:897 PIDRunner.start_PID C(11)
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:70 LoaderPlotter.load_data C(11)
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:552 ExtensionSaver.finalize C(11)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py:126 SequentialScanner.update_model C(11)
+
+## jscpd duplication (ignoring **/resources/material_icons/resources/**): 3.08% of lines, 92 clones
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:24-69 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:90-135 (46 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:24-63 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:156-195 (40 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:24-63 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:222-261 (40 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/button.py:36-62 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/group.py:42-68 (27 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:43-69 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:314-340 (27 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:314-340 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:372-398 (27 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:314-340 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:430-456 (27 lines)
+- packages/pymodaq/src/pymodaq/dashboard.py:1005-1025 = packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:624-641 (21 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:181-201 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:247-267 (21 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:296-314 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:354-372 (19 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:296-314 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:412-430 (19 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:183-200 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py:105-120 (18 lines)
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger.py:323-338 = packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:490-505 (16 lines)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:624-638 = packages/pymodaq/src/pymodaq/control_modules/units.py:9-23 (15 lines)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:425-439 = packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:214-228 (15 lines)
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/base_acquisition_function.py:46-60 = packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/base_acquisition_function.py:79-92 (15 lines)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/models.py:112-126 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/models.py:178-192 (15 lines)
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:971-984 = packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:87-101 (14 lines)
+- packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/base_acquisition_function.py:60-73 = packages/pymodaq/src/pymodaq/extensions/bayesian/acquisition/base_acquisition_function.py:92-105 (14 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:95-108 = packages/pymodaq/src/pymodaq/extensions/pid/utils.py:168-181 (14 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/loader.py:10-23 = packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:362-375 (14 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/choice.py:44-57 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/while_loop.py:29-42 (14 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:24-37 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:296-309 (14 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:24-37 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:354-367 (14 lines)
+- packages/pymodaq/src/pymodaq/resources/experiment_default.xml:24-37 = packages/pymodaq/src/pymodaq/resources/experiment_default.xml:412-425 (14 lines)
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:187-200 = packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:625-638 (14 lines)
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:309-322 = packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:418-432 (14 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:119-132 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:172-185 (14 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py:115-128 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:65-78 (14 lines)
+- packages/pymodaq/src/pymodaq/dashboard.py:1034-1046 = packages/pymodaq/src/pymodaq/extensions/scan/daq_scan.py:655-667 (13 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:51-63 = packages/pymodaq/src/pymodaq/extensions/pid/utils.py:101-113 (13 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/scan_manager.py:178-190 = packages/pymodaq/src/pymodaq/utils/managers/overshoot/overshooter.py:147-158 (13 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:65-77 = packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:92-103 (13 lines)
+- packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py:68-80 = packages/pymodaq/src/pymodaq/utils/managers/modules/module_creator.py:96-108 (13 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:162-173 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/sequence.py:86-97 (12 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/group.py:38-49 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/elements/repeat.py:51-62 (12 lines)
+- packages/pymodaq/src/pymodaq/utils/daq_utils.py:91-102 = packages/pymodaq/src/pymodaq/utils/daq_utils.py:224-235 (12 lines)
+- packages/pymodaq/src/pymodaq/utils/managers/experiment/experiment_manager.py:288-299 = packages/pymodaq/src/pymodaq/utils/managers/extension/extension_manager.py:180-191 (12 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:38-48 = packages/pymodaq/src/pymodaq/extensions/bayesian/bayesian_optimization.py:32-41 (11 lines)
+- packages/pymodaq/src/pymodaq/extensions/console.py:81-91 = packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:63-72 (11 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:85-95 = packages/pymodaq/src/pymodaq/extensions/pid/utils.py:158-168 (11 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/utils.py:13-23 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/utils.py:86-96 (11 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:65-75 = packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:112-122 (11 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:65-75 = packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:167-177 (11 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:65-75 = packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:219-229 (11 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/utils.py:73-83 = packages/pymodaq/src/pymodaq/utils/scanner/utils.py:89-98 (11 lines)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move.py:721-730 = packages/pymodaq/src/pymodaq/control_modules/daq_viewer.py:922-931 (10 lines)
+- packages/pymodaq/src/pymodaq/control_modules/daq_move_ui/ui_base.py:37-46 = packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:45-54 (10 lines)
+- packages/pymodaq/src/pymodaq/control_modules/utils.py:348-357 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:372-381 (10 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:95-104 = packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:231-240 (10 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:95-104 = packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:397-406 (10 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:85-94 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/models.py:211-222 (10 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py:194-203 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:101-110 (10 lines)
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:53-61 = packages/pymodaq/src/pymodaq/control_modules/daq_viewer_ui/ui_base.py:30-39 (9 lines)
+- packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:587-595 = packages/pymodaq/src/pymodaq/control_modules/move_utility_classes.py:612-620 (9 lines)
+- packages/pymodaq/src/pymodaq/examples/qt_less_standalone_module.py:95-103 = packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py:189-197 (9 lines)
+- packages/pymodaq/src/pymodaq/examples/qt_less_standalone_module.py:109-117 = packages/pymodaq/src/pymodaq/utils/leco/pymodaq_listener.py:202-210 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:95-103 = packages/pymodaq/src/pymodaq/extensions/bayesian/bayesian_optimization.py:96-105 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/adaptive_optimization.py:95-103 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:500-508 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger.py:147-155 = packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:172-180 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger.py:158-166 = packages/pymodaq/src/pymodaq/extensions/daq_logger/daq_logger_legacy.py:109-118 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:233-241 = packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:399-407 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/model.py:85-93 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/choice_models/model.py:114-123 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:574-582 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:586-594 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:574-582 = packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:474-482 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:39-47 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/states.py:60-68 (9 lines)
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:316-324 = packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:356-364 (9 lines)
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:316-324 = packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:396-404 (9 lines)
+- packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:357-365 = packages/pymodaq/src/pymodaq/utils/managers/state/subentries.py:397-405 (9 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:215-223 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:159-168 (9 lines)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:206-213 = packages/pymodaq/src/pymodaq/extensions/pid/pid_controller.py:900-907 (8 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:85-92 = packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:144-151 (8 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:85-92 = packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:201-208 (8 lines)
+- packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:89-96 = packages/pymodaq/src/pymodaq/post_treatment/load_and_plot.py:133-140 (8 lines)
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:200-207 = packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:640-647 (8 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/sequential.py:187-194 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:94-101 (8 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/help.md:5-11 = packages/pymodaq/src/pymodaq/extensions/bayesian/help.md:5-11 (7 lines)
+- packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:101-107 = packages/pymodaq/src/pymodaq/extensions/adaptive_optim/utils.py:108-115 (7 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:232-238 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:607-613 (7 lines)
+- packages/pymodaq/src/pymodaq/extensions/sequencer/sequencer.py:257-263 = packages/pymodaq/src/pymodaq/extensions/sequencer/utilities/sequencer/model_view.py:616-622 (7 lines)
+- packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:538-544 = packages/pymodaq/src/pymodaq/utils/h5modules/module_saving.py:691-697 (7 lines)
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:65-71 = packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:47-54 (7 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:157-163 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:347-353 (7 lines)
+- packages/pymodaq/src/pymodaq/control_modules/control_module_selector.py:55-60 = packages/pymodaq/src/pymodaq/utils/managers/experiment/utils.py:122-127 (6 lines)
+- packages/pymodaq/src/pymodaq/extensions/bayesian/bayesian_optimization.py:72-77 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:540-544 (6 lines)
+- packages/pymodaq/src/pymodaq/extensions/data_mixer/data_mixer.py:243-248 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/optimizer.py:512-516 (6 lines)
+- packages/pymodaq/src/pymodaq/extensions/optimizers_base/utils.py:56-61 = packages/pymodaq/src/pymodaq/extensions/optimizers_base/utils.py:69-74 (6 lines)
+- packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:105-110 = packages/pymodaq/src/pymodaq/extensions/scan/manager/subentries.py:124-129 (6 lines)
+- packages/pymodaq/src/pymodaq/utils/leco/daq_move_LECODirector.py:41-46 = packages/pymodaq/src/pymodaq/utils/leco/daq_xDviewer_LECODirector.py:103-107 (6 lines)
+- packages/pymodaq/src/pymodaq/utils/managers/batchscan_manager.py:161-166 = packages/pymodaq/src/pymodaq/utils/managers/remote_manager.py:459-465 (6 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:137-142 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/_2d_scanners.py:272-277 (6 lines)
+- packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:97-102 = packages/pymodaq/src/pymodaq/utils/scanner/scanners/tabular.py:227-231 (6 lines)
+sha256: 78e9dfd7d92dc2ed
+(scanned at commit 88f0fdccf; not part of the hash)
