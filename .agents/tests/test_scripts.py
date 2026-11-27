@@ -176,6 +176,18 @@ def test_run_tests_uses_a_throwaway_home(tmp_path, monkeypatch):
     assert home == userprofile and home != os.environ["HOME"] and not Path(home).exists()  # removed afterwards
 
 
+def test_run_tests_runs_the_rest_of_the_suite_past_a_collection_error(tmp_path, monkeypatch):
+    # 2026-11-26: a missing optional dependency (QtWebEngine) broke collection of two pymodaq_gui files,
+    # pytest stopped with 0 tests run and the check passed vacuously
+    import task
+    (tmp_path / "test_broken.py").write_text("import not_a_module_xyz\n")
+    (tmp_path / "test_ok.py").write_text("def test_ok():\n    pass\n")
+    monkeypatch.setattr(task, "profile", lambda: _fake_profile(tmp_path))
+    r, _ = task.run_tests("pyqt6", "x")
+    assert "1 passed" in r.stdout
+    assert task.pytest_failures(r.stdout) == ["test_broken.py"]
+
+
 def test_a_pr_without_checks_yet_is_retried_by_merge_not_run():
     import merge, status
     assert "blocked — PR CI unavailable" in merge.RETRY

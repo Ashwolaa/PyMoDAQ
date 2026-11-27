@@ -125,7 +125,9 @@ def run_tests(backend, scope, ids=()):
     - a throwaway HOME/USERPROFILE: the shared ~/.pymodaq leaks test state between runs and branches
       (2026-11-23: a stale save_path made h5manager open a modal dialog, 80 minutes lost);
     - faulthandler_timeout: a test stuck for N seconds dumps every thread's stack into the output;
-    - a wall-clock limit on the whole run (coreutils timeout, exit 124), killed with its children.
+    - a wall-clock limit on the whole run (coreutils timeout, exit 124), killed with its children;
+    - --continue-on-collection-errors: a file that fails to import (a missing optional dependency) is reported
+      as an ERROR id and the rest of the suite still runs (2026-11-26: 0 tests run, check passed vacuously).
     Returns (CompletedProcess, timed_out)."""
     import tempfile
     ck = profile()["checks"]
@@ -138,7 +140,7 @@ def run_tests(backend, scope, ids=()):
         head, _, tool = cmd.rpartition("&&")
         tool = tool.strip()
         extra = " ".join(shlex.quote(i) for i in ids)
-        full = (f"{pre}; {head + '&& ' if head else ''}timeout -k 10 {limit} {tool} -q -rfE -p no:cacheprovider "
+        full = (f"{pre}; {head + '&& ' if head else ''}timeout -k 10 {limit} {tool} -q -rfE -p no:cacheprovider --continue-on-collection-errors "
                 f"-o faulthandler_timeout={fh} {extra}")
         r = sh(full, check=False, shell=True)
     return r, r.returncode == 124
@@ -260,6 +262,8 @@ def cmd_checks(a):
             elif r.returncode and not failed:
                 entry["error"] = "pytest failed without a failing test id (crash or collection error): " + \
                                  (r.stdout + r.stderr).strip()[-400:]
+            elif not timed_out and not re.search(r"\b\d+ passed\b", tail):
+                entry["error"] = f"no test passed ({tail}): the check proves nothing"
             if failed and not timed_out:
                 # 1. rerun the failures on the branch: green the second time = flaky, recorded, not blocking
                 r2, _ = run_tests(a.backend, s, failed)
