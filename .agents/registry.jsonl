@@ -29,3 +29,4 @@
 {"branch": "agent/pymodaq_gui/hygiene/2026-11-26-fix-mutable-default", "date": "2026-11-26", "pr": 30, "risk": "low", "run_id": "2026-11-26-run-T-pymodaq_gui-001", "scope": "pymodaq_gui", "specialty": "hygiene", "status": "open", "task_id": "T-pymodaq_gui-001"}
 {"branch": "agent/pymodaq_gui/hygiene/2026-11-27", "date": "2026-11-27", "pr": 31, "risk": "low", "run_id": "2026-11-27-run-T-pymodaq_gui-002", "scope": "pymodaq_gui", "specialty": "hygiene", "status": "open", "task_id": "T-pymodaq_gui-002"}
 {"branch": "agent/pymodaq_gui/uiux/2026-11-27", "date": "2026-11-27", "pr": 32, "risk": "medium", "run_id": "2026-11-27-run-T-pymodaq_gui-003", "scope": "pymodaq_gui", "specialty": "uiux", "status": "open", "task_id": "T-pymodaq_gui-003"}
+{"branch": "agent-tool/T-pymodaq_gui-004", "date": "2026-11-27", "pr": null, "risk": "low", "run_id": "2026-11-27-run-T-pymodaq_gui-004", "scope": "pymodaq_gui", "specialty": "tool", "status": "pushed", "task_id": "T-pymodaq_gui-004"}
