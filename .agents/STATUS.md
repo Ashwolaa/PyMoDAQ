@@ -1,12 +1,12 @@
-# Consortium status — generated 2026-11-27 23:57 by `scripts/status.py`
+# Consortium status — generated 2026-11-28 00:04 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `d4b273006`; 360 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 6/20, specialist_runs 3/10, prs_opened 3/6, reviews 3/10; outcomes: ok 6
-- last /usage reading: 2026-11-27T22:57:13.490000+00:00  session 35% (resets Nov 28, 2am (Europe/Paris))  week 19% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `a228e575b`; 363 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
+- last /usage reading: 2026-11-27T23:00:47.755000+00:00  session 38% (resets Nov 28, 2am (Europe/Paris))  week 20% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `plan pymodaq`
 
 ## Needs you
 - **T-pymodaq_gui-001** — done — PR #30 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/parameter_test/param_ioxml_mutable_default_test.py, packages/pymodaq_gui/tests/utils/h5tree_to_qtree_test.py; touches
@@ -16,7 +16,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- `agent-tool/T-pymodaq_gui-004` (T-pymodaq_gui-004, risk low): pushed, waiting for /optimize-merge
+- nothing queued
 
 ## Open findings (go to the next /optimize-plan of their scope)
 - [pymodaq] CI tests-pymodaq.yml tests (ubuntu-latest, pyside6): crash (Fatal Python error: Segmentation), also on upstream/dev
@@ -55,7 +55,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-26-run-T-pymodaq_gui-004 | optimize-run | failed |  | 336 | tool task not executable by /optimize-run: its only file .agents/scrip |
 | 2026-11-26-run-T-pymodaq_gui-005 | optimize-run | ok | 10.5 | 10490 | task.py checks: pytest stopped at 2 editor collection errors (missing  |
 | 2026-11-26-merge-T-pymodaq_gui-005-r1 | optimize-merge | ok | 8.4 | 7983 | T-pymodaq_gui-005: done — PR #29 open, awaiting the human: touches a U |
 | 2026-11-26-run-T-pymodaq_gui-001 | optimize-run | ok | 12.8 | 12291 | mutable defaults fixed in 5 files, 2 regression tests; local gui suite |
@@ -65,6 +64,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-27-run-T-pymodaq_gui-003 | optimize-run | ok | 4.9 | 11641 | .colors element type GlobalColor->QColor (note in PR); screenshots lig |
 | 2026-11-27-merge-T-pymodaq_gui-003-r1 | optimize-merge | ok | 7.9 | 8309 | T-pymodaq_gui-003: done — PR #32 open, awaiting the human: registry ri |
 | 2026-11-27-run-T-pymodaq_gui-004 | optimize-run | ok | 1.4 | 4960 | jscpd --ignore material_icons resources; 55 agents tests green |
+| 2026-11-28-merge-T-pymodaq_gui-004-r1 | optimize-merge | ok | 3.1 | 7116 | T-pymodaq_gui-004: done — PR #33 merged (auto: low risk, approved by d |
 
 ## Done so far
-- tasks done: 35; PRs merged into dev_agent: 25
+- tasks done: 35; PRs merged into dev_agent: 26
