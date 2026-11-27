@@ -215,3 +215,24 @@ def test_tool_branch_auto_merges_only_outside_the_guards():
     gate = [".agents/scripts/merge_gate.py"]
     assert "guards" in merge_gate.tool_human_reasons(gate, [("2", "2", gate[0])])[0]
     assert "removes lines" in merge_gate.tool_human_reasons(scan, [("3", "1", scan[0]), ("0", "4", scan[1])])[0]
+
+
+def test_scan_jscpd_ignores_generated_icon_resources(monkeypatch, tmp_path):
+    """jscpd skips the generated material icon resources, and the scan section header says so."""
+    import scan
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        out = Path(cmd[cmd.index("-o") + 1])
+        (out / "jscpd-report.json").write_text(json.dumps(
+            {"statistics": {"total": {"percentage": 1.5, "clones": 0}}, "duplicates": []}))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(scan, "run", fake_run)
+    lines = scan.section_jscpd(tmp_path)
+    pattern = "**/resources/material_icons/resources/**"
+    assert scan.JSCPD_IGNORE == pattern
+    cmd = calls[0]
+    assert cmd[cmd.index("--ignore") + 1] == pattern
+    assert pattern in lines[0] and lines[0].startswith("## jscpd")
