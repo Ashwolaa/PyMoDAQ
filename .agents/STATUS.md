@@ -1,11 +1,11 @@
-# Consortium status — generated 2026-11-27 23:39 by `scripts/status.py`
+# Consortium status — generated 2026-11-27 23:40 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `b29b551f4`; 354 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- `dev_agent` at `93c667101`; 355 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
 - today: runs 4/20, specialist_runs 2/10, prs_opened 2/6, reviews 2/10; outcomes: ok 4
-- last /usage reading: 2026-11-27T22:33:40.906000+00:00  session 11% (resets Nov 28, 2am (Europe/Paris))  week 16% (resets Nov 29, 12am (Europe/Paris))
+- last /usage reading: 2026-11-27T22:40:02.742000+00:00  session 22% (resets Nov 28, 2am (Europe/Paris))  week 18% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `merge`
 
 ## Needs you
