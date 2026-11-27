@@ -439,7 +439,9 @@ class H5Browser(CustomApp):
         except Exception as e:
             logger.exception(str(e))
 
-    def show_pixmaps(self, pixmaps=[]):
+    def show_pixmaps(self, pixmaps=None):
+        if pixmaps is None:
+            pixmaps = []
         if self.view.pixmap_widget.layout() is None:
             self.view.pixmap_widget.setLayout(QtWidgets.QHBoxLayout())
         clear_layout(self.view.pixmap_widget.layout())

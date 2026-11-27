@@ -293,10 +293,12 @@ if __name__ == '__main__':
         return Axis(label=LABEL, units=UNITS, data=data, index=index)
 
 
-    def init_data(data=None, Ndata=1, axes=[], name='myData', source=DataSource['raw'],
+    def init_data(data=None, Ndata=1, axes=None, name='myData', source=DataSource['raw'],
                   labels=None) -> DataWithAxes:
         if data is None:
             data = DATA2D
+        if axes is None:
+            axes = []
         return DataWithAxes(name, source, data=[data for ind in range(Ndata)],
                             axes=axes, labels=labels)
 

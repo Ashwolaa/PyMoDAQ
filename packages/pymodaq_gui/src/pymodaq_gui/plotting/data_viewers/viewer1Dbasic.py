@@ -99,7 +99,9 @@ class Viewer1DBasic(QObject):
         self._labels = labels
         self.update_labels(labels)
 
-    def update_labels(self, labels=[]):
+    def update_labels(self, labels=None):
+        if labels is None:
+            labels = []
         try:
             if self.datas is not None:
                 labels_tmp = labels[:]
@@ -169,7 +171,9 @@ class Viewer1DBasic(QObject):
             for item in items:
                 self.legend.removeItem(item)
 
-    def set_axis_label(self, axis_settings=dict(orientation='bottom', label='x axis', units='index')):
+    def set_axis_label(self, axis_settings=None):
+        if axis_settings is None:
+            axis_settings = dict(orientation='bottom', label='x axis', units='index')
         axis = self.plotwidget.plotItem.getAxis(axis_settings['orientation'])
         axis.setLabel(text=axis_settings['label'], units=axis_settings['units'])
 
