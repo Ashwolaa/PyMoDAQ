@@ -145,6 +145,17 @@ class TestPatternLineEdit:
         assert pattern_line_edit.global_config['min_width'] == 400
         assert pattern_line_edit.global_config['max_width'] == 800
 
+    @pytest.mark.parametrize('word_wrap', [True, False])
+    def test_update_completer_config_word_wrap(self, pattern_line_edit, word_wrap):
+        """Test that update_completer_config applies word_wrap to the popup"""
+        pattern_line_edit.add_completer('@', ['alice', 'bob'], word_wrap=not word_wrap)
+        popup = pattern_line_edit.completers['@']['completer'].popup()
+        assert popup.wordWrap() is (not word_wrap)
+
+        pattern_line_edit.update_completer_config('@', word_wrap=word_wrap)
+
+        assert popup.wordWrap() is word_wrap
+
     def test_cleanup(self, pattern_line_edit):
         """Test cleanup of completer resources"""
         pattern_line_edit.add_completer('@', ['alice', 'bob'])

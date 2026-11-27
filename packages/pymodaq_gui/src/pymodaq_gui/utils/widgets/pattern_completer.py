@@ -185,8 +185,6 @@ class PatternCompleter:
             if "max_width" in kwargs:
                 popup.setMaximumWidth(kwargs["max_width"])
             if "word_wrap" in kwargs:
-                from PyQt6.QtWidgets import QListView
-
                 if isinstance(popup, QListView):
                     popup.setWordWrap(kwargs["word_wrap"])
 
