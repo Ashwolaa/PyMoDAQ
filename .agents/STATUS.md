@@ -1,9 +1,9 @@
-# Consortium status — generated 2026-11-27 19:12 by `scripts/status.py`
+# Consortium status — generated 2026-11-27 19:13 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `6bd90d35c`; 346 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- `dev_agent` at `76c7bf281`; 347 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
 - today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
 - last /usage reading: 2026-11-27T17:41:14.840000+00:00  session 55% (resets Nov 27, 9pm (Europe/Paris))  week 9% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `run T-pymodaq_gui-002 .agents/plans/2026-11-26-pymodaq_gui.md`
@@ -48,7 +48,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 - [pymodaq_utils] Utils suite prints 6 '--- Logging error ---' blocks (Not saving config utils under pytest)
 - [pymodaq_scripting] No autodoc page for pymodaq_scripting: :class:/:mod: targets in scripting docs do not resolve
 - [pymodaq] Enable scripting tooltip says it also runs a Coordinator; handler only calls connect_leco
-- [tool] task.py checks passes vacuously when pytest aborts on collection errors
 - [pymodaq_gui] tests/managers/action_manager_test.py::test_icon_qt fails on base (PyQt6 and PySide6, offscreen)
 - [pymodaq_gui] The 6 touched files still have other unused imports (e.g. roi.py LinearRegionItem, Slot; pixmap.py QByteArray, QObject; filter.py QtCore, roi_format),
 - [pymodaq_gui] flake8 on pymodaq_gui prints SyntaxWarning invalid escape '\*' at <unknown>:457 (file not identified)
