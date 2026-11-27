@@ -1,20 +1,20 @@
-# Consortium status — generated 2026-11-27 19:24 by `scripts/status.py`
+# Consortium status — generated 2026-11-27 21:15 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `62072c8b4`; 349 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 2/20, specialist_runs 1/10, prs_opened 1/6, reviews 1/10; outcomes: ok 2
-- last /usage reading: 2026-11-27T18:24:27.918000+00:00  session 79% (resets Nov 27, 9pm (Europe/Paris))  week 12% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `4bbd9a399`; 350 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 3/20, specialist_runs 1/10, prs_opened 2/6, reviews 2/10; outcomes: ok 3
+- last /usage reading: 2026-11-27T20:05:04.803000+00:00  session 2% (resets Nov 28, 2am (Europe/Paris))  week 15% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_gui-003 .agents/plans/2026-11-26-pymodaq_gui.md`
 
 ## Needs you
 - **T-pymodaq_gui-001** — done — PR #30 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/parameter_test/param_ioxml_mutable_default_test.py, packages/pymodaq_gui/tests/utils/h5tree_to_qtree_test.py; touches
+- **T-pymodaq_gui-002** — done — PR #31 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/utils/widgets/pattern_completer_test.py; touches a UI scope: packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/patter
 - **T-pymodaq_gui-005** — done — PR #29 open, awaiting the human: touches a UI scope: packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py, packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.p
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- `agent/pymodaq_gui/hygiene/2026-11-27` (T-pymodaq_gui-002, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_gui-003 Manager sub-entry status colours via StatusPalette — approved — owner, 2026-11-26
 - T-pymodaq_gui-004 Exclude generated icon resources from jscpd — approved — owner, 2026-11-26 (tool path now exists)
 
@@ -55,7 +55,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-merge-T-pymodaq_scripting-002-r1 | optimize-merge | ok | 2.6 | 8818 | T-pymodaq_scripting-002: blocked — review: Points the scripting docs t |
 | 2026-11-25-run-T-pymodaq_scripting-002-r1 | optimize-run | ok | 1.1 | 4216 | rework r1: 3 review fixes applied (leco import + :class: targets, get_ |
 | 2026-11-26-merge-T-pymodaq_scripting-002-r2 | optimize-merge | ok | 5.0 | 6689 | T-pymodaq_scripting-002: done — PR #28 merged (auto: low risk, approve |
 | plan-pymodaq_gui-2026-11-26 | optimize-plan | ok | 7.0 | 86184 |  |
@@ -65,6 +64,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-26-run-T-pymodaq_gui-001 | optimize-run | ok | 12.8 | 12291 | mutable defaults fixed in 5 files, 2 regression tests; local gui suite |
 | 2026-11-27-merge-T-pymodaq_gui-001-r1 | optimize-merge | ok | 8.8 | 8553 | T-pymodaq_gui-001: done — PR #30 open, awaiting the human: touches tes |
 | 2026-11-27-run-T-pymodaq_gui-002 | optimize-run | ok | 8.0 | 5843 | qtpy QListView in update_completer_config; word_wrap test fails on PyS |
+| 2026-11-27-merge-T-pymodaq_gui-002-r1 | optimize-merge | ok | 9.0 | 6690 | T-pymodaq_gui-002: done — PR #31 open, awaiting the human: touches tes |
 
 ## Done so far
 - tasks done: 33; PRs merged into dev_agent: 25
