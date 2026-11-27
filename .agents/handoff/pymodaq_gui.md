@@ -1,15 +1,16 @@
-# Handoff: pymodaq_gui — 2026-11-27 /optimize-merge (max 40 lines, overwrite each run)
+# Handoff: pymodaq_gui — 2026-11-27 /optimize-run T-003 (max 40 lines, overwrite each run)
 
 ## Done
-- No PR merged this run.
-- T-pymodaq_gui-002 (drop direct PyQt6 import in PatternCompleter, hard rule 6): rebased on dev_agent,
-  local checks green (pyqt6 + pyside6: 738 passed, only pre-existing failures), pr-reviewer approve
-  (fails_without_fix: yes, no public API change), PR #31 ready, CI green (tests-gui, typing, compile-doc).
-  merge_gate: stays open for the human (touches tests; touches a UI scope).
-  Review: .agents/reports/pymodaq_gui/2026-11-27-pr-review-T-pymodaq_gui-002-r1.md
+- T-pymodaq_gui-003 (manager sub-entry status colours via StatusPalette, uiux): branch
+  agent/pymodaq_gui/uiux/2026-11-27 pushed (ed269f946, 48 lines). New static
+  ManagerSubEntriesModel.status_color(): None->OFF, True->IDLE, False->ERROR (orange);
+  colour resolved in data() so theme changes apply. set_status(int, bool) kept; it now also
+  emits ForegroundRole in dataChanged. New test tests/managers/manager_base_test.py (fails on base).
+  PR NOTE: `.colors` element type changed GlobalColor -> QColor (not read in packages/; plugins unchecked).
 
 ## Awaiting the human
 - PR #31 (T-002), PR #30 (T-001), PR #29 (T-005).
+- T-003: needs /optimize-merge (pr-reviewer, then PR).
 
 ## Open findings (ranked)
 1. test-icon-qt-preexisting-fail: action_manager_test.py::test_icon_qt fails on base and branch.
@@ -21,8 +22,12 @@
 - none.
 
 ## Queue
-- Plan 2026-11-26-pymodaq_gui: T-003 (uiux, screenshots light/dark), T-004 (tool) `approved`, not yet run.
+- Plan 2026-11-26-pymodaq_gui: T-004 (tool, scan.py jscpd ignore) `approved`, not yet run.
 
 ## Next step
-- Human: review/merge PR #31 (smallest: 13 lines), then PR #30 and PR #29.
-- Then `/optimize-run` T-003, T-004.
+- `/optimize-merge T-pymodaq_gui-003`, then `/optimize-run T-pymodaq_gui-004`.
+
+## Evidence
+- tests: task.py checks --backend pyqt6 / pyside6 -> 739 passed, 1 failed + 2 errors, all pre-existing.
+- lint: flake8 blocking ok, layering 3 passed, merge_gate lint OK.
+- screenshots: .agents/reports/pymodaq_gui/screenshots/T-pymodaq_gui-003/{before,after}_{light,dark}.png

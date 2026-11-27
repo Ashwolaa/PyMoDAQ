@@ -29,7 +29,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `packages/pymodaq_gui/src/pymodaq_gui/managers/manager_base.py:58-94`
 - notes: None->OFF, True->IDLE, False->ERROR (utils/status_palette.py:121-128; ERROR is orange, not darkRed). Keep set_status(int, bool) signature and the .colors attribute (note in PR if its element type changes). DecorationRole icons (:80-85) and settings_manager.py:288 out of scope. Before/after screenshots, light and dark.
 - verdicts: decider-compat-risk: approve (medium) — public set_status/.colors kept, visible colour change unrendered; decider-triage (2nd): approve — mapping exists, .colors never read in repo
-- status: approved — owner, 2026-11-26
+- status: done — branch agent/pymodaq_gui/uiux/2026-11-27, local checks green, CI on the PR, awaiting review
 
 ## T-pymodaq_gui-004 Exclude generated icon resources from jscpd
 - scope: tool   specialty: tool
