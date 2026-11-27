@@ -1,11 +1,11 @@
-# Consortium status — generated 2026-11-28 00:04 by `scripts/status.py`
+# Consortium status — generated 2026-11-28 00:05 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `a228e575b`; 363 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- `dev_agent` at `d3910ccd6`; 365 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
 - today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
-- last /usage reading: 2026-11-27T23:00:47.755000+00:00  session 38% (resets Nov 28, 2am (Europe/Paris))  week 20% (resets Nov 29, 12am (Europe/Paris))
+- last /usage reading: 2026-11-27T23:05:30.589000+00:00  session 43% (resets Nov 28, 2am (Europe/Paris))  week 20% (resets Nov 29, 12am (Europe/Paris))
 - next cycle step: `plan pymodaq`
 
 ## Needs you
