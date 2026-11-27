@@ -32,6 +32,8 @@ IMPORTS = re.compile(r"^F401")
 SIMPLIFY = re.compile(r"^(SIM|E741|E703|F541)")
 VULTURE_FULL = 80          # vulture findings at or above this confidence are listed, the rest are counted
 RADON_MIN_RANK = "C"
+# generated files jscpd skips: the material icon resources are compiled Qt resource modules, not written code
+JSCPD_IGNORE = "**/resources/material_icons/resources/**"
 
 
 def apply_env(profile: dict) -> None:
@@ -123,16 +125,17 @@ def section_radon(path: Path) -> list[str]:
 
 def section_jscpd(path: Path) -> list[str]:
     with tempfile.TemporaryDirectory() as tmp:
-        run(["jscpd", "--silent", "-a", "-r", "json", "-o", tmp, str(path)])
+        run(["jscpd", "--silent", "-a", "-r", "json", "-o", tmp, "--ignore", JSCPD_IGNORE, str(path)])
         report = Path(tmp) / "jscpd-report.json"
         if not report.exists():
-            return ["## jscpd", "- no report produced"]
+            return [f"## jscpd (ignoring {JSCPD_IGNORE})", "- no report produced"]
         data = json.loads(report.read_text())
     total = data["statistics"]["total"]
     dups = sorted((-d["lines"], rel(d["firstFile"]["name"]), d["firstFile"]["start"], d["firstFile"]["end"],
                    rel(d["secondFile"]["name"]), d["secondFile"]["start"], d["secondFile"]["end"])
                   for d in data["duplicates"])
-    out = [f"## jscpd duplication: {total['percentage']:.2f}% of lines, {total['clones']} clones"]
+    out = [f"## jscpd duplication (ignoring {JSCPD_IGNORE}): {total['percentage']:.2f}% of lines, "
+           f"{total['clones']} clones"]
     out += [f"- {f1}:{s1}-{e1} = {f2}:{s2}-{e2} ({-n} lines)" for n, f1, s1, e1, f2, s2, e2 in dups] or ["- none"]
     return out
 
