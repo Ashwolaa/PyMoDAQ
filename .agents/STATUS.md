@@ -1,19 +1,19 @@
-# Consortium status — generated 2026-11-26 12:15 by `scripts/status.py`
+# Consortium status — generated 2026-11-27 18:40 by `scripts/status.py`
 
 Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design: `.agents/BRIEFING.md`.
 
 ## Now
-- `dev_agent` at `016f81560`; 341 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
-- today: runs 6/20, specialist_runs 2/10, prs_opened 2/6, reviews 2/10; outcomes: ok 5, failed 1
-- last /usage reading: 2026-11-26T11:15:35.267000+00:00  session 81% (resets Nov 26, 12:50pm (Europe/Paris))  week 61% (resets Nov 29, 12am (Europe/Paris))
-- next cycle step: `merge`
+- `dev_agent` at `a14d22bfc`; 343 commits ahead of upstream/dev (49 files changed, 807 insertions(+), 246 deletions(-))
+- today: runs 1/20, specialist_runs 0/10, prs_opened 1/6, reviews 1/10; outcomes: ok 1
+- last /usage reading: 2026-11-27T17:30:24.934000+00:00  session 44% (resets Nov 27, 9pm (Europe/Paris))  week 7% (resets Nov 29, 12am (Europe/Paris))
+- next cycle step: `run T-pymodaq_gui-002 .agents/plans/2026-11-26-pymodaq_gui.md`
 
 ## Needs you
+- **T-pymodaq_gui-001** — done — PR #30 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/parameter_test/param_ioxml_mutable_default_test.py, packages/pymodaq_gui/tests/utils/h5tree_to_qtree_test.py; touches
 - **T-pymodaq_gui-005** — done — PR #29 open, awaiting the human: touches a UI scope: packages/pymodaq_gui/src/pymodaq_gui/managers/settings/subentries.py, packages/pymodaq_gui/src/pymodaq_gui/parameter/pymodaq_ptypes/pixmap.p
 - blocked: **T-pymodaq_utils-M06** — blocked — pymodaq test scope hangs (extension_loading_test::test_load[Scanner]) on both Qt backends and on the base commit, so qt-backend checks cannot be recorded; code and utils tests are fine
 
 ## In flight
-- `agent/pymodaq_gui/hygiene/2026-11-26-fix-mutable-default` (T-pymodaq_gui-001, risk low): pushed, waiting for /optimize-merge
 - T-pymodaq_gui-002 Drop the direct PyQt6 import in PatternCompleter — approved — owner, 2026-11-26
 - T-pymodaq_gui-003 Manager sub-entry status colours via StatusPalette — approved — owner, 2026-11-26
 - T-pymodaq_gui-004 Exclude generated icon resources from jscpd — approved — owner, 2026-11-26 (tool path now exists)
@@ -56,7 +56,6 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 ## Recent runs
 | run | command | outcome | min | out tok | note |
 |---|---|---|---|---|---|
-| 2026-11-25-merge-T-pymodaq_scripting-001-r1 | optimize-merge | ok | 5.7 | 5603 | T-pymodaq_scripting-001: done — PR #27 merged (auto: low risk, approve |
 | 2026-11-25-run-T-pymodaq_scripting-002 | optimize-run | ok | 2.1 | 12314 | docs only, 101 lines; make_component_leco_available.rst:584-610 left o |
 | 2026-11-25-merge-T-pymodaq_scripting-002-r1 | optimize-merge | ok | 2.6 | 8818 | T-pymodaq_scripting-002: blocked — review: Points the scripting docs t |
 | 2026-11-25-run-T-pymodaq_scripting-002-r1 | optimize-run | ok | 1.1 | 4216 | rework r1: 3 review fixes applied (leco import + :class: targets, get_ |
@@ -66,6 +65,7 @@ Do not edit: regenerate with `python3 .agents/scripts/status.py --write`. Design
 | 2026-11-26-run-T-pymodaq_gui-005 | optimize-run | ok | 10.5 | 10490 | task.py checks: pytest stopped at 2 editor collection errors (missing  |
 | 2026-11-26-merge-T-pymodaq_gui-005-r1 | optimize-merge | ok | 8.4 | 7983 | T-pymodaq_gui-005: done — PR #29 open, awaiting the human: touches a U |
 | 2026-11-26-run-T-pymodaq_gui-001 | optimize-run | ok | 12.8 | 12291 | mutable defaults fixed in 5 files, 2 regression tests; local gui suite |
+| 2026-11-27-merge-T-pymodaq_gui-001-r1 | optimize-merge | ok | 8.8 | 8553 | T-pymodaq_gui-001: done — PR #30 open, awaiting the human: touches tes |
 
 ## Done so far
 - tasks done: 32; PRs merged into dev_agent: 25

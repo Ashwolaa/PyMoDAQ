@@ -13,7 +13,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `packages/pymodaq_gui/src/pymodaq_gui/utils/utils.py:245`, `packages/pymodaq_gui/src/pymodaq_gui/parameter/ioxml.py:377`, `packages/pymodaq_gui/src/pymodaq_gui/h5modules/browsing.py:442`, `packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer1Dbasic.py:102,172`, `packages/pymodaq_gui/src/pymodaq_gui/plotting/data_viewers/viewer.py:296`
 - notes: default None, build in body; keep names, keywords and positions. Confirmed bugs: h5tree_to_QTree shared pixmap_items (browsing.py:494 omits it, utils.py:298 appends); walk_xml_to_parameter shared params when the caller omits it (docstring example :398; in-repo callers pass params=[]). viewer1Dbasic.py:102 needs labels=[] in body (lines 105-106 slice/compare). 172 and browsing.py:442 are read-only cleanup. Add regression tests that fail on current code (call twice with the default); edit no existing test. Leave roi.py out (#1515).
 - verdicts: decider-compat-risk: approve — names/keywords/positions unchanged, no hard rule touched; decider-test-change: approve — tests only added, must fail before the fix
-- status: done — branch agent/pymodaq_gui/hygiene/2026-11-26-fix-mutable-default, local checks green, CI on the PR, awaiting review
+- status: done — PR #30 open, awaiting the human: touches tests: packages/pymodaq_gui/tests/parameter_test/param_ioxml_mutable_default_test.py, packages/pymodaq_gui/tests/utils/h5tree_to_qtree_test.py; touches 
 
 ## T-pymodaq_gui-002 Drop the direct PyQt6 import in PatternCompleter
 - scope: pymodaq_gui   specialty: hygiene
