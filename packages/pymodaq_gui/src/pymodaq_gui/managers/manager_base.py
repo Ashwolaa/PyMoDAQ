@@ -9,6 +9,7 @@ from qtpy import QtWidgets, QtCore, QtGui
 from qtpy.QtGui import QKeySequence
 
 from pymodaq_gui.utils.styling import create_icon, ThemeColor
+from pymodaq_gui.utils.status_palette import Status, StatusPalette
 
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_gui.utils.custom_app import CustomApp
@@ -55,18 +56,23 @@ class ManagerSubEntriesModel(QtCore.QAbstractListModel):
     def __init__(self, entries: list[str]):
         super().__init__()
         self._data = entries
-        self.colors: list[QtCore.Qt.GlobalColor] = [QtCore.Qt.GlobalColor.darkGray for _ in range(len(self._data))]
+        self.colors: list[QtGui.QColor] = [self.status_color(None) for _ in range(len(self._data))]
         self.status: list[Union[bool, None]] = [None for _ in range(len(self._data))]
+
+    @staticmethod
+    def status_color(status: Union[bool, None]) -> QtGui.QColor:
+        """StatusPalette colour of a sub-entry status: None -> off, True -> idle, False -> error"""
+        if status is None:
+            return StatusPalette.color(Status.OFF)
+        return StatusPalette.color(Status.IDLE if status else Status.ERROR)
 
     def set_status(self, index: int, status: bool):
         self.status[index] = status
-        if status:
-            self.colors[index] = QtCore.Qt.GlobalColor.darkGreen
-        else:
-            self.colors[index] = QtCore.Qt.GlobalColor.darkRed
+        self.colors[index] = self.status_color(status)
         model_index = self.index(index, 0)
         self.dataChanged.emit(model_index, model_index,
                               [Qt.ItemDataRole.DecorationRole,
+                              Qt.ItemDataRole.ForegroundRole,
                               Qt.ItemDataRole.BackgroundColorRole])
 
     def rowCount(self, *args, **kwargs) -> int:
@@ -86,12 +92,8 @@ class ManagerSubEntriesModel(QtCore.QAbstractListModel):
             elif role == Qt.ItemDataRole.FontRole:
                 return QtGui.QFont('Arial', 10)
             elif role == Qt.ItemDataRole.ForegroundRole:
-                if self.status[index.row()] is None:
-                    return QtGui.QBrush(QtCore.Qt.GlobalColor.darkGray)
-                elif self.status[index.row()]:
-                    return QtGui.QBrush(QtCore.Qt.GlobalColor.darkGreen)
-                else:
-                    return QtGui.QBrush(QtCore.Qt.GlobalColor.darkRed)
+                # resolved here, not from self.colors, so that a theme change is honoured
+                return QtGui.QBrush(self.status_color(self.status[index.row()]))
             elif role == Qt.ItemDataRole.BackgroundColorRole:
                 return Qt.BrushStyle.NoBrush
 
