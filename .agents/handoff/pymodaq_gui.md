@@ -1,19 +1,16 @@
-# Handoff: pymodaq_gui — 2026-11-27 /optimize-run T-pymodaq_gui-004 (max 40 lines, overwrite each run)
+# Handoff: pymodaq_gui — 2026-11-28 /optimize-merge (max 40 lines, overwrite each run)
 
 ## Done
-- T-pymodaq_gui-004 (run 2026-11-27-run-T-pymodaq_gui-004): spec-tool added module constant
-  JSCPD_IGNORE = "**/resources/material_icons/resources/**" to .agents/scripts/scan.py, passed as
-  `--ignore` to jscpd and stated in the jscpd section header; new test
-  test_scan_jscpd_ignores_generated_icon_resources (.agents/tests/test_scripts.py).
-- Commit 9a54c8def on agent-tool/T-pymodaq_gui-004, pushed. No PR opened (merge opens it).
-- Local checks: layering 3 passed; merge_gate lint OK (30 lines, tool code only); agents tests 55 passed;
-  pyqt6/pyside6: no package touched, no scope tests.
-- Expected side effect: scan sha256 of every scope changes on the next scan.
+- T-pymodaq_gui-004 (run 2026-11-28-merge-T-pymodaq_gui-004-r1): PR #33 merged into dev_agent (auto:
+  low risk, decider-compat-risk + decider-triage + pr-reviewer approve, 30 lines, tool code only).
+  scan.py now passes `--ignore "**/resources/material_icons/resources/**"` to jscpd; reviewer measured
+  pymodaq_gui duplication 24.22% -> 1.72% (917 generated-icon clones gone).
+- Rebased on dev_agent before review; local checks green (layering, lint, agents tests 55 passed).
 
 ## Awaiting the human
 - PR #32 (T-003): risk medium, public_api yes (`.colors` GlobalColor -> QColor); add the screenshots in
   .agents/reports/pymodaq_gui/screenshots/T-pymodaq_gui-003/{before,after}_{light,dark}.png to its body.
-- PR #31 (T-002), PR #30 (T-001), PR #29 (T-005): still open.
+- PR #31 (T-002), PR #30 (T-001), PR #29 (T-005, touches a UI scope): still open.
 
 ## Open findings (ranked)
 1. test-icon-qt-preexisting-fail: action_manager_test.py::test_icon_qt fails on base and branch.
@@ -25,11 +22,12 @@
 - none.
 
 ## Queue
-- Plan 2026-11-26-pymodaq_gui: no approved task left (T-004 done, awaiting review).
+- Plan 2026-11-26-pymodaq_gui: no approved task left; no merge candidate left.
+- Expected: scan sha256 of every scope changes on the next scan (jscpd ignore).
 
 ## Next step
-- Agents: `/optimize-merge T-pymodaq_gui-004`.
 - Human: review PR #32 (attach screenshots), then #31, #30, #29.
+- Agents: re-scan pymodaq_gui (`/optimize-plan pymodaq_gui`) once the open PRs are settled.
 
 ## Evidence
-- branch: agent-tool/T-pymodaq_gui-004 (9a54c8def)
+- PR #33, merge commit a228e575b; review .agents/reports/pymodaq_gui/2026-11-28-pr-review-T-pymodaq_gui-004-r1.md
