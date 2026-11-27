@@ -21,7 +21,7 @@ Dropped by triage: viewerND.py:313/451 return-in-finally (real bug, PR #1515 fil
 - files: `packages/pymodaq_gui/src/pymodaq_gui/utils/widgets/pattern_completer.py:188`
 - notes: delete the local `from PyQt6.QtWidgets import QListView` (qtpy QListView already imported at line 8). Under PySide6 word_wrap raises ImportError or is silently ignored. Add a test in tests/utils/widgets/pattern_completer_test.py asserting popup.wordWrap(), run under PyQt6 and PySide6 (PYTEST_QT_API, offscreen).
 - verdicts: decider-compat-risk: approve — hard rule 6 fix, no public name changes; decider-test-change: approve — test added, none weakened
-- status: approved — owner, 2026-11-26
+- status: done — branch agent/pymodaq_gui/hygiene/2026-11-27, local checks green, CI on the PR, awaiting review
 
 ## T-pymodaq_gui-003 Manager sub-entry status colours via StatusPalette
 - scope: pymodaq_gui   specialty: uiux
