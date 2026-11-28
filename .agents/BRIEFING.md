@@ -61,10 +61,11 @@ plugin for any GitHub repository.
   `[grill].max_open` open) and `/optimize-plugins` (discover, assess, port; `plugin-scout`, `spec-plugin-port`).
   `runner/cycle.sh` turns the wheel unattended: `status.py next` picks the step, `runner/cost.py` checks it fits the
   plan quota, `runner/step.py` runs it headless. Start a session from `README.md`.
-- Ledger (2026-11-25): 84 lines (39 run, 30 merge, 14 plan, 1 research); 25 branches in the registry; PRs #3-#26 on
-  the fork are merged into `dev_agent` (#10 closed, replaced by #11); none is open. Scopes planned so far:
-  `pymodaq_utils`, `pymodaq_data`; next is `pymodaq_scripting`. Plan files keep the text "PR open, awaiting the
-  human" after the owner merges, so trust the registry or `gh pr list`, not the plan text.
+- State (2026-11-28): PRs #3-#33 on the fork are merged into `dev_agent` (#10 closed); none is open. Scopes planned:
+  `pymodaq_utils`, `pymodaq_data`, `pymodaq_scripting`, `pymodaq_gui` (all its tasks merged), `pymodaq`
+  (`plans/2026-11-28-pymodaq.md`: 001, 004, 005, 009, 010 approved and next to run). UI-scope PRs wait for the owner,
+  who merges them on GitHub. First tool task (T-pymodaq_gui-004, PR #33) auto-merged on 2026-11-28. Plan files keep
+  the text "PR open, awaiting the human" after the owner merges, so trust the registry or `gh pr list`.
 - Never run yet: `/optimize-review` (committee) has no ledger line, nor has any `/optimize-plugins` step; `/optimize-init`
   and the plugin extraction (step 5) are not started.
 - Caps: daily `[daily]` caps in `budget.toml` were set by the owner on 2026-11-19 from the pilot ("about one day of the
@@ -75,8 +76,12 @@ plugin for any GitHub repository.
   cannot be closed in the ledger.
 
 ## Next (in order)
-1. Owner: answer the pending grill (`/optimize-grill config-reconcile`); merge future PRs with a merge commit,
-   never squash.
+1. Owner decisions on `plans/2026-11-28-pymodaq.md`: approve or drop proposed 003, 007, 011; confirm
+   `extensions/sequencer/utilities/states.py` as a hard-rule-6 exception (002: qtpy has no PyQt6 QtStateMachine).
+   Merge PRs with a merge commit, never squash. Grill `config-reconcile` is answered (Direction section).
+1b. Fix `scripts/sync_branches.sh`: it pushes `dev_agent` without first fast-forwarding from `origin/dev_agent`, so a
+   PR merged on GitHub stops the next cycle ("sync failed", push rejected); fixed by hand on 2026-11-28.
+   Also: a headless plan step cannot wait for its advisors (no Yield) and polled, costing 37% session vs 11.5% est.
 2. Fix the agent tooling findings that stall the wheel (hung-test timeout, known-flaky tests, closing a blocked merge
    run); then keep turning the wheel through the rotation. Tool tasks run since 2026-11-26: `agent-tool/<task-id>`,
    `spec-tool`, `.agents/tests` as their check, auto-merge only within `merge_gate.py` TOOL_AUTO_MERGE.
